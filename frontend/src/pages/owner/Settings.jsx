@@ -53,7 +53,7 @@ import UsersPanel from "./UsersPanel";
 
 const STATIC_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace("/api/v1", "")
-  : "http://localhost:8000";
+  : import.meta.env.VITE_API_URL;
 
 const normalizeShopSettings = (data = {}, fallback = {}) => ({
   salon_name: data.salon_name ?? data.salonName ?? fallback.salon_name ?? "",

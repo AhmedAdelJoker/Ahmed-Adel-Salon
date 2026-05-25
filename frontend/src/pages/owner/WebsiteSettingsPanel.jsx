@@ -32,7 +32,7 @@ import {
 
 const STATIC_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace("/api/v1", "")
-  : "http://localhost:8000";
+  : import.meta.env.VITE_API_URL;
 
 const SUB_TABS = [
   {

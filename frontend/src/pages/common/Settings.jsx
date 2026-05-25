@@ -71,7 +71,7 @@ export default function Settings() {
     profileImageUrl: "",
   });
 
-  const STATIC_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1")
+  const STATIC_URL = (import.meta.env.VITE_API_URL || "import.meta.env.VITE_API_URL/api/v1")
     .replace("/api/v1", "");
   const getAvatarUrl = () => {
     if (!profileData.profileImageUrl) return null;
