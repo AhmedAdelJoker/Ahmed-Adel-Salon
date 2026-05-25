@@ -14,10 +14,10 @@ import {
   Scissors,
 } from "lucide-react";
 
-import { scheduleService } from "../services/scheduleService";
-import PageHero from "../components/common/PageHero";
-import DashboardPanel from "../components/common/DashboardPanel";
-import MetricCard from "../components/common/MetricCard";
+import { scheduleService } from "../../services/scheduleService";
+import PageHero from "../../components/common/PageHero";
+import DashboardPanel from "../../components/common/DashboardPanel";
+import MetricCard from "../../components/common/MetricCard";
 import Button from "../components/common/Button";
 import StatusBadge from "../components/common/StatusBadge";
 
