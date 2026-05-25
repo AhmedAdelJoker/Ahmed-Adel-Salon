@@ -207,3 +207,6 @@ db.close()
 
 print("✅ Admin user created")
 \*/
+git add .
+git commit -m "اكتب هنا التعديل اللي عملته"
+git push

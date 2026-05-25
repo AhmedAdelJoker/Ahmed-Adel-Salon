@@ -1,8 +1,6 @@
 import { useAuth } from "../../context/AuthContext";
 import React, { useEffect, useMemo, useState } from "react";
 
-
-
 import {
   Banknote,
   TrendingUp,
@@ -41,7 +39,7 @@ import {
   CardTitle,
   CardDescription,
 } from "../../components/ui/card";
-import { Button } from "../../components/ui/Button";
+import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Badge } from "../../components/ui/badge";
 
@@ -123,7 +121,6 @@ export default function FinancialReports() {
   };
 
   useEffect(() => {
-
     fetchFinancials();
   }, []);
 
@@ -387,4 +384,3 @@ export default function FinancialReports() {
     </div>
   );
 }
-

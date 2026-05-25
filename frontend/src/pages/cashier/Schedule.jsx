@@ -18,8 +18,8 @@ import { scheduleService } from "../../services/scheduleService";
 import PageHero from "../../components/common/PageHero";
 import DashboardPanel from "../../components/common/DashboardPanel";
 import MetricCard from "../../components/common/MetricCard";
-import Button from "../components/common/Button";
-import StatusBadge from "../components/common/StatusBadge";
+import Button from "../../components/common/Button";
+import StatusBadge from "../../components/common/StatusBadge";
 
 const DAY_START_HOUR = 9;
 const DAY_END_HOUR = 18;

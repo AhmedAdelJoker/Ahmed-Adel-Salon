@@ -1,7 +1,6 @@
 import fs from "fs";
 import path from "path";
 
-// مسارات الملفات التي تحتوي على أخطاء
 const financialReportsPath = path.join(
   "src",
   "pages",
@@ -10,29 +9,33 @@ const financialReportsPath = path.join(
 );
 const schedulePath = path.join("src", "pages", "cashier", "Schedule.jsx");
 
-console.log("⏳ جاري فحص وتصحيح مسارات الاستدعاء المكسورة...");
+console.log("⏳ جاري التنظيف النهائي للمسارات والمجلدات المتبقية...");
 
-// 1. تصحيح ملف FinancialReports.jsx (تأمين استدعاء Button وحروف المجلدات)
+// 1. تصحيح FinancialReports.jsx بالكامل
 if (fs.existsSync(financialReportsPath)) {
   let content = fs.readFileSync(financialReportsPath, "utf8");
 
-  // تصحيح استدعاء البوتون لو كان مكتوب بحروف صغيرة أو مسار غير دقيق
-  const updatedContent = content.replace(
-    /import\s+\{\s*Button\s*\}\s+from\s+['"].*?components\/ui\/[bB]utton['"];?/g,
+  // استبدال شامل لأي شكل من أشكال استدعاء Button المكسور في هذا الملف
+  let updatedContent = content.replace(
+    /import\s+.*\s+from\s+['"].*?components\/ui\/[bB]utton['"];?/g,
     'import { Button } from "../../components/ui/Button";',
   );
 
+  // لزيادة الأمان: لو كان المستودع عندك بيستخدم حروف صغيرة بالكامل لمجلد الـ Components
+  updatedContent = updatedContent.replace(
+    /..\/..\/components\/ui\/Button/g,
+    "../../components/ui/button", // تجربة الحرف الصغير لو الكابيتال منفعش
+  );
+
   fs.writeFileSync(financialReportsPath, updatedContent, "utf8");
-  console.log(`✅ تم فحص وتحديث ملف: ${financialReportsPath}`);
-} else {
-  console.log(`⚠️ لم يتم العثور على الملف: ${financialReportsPath}`);
+  console.log(`✅ تم تصحيح ملف الحسابات: ${financialReportsPath}`);
 }
 
-// 2. تصحيح ملف Schedule.jsx (إضافة الـ المفقودة وترجيع المسار خطوتين لورا)
+// 2. تصحيح السطور المتبقية في Schedule.jsx
 if (fs.existsSync(schedulePath)) {
   let content = fs.readFileSync(schedulePath, "utf8");
 
-  // تصحيح الـ 4 مسارات المكسورة وترجيعها خطوتين للخلف لأن الفولدر فرعي (cashier)
+  // تصحيح السطرين الفاضلين (Button و StatusBadge) وترجيعهم خطوتين للخلف (../../)
   let updatedContent = content
     .replace(
       /["']\.\.\/services\/scheduleService["']/g,
@@ -49,16 +52,18 @@ if (fs.existsSync(schedulePath)) {
     .replace(
       /["']\.\.\/components\/common\/MetricCard["']/g,
       '"../../components/common/MetricCard"',
+    )
+    .replace(
+      /["']\.\.\/components\/common\/Button["']/g,
+      '"../../components/common/Button"',
+    )
+    .replace(
+      /["']\.\.\/components\/common\/StatusBadge["']/g,
+      '"../../components/common/StatusBadge"',
     );
 
   fs.writeFileSync(schedulePath, updatedContent, "utf8");
-  console.log(
-    `✅ تم تصحيح مسارات الاستدعاء (../../) بنجاح في ملف: ${schedulePath}`,
-  );
-} else {
-  console.log(`⚠️ لم يتم العثور على الملف: ${schedulePath}`);
+  console.log(`✅ تم تصحيح أزرار وشارات ملف الجداول: ${schedulePath}`);
 }
 
-console.log(
-  "\n🚀 الكل تمام! الحسابات والمسارات اتظبطت. تقدر ترفع الكود دلوقتي.",
-);
+console.log("🚀 انتهى التصحيح! جاهز للرفع.");
