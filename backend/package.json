@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "dotenv": "^17.4.2",
+    "puppeteer": "^24.42.0",
+    "qrcode.react": "^4.2.0",
+    "stimulsoft-reports-js": "^2026.2.2"
+  },
+  "devDependencies": {
+    "prisma": "^7.8.0"
+  }
+}

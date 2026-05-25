@@ -1,0 +1,31 @@
+{
+  "name": "salon-public-site",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.18.0",
+    "framer-motion": "^10.16.4",
+    "lucide-react": "^0.292.0",
+    "axios": "^1.6.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.0.0",
+    "react-hot-toast": "^2.4.1",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "class-variance-authority": "^0.7.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@vitejs/plugin-react": "^6.0.1",
+    "tailwindcss": "^4.2.2",
+    "vite": "^8.0.12"
+  }
+}
