@@ -181,7 +181,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
         socialTiktok: settingsData.socialTiktok || "",
         socialYoutube: settingsData.socialYoutube || "",
       });
-    } catch (err) {
+    } catch (_err) {
       toast.error("فشل تحميل إعدادات الموقع");
     } finally {
       setLoading(false);
@@ -194,7 +194,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
       await api.put("/business-settings", settings);
       toast.success("تم حفظ إعدادات الموقع بنجاح");
       onSaved?.();
-    } catch (err) {
+    } catch (_err) {
       toast.error("فشل الحفظ");
     } finally {
       setSaving(false);
@@ -221,7 +221,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
         landingPortfolio: [...prev.landingPortfolio, newUrl],
       }));
       toast.success("تم إضافة الصورة للمعرض", { id: "upload" });
-    } catch (err) {
+    } catch (_err) {
       toast.error("فشل رفع الصورة", { id: "upload" });
     } finally {
       e.target.value = "";
@@ -247,7 +247,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
         landingCoverImageUrl: data.url || "",
       }));
       toast.success("تم تحديث صورة الغلاف", { id: "cover-upload" });
-    } catch (err) {
+    } catch (_err) {
       toast.error("فشل رفع صورة الغلاف", { id: "cover-upload" });
     } finally {
       e.target.value = "";
@@ -323,7 +323,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
 
   if (loading)
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
+      <div className="flex min-h-100 items-center justify-center">
         <Activity className="w-10 h-10 animate-pulse text-accent" />
       </div>
     );
@@ -451,7 +451,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
                             landingHeroSubtitle: e.target.value,
                           })
                         }
-                        className="w-full min-h-[100px] rounded-xl bg-soft border border-border p-4 text-sm font-bold outline-none focus:border-accent"
+                        className="w-full min-h-25 rounded-xl bg-soft border border-border p-4 text-sm font-bold outline-none focus:border-accent"
                         placeholder="تجربة حلاقة فاخرة تجمع بين الدقة، الفن، والراحة..."
                       />
                     </div>
@@ -494,7 +494,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
                             landingAboutContent: e.target.value,
                           })
                         }
-                        className="w-full min-h-[100px] rounded-xl bg-soft border border-border p-4 text-sm font-bold outline-none focus:border-accent"
+                        className="w-full min-h-25 rounded-xl bg-soft border border-border p-4 text-sm font-bold outline-none focus:border-accent"
                         placeholder="بدأنا بشغف الحلاقة الكلاسيكية وطورناها لتناسب العصر الحديث..."
                       />
                     </div>
@@ -557,7 +557,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
                             e.target.value,
                           )
                         }
-                        className="min-h-[90px] w-full rounded-xl border border-border bg-white/70 p-4 text-sm font-bold outline-none focus:border-accent"
+                        className="min-h-22.5 w-full rounded-xl border border-border bg-white/70 p-4 text-sm font-bold outline-none focus:border-accent"
                         placeholder="الوصف القصير"
                       />
                     </div>
@@ -595,7 +595,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
                             e.target.value,
                           )
                         }
-                        className="min-h-[120px] w-full rounded-xl border border-border bg-white/70 p-4 text-sm font-bold outline-none focus:border-accent"
+                        className="min-h-30 w-full rounded-xl border border-border bg-white/70 p-4 text-sm font-bold outline-none focus:border-accent"
                         placeholder="وصف البطاقة"
                       />
                     </div>
@@ -654,7 +654,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
                           onChange={(e) =>
                             setSettings({ ...settings, [key]: e.target.value })
                           }
-                          className="min-h-[100px] w-full rounded-xl border border-border bg-soft p-4 text-sm font-bold outline-none focus:border-accent"
+                          className="min-h-25 w-full rounded-xl border border-border bg-soft p-4 text-sm font-bold outline-none focus:border-accent"
                         />
                       ) : (
                         <Input
@@ -829,7 +829,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
                             e.target.value,
                           )
                         }
-                        className="min-h-[120px] w-full rounded-xl border border-border bg-white/70 p-4 text-sm font-bold outline-none focus:border-accent"
+                        className="min-h-30 w-full rounded-xl border border-border bg-white/70 p-4 text-sm font-bold outline-none focus:border-accent"
                         placeholder="رأي العميل"
                       />
                     </div>
@@ -899,10 +899,10 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft }) => {
                           : `${STATIC_URL}${settings.landingCoverImageUrl}`
                       }
                       alt="Cover"
-                      className="h-[280px] w-full object-cover"
+                      className="h-70 w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-[280px] flex-col items-center justify-center gap-4 text-muted">
+                    <div className="flex h-70 flex-col items-center justify-center gap-4 text-muted">
                       <ImageIcon size={42} className="opacity-25" />
                       <p className="text-sm font-bold">
                         لا توجد صورة غلاف مستقلة حتى الآن

@@ -14,7 +14,7 @@ import {
   History,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
-import api from "../../services/api";
+import api, { baseURL } from "../../services/api";
 import { normalizeListResponse } from "../../services/apiAdapter";
 import { exportService } from "../../services/exportService";
 import { importService } from "../../services/importService";
@@ -48,6 +48,7 @@ const DEFAULT_FORM = {
   quantity: 0,
   min_quantity_alert: 5,
   category: "زيوت",
+  unit: "g",
 };
 
 const DEFAULT_STOCK_FORM = {
@@ -57,6 +58,14 @@ const DEFAULT_STOCK_FORM = {
   purchase_price: "",
   invoice_image_url: "",
 };
+
+const STATIC_BASE_URL = baseURL.replace("/api/v1", "");
+
+function toAssetUrl(url) {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  return `${STATIC_BASE_URL}${url}`;
+}
 
 export default function Inventory() {
   const [products, setProducts] = useState([]);
@@ -132,11 +141,37 @@ export default function Inventory() {
     (product) =>
       Number(product.quantity || 0) <= Number(product.min_quantity_alert || 0),
   ).length;
+  const getAvailablePacks = (product) => {
+    const quantity = Number(product?.quantity || 0);
+    const weight = Number(product?.weight || 0);
+    if (weight > 0) return quantity / weight;
+    return 0;
+  };
+  const getEstimatedGramCost = (product) => {
+    const costPrice = Number(product?.cost_price || 0);
+    const weight = Number(product?.weight || 0);
+    if (weight > 0) return costPrice / weight;
+    if ((product?.unit || "g").toLowerCase() === "g") return costPrice;
+    return 0;
+  };
+  const totalInventoryGrams = productRows.reduce(
+    (sum, product) => sum + Number(product.quantity ?? 0),
+    0,
+  );
+  const inventoryCostValue = productRows.reduce(
+    (sum, product) =>
+      sum +
+      Number(product.quantity ?? 0) * getEstimatedGramCost(product),
+    0,
+  );
   const inventoryValue = productRows.reduce(
     (sum, product) =>
       sum +
-      Number(product.sell_price ?? product.price ?? 0) *
-        Number(product.quantity ?? 0),
+      (getAvailablePacks(product) > 0
+        ? getAvailablePacks(product) *
+          Number(product.sell_price ?? product.price ?? 0)
+        : Number(product.quantity ?? 0) *
+          Number(product.sell_price ?? product.price ?? 0)),
     0,
   );
 
@@ -157,6 +192,7 @@ export default function Inventory() {
       quantity: product.quantity ?? 0,
       min_quantity_alert: product.min_quantity_alert ?? 5,
       category: product.category || "زيوت",
+      unit: product.unit || "g",
     });
     setIsModalOpen(true);
   }
@@ -165,7 +201,7 @@ export default function Inventory() {
     setEditingProduct(product);
     setStockFormData({
       ...DEFAULT_STOCK_FORM,
-      purchase_price: product.cost_price || "",
+      purchase_price: "",
     });
     setIsStockModalOpen(true);
   }
@@ -182,6 +218,7 @@ export default function Inventory() {
       weight: formData.weight ? Number(formData.weight) : null,
       quantity: Number(formData.quantity || 0),
       min_quantity_alert: Number(formData.min_quantity_alert || 0),
+      unit: formData.unit || "g",
     };
     try {
       setSaving(true);
@@ -241,7 +278,7 @@ export default function Inventory() {
       });
       setStockFormData((prev) => ({
         ...prev,
-        invoice_image_url: response.data.url,
+        invoice_image_url: toAssetUrl(response.data.url),
       }));
       toast.success("تم رفع صورة الفاتورة");
     } catch (error) {
@@ -304,7 +341,7 @@ export default function Inventory() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="إجمالي الأصول السلعية"
           value={`${productRows.length} صنف`}
@@ -318,9 +355,21 @@ export default function Inventory() {
           tone={lowStockCount > 0 ? "danger" : "success"}
         />
         <StatCard
-          title="إجمالي القيمة السوقية"
+          title="إجمالي الرصيد بالجرام"
+          value={`${Math.round(totalInventoryGrams)} جرام`}
+          icon={Activity}
+          tone="accent"
+        />
+        <StatCard
+          title="القيمة البيعية التقديرية"
           value={formatCurrency(inventoryValue)}
           icon={Database}
+          tone="success"
+        />
+        <StatCard
+          title="تكلفة المخزون الحالية"
+          value={formatCurrency(inventoryCostValue)}
+          icon={History}
           tone="success"
         />
       </div>
@@ -369,22 +418,34 @@ export default function Inventory() {
                 <div className="grid grid-cols-2 gap-4">
                   <InfoBox
                     label="المخزون"
-                    value={`${product.quantity || 0} وحدة`}
+                    value={`${product.quantity || 0} ${product.unit || "g"}`}
                   />
                   <InfoBox
-                    label="سعر البيع"
+                    label="العبوات المتاحة"
+                    value={
+                      product.weight
+                        ? `${getAvailablePacks(product).toFixed(1)} عبوة`
+                        : "-"
+                    }
+                  />
+                  <InfoBox
+                    label="سعر بيع العبوة"
                     value={formatCurrency(
                       product.sell_price ?? product.price ?? 0,
                     )}
                     accent
                   />
                   <InfoBox
-                    label="سعر الشراء"
+                    label="تكلفة العبوة"
                     value={formatCurrency(product.cost_price || 0)}
                   />
                   <InfoBox
+                    label="تكلفة الجرام"
+                    value={formatCurrency(getEstimatedGramCost(product))}
+                  />
+                  <InfoBox
                     label="الوزن"
-                    value={product.weight ? `${product.weight} جرام` : "-"}
+                    value={product.weight ? `${product.weight} جرام/عبوة` : "-"}
                   />
                 </div>
                 <div className="flex gap-2">
@@ -453,7 +514,7 @@ export default function Inventory() {
               />
             </Field>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Field label="سعر البيع">
+              <Field label="سعر بيع العبوة">
                 <Input
                   type="number"
                   value={formData.sell_price}
@@ -465,7 +526,7 @@ export default function Inventory() {
                   }
                 />
               </Field>
-              <Field label="سعر الشراء">
+              <Field label="تكلفة العبوة">
                 <Input
                   type="number"
                   value={formData.cost_price}
@@ -500,7 +561,7 @@ export default function Inventory() {
                   }
                 />
               </Field>
-              <Field label="الكمية الافتتاحية">
+              <Field label="الكمية الافتتاحية (جرام)">
                 <Input
                   type="number"
                   value={formData.quantity}
@@ -512,7 +573,10 @@ export default function Inventory() {
                   }
                 />
               </Field>
-              <Field label="حد الإنذار">
+              <Field label="وحدة المخزون">
+                <Input value="جرام" disabled />
+              </Field>
+              <Field label="حد الإنذار (جرام)">
                 <Input
                   type="number"
                   value={formData.min_quantity_alert}
@@ -543,11 +607,12 @@ export default function Inventory() {
           <DialogHeader>
             <DialogTitle>إضافة كمية للمخزون (توريد)</DialogTitle>
             <DialogDescription>
-              توريد كمية جديدة للمنتج: {editingProduct?.name}
+              توريد كمية جديدة للمنتج: {editingProduct?.name}. إذا تركت تكلفة
+              التوريد فارغة سيجري تقديرها من تكلفة العبوة ووزنها.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <Field label="الكمية المضافة">
+            <Field label="الكمية المضافة (جرام)">
               <Input
                 type="number"
                 value={stockFormData.amount}
@@ -575,13 +640,17 @@ export default function Inventory() {
 
             {stockFormData.create_expense && (
               <>
-                <Field label="سعر شراء الوحدة">
+                <Field label="إجمالي تكلفة التوريد (اختياري)">
                   <Input
                     type="number"
                     value={stockFormData.purchase_price}
                     onChange={(e) => setStockFormData(p => ({ ...p, purchase_price: e.target.value }))}
                   />
                 </Field>
+                <p className="text-xs font-bold text-gray-500">
+                  اكتب إجمالي قيمة الفاتورة، وليس تكلفة الجرام. عند تركه فارغًا
+                  سيتم احتساب تقدير تلقائي.
+                </p>
                 <div className="mt-2">
                   <p className="text-xs font-bold text-gray-500 mb-2">فاتورة الشراء</p>
                   <input
@@ -596,7 +665,7 @@ export default function Inventory() {
                     className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-white/10 rounded-2xl p-4 cursor-pointer hover:bg-soft text-main dark:hover:bg-white/5 transition"
                   >
                     {stockFormData.invoice_image_url ? (
-                      <img src={stockFormData.invoice_image_url} alt="Invoice" className="h-20 w-auto rounded-lg mb-2" />
+                      <img src={toAssetUrl(stockFormData.invoice_image_url)} alt="Invoice" className="h-20 w-auto rounded-lg mb-2" />
                     ) : (
                       <ImageIcon className="h-8 w-8 text-gray-400 mb-2" />
                     )}

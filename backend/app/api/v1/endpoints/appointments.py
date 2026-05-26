@@ -1,5 +1,5 @@
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -19,9 +19,12 @@ from app.models.business_settings import BusinessSettings
 from app.models.service_session import ServiceSession
 
 from app.schemas.appointment import (
+    AppointmentAssignBarberPayload,
     AppointmentCreate,
+    AppointmentFastWalkinCreate,
     AppointmentMovePayload,
     AppointmentRead,
+    AppointmentServiceItemCreate,
     AppointmentStatusUpdate,
     AppointmentUpdate,
 )
@@ -36,6 +39,7 @@ from app.services.meta_whatsapp_service import (
     upload_and_send_pdf,
 )
 from app.services.pdf_service import generate_invoice_pdf
+from app.services.inventory_service import deduct_stock_for_invoice
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
@@ -140,13 +144,42 @@ def _get_manageable_appointment(
     return appointment
 
 @router.get("", response_model=list[AppointmentRead])
-def list_appointments(db: Session = Depends(get_db), current_user: User = Depends(require_any_staff)):
+def list_appointments(
+    date_filter: str | None = None,
+    limit: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_staff),
+):
     query = db.query(Appointment).options(joinedload(Appointment.services)).order_by(Appointment.id.desc())
+    if date_filter == "today":
+        query = query.filter(Appointment.appointment_date == date.today())
     if current_user.role == "barber":
         if not current_user.barber_id:
             return []
         query = query.filter(Appointment.barber_id == current_user.barber_id)
+    if limit:
+        query = query.limit(limit)
     return [_appointment_to_read(db, row) for row in query.all()]
+
+@router.get("/ready-for-payment", response_model=list[AppointmentRead])
+def list_ready_appointments(db: Session = Depends(get_db), current_user: User = Depends(require_any_staff)):
+    """
+    جلب المواعيد الجاهزة للدفع (التي لم تكتمل ولم تُلغَ بعد)
+    """
+    query = (
+        db.query(Appointment)
+        .options(joinedload(Appointment.services))
+        .filter(Appointment.status.in_(["pending", "confirmed", "in_progress"]))
+        .order_by(Appointment.appointment_date.desc(), Appointment.appointment_time.desc())
+    )
+    
+    if current_user.role == "barber":
+        if not current_user.barber_id:
+            return []
+        query = query.filter(Appointment.barber_id == current_user.barber_id)
+        
+    return [_appointment_to_read(db, row) for row in query.all()]
+
 
 @router.get("/{appointment_id}", response_model=AppointmentRead)
 def get_appointment(appointment_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_any_staff)):
@@ -254,6 +287,82 @@ def update_appointment_status(appointment_id: int, payload: AppointmentStatusUpd
     db.refresh(appointment)
     return _appointment_to_read(db, appointment)
 
+@router.patch("/{appointment_id}/assign-barber", response_model=AppointmentRead)
+def assign_barber_to_appointment(
+    appointment_id: int,
+    payload: AppointmentAssignBarberPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+):
+    appointment = _get_manageable_appointment(db, appointment_id)
+    _ensure_existing_barber(db, payload.employee_id)
+    appointment.barber_id = payload.employee_id
+    appointment.updated_by_user_id = getattr(current_user, "id", None)
+    db.commit()
+    db.refresh(appointment)
+    return _appointment_to_read(db, appointment)
+
+@router.post("/fast-walkin", response_model=AppointmentRead, status_code=status.HTTP_201_CREATED)
+def create_fast_walkin(
+    payload: AppointmentFastWalkinCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+):
+    service = db.query(Service).filter(Service.id == payload.service_id).first()
+    if not service:
+        raise HTTPException(status_code=404, detail="الخدمة غير موجودة")
+
+    customer = db.query(Customer).filter(Customer.phone == payload.phone).first()
+    if not customer:
+        customer = Customer(
+            first_name=payload.first_name.strip(),
+            last_name="",
+            phone=payload.phone.strip(),
+            email=None,
+        )
+        db.add(customer)
+        db.flush()
+    else:
+        if payload.first_name.strip():
+            customer.first_name = payload.first_name.strip()
+
+    assigned_barber_id = payload.employee_id
+    if assigned_barber_id is None:
+        fallback_barber = db.query(Barber).order_by(Barber.id.asc()).first()
+        if not fallback_barber:
+            raise HTTPException(status_code=400, detail="لا يوجد خبراء متاحون حاليًا")
+        assigned_barber_id = fallback_barber.id
+    else:
+        _ensure_existing_barber(db, assigned_barber_id)
+
+    now = datetime.now()
+    appointment = Appointment(
+        customer_id=customer.customer_id,
+        barber_id=assigned_barber_id,
+        appointment_date=now.date(),
+        appointment_time=now.time().replace(second=0, microsecond=0),
+        status="pending",
+        notes="Fast walk-in",
+        created_by_user_id=getattr(current_user, "id", None),
+        updated_by_user_id=getattr(current_user, "id", None),
+    )
+    db.add(appointment)
+    db.flush()
+    _rebuild_appointment_services(
+        db,
+        appointment,
+        [AppointmentServiceItemCreate(service_id=payload.service_id, quantity=1)],
+    )
+    db.commit()
+    db.refresh(appointment)
+    appointment = (
+        db.query(Appointment)
+        .options(joinedload(Appointment.services))
+        .filter(Appointment.id == appointment.id)
+        .first()
+    )
+    return _appointment_to_read(db, appointment)
+
 @router.post("/{appointment_id}/send-confirmation")
 def send_confirmation(appointment_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_cashier_manager_owner)):
     appointment = db.query(Appointment).options(joinedload(Appointment.services)).filter(Appointment.id == appointment_id).first()
@@ -352,6 +461,10 @@ def issue_invoice_from_appointment(appointment_id: int, payment_method: str = "c
     if customer and customer.phone:
         customer_name = f"{customer.first_name or ''} {customer.last_name or ''}".strip() or "عميلنا"
         upload_and_send_pdf(db, to_phone=customer.phone, pdf_path=pdf_path, filename=Path(pdf_path).name, caption=f"مرحبًا {customer_name}، مرفق فاتورتك رقم {invoice_no}", appointment_id=appointment.id, invoice_id=invoice.id, created_by_user_id=getattr(current_user, "id", None))
+    
+    # Deduct stock for the invoice
+    deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=getattr(current_user, "id", None))
+    
     db.commit()
     db.refresh(invoice)
     return IssueInvoiceResponse(message="تم إصدار الفاتورة بنجاح", invoice_id=invoice.id, invoice_no=invoice.invoice_no)

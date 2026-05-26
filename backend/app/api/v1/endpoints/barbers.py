@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -12,10 +12,22 @@ router = APIRouter(prefix="/barbers", tags=["Barbers"])
 
 @router.get("", response_model=list[BarberRead])
 def list_barbers(
+    limit: int = Query(100, ge=1, le=2000),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    return db.query(Barber).order_by(Barber.id.desc()).all()
+    return db.query(Barber).order_by(Barber.id.desc()).offset(offset).limit(limit).all()
+
+
+@router.post("/upload-image")
+def upload_barber_image(
+    current_user: User = Depends(require_any_staff),
+):
+    """
+    Stub for image upload
+    """
+    return {"message": "Image uploaded successfully (Stub)", "url": "/uploads/profiles/default.png"}
 
 
 @router.get("/{barber_id}", response_model=BarberRead)

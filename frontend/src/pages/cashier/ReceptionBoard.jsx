@@ -37,6 +37,7 @@ import { Input } from "../../components/ui/input";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
@@ -109,7 +110,40 @@ export default function ReceptionBoard() {
         api.get("/services"),
         api.get("/service-categories"),
       ]);
-      setAppointments(apptsRes.data.items || []);
+      const appointmentsPayload = Array.isArray(apptsRes.data?.items)
+        ? apptsRes.data.items
+        : Array.isArray(apptsRes.data)
+          ? apptsRes.data
+          : [];
+      setAppointments(
+        appointmentsPayload.map((appt) => {
+          const servicesList = Array.isArray(appt.services) ? appt.services : [];
+          const primaryService = servicesList[0];
+          const employeeId =
+            appt.employee_id ?? appt.barber_id ?? appt.barberId ?? null;
+          const employeeName =
+            appt.employeeName ||
+            appt.employee_name ||
+            appt.barber_name ||
+            appt.barberName ||
+            null;
+
+          return {
+            ...appt,
+            customerName: appt.customerName || appt.customer_name || "عميل",
+            customer_name: appt.customer_name || appt.customerName || "عميل",
+            employee_id: employeeId,
+            employeeName,
+            employee_name: employeeName,
+            serviceName:
+              appt.serviceName ||
+              appt.service_name ||
+              primaryService?.service_name_snapshot ||
+              primaryService?.name ||
+              "خدمة",
+          };
+        }),
+      );
       setBarbers(barbersRes.data || []);
       setServices(
         Array.isArray(servicesRes.data.items)
@@ -152,7 +186,7 @@ export default function ReceptionBoard() {
         const res = await api.get(
           `/customers/search?phone=${fastClientData.phone}`,
         );
-        if (res.data && res.data.id) {
+        if (res.data && (res.data.customer_id || res.data.id)) {
           setExistingCustomer(res.data);
           setFastClientData((p) => ({
             ...p,
@@ -210,8 +244,8 @@ export default function ReceptionBoard() {
 
   const handleAssignBarber = async (apptId, barberId) => {
     try {
-      await api.put(`/appointments/${apptId}/assign-barber`, {
-        employeeId: barberId,
+      await api.patch(`/appointments/${apptId}/assign-barber`, {
+        employee_id: barberId,
       });
       toast.success("تم توجيه المهمة للخبير بنجاح");
       setAssigningAppt(null);
@@ -223,7 +257,7 @@ export default function ReceptionBoard() {
 
   const handleUpdateStatus = async (apptId, newStatus) => {
     try {
-      await api.put(`/appointments/${apptId}/status`, { status: newStatus });
+      await api.patch(`/appointments/${apptId}/status`, { status: newStatus });
       toast.success("تم تحديث حالة العميل");
       fetchData();
     } catch (error) {
@@ -573,6 +607,10 @@ export default function ReceptionBoard() {
           className="max-w-7xl w-[95%] md:w-[90%] rounded-[2rem] md:rounded-[3rem] p-0 overflow-hidden border-none shadow-3xl bg-slate-900 text-right"
           dir="rtl"
         >
+          <DialogTitle className="sr-only">تسجيل دخول سريع</DialogTitle>
+          <DialogDescription className="sr-only">
+            تسجيل عميل سريع واختيار الخدمة والخبير المسؤول.
+          </DialogDescription>
           <div className="flex flex-col lg:flex-row min-h-[85vh] lg:h-[80vh] w-full overflow-y-auto lg:overflow-hidden">
             {/* COLUMN 1: CONCIERGE / SMART RECOGNITION */}
             <div className="w-full lg:w-[28%] p-6 md:p-8 flex flex-col justify-between bg-slate-950/60 shrink-0 border-b lg:border-b-0 lg:border-l border-white/5">
@@ -1041,6 +1079,9 @@ export default function ReceptionBoard() {
                 {assigningAppt?.customerName || assigningAppt?.customer_name}
               </span>
             </p>
+            <DialogDescription className="px-2 pt-2 text-slate-400">
+              اختر الخبير الذي سيتولى هذه الخدمة الآن.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-5 py-4">
             {barbers.map((b) => (

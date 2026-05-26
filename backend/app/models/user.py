@@ -24,6 +24,12 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     barber = relationship("Barber", back_populates="users")
+    employee = relationship(
+        "Employee",
+        back_populates="linked_user",
+        foreign_keys="Employee.user_id",
+        uselist=False,
+    )
 
     preference = relationship(
         "Preference",
@@ -37,3 +43,7 @@ class User(Base):
         back_populates="created_by_user",
         foreign_keys="NotificationLog.created_by_user_id",
     )
+
+    @property
+    def employee_id(self):
+        return self.employee.id if self.employee else None

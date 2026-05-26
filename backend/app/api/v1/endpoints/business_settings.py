@@ -64,6 +64,8 @@ def update_business_settings(
         row.receipt_footer = payload.receipt_footer
     if payload.currency is not None:
         row.currency = payload.currency
+    if payload.working_hours is not None:
+        row.working_hours = payload.working_hours
 
     db.add(row)
     db.commit()

@@ -13,4 +13,4 @@ class ServiceProduct(Base):
     amount_used = Column(Numeric(10, 2), nullable=False, default=1)
 
     product = relationship("Product", back_populates="service_products")
-    service = relationship("Service")
+    service = relationship("Service", back_populates="ingredients")

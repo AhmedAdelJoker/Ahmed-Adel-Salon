@@ -13,8 +13,10 @@ import {
   Package,
   Receipt,
   ArrowRight,
+  Clock,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { usePreferences } from "../../context/PreferencesContext";
 import { normalizeRole } from "../../lib/roleRoutes";
@@ -80,6 +82,26 @@ export default function Header({
     window.dispatchEvent(event);
   };
 
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedTime = new Intl.DateTimeFormat("ar-EG", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  }).format(currentTime);
+
+  const formattedDate = new Intl.DateTimeFormat("ar-EG", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(currentTime);
+
   return (
     <header
       className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 md:px-8 lg:px-10"
@@ -109,6 +131,21 @@ export default function Header({
       </div>
 
       <div className="flex w-full items-center justify-end gap-2 sm:gap-3 lg:w-auto">
+        {/* Live Clock Section */}
+        <div className="hidden items-center gap-3 px-4 py-2 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/40 dark:border-white/5 xl:flex">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-sky-400/10 dark:text-sky-400">
+            <Clock size={16} />
+          </div>
+          <div className="flex flex-col items-start leading-tight">
+            <span className="text-sm font-black text-slate-900 dark:text-white tabular-nums">
+              {formattedTime}
+            </span>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+              {formattedDate}
+            </span>
+          </div>
+        </div>
+
         {hasQuickPOSAccess && (
           <button
             onClick={() => navigate("/pos")}

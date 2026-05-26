@@ -5,6 +5,7 @@ from typing import Any
 
 import requests
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.core.config import settings
 from app.models.notification_log import NotificationLog
@@ -35,6 +36,25 @@ def _headers_auth() -> dict[str, str]:
 
 def _normalize_to_phone(to_phone: str) -> str:
     return str(to_phone).replace(" ", "").strip()
+
+
+def normalize_to_phone(to_phone: str) -> str:
+    return _normalize_to_phone(to_phone)
+
+
+def is_meta_whatsapp_configured() -> bool:
+    return bool(settings.META_WA_PHONE_NUMBER_ID and settings.META_WA_ACCESS_TOKEN)
+
+
+def get_meta_whatsapp_status() -> dict[str, Any]:
+    return {
+        "configured": is_meta_whatsapp_configured(),
+        "provider_name": "meta_cloud_api",
+        "graph_api_version": settings.META_GRAPH_API_VERSION,
+        "phone_number_id_present": bool(settings.META_WA_PHONE_NUMBER_ID),
+        "access_token_present": bool(settings.META_WA_ACCESS_TOKEN),
+        "verify_token_present": bool(settings.META_WA_VERIFY_TOKEN),
+    }
 
 
 def _create_notification_log(db: Session, *, appointment_id: int | None, invoice_id: int | None, created_by_user_id: int | None, message_type: str, recipient_phone: str, payload: str):
@@ -135,3 +155,44 @@ def send_appointment_reminder_24h_template(db: Session, *, to_phone: str, custom
 
 def send_appointment_reminder_2h_template(db: Session, *, to_phone: str, appointment_time: str, barber_name: str, appointment_id: int | None = None):
     return send_template_message(db, to_phone=to_phone, template_name="appointment_reminder_2h_utility", language_code="ar", components=[{"type": "body", "parameters": [{"type": "text", "text": appointment_time}, {"type": "text", "text": barber_name}]}], message_type="appointment_reminder_2h_template", appointment_id=appointment_id)
+
+
+def update_logs_from_webhook_payload(db: Session, payload: dict[str, Any]) -> int:
+    updated_logs = 0
+    entries = payload.get("entry") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        return 0
+
+    for entry in entries:
+        changes = entry.get("changes", []) if isinstance(entry, dict) else []
+        for change in changes:
+            value = change.get("value", {}) if isinstance(change, dict) else {}
+            statuses = value.get("statuses", []) if isinstance(value, dict) else []
+            for status_item in statuses:
+                provider_message_id = status_item.get("id")
+                if not provider_message_id:
+                    continue
+
+                log = (
+                    db.query(NotificationLog)
+                    .filter(NotificationLog.provider_message_id == provider_message_id)
+                    .first()
+                )
+                if not log:
+                    continue
+
+                mapped_status = status_item.get("status") or log.status
+                log.status = mapped_status
+                if mapped_status in {"sent", "delivered", "read"}:
+                    log.sent_at = log.sent_at or datetime.utcnow()
+                errors = status_item.get("errors")
+                if isinstance(errors, list) and errors:
+                    first_error = errors[0]
+                    if isinstance(first_error, dict):
+                        log.failure_reason = first_error.get("title") or first_error.get("message")
+                db.add(log)
+                updated_logs += 1
+
+    if updated_logs:
+        db.commit()
+    return updated_logs

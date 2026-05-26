@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,6 +24,7 @@ class BusinessSettingsUpdate(BaseModel):
     address: Optional[str] = Field(default=None, max_length=500)
     receipt_footer: Optional[str] = None
     currency: Optional[str] = Field(default=None, max_length=10)
+    working_hours: Optional[dict[str, Any]] = None
 
 
 class BusinessSettingsRead(BaseModel):
@@ -34,6 +35,7 @@ class BusinessSettingsRead(BaseModel):
     address: Optional[str] = None
     receipt_footer: Optional[str] = None
     currency: str = "EGP"
+    working_hours: Optional[dict[str, Any]] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

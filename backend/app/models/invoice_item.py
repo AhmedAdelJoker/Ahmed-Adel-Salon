@@ -11,6 +11,7 @@ class InvoiceItem(Base):
 
     invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
     service_id = Column(Integer, ForeignKey("services.id"), nullable=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
 
     service_name = Column(String(255), nullable=False)
 

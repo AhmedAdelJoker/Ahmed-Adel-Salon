@@ -1,24 +1,40 @@
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.api.deps import require_cashier_manager_owner
+from app.models.expense import Expense
 from app.models.user import User
 from app.models.product import Product
 from app.models.inventory_log import InventoryLog
 from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
-from app.schemas.inventory import InventoryAdjustPayload, InventoryLogRead
+from app.schemas.inventory import InventoryAddStockPayload, InventoryAdjustPayload, InventoryLogRead
 from app.services.inventory_service import add_stock, remove_stock, adjust_stock
 
 router = APIRouter(prefix="/products", tags=["Products Inventory"])
 
 
+def _get_estimated_gram_cost(product: Product) -> Decimal:
+    weight = Decimal(str(product.weight or 0))
+    cost_price = Decimal(str(product.cost_price or 0))
+
+    if weight > 0:
+        return cost_price / weight
+    if (product.unit or "g").lower() == "g":
+        return cost_price
+    return Decimal("0")
+
+
 @router.get("", response_model=list[ProductRead])
 def list_products(
+    limit: int = 100,
+    offset: int = 0,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    return db.query(Product).order_by(Product.id.desc()).all()
+    return db.query(Product).order_by(Product.id.desc()).offset(offset).limit(limit).all()
 
 
 @router.get("/{product_id}", response_model=ProductRead)
@@ -69,7 +85,7 @@ def update_product(
 @router.post("/{product_id}/add-stock", response_model=ProductRead)
 def add_product_stock(
     product_id: int,
-    payload: InventoryAdjustPayload,
+    payload: InventoryAddStockPayload,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
@@ -84,6 +100,23 @@ def add_product_stock(
         note=payload.note,
         created_by_user_id=current_user.id,
     )
+
+    if payload.create_expense:
+        if payload.purchase_price is not None:
+            total_cost = Decimal(str(payload.purchase_price))
+        else:
+            total_cost = Decimal(str(payload.amount)) * _get_estimated_gram_cost(product)
+        expense_note = payload.note or f"توريد مخزون للمنتج {product.name}"
+        if payload.invoice_image_url:
+            expense_note = f"{expense_note}\nمرفق: {payload.invoice_image_url}"
+        db.add(
+            Expense(
+                amount=float(total_cost),
+                category="مشتريات مخزون",
+                description=expense_note,
+                recipient_name=product.name,
+            )
+        )
 
     db.commit()
     db.refresh(product)

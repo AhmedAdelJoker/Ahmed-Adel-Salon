@@ -10,6 +10,12 @@ class InventoryAdjustPayload(BaseModel):
     note: Optional[str] = None
 
 
+class InventoryAddStockPayload(InventoryAdjustPayload):
+    create_expense: bool = True
+    purchase_price: Optional[Decimal] = Field(default=None, ge=0)
+    invoice_image_url: Optional[str] = None
+
+
 class InventoryLogRead(BaseModel):
     id: int
     product_id: int
@@ -32,5 +38,10 @@ class ServiceProductRead(BaseModel):
     service_id: int
     product_id: int
     amount_used: Decimal
+    product_name: Optional[str] = None
+    product_unit: Optional[str] = None
+    product_quantity: Optional[Decimal] = None
+    product_cost_price: Optional[Decimal] = None
+    product_weight: Optional[Decimal] = None
 
     model_config = ConfigDict(from_attributes=True)

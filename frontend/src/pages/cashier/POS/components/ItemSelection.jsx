@@ -113,6 +113,12 @@ const ItemSelection = () => {
                           <span className="text-sm font-black text-primary tabular-nums">
                             {formatCurrency(item.price || item.sell_price || item.offer_price)}
                           </span>
+                          {activeCategory === "المنتجات" ? (
+                            <span className="mt-1 text-[10px] font-bold text-muted">
+                              {item.quantity || 0} {item.unit || "g"}
+                              {item.weight ? ` • ${item.weight} جرام/عبوة` : ""}
+                            </span>
+                          ) : null}
                         </div>
                         <div className="h-9 w-9 rounded-xl bg-soft flex items-center justify-center text-muted group-hover:bg-primary group-hover:text-white group-hover:shadow-lg group-hover:shadow-primary/30 transition-all duration-300">
                           <PlusCircle size={20} />

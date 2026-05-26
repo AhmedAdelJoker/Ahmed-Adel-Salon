@@ -56,6 +56,17 @@ class AppointmentStatusUpdate(BaseModel):
     status: str
 
 
+class AppointmentAssignBarberPayload(BaseModel):
+    employee_id: int
+
+
+class AppointmentFastWalkinCreate(BaseModel):
+    phone: str = Field(..., min_length=5, max_length=30)
+    first_name: str = Field(..., min_length=1, max_length=100)
+    service_id: int
+    employee_id: Optional[int] = None
+
+
 class AppointmentRead(BaseModel):
     id: int
     customer_id: int

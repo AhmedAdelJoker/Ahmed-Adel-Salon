@@ -28,3 +28,18 @@ class Invoice(Base):
     barber = relationship("Barber", back_populates="invoices")
     items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
     created_by_user = relationship("User", foreign_keys=[created_by_user_id])
+    discount_approval_requests = relationship(
+        "DiscountApprovalRequest",
+        back_populates="invoice",
+        cascade="all, delete-orphan",
+    )
+    adjustment_requests = relationship(
+        "InvoiceAdjustmentRequest",
+        back_populates="invoice",
+        cascade="all, delete-orphan",
+    )
+    payments = relationship(
+        "InvoicePayment",
+        back_populates="invoice",
+        cascade="all, delete-orphan",
+    )

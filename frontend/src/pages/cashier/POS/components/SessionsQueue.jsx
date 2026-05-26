@@ -139,7 +139,18 @@ const SessionsQueue = () => {
                               #{appt.appointment_id || appt.id}
                             </Badge>
                             <span className="text-[10px] font-bold text-muted bg-soft px-2 py-0.5 rounded-lg">
-                              {appt.appointment_time || "--:--"}
+                              {(() => {
+                                const timeStr = appt.appointment_time;
+                                if (!timeStr) return "--:--";
+                                const [h, m] = timeStr.split(":");
+                                const d = new Date();
+                                d.setHours(parseInt(h), parseInt(m), 0);
+                                return d.toLocaleTimeString("ar-EG", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  hour12: true
+                                });
+                              })()}
                             </span>
                           </div>
                         </div>

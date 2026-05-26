@@ -15,7 +15,12 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent } from "../ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "../ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
 
 const QUICK_LINKS = [
@@ -65,6 +70,10 @@ export default function CommandPalette() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-2xl p-0 overflow-hidden border-none shadow-2xl bg-transparent" showCloseButton={false}>
+        <DialogTitle className="sr-only">لوحة الأوامر</DialogTitle>
+        <DialogDescription className="sr-only">
+          ابحث سريعًا داخل النظام وانتقل إلى الصفحات المتاحة.
+        </DialogDescription>
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-[2.5rem] border border-slate-200/60 dark:border-slate-800/60 shadow-2xl flex flex-col overflow-hidden h-[500px]">
           <div className="flex items-center gap-4 px-8 h-20 border-b border-slate-100 dark:border-slate-800/50">
             <Search className="text-indigo-600 dark:text-sky-400 shrink-0" size={22} />

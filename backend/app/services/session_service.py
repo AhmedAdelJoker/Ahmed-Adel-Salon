@@ -9,6 +9,7 @@ from app.models.product import Product
 from app.models.service_session import ServiceSession
 from app.models.session_product import SessionProduct
 from app.models.inventory_log import InventoryLog
+from app.models.walk_in_queue import WalkInQueue
 
 
 def create_session_from_appointment(db: Session, *, appointment: Appointment, created_by_user_id: int | None, notes: str | None = None):
@@ -59,6 +60,47 @@ def create_manual_session(db: Session, *, customer_id: int, barber_id: int, appo
         barber_id=barber_id,
         status="active",
         notes=notes,
+        total_price=Decimal("0.00"),
+        created_by_user_id=created_by_user_id,
+    )
+    db.add(session)
+    db.flush()
+    return session
+
+
+def convert_queue_to_session(
+    db: Session,
+    queue_id: int,
+    created_by_user_id: int | None,
+):
+    queue_item = db.query(WalkInQueue).filter(WalkInQueue.id == queue_id).first()
+    if not queue_item:
+        raise HTTPException(status_code=404, detail="عنصر الطابور غير موجود")
+
+    if queue_item.converted_session_id:
+        existing_session = (
+            db.query(ServiceSession)
+            .filter(ServiceSession.id == queue_item.converted_session_id)
+            .first()
+        )
+        if existing_session:
+            return existing_session
+
+    assigned_barber_id = (
+        queue_item.assigned_employee_id or queue_item.requested_employee_id
+    )
+    if not assigned_barber_id:
+        raise HTTPException(
+            status_code=400,
+            detail="يجب تعيين مقدم الخدمة قبل تحويل التذكرة إلى جلسة",
+        )
+
+    session = ServiceSession(
+        appointment_id=None,
+        customer_id=queue_item.customer_id,
+        barber_id=assigned_barber_id,
+        status="active",
+        notes=queue_item.queue_note,
         total_price=Decimal("0.00"),
         created_by_user_id=created_by_user_id,
     )

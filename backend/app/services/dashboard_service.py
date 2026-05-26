@@ -41,32 +41,27 @@ def get_dashboard_widgets(
             Invoice.id,
             Invoice.invoice_no,
             Invoice.total_amount,
-            Invoice.issued_at,
-            Customer.name.label("customer_name"),
+            Invoice.created_at.label("issued_at"),
+            Customer.first_name.label("customer_name"),
         )
-        .join(ServiceSession, ServiceSession.id == Invoice.session_id)
-        .join(Customer, Customer.id == ServiceSession.customer_id)
+        .join(Customer, Customer.customer_id == Invoice.customer_id)
     )
 
     if start_date:
         latest_invoices_query = latest_invoices_query.filter(
-            Invoice.issued_at >= datetime.combine(start_date, time.min)
+            Invoice.created_at >= datetime.combine(start_date, time.min)
         )
     if end_date:
         latest_invoices_query = latest_invoices_query.filter(
-            Invoice.issued_at <= datetime.combine(end_date, time.max)
+            Invoice.created_at <= datetime.combine(end_date, time.max)
         )
     if payment_method:
         latest_invoices_query = latest_invoices_query.filter(
             Invoice.payment_method == payment_method
         )
-    if service_id:
-        latest_invoices_query = latest_invoices_query.filter(
-            ServiceSession.service_id == service_id
-        )
     if barber_id:
         latest_invoices_query = latest_invoices_query.filter(
-            ServiceSession.barber_id == barber_id
+            Invoice.barber_id == barber_id
         )
 
     latest_invoices = (
@@ -85,29 +80,24 @@ def get_dashboard_widgets(
             Barber.display_name.label("barber_name"),
             func.coalesce(func.sum(Invoice.total_amount), 0).label("total_revenue"),
         )
-        .join(ServiceSession, ServiceSession.barber_id == Barber.id)
-        .outerjoin(Invoice, Invoice.session_id == ServiceSession.id)
+        .join(Invoice, Invoice.barber_id == Barber.id)
     )
 
     if start_date:
         top_barber_query = top_barber_query.filter(
-            Invoice.issued_at >= datetime.combine(start_date, time.min)
+            Invoice.created_at >= datetime.combine(start_date, time.min)
         )
     if end_date:
         top_barber_query = top_barber_query.filter(
-            Invoice.issued_at <= datetime.combine(end_date, time.max)
+            Invoice.created_at <= datetime.combine(end_date, time.max)
         )
     if payment_method:
         top_barber_query = top_barber_query.filter(
             Invoice.payment_method == payment_method
         )
-    if service_id:
-        top_barber_query = top_barber_query.filter(
-            ServiceSession.service_id == service_id
-        )
     if barber_id:
         top_barber_query = top_barber_query.filter(
-            ServiceSession.barber_id == barber_id
+            Invoice.barber_id == barber_id
         )
 
     top_barber = (
@@ -119,41 +109,36 @@ def get_dashboard_widgets(
 
     
     # Top service
-    
+    from app.models.invoice_item import InvoiceItem
     top_service_query = (
         db.query(
-            Service.name.label("service_name"),
-            func.coalesce(func.sum(Invoice.total_amount), 0).label("total_revenue"),
+            InvoiceItem.service_name.label("service_name"),
+            func.coalesce(func.sum(InvoiceItem.total_price), 0).label("total_revenue"),
         )
-        .join(ServiceSession, ServiceSession.service_id == Service.id)
-        .outerjoin(Invoice, Invoice.session_id == ServiceSession.id)
+        .join(Invoice, Invoice.id == InvoiceItem.invoice_id)
     )
 
     if start_date:
         top_service_query = top_service_query.filter(
-            Invoice.issued_at >= datetime.combine(start_date, time.min)
+            Invoice.created_at >= datetime.combine(start_date, time.min)
         )
     if end_date:
         top_service_query = top_service_query.filter(
-            Invoice.issued_at <= datetime.combine(end_date, time.max)
+            Invoice.created_at <= datetime.combine(end_date, time.max)
         )
     if payment_method:
         top_service_query = top_service_query.filter(
             Invoice.payment_method == payment_method
         )
-    if service_id:
-        top_service_query = top_service_query.filter(
-            ServiceSession.service_id == service_id
-        )
     if barber_id:
         top_service_query = top_service_query.filter(
-            ServiceSession.barber_id == barber_id
+            Invoice.barber_id == barber_id
         )
 
     top_service = (
         top_service_query
-        .group_by(Service.name)
-        .order_by(func.coalesce(func.sum(Invoice.total_amount), 0).desc())
+        .group_by(InvoiceItem.service_name)
+        .order_by(func.coalesce(func.sum(InvoiceItem.total_price), 0).desc())
         .first()
     )
 

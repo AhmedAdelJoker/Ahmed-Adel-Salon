@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -14,7 +15,35 @@ from app.core.security import (
 from app.core.rate_limit import rate_limit
 from app.models.user import User
 
+from app.api.deps_auth import get_current_active_user
+from app.schemas.profile import ProfileRead
+
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@router.get("/me", response_model=ProfileRead)
+def get_me(current_user: User = Depends(get_current_active_user)):
+    """
+    الحصول على بيانات المستخدم الحالي
+    """
+    return current_user
+
+
+class RefreshTokenPayload(BaseModel):
+    refresh_token: str
+
+@router.post("/refresh")
+def refresh_token(payload: RefreshTokenPayload):
+    """
+    تجديد توكن الوصول (Stub)
+    """
+    # NOTE: In a real implementation, you would verify the refresh token
+    # and issue a new access token. For now, we return 401 to force re-login
+    # or implement basic logic if needed.
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Token refresh not fully implemented",
+    )
 
 
 @router.post(

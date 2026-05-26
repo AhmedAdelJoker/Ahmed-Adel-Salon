@@ -18,6 +18,7 @@ from app.services.session_service import (
     create_manual_session,
     create_session_from_appointment,
 )
+from app.services.inventory_service import deduct_stock_for_session
 
 router = APIRouter(prefix="/sessions", tags=["Service Sessions"])
 
@@ -139,6 +140,9 @@ def update_session_status(
         raise HTTPException(status_code=403, detail="ليس لديك صلاحية لهذه الجلسة")
 
     session_row.status = payload.status
+    if payload.status == "completed":
+        deduct_stock_for_session(db, session_id=session_row.id, created_by_user_id=current_user.id)
+    
     db.commit()
     db.refresh(session_row)
 

@@ -107,8 +107,17 @@ const AttendanceManagement = () => {
   const fetchAttendance = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get("/attendance/logs", { params: { limit: 1500 } });
-      setRecords(adaptList(res));
+      const res = await api.get("/barber-presence/logs", {
+        params: { limit: 1500 },
+      });
+      setRecords(
+        adaptList(res).map((record) => ({
+          ...record,
+          employee_id: record.employee_id ?? record.barber_id,
+          employee_name:
+            record.employee_name || record.barber_name || "موظف غير معروف",
+        })),
+      );
     } catch (err) {
       toast.error("فشل تحميل سجلات الحضور");
     } finally {
@@ -119,7 +128,16 @@ const AttendanceManagement = () => {
   const fetchEmployees = useCallback(async () => {
     try {
       const res = await api.get("/employees");
-      setEmployees(adaptList(res));
+      setEmployees(
+        adaptList(res).map((employee) => ({
+          ...employee,
+          full_name:
+            employee.full_name ||
+            employee.display_name ||
+            employee.name ||
+            "موظف",
+        })),
+      );
     } catch (err) {
       console.error("Failed to fetch employees", err);
     }
@@ -137,7 +155,7 @@ const AttendanceManagement = () => {
     }
     setIsRegistering(true);
     try {
-      await api.post("/attendance/register", null, {
+      await api.post("/barber-presence/register", null, {
         params: {
           employee_id: regEmployeeId,
           status_type: regStatus,

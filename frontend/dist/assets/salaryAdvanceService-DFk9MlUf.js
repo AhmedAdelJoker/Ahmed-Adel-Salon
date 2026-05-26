@@ -1,0 +1,1 @@
+import{t as e}from"./api-DEr5btBg.js";import{a as t,o as n}from"./apiAdapter-DUzUVWJK.js";var r={list:t=>e.get(`/salary-advances`,{params:t}).then(n),create:n=>e.post(`/salary-advances`,n).then(t),remove:n=>e.delete(`/salary-advances/${n}`).then(t)};export{r as t};

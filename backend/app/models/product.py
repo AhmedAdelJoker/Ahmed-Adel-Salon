@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -10,12 +10,15 @@ class Product(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(255), nullable=True)
     sku = Column(String(100), nullable=True)
     quantity = Column(Numeric(10, 2), nullable=False, default=0)
-    unit = Column(String(50), nullable=False, default="pcs")
+    unit = Column(String(50), nullable=False, default="g")
     cost_price = Column(Numeric(10, 2), nullable=False, default=0)
     sell_price = Column(Numeric(10, 2), nullable=True)
     min_quantity_alert = Column(Numeric(10, 2), nullable=False, default=0)
+    weight = Column(Numeric(10, 2), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

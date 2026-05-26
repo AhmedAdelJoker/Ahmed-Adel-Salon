@@ -31,6 +31,7 @@ const PAGE_TITLES = Object.freeze({
   "/owner/hr": "إدارة الموارد البشرية",
   "/owner/permissions": "صلاحيات الوصول",
   "/owner/financial": "التقارير المالية",
+  "/owner/daily-summary": "الملخص التشغيلي اليومي",
   "/owner/financial-rules": "القواعد المالية",
   "/owner/alerts": "التنبيهات الذكية",
   "/owner/payroll": "إدارة الرواتب",
@@ -69,6 +70,7 @@ const PAGE_SUBTITLES = Object.freeze({
   "/owner/services": "إدارة الخدمات والأسعار والتصنيفات.",
   "/bookings": "إدارة الحجوزات والمواعيد.",
   "/invoices": "الفواتير وتفاصيلها وإعادة الطباعة.",
+  "/owner/daily-summary": "الملخص التشغيلي الشامل لكافة الورديات والمصروفات.",
   "/owner/financial": "تحليل الإيرادات والمصروفات ومؤشرات الأداء.",
   "/pos": "إصدار الفواتير وإدارة المبيعات المباشرة.",
   "/inventory": "متابعة المنتجات والمخزون.",
@@ -89,6 +91,7 @@ const PermissionsManagement = lazy(
 const FinancialReports = lazy(() => import("../pages/owner/FinancialReports"));
 const EmployeeReports = lazy(() => import("../pages/owner/EmployeeReports"));
 const FinancialRules = lazy(() => import("../pages/owner/FinancialRules"));
+const DailySummaryReport = lazy(() => import("../pages/owner/DailySummaryReport"));
 const SmartAlerts = lazy(() => import("../pages/owner/SmartAlerts"));
 const Expenses = lazy(() => import("../pages/owner/Expenses"));
 const ExpensesArchive = lazy(() => import("../pages/owner/ExpensesArchive"));
@@ -354,6 +357,10 @@ export default function AppRouter() {
                   element={<PermissionsManagement />}
                 />
                 <Route path="/owner/financial" element={<FinancialReports />} />
+                <Route
+                  path="/owner/daily-summary"
+                  element={<DailySummaryReport />}
+                />
                 <Route
                   path="/owner/financial-rules"
                   element={<FinancialRules />}

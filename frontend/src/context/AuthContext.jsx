@@ -136,7 +136,10 @@ export const AuthProvider = ({ children }) => {
       if (typeof detail === "string") {
         errorMsg = detail;
       } else if (Array.isArray(detail)) {
-        errorMsg = detail[0]?.msg || errorMsg;
+        const firstError = detail[0];
+        errorMsg = typeof firstError === 'string' ? firstError : (firstError?.msg || JSON.stringify(firstError));
+      } else if (detail && typeof detail === 'object') {
+        errorMsg = detail.msg || JSON.stringify(detail);
       }
 
       toast.error(errorMsg);

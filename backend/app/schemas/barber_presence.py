@@ -4,7 +4,9 @@ from pydantic import BaseModel, ConfigDict
 
 
 class BarberPresenceRead(BaseModel):
+    id: int
     barber_id: int
+    barber_name: str | None = None
     status: str
     created_at: datetime
 

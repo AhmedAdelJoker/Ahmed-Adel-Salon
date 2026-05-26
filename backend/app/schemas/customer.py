@@ -28,3 +28,8 @@ class CustomerRead(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CustomerSearchRead(CustomerRead):
+    last_employee_name: Optional[str] = None
+    visits_count: int = 0

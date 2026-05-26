@@ -22,6 +22,7 @@ import {
   ChevronDown,
   LayoutGrid,
   User,
+  Activity,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
@@ -177,6 +178,13 @@ const MENU_GROUPS = [
         label: "التقارير المالية",
         to: "/owner/financial",
         icon: TrendingUp,
+        roles: ["OWNER", "ADMIN", "MANAGER"],
+      },
+      {
+        key: "daily-summary",
+        label: "الملخص اليومي",
+        to: "/owner/daily-summary",
+        icon: Activity,
         roles: ["OWNER", "ADMIN", "MANAGER"],
       },
       {

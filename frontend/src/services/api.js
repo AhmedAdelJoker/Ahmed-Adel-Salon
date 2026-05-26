@@ -49,6 +49,21 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Normalize error message for toast and UI consumption
+    if (error.response?.data?.detail) {
+      const detail = error.response.data.detail;
+      if (typeof detail === "string") {
+        error.message = detail;
+      } else if (Array.isArray(detail)) {
+        const first = detail[0];
+        error.message = first?.msg || JSON.stringify(first);
+      } else if (typeof detail === "object") {
+        error.message = detail.msg || JSON.stringify(detail);
+      }
+    } else if (error.response?.data?.message) {
+      error.message = error.response.data.message;
+    }
+
     const originalRequest = error.config;
 
     if (!originalRequest) {

@@ -6,11 +6,17 @@ from reportlab.lib.units import mm
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 PDF_DIR = BASE_DIR / "generated_invoices"
+RECEIPT_DIR = BASE_DIR / "generated_receipts"
 
 
 def ensure_pdf_dir():
     PDF_DIR.mkdir(parents=True, exist_ok=True)
     return PDF_DIR
+
+
+def ensure_receipt_dir():
+    RECEIPT_DIR.mkdir(parents=True, exist_ok=True)
+    return RECEIPT_DIR
 
 
 def generate_invoice_pdf(invoice, items, customer, barber=None, shop_name="Salon Management Pro", shop_phone=None):
@@ -101,4 +107,62 @@ def generate_invoice_pdf(invoice, items, customer, barber=None, shop_name="Salon
 
     c.save()
 
+    return str(file_path)
+
+
+def generate_cash_receipt_pdf(transaction, settings=None):
+    """
+    إنشاء إيصال PDF لحركة خزنة وإرجاع المسار النهائي.
+    """
+    ensure_receipt_dir()
+
+    filename = f"receipt_TX_{transaction.id}.pdf"
+    file_path = RECEIPT_DIR / filename
+
+    c = canvas.Canvas(str(file_path), pagesize=A4)
+    width, height = A4
+    y = height - 20 * mm
+
+    shop_name = getattr(settings, "salon_name", None) or "Salon Management Pro"
+    shop_phone = getattr(settings, "shop_phone", None)
+    currency = getattr(settings, "currency", None) or "EGP"
+
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(20 * mm, y, "Cash Receipt / إيصال خزنة")
+    y -= 12 * mm
+
+    c.setFont("Helvetica", 11)
+    c.drawString(20 * mm, y, f"Shop: {shop_name}")
+    y -= 6 * mm
+    if shop_phone:
+        c.drawString(20 * mm, y, f"Phone: {shop_phone}")
+        y -= 6 * mm
+
+    c.drawString(20 * mm, y, f"Receipt No: TX-{transaction.id}")
+    y -= 6 * mm
+    tx_date = getattr(transaction, "transaction_date", None) or getattr(transaction, "created_at", None)
+    if tx_date:
+        c.drawString(20 * mm, y, f"Date: {tx_date.strftime('%Y-%m-%d %H:%M')}")
+        y -= 6 * mm
+
+    c.drawString(20 * mm, y, f"Direction: {transaction.direction}")
+    y -= 6 * mm
+    c.drawString(20 * mm, y, f"Type: {transaction.type}")
+    y -= 6 * mm
+    c.drawString(20 * mm, y, f"Payment Method: {transaction.payment_method or 'cash'}")
+    y -= 10 * mm
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(20 * mm, y, f"Amount: {float(transaction.amount):.2f} {currency}")
+    y -= 10 * mm
+
+    c.setFont("Helvetica", 10)
+    if getattr(transaction, "reference_no", None):
+        c.drawString(20 * mm, y, f"Reference: {transaction.reference_no}")
+        y -= 6 * mm
+    if getattr(transaction, "notes", None):
+        c.drawString(20 * mm, y, f"Notes: {transaction.notes}")
+        y -= 6 * mm
+
+    c.save()
     return str(file_path)

@@ -39,8 +39,30 @@ const ORDER = [
   "friday",
 ];
 
+const DEFAULT_DAY_CONFIG = {
+  is_open: false,
+  open_time: null,
+  close_time: null,
+};
+
+const normalizeDayConfig = (config = {}) => {
+  const isOpen = Boolean(config?.is_open);
+
+  return {
+    is_open: isOpen,
+    open_time: isOpen ? config?.open_time || "10:00" : null,
+    close_time: isOpen ? config?.close_time || "22:00" : null,
+  };
+};
+
+const normalizeWorkingHours = (rawHours = {}) =>
+  ORDER.reduce((acc, day) => {
+    acc[day] = normalizeDayConfig(rawHours?.[day] || DEFAULT_DAY_CONFIG);
+    return acc;
+  }, {});
+
 const WorkingHoursPanel = () => {
-  const [hours, setWorkingHours] = useState(null);
+  const [hours, setWorkingHours] = useState(() => normalizeWorkingHours());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -50,7 +72,11 @@ const WorkingHoursPanel = () => {
       try {
         setLoading(true);
         const settings = await businessSettingsService.get();
-        setWorkingHours(settings.workingHours || {});
+        setWorkingHours(
+          normalizeWorkingHours(
+            settings?.working_hours || settings?.workingHours || {},
+          ),
+        );
       } catch (err) {
         toast.error("فشل تحميل ساعات العمل");
       } finally {
@@ -61,25 +87,34 @@ const WorkingHoursPanel = () => {
   }, []);
 
   const handleToggle = (day) => {
-    setWorkingHours((prev) => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        is_open: !prev[day].is_open,
-        open_time: prev[day].is_open ? null : prev[day].open_time || "10:00",
-        close_time: prev[day].is_open ? null : prev[day].close_time || "22:00",
-      },
-    }));
+    setWorkingHours((prev) => {
+      const currentDay = normalizeDayConfig(prev?.[day]);
+      const isOpen = !currentDay.is_open;
+
+      return {
+        ...prev,
+        [day]: {
+          ...currentDay,
+          is_open: isOpen,
+          open_time: isOpen ? currentDay.open_time || "10:00" : null,
+          close_time: isOpen ? currentDay.close_time || "22:00" : null,
+        },
+      };
+    });
   };
 
   const handleChange = (day, field, value) => {
-    setWorkingHours((prev) => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        [field]: value,
-      },
-    }));
+    setWorkingHours((prev) => {
+      const currentDay = normalizeDayConfig(prev?.[day]);
+
+      return {
+        ...prev,
+        [day]: {
+          ...currentDay,
+          [field]: value,
+        },
+      };
+    });
   };
 
   const applyToAll = () => {
@@ -96,7 +131,7 @@ const WorkingHoursPanel = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await businessSettingsService.update({ workingHours: hours });
+      await businessSettingsService.update({ working_hours: hours });
       toast.success("تم حفظ ساعات العمل بنجاح");
     } catch (err) {
       toast.error("فشل الحفظ");
@@ -222,9 +257,8 @@ const WorkingHoursPanel = () => {
 
       <div className="flex justify-end pt-4">
         <Button
-          disabled={loading}
           onClick={handleSave}
-          disabled={saving}
+          disabled={loading || saving}
           variant="accent"
           className="px-16 h-14 rounded-xl font-black text-[11px] uppercase tracking-[0.2em] shadow-soft hover:-translate-y-0.5 transition-all"
         >

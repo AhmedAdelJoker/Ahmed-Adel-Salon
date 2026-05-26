@@ -64,7 +64,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { safePositive } from "../../lib/utils";
+import { formatCurrency, safePositive } from "../../lib/utils";
 import { ConfirmDialog } from "../../components/shared/ConfirmDialog";
 
 const TABS = [
@@ -78,10 +78,11 @@ const DEFAULT_SERVICE_FORM = {
   name_en: "",
   description_ar: "",
   description_en: "",
+  duration_minutes: 30,
   price: "",
   category: "شعر",
   category_id: "",
-  imageUrl: "",
+  image_url: "",
   isActive: true,
   ingredients: [],
 };
@@ -97,16 +98,18 @@ const DEFAULT_CATEGORY_FORM = {
 const DEFAULT_OFFER_FORM = {
   name: "",
   name_ar: "",
+  name_en: "",
   description: "",
   description_ar: "",
   description_en: "",
-  imageUrl: "",
+  image_url: "",
   original_price: "",
   offer_price: "",
   discount_percentage: "",
   start_date: "",
   end_date: "",
   service_ids: [],
+  is_public: true,
   is_active: true,
 };
 const FALLBACK_SERVICE_CATEGORIES = [
@@ -259,6 +262,17 @@ const ServicesManagement = ({ hideHeader = false }) => {
     () => (Array.isArray(offers) ? offers : []),
     [offers],
   );
+  const productRows = useMemo(
+    () => (Array.isArray(products) ? products : []),
+    [products],
+  );
+  const productIndex = useMemo(
+    () =>
+      new Map(
+        productRows.map((product) => [Number(product.id), product]),
+      ),
+    [productRows],
+  );
 
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
 
@@ -268,6 +282,7 @@ const ServicesManagement = ({ hideHeader = false }) => {
     return serviceRows.filter((service) => {
       const haystack = [
         service?.name,
+        service?.name_ar,
         service?.category,
         service?.price,
         isItemActive(service) ? "نشط متاح" : "معطل متوقف",
@@ -321,6 +336,75 @@ const ServicesManagement = ({ hideHeader = false }) => {
     });
   }, [normalizedSearchTerm, offerRows]);
 
+  const getIngredientProduct = useCallback(
+    (ingredient) => {
+      const productId = Number(ingredient?.product_id);
+      if (productIndex.has(productId)) {
+        return productIndex.get(productId);
+      }
+
+      return {
+        id: ingredient?.product_id,
+        name: ingredient?.product_name,
+        unit: ingredient?.product_unit || "g",
+        quantity: ingredient?.product_quantity || 0,
+        cost_price: ingredient?.product_cost_price || 0,
+        weight: ingredient?.product_weight || 0,
+      };
+    },
+    [productIndex],
+  );
+
+  const getProductGramCost = useCallback((product) => {
+    const weight = Number(product?.weight || 0);
+    const costPrice = Number(product?.cost_price || 0);
+
+    if (weight > 0) return costPrice / weight;
+    if ((product?.unit || "g").toLowerCase() === "g") return costPrice;
+    return 0;
+  }, []);
+
+  const getIngredientCost = useCallback(
+    (ingredient) => {
+      const amountUsed = Number(ingredient?.amount_used || 0);
+      const product = getIngredientProduct(ingredient);
+      return amountUsed * getProductGramCost(product);
+    },
+    [getIngredientProduct, getProductGramCost],
+  );
+
+  const getServiceOperationalCost = useCallback(
+    (service) =>
+      (service?.ingredients || []).reduce(
+        (sum, ingredient) => sum + getIngredientCost(ingredient),
+        0,
+      ),
+    [getIngredientCost],
+  );
+
+  const getServiceProfit = useCallback(
+    (service) => Number(service?.price || 0) - getServiceOperationalCost(service),
+    [getServiceOperationalCost],
+  );
+
+  const getServiceMargin = useCallback(
+    (service) => {
+      const price = Number(service?.price || 0);
+      if (price <= 0) return 0;
+      return (getServiceProfit(service) / price) * 100;
+    },
+    [getServiceProfit],
+  );
+
+  const getServiceLowStockCount = useCallback(
+    (service) =>
+      (service?.ingredients || []).filter((ingredient) => {
+        const product = getIngredientProduct(ingredient);
+        return Number(product?.quantity || 0) < Number(ingredient?.amount_used || 0);
+      }).length,
+    [getIngredientProduct],
+  );
+
   const serviceSummary = useMemo(
     () => ({
       total: serviceRows.length,
@@ -328,9 +412,54 @@ const ServicesManagement = ({ hideHeader = false }) => {
       categories: new Set(
         serviceRows.map((service) => service.category).filter(Boolean),
       ).size,
+      averageMargin:
+        serviceRows.length > 0
+          ? serviceRows.reduce(
+              (sum, service) => sum + getServiceMargin(service),
+              0,
+            ) / serviceRows.length
+          : 0,
+      lowStock:
+        serviceRows.filter((service) => getServiceLowStockCount(service) > 0)
+          .length,
     }),
-    [serviceRows],
+    [getServiceLowStockCount, getServiceMargin, serviceRows],
   );
+
+  const serviceFormInsights = useMemo(() => {
+    const ingredients = formData.ingredients || [];
+    const totals = ingredients.reduce(
+      (accumulator, ingredient) => {
+        const amountUsed = Number(ingredient?.amount_used || 0);
+        const product = getIngredientProduct(ingredient);
+        const unitCost = getProductGramCost(product);
+        const lineCost = amountUsed * unitCost;
+        const availableQuantity = Number(product?.quantity || 0);
+
+        return {
+          totalCost: accumulator.totalCost + lineCost,
+          lowStockCount:
+            accumulator.lowStockCount +
+            (ingredient?.product_id && availableQuantity < amountUsed ? 1 : 0),
+          missingCostCount:
+            accumulator.missingCostCount +
+            (ingredient?.product_id && unitCost <= 0 ? 1 : 0),
+        };
+      },
+      { totalCost: 0, lowStockCount: 0, missingCostCount: 0 },
+    );
+
+    const servicePrice = Number(formData.price || 0);
+    const projectedProfit = servicePrice - totals.totalCost;
+    const projectedMargin =
+      servicePrice > 0 ? (projectedProfit / servicePrice) * 100 : 0;
+
+    return {
+      ...totals,
+      projectedProfit,
+      projectedMargin,
+    };
+  }, [formData.ingredients, formData.price, getIngredientProduct, getProductGramCost]);
 
   const currentSearchPlaceholder =
     activeTab === "services"
@@ -401,12 +530,19 @@ const ServicesManagement = ({ hideHeader = false }) => {
       }
       setIsActionLoading(true);
       const payload = {
-        ...formData,
-        name: formData.name || formData.name_ar || formData.name_en,
+        name: (formData.name || formData.name_ar || formData.name_en || "").trim(),
+        name_ar: formData.name_ar || null,
+        name_en: formData.name_en || null,
+        description_ar: formData.description_ar || null,
+        description_en: formData.description_en || null,
+        image_url: formData.image_url || null,
         price: normalizedPrice,
+        duration_minutes: Number(formData.duration_minutes || 30),
+        category: formData.category || null,
         category_id: formData.category_id
           ? parseInt(formData.category_id)
           : null,
+        is_active: Boolean(formData.isActive),
         ingredients: formData.ingredients.map(ing => ({
           product_id: ing.product_id,
           amount_used: Number(ing.amount_used)
@@ -440,9 +576,13 @@ const ServicesManagement = ({ hideHeader = false }) => {
       price: service.price || "",
       category: service.category || "شعر",
       category_id: service.category_id?.toString() || "",
-      imageUrl: service.image_url || service.imageUrl || "",
+      image_url: service.image_url || service.imageUrl || "",
       isActive: isItemActive(service),
-      ingredients: service.ingredients || [],
+      duration_minutes: service.duration_minutes || 30,
+      ingredients: (service.ingredients || []).map((ingredient) => ({
+        product_id: ingredient.product_id,
+        amount_used: ingredient.amount_used,
+      })),
     });
     setIsModalOpen(true);
   };
@@ -450,7 +590,7 @@ const ServicesManagement = ({ hideHeader = false }) => {
   const addIngredient = () => {
     setFormData(prev => ({
       ...prev,
-      ingredients: [...prev.ingredients, { product_id: "", amount_used: 1 }]
+      ingredients: [...prev.ingredients, { product_id: "", amount_used: 10 }]
     }));
   };
 
@@ -507,7 +647,7 @@ const ServicesManagement = ({ hideHeader = false }) => {
   // --- Offers CRUD ---
   const handleOfferSubmit = async () => {
     try {
-      if (!offerForm.name.trim() || !offerForm.offer_price) {
+      if (!(offerForm.name || offerForm.name_ar).trim() || !offerForm.offer_price) {
         toast.error("يرجى إدخال اسم وسعر العرض");
         return;
       }
@@ -525,7 +665,13 @@ const ServicesManagement = ({ hideHeader = false }) => {
       }
       setIsActionLoading(true);
       const payload = {
-        ...offerForm,
+        name: (offerForm.name || offerForm.name_ar || offerForm.name_en || "").trim(),
+        name_ar: offerForm.name_ar || null,
+        name_en: offerForm.name_en || null,
+        description: offerForm.description || offerForm.description_ar || null,
+        description_ar: offerForm.description_ar || null,
+        description_en: offerForm.description_en || null,
+        image_url: offerForm.image_url || null,
         original_price: offerForm.original_price
           ? safePositive(offerForm.original_price)
           : null,
@@ -558,7 +704,11 @@ const ServicesManagement = ({ hideHeader = false }) => {
     setOfferForm({
       name: offer.name || "",
       name_ar: offer.name_ar || "",
+      name_en: offer.name_en || "",
       description: offer.description || "",
+      description_ar: offer.description_ar || "",
+      description_en: offer.description_en || "",
+      image_url: offer.image_url || offer.imageUrl || "",
       original_price: offer.original_price?.toString() || "",
       offer_price: offer.offer_price?.toString() || "",
       discount_percentage: offer.discount_percentage?.toString() || "",
@@ -713,7 +863,7 @@ const ServicesManagement = ({ hideHeader = false }) => {
       {/* ====== TAB: SERVICES ====== */}
       {activeTab === "services" && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
             <Card className="rounded-[26px] border border-border bg-card shadow-soft p-8 flex items-center gap-6">
               <div className="w-16 h-16 rounded-xl bg-accent-soft/30 flex items-center justify-center text-accent shadow-soft">
                 <Scissors className="w-7 h-7" />
@@ -753,6 +903,32 @@ const ServicesManagement = ({ hideHeader = false }) => {
                 </h3>
               </div>
             </Card>
+            <Card className="rounded-[26px] border border-border bg-card shadow-soft p-8 flex items-center gap-6">
+              <div className="w-16 h-16 rounded-xl bg-warning-soft/30 flex items-center justify-center text-warning shadow-soft">
+                <Percent size={28} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-muted uppercase tracking-widest mb-1">
+                  متوسط الهامش
+                </p>
+                <h3 className="text-3xl font-black text-main tracking-tighter">
+                  {serviceSummary.averageMargin.toFixed(1)}%
+                </h3>
+              </div>
+            </Card>
+            <Card className="rounded-[26px] border border-border bg-card shadow-soft p-8 flex items-center gap-6 md:col-span-2 xl:col-span-1">
+              <div className="w-16 h-16 rounded-xl bg-danger-soft/30 flex items-center justify-center text-danger shadow-soft">
+                <Package size={28} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-muted uppercase tracking-widest mb-1">
+                  خدمات تحتاج توريد
+                </p>
+                <h3 className="text-3xl font-black text-main tracking-tighter">
+                  {serviceSummary.lowStock}
+                </h3>
+              </div>
+            </Card>
           </div>
 
           <Card className="rounded-[26px] overflow-hidden border border-border bg-card shadow-soft">
@@ -774,6 +950,18 @@ const ServicesManagement = ({ hideHeader = false }) => {
                     <TableHead className="font-bold text-muted text-right">
                       السعر
                     </TableHead>
+                    <TableHead className="font-bold text-muted text-right">
+                      تكلفة المواد
+                    </TableHead>
+                    <TableHead className="font-bold text-muted text-right">
+                      الربح المتوقع
+                    </TableHead>
+                    <TableHead className="font-bold text-muted text-right">
+                      المدة
+                    </TableHead>
+                    <TableHead className="font-bold text-muted text-center">
+                      الجاهزية
+                    </TableHead>
                     <TableHead className="font-bold text-muted text-center">
                       الحالة
                     </TableHead>
@@ -784,16 +972,23 @@ const ServicesManagement = ({ hideHeader = false }) => {
                 </TableHeader>
                 <TableBody>
                   {filteredServiceRows.map((service) => (
-                    <TableRow
-                      key={service.id}
-                      className="group border-border/50"
-                    >
+                    <TableRow key={service.id} className="group border-border/50">
                       <TableCell className="font-bold text-main px-8 py-4 uppercase tracking-tight text-right">
-                        {service.name}
+                        {service.name_ar || service.name}
+                        <div className="text-[10px] font-bold text-muted mt-1 normal-case">
+                          {(service.ingredients || []).length > 0
+                            ? `${service.ingredients.length} منتج تشغيلي`
+                            : "بدون ربط منتجات"}
+                        </div>
+                        {service.name_en ? (
+                          <div className="text-[10px] font-bold text-muted mt-1 normal-case">
+                            {service.name_en}
+                          </div>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-right">
                         <Badge className="bg-soft text-accent border-none rounded-lg px-3 py-1 font-bold text-[10px] uppercase tracking-widest">
-                          {service.category}
+                          {service.category || "عام"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -803,6 +998,41 @@ const ServicesManagement = ({ hideHeader = false }) => {
                             ج.م
                           </span>
                         </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="text-sm font-black text-main">
+                          {formatCurrency(getServiceOperationalCost(service))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div
+                          className={`text-sm font-black ${getServiceProfit(service) >= 0 ? "text-success" : "text-danger"}`}
+                        >
+                          {formatCurrency(getServiceProfit(service))}
+                        </div>
+                        <div className="text-[10px] font-bold text-muted mt-1">
+                          هامش {getServiceMargin(service).toFixed(1)}%
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="text-sm font-black text-main">
+                          {service.duration_minutes || 30} دقيقة
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {getServiceLowStockCount(service) > 0 ? (
+                          <Badge className="bg-warning-soft text-warning border-none px-4 rounded-full font-black text-[10px]">
+                            نقص {getServiceLowStockCount(service)} صنف
+                          </Badge>
+                        ) : (service.ingredients || []).length > 0 ? (
+                          <Badge className="bg-info-soft text-info border-none px-4 rounded-full font-black text-[10px]">
+                            جاهزة
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-soft text-muted border-none px-4 rounded-full font-black text-[10px]">
+                            بدون مواد
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         {isItemActive(service) ? (
@@ -907,9 +1137,9 @@ const ServicesManagement = ({ hideHeader = false }) => {
                   <div className="flex gap-2">
                     <Input
                       className="h-12 rounded-xl pr-4 font-bold bg-soft border-border text-main focus:border-accent"
-                      value={formData.imageUrl || ""}
+                      value={formData.image_url || ""}
                       onChange={(e) =>
-                        setFormData({ ...formData, imageUrl: e.target.value })
+                        setFormData({ ...formData, image_url: e.target.value })
                       }
                       placeholder="https://..."
                     />
@@ -925,7 +1155,7 @@ const ServicesManagement = ({ hideHeader = false }) => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-muted uppercase tracking-widest mr-1">
                       السعر (ج.م)
@@ -936,6 +1166,23 @@ const ServicesManagement = ({ hideHeader = false }) => {
                       value={formData.price || ""}
                       onChange={(e) =>
                         setFormData({ ...formData, price: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-muted uppercase tracking-widest mr-1">
+                      المدة (دقيقة)
+                    </label>
+                    <Input
+                      type="number"
+                      min="1"
+                      className="h-12 rounded-xl font-black bg-soft border-border text-main focus:border-accent"
+                      value={formData.duration_minutes || 30}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          duration_minutes: e.target.value,
+                        })
                       }
                     />
                   </div>
@@ -1014,53 +1261,151 @@ const ServicesManagement = ({ hideHeader = false }) => {
                   
                   {formData.ingredients.length > 0 ? (
                     <div className="space-y-3">
-                      {formData.ingredients.map((ing, idx) => (
-                        <div key={idx} className="flex gap-3 items-end bg-soft p-3 rounded-xl border border-border">
-                          <div className="flex-1 space-y-1">
-                            <label className="text-[9px] font-bold text-muted pr-1">المنتج</label>
-                            <Select
-                              value={ing.product_id?.toString()}
-                              onValueChange={(val) => updateIngredient(idx, "product_id", parseInt(val))}
-                            >
-                              <SelectTrigger className="h-10 rounded-lg bg-card border-border text-xs">
-                                <SelectValue placeholder="اختر المنتج..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {products.map(p => (
-                                  <SelectItem key={p.id} value={p.id.toString()}>
-                                    {p.name} ({p.quantity} {p.unit})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="w-24 space-y-1">
-                            <label className="text-[9px] font-bold text-muted pr-1">الكمية</label>
-                            <Input
-                              type="number"
-                              className="h-10 rounded-lg bg-card border-border text-xs font-bold"
-                              value={ing.amount_used}
-                              onChange={(e) => updateIngredient(idx, "amount_used", e.target.value)}
-                            />
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeIngredient(idx)}
-                            className="h-10 w-10 text-danger hover:bg-danger-soft/50 rounded-lg"
+                      {formData.ingredients.map((ing, idx) => {
+                        const product = getIngredientProduct(ing);
+                        const estimatedCost = getIngredientCost(ing);
+                        const availableQuantity = Number(product?.quantity || 0);
+                        const amountUsed = Number(ing?.amount_used || 0);
+                        const isLowStock =
+                          Boolean(ing?.product_id) && availableQuantity < amountUsed;
+
+                        return (
+                          <div
+                            key={idx}
+                            className="bg-soft p-3 rounded-xl border border-border"
                           >
-                            <Trash2 size={16} />
-                          </Button>
-                        </div>
-                      ))}
+                            <div className="flex gap-3 items-end">
+                              <div className="flex-1 space-y-1">
+                                <label className="text-[9px] font-bold text-muted pr-1">
+                                  المنتج
+                                </label>
+                                <Select
+                                  value={ing.product_id?.toString()}
+                                  onValueChange={(val) =>
+                                    updateIngredient(
+                                      idx,
+                                      "product_id",
+                                      parseInt(val),
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger className="h-10 rounded-lg bg-card border-border text-xs">
+                                    <SelectValue placeholder="اختر المنتج..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {products.map((p) => (
+                                      <SelectItem
+                                        key={p.id}
+                                        value={p.id.toString()}
+                                      >
+                                        {p.name} ({p.quantity} {p.unit || "g"})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="w-24 space-y-1">
+                                <label className="text-[9px] font-bold text-muted pr-1">
+                                  الكمية بالجرام
+                                </label>
+                                <Input
+                                  type="number"
+                                  className="h-10 rounded-lg bg-card border-border text-xs font-bold"
+                                  value={ing.amount_used}
+                                  onChange={(e) =>
+                                    updateIngredient(
+                                      idx,
+                                      "amount_used",
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeIngredient(idx)}
+                                className="h-10 w-10 text-danger hover:bg-danger-soft/50 rounded-lg"
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-bold">
+                              <Badge className="bg-card text-muted border-none rounded-full px-3 py-1">
+                                المتاح: {availableQuantity || 0}{" "}
+                                {product?.unit || "g"}
+                              </Badge>
+                              <Badge className="bg-card text-accent border-none rounded-full px-3 py-1">
+                                التكلفة التقديرية: {formatCurrency(estimatedCost)}
+                              </Badge>
+                              {Number(product?.weight || 0) > 0 ? (
+                                <Badge className="bg-card text-info border-none rounded-full px-3 py-1">
+                                  تكلفة الجرام:{" "}
+                                  {formatCurrency(
+                                    getProductGramCost(product),
+                                  )}
+                                </Badge>
+                              ) : null}
+                              {isLowStock ? (
+                                <Badge className="bg-warning-soft text-warning border-none rounded-full px-3 py-1">
+                                  الكمية الحالية لا تكفي تنفيذ الخدمة مرة كاملة
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-6 bg-soft/50 rounded-xl border border-dashed border-border">
                       <Package size={24} className="text-muted/30 mb-2" />
-                      <p className="text-[10px] font-bold text-muted/60">لم يتم تحديد منتجات مستهلكة لهذه الخدمة</p>
+                      <p className="text-[10px] font-bold text-muted/60">لم يتم تحديد منتجات مستهلكة لهذه الخدمة بالجرام</p>
                     </div>
                   )}
+
+                  <div className="grid grid-cols-1 gap-3 rounded-2xl border border-border bg-card p-4 md:grid-cols-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted">
+                        تكلفة المواد
+                      </p>
+                      <p className="mt-1 text-lg font-black text-main">
+                        {formatCurrency(serviceFormInsights.totalCost)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted">
+                        الربح التقديري
+                      </p>
+                      <p
+                        className={`mt-1 text-lg font-black ${serviceFormInsights.projectedProfit >= 0 ? "text-success" : "text-danger"}`}
+                      >
+                        {formatCurrency(serviceFormInsights.projectedProfit)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted">
+                        هامش الربح
+                      </p>
+                      <p className="mt-1 text-lg font-black text-main">
+                        {serviceFormInsights.projectedMargin.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+
+                  {serviceFormInsights.lowStockCount > 0 ? (
+                    <div className="rounded-xl border border-warning/20 bg-warning-soft/20 px-4 py-3 text-[11px] font-bold text-warning">
+                      هناك {serviceFormInsights.lowStockCount} مادة لا تكفي
+                      لتنفيذ الخدمة بالكامل بالحالة الحالية للمخزون.
+                    </div>
+                  ) : null}
+
+                  {serviceFormInsights.missingCostCount > 0 ? (
+                    <div className="rounded-xl border border-info/20 bg-info-soft/20 px-4 py-3 text-[11px] font-bold text-info">
+                      بعض المنتجات بلا تكلفة شراء أو وزن معبأ واضح، لذلك
+                      الحسابات التقديرية قد تكون أقل من التكلفة الحقيقية.
+                    </div>
+                  ) : null}
                 </div>
 
                 <button
@@ -1560,9 +1905,9 @@ const ServicesManagement = ({ hideHeader = false }) => {
                   <div className="flex gap-2">
                     <Input
                       className="h-12 rounded-xl pr-4 font-bold bg-soft border-border text-main focus:border-accent"
-                      value={offerForm.imageUrl || ""}
+                      value={offerForm.image_url || ""}
                       onChange={(e) =>
-                        setOfferForm({ ...offerForm, imageUrl: e.target.value })
+                        setOfferForm({ ...offerForm, image_url: e.target.value })
                       }
                       placeholder="https://..."
                     />
