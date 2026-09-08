@@ -2,8 +2,103 @@
 @config "../../tailwind.config.js";
 
 /* ============================================================
-   THEME TOKENS
+   BRAND & SYSTEM TOKENS (Midnight Gold Luxury)
    ============================================================ */
+:root,
+[data-theme="light"] {
+  /* Core Colors */
+  --primary: #2402ffb4; /* Champagne Gold */
+  --primary-strong: #3b8a53;
+  --primary-soft: rgba(166, 139, 92, 0.08);
+  --primary-subtle: rgba(166, 139, 92, 0.04);
+
+  --accent: var(--primary);
+  --accent-strong: #8b7345; /* Darker gold for light-mode text contrast (WCAG AA) */
+  --accent-soft: var(--primary-soft);
+  --accent-glow: rgba(166, 139, 92, 0.15);
+
+  /* Neutrals */
+  --bg-main: #fdfbf7; /* Off-white champagne */
+  --bg-soft: #f5f2eb;
+  --bg-card: rgba(255, 255, 255, 0.95);
+  --bg-overlay: rgba(253, 251, 247, 0.85);
+  --text-main: #1c1917; /* Stone 900 */
+  --text-muted: #57534e; /* Stone 600 */
+  --text-soft: #a8a29e; /* Stone 400 */
+  --border: rgba(166, 139, 92, 0.12);
+  --inverse: #09090b;
+
+  /* Status */
+  --success: #15803d;
+  --success-soft: rgba(21, 128, 61, 0.08);
+  --warning: #b45309;
+  --warning-soft: rgba(180, 83, 9, 0.08);
+  --danger: #b91c1c;
+  --danger-soft: rgba(185, 28, 28, 0.08);
+  --info: #1d4ed8;
+  --info-soft: rgba(29, 78, 216, 0.08);
+
+  /* Shadows & Radius */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md:
+    0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-premium: 0 25px 50px -12px rgba(166, 139, 92, 0.1);
+  --shadow-soft: 0 10px 30px -10px rgba(0, 0, 0, 0.02);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-premium: 1.25rem;
+  --radius-2xl: 1.75rem;
+
+  --grad-page:
+    radial-gradient(
+      circle at top right,
+      rgba(166, 139, 92, 0.05),
+      transparent 40%
+    ),
+    linear-gradient(180deg, #fdfbf7 0%, #f5f2eb 100%);
+
+  /* Layout Variables */
+  --shell-gap: 1.25rem;
+  --shell-pad: 1.5rem;
+}
+
+.dark,
+[data-theme="dark"] {
+  /* Core Colors */
+  --primary: #44d437b8; /* Metallic Gold */
+  --primary-strong: #f30606d6;
+  --primary-soft: rgba(212, 175, 55, 0.1);
+  --primary-subtle: rgba(212, 175, 55, 0.05);
+
+  --accent: var(--primary);
+  --accent-strong: #d4af37; /* Brighter gold for dark-mode text contrast */
+  --accent-soft: var(--primary-soft);
+  --accent-glow: rgba(212, 175, 55, 0.2);
+
+  /* Neutrals */
+  --bg-main: #09090b; /* Zinc 950 */
+  --bg-soft: #121214;
+  --bg-card: rgba(18, 18, 20, 0.85);
+  --bg-overlay: rgba(9, 9, 11, 0.9);
+  --text-main: #fafaf9; /* Stone 50 */
+  --text-muted: #a8a29e; /* Stone 400 */
+  --text-soft: #57534e; /* Stone 600 */
+  --inverse: #fdfbf7;
+  --border: rgba(212, 175, 55, 0.15);
+
+  --shadow-premium:
+    0 30px 60px -12px rgba(0, 0, 0, 0.7), 0 0 20px -5px rgba(212, 175, 55, 0.05);
+  --grad-page:
+    radial-gradient(
+      circle at top right,
+      rgba(212, 175, 55, 0.03),
+      transparent 30%
+    ),
+    linear-gradient(180deg, #09090b 0%, #121214 100%);
+}
+
 @theme {
   /* تأمين مساحة السكرول بار لمنع اهتزاز المحتوى عند فتح الـ Dialogs */
   --scrollbar-gutter: stable;
@@ -11,145 +106,25 @@
     "Alexandria", "IBM Plex Sans Arabic", "Cairo", system-ui, sans-serif;
   --font-display: "Alexandria", "IBM Plex Sans Arabic", system-ui, sans-serif;
 
-  --radius-premium: 1.5rem;
-  --radius-2xl: 2rem;
+  --radius-premium: var(--radius-premium);
+  --radius-2xl: var(--radius-2xl);
 
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --duration-base: 300ms;
 
-  /* ربط متغيرات الـ CSS بثيم Tailwind v4 لتعمل الشفافية والألوان تلقائياً */
+  /* Mapping for Tailwind v4 */
   --color-main: var(--text-main);
   --color-muted: var(--text-muted);
   --color-card: var(--bg-card);
   --color-soft: var(--bg-soft);
   --color-border: var(--border);
-  --color-primary: var(--accent); /* تعيين الـ accent ليكون هو الـ primary */
+  --color-primary: var(--primary);
 
-  /* ربط الظلال */
-  --shadow-soft: var(--shadow-premium);
+  --shadow-soft: var(--shadow-soft);
+  --shadow-premium: var(--shadow-premium);
 }
 
-/* ============================================================
-   KEYFRAMES
-   ============================================================ */
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 18px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes sidebar-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes sidebar-pulse {
-  0%,
-  100% {
-    opacity: 0.42;
-    transform: scale(0.96);
-  }
-  50% {
-    opacity: 0.82;
-    transform: scale(1.05);
-  }
-}
-
-@keyframes sidebar-shimmer {
-  0% {
-    transform: translateX(-150%);
-  }
-  100% {
-    transform: translateX(150%);
-  }
-}
-
-/* ============================================================
-   BASE
-   ============================================================ */
 @layer base {
-  /* ── Viewport lock: no page-level scroll on any screen ── */
-  html,
-  body,
-  #root {
-    height: 100%;
-    min-height: 100dvh;
-    width: 100%;
-    overflow: hidden !important;
-    margin: 0;
-    padding: 0;
-    scroll-behavior: smooth;
-  }
-
-  body {
-    background: var(--grad-page);
-    color: var(--text-main);
-    font-family: var(--font-sans);
-    transition:
-      background-color 0.4s ease,
-      color 0.4s ease;
-  }
-
-  #root {
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* ── CSS custom properties ── */
-  :root,
-  [data-theme="light"] {
-    --bg-main: rgba(252, 252, 253, 0.2);
-    --bg-soft: rgba(244, 245, 247, 0.4);
-    --bg-card: rgba(255, 255, 255, 0.6);
-    --bg-overlay: rgba(255, 255, 255, 0.85);
-    --text-main: #09090b;
-    --text-muted: #71717a;
-    --border: rgba(9, 9, 11, 0.06);
-    --accent: #7c3aed;
-    --accent-glow: rgba(124, 58, 237, 0.15);
-    --shadow-premium: 0 24px 70px -36px rgba(15, 23, 42, 0.28);
-    --shadow-neon:
-      0 0 0 1px rgba(124, 58, 237, 0.12),
-      0 18px 40px -18px rgba(124, 58, 237, 0.42);
-    --sidebar-surface: rgba(248, 250, 252, 0.78);
-    --sidebar-surface-strong: rgba(255, 255, 255, 0.92);
-    --sidebar-stroke: rgba(255, 255, 255, 0.68);
-    --sidebar-glow: rgba(124, 58, 237, 0.22);
-    --grad-page: linear-gradient(180deg, #fcfcfd 0%, #f4f5f7 100%);
-
-    /* Responsive spacing tokens */
-    --shell-gap: clamp(0.6rem, 1.2vw, 1.45rem);
-    --shell-pad: clamp(0.6rem, 1.2vw, 1.2rem);
-  }
-
-  .dark,
-  [data-theme="dark"] {
-    --bg-main: rgba(9, 9, 11, 0.2);
-    --bg-soft: rgba(18, 18, 22, 0.4);
-    --bg-card: rgba(24, 24, 27, 0.6);
-    --bg-overlay: rgba(9, 9, 11, 0.8);
-    --text-main: #fafafa;
-    --text-muted: #a1a1aa;
-    --border: rgba(250, 250, 250, 0.08);
-    --accent: #22d3ee;
-    --accent-glow: rgba(34, 211, 238, 0.2);
-    --shadow-premium: 0 30px 80px -42px rgba(2, 8, 23, 0.82);
-    --shadow-neon:
-      0 0 0 1px rgba(34, 211, 238, 0.14),
-      0 22px 44px -20px rgba(34, 211, 238, 0.34);
-    --sidebar-surface: rgba(7, 13, 24, 0.76);
-    --sidebar-surface-strong: rgba(10, 18, 32, 0.92);
-    --sidebar-stroke: rgba(148, 163, 184, 0.18);
-    --sidebar-glow: rgba(34, 211, 238, 0.22);
-    --grad-page: radial-gradient(circle at 50% 0%, #1c1917 0%, #09090b 100%);
-  }
-
   * {
     box-sizing: border-box;
   }
@@ -161,7 +136,11 @@
     margin: 0;
   }
   input[type="number"] {
+    /* Standard property for modern browsers */
+    /* Vendor-prefixed fallbacks */
+    -webkit-appearance: textfield;
     -moz-appearance: textfield;
+    appearance: textfield;
   }
 
   /* Fluid headings */
@@ -173,9 +152,10 @@
   h6 {
     font-family: var(--font-display);
     font-weight: 800;
-    letter-spacing: -0.025em;
+    letter-spacing: 0;
     line-height: 1.2;
     color: var(--text-main);
+    overflow-wrap: anywhere;
   }
 
   h1 {
@@ -191,6 +171,26 @@
   p {
     line-height: 1.6;
     color: var(--text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  body {
+    min-width: 320px;
+    overflow-wrap: anywhere;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    min-width: 0;
   }
 
   /* Accessibility & Focus */
@@ -258,11 +258,11 @@
   }
 
   .glass-effect {
-    @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white/20 dark:border-slate-800/20 shadow-premium;
+    @apply border border-border/70 bg-card shadow-sm backdrop-blur-xl;
   }
 
   .surface-toolbar {
-    @apply rounded-[1.75rem] border border-border/70 bg-white/70 p-3 shadow-sm backdrop-blur-xl dark:bg-slate-900/60;
+    @apply rounded-[1.25rem] border border-border/70 bg-card p-3 shadow-sm backdrop-blur-xl;
   }
 
   .chip-scroller {
@@ -274,11 +274,11 @@
   }
 
   .page-subtitle {
-    @apply max-w-2xl text-sm font-bold text-slate-500 dark:text-slate-400 sm:text-base;
+    @apply max-w-2xl text-sm font-bold text-muted sm:text-base;
   }
 
   .content-panel {
-    @apply rounded-[1.75rem] border border-border/70 bg-white/65 shadow-sm backdrop-blur-xl dark:bg-slate-900/55;
+    @apply rounded-premium border border-border/70 bg-card shadow-sm backdrop-blur-xl;
   }
 }
 
@@ -314,10 +314,12 @@
     display: flex;
     flex-direction: row;
     flex: 1 1 0%;
-    min-height: 0; /* crucial: allows children to shrink */
+    min-height: 0;
+    min-width: 0;
     gap: var(--shell-gap);
     padding: var(--shell-pad);
     overflow: hidden;
+    width: 100%;
   }
 
   /* ── Sidebar Slot (desktop) ── */
@@ -327,23 +329,24 @@
     overflow: hidden;
     position: relative;
     z-index: 40;
+    min-width: 0;
   }
 
   /* ── Scrollable body column ── */
   .app-shell__body {
     min-width: 0;
     flex: 1 1 0%;
-    min-height: 0; /* crucial: allows child shrink */
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: var(--shell-gap);
-    padding-right: 0.15rem;
     overflow: hidden;
   }
 
   /* ── Scrollable main area (only place that can scroll internally) ── */
   .app-shell__main {
     min-width: 0;
+    width: 100%;
     flex: 1 1 0%;
     min-height: 0;
     overflow-y: auto;
@@ -355,14 +358,31 @@
 
   .app-shell__main > * {
     min-width: 0;
+    width: 100%;
     min-height: min-content;
   }
 
   .app-shell__content {
     min-width: 0;
     width: 100%;
-    max-width: min(100%, 120rem);
+    max-width: 100%;
     margin-inline: auto;
+    overflow-x: hidden;
+  }
+
+  @media (min-width: 1536px) {
+    .app-shell__content {
+      max-width: 96rem; /* 1536px - يستغل الشاشات الكبيرة */
+      padding-inline: 0.5rem;
+    }
+    .app-shell__main {
+      padding-inline: 0.5rem;
+    }
+  }
+
+  .app-shell__content > * {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .app-shell__mobile-drawer {
@@ -378,6 +398,7 @@
     inset: 0;
     border: 0;
     background: rgba(2, 6, 23, 0.55);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
   }
 
@@ -399,6 +420,19 @@
     min-height: 0;
     position: relative;
     z-index: 10;
+  }
+
+  .erp-page *,
+  .erp-page-container *,
+  .content-panel *,
+  .premium-card *,
+  .glass-card * {
+    min-width: 0;
+  }
+
+  .erp-page :where(.grid, .flex),
+  .erp-page-container :where(.grid, .flex) {
+    min-width: 0;
   }
 
   /* Fixed height mode for pages that need it (like POS) on desktop */
@@ -446,6 +480,17 @@
     width: 100%;
   }
 
+  .table-wrapper table,
+  .premium-table table {
+    min-width: max-content;
+  }
+
+  .table-wrapper :where(th, td),
+  .premium-table :where(th, td) {
+    overflow-wrap: anywhere;
+    vertical-align: middle;
+  }
+
   /* الهيدر ثابت فوق الـ scroll */
   .table-wrapper__head {
     position: sticky;
@@ -456,8 +501,7 @@
   /* ── Data card (كروت الإحصائيات) — مش تتجاوز الشاشة ── */
   .data-card {
     min-height: 0;
-    max-height: clamp(120px, 20dvh, 220px);
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -466,10 +510,7 @@
   /* شبكة الكروت تتكيف مع الارتفاع المتاح */
   .stats-grid {
     display: grid;
-    grid-template-columns: repeat(
-      auto-fill,
-      minmax(clamp(160px, 20%, 260px), 1fr)
-    );
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
     gap: clamp(0.6rem, 1.5vw, 1.25rem);
     min-height: 0;
     align-items: start;
@@ -478,6 +519,7 @@
   /* ── Glass card ── */
   .glass-card {
     background: var(--bg-overlay);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);
     border: 1px solid var(--border);
     border-radius: var(--radius-premium);
@@ -538,10 +580,7 @@
   /* ── Adaptive grid ── */
   .adaptive-grid {
     display: grid;
-    grid-template-columns: repeat(
-      auto-fill,
-      minmax(clamp(240px, 30%, 400px), 1fr)
-    );
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
     gap: 1.5rem;
   }
 
@@ -549,7 +588,8 @@
   .card {
     position: relative;
     isolation: isolate;
-    overflow: hidden;
+    overflow: clip;
+    min-width: 0;
     transition:
       transform 360ms var(--ease-spring),
       border-color 320ms ease,
@@ -651,6 +691,7 @@
     display: flex;
     align-items: center;
     background: var(--bg-overlay);
+    -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--border);
   }
@@ -661,8 +702,8 @@
     overflow: visible;
     border-color: var(--sidebar-stroke);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 24%),
-      color-mix(in srgb, var(--sidebar-surface-strong) 78%, transparent);
+      linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 22%),
+      color-mix(in srgb, var(--sidebar-surface-strong) 88%, transparent);
     box-shadow: var(--shadow-premium);
   }
 
@@ -676,9 +717,9 @@
   /* ── Topbar buttons ── */
   .topbar-modern__icon-btn {
     border: 1px solid var(--border);
-    background: color-mix(in srgb, var(--bg-card) 86%, transparent);
+    background: color-mix(in srgb, var(--bg-card) 92%, transparent);
     color: var(--text-muted);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
     transition:
       transform 260ms ease,
       box-shadow 260ms ease,
@@ -697,7 +738,7 @@
 
   .topbar-modern__cta {
     border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
-    background: color-mix(in srgb, var(--accent) 10%, var(--bg-card));
+    background: color-mix(in srgb, var(--accent) 9%, var(--bg-card));
     color: var(--accent);
     transition:
       transform 260ms ease,
@@ -787,6 +828,7 @@
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.26),
       0 16px 34px -28px rgba(15, 23, 42, 0.18);
+    -webkit-backdrop-filter: blur(16px);
     backdrop-filter: blur(16px);
   }
 
@@ -825,6 +867,7 @@
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.24),
       0 28px 65px -36px rgba(15, 23, 42, 0.34);
+    -webkit-backdrop-filter: blur(18px);
     backdrop-filter: blur(18px);
   }
 
@@ -865,8 +908,9 @@
   /* ── Sidebar modern ── */
   .sidebar-modern {
     isolation: isolate;
-    border-radius: 2rem;
-    backdrop-filter: blur(28px) saturate(165%);
+    border-radius: 1.75rem;
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+    backdrop-filter: blur(22px) saturate(140%);
     box-shadow: var(--shadow-premium);
     height: 100%;
     display: flex;
@@ -876,59 +920,53 @@
 
   .sidebar-modern__edge {
     position: absolute;
-    inset: -42%;
+    inset: -28%;
     border-radius: inherit;
     background: conic-gradient(
       from 180deg,
-      rgba(255, 255, 255, 0.08),
-      rgba(124, 58, 237, 0.88) 14%,
-      rgba(255, 255, 255, 0.15) 28%,
-      rgba(16, 185, 129, 0.2) 42%,
-      transparent 56%,
-      rgba(34, 211, 238, 0.54) 74%,
-      rgba(124, 58, 237, 0.82) 88%,
-      rgba(255, 255, 255, 0.08)
+      rgba(255, 255, 255, 0.04),
+      rgba(15, 108, 189, 0.18) 18%,
+      transparent 38%,
+      rgba(15, 108, 189, 0.12) 58%,
+      transparent 76%,
+      rgba(15, 108, 189, 0.08)
     );
-    animation: sidebar-spin 12s linear infinite;
-    opacity: 0.92;
+    opacity: 0.65;
   }
 
   .dark .sidebar-modern__edge,
   [data-theme="dark"] .sidebar-modern__edge {
     background: conic-gradient(
       from 180deg,
-      rgba(255, 255, 255, 0.05),
-      rgba(34, 211, 238, 0.82) 16%,
-      rgba(96, 165, 250, 0.2) 28%,
-      rgba(16, 185, 129, 0.16) 42%,
-      transparent 58%,
-      rgba(125, 211, 252, 0.46) 78%,
-      rgba(34, 211, 238, 0.78) 92%,
-      rgba(255, 255, 255, 0.05)
+      rgba(255, 255, 255, 0.04),
+      rgba(108, 182, 255, 0.16) 18%,
+      transparent 38%,
+      rgba(108, 182, 255, 0.1) 58%,
+      transparent 76%,
+      rgba(108, 182, 255, 0.06)
     );
   }
 
   .sidebar-modern__glow {
     position: absolute;
-    inset: 10% -18% auto;
-    height: 40%;
+    inset: 14% -10% auto;
+    height: 30%;
     border-radius: 999px;
     background: radial-gradient(
       circle,
       var(--sidebar-glow) 0%,
       transparent 70%
     );
-    filter: blur(36px);
-    animation: sidebar-pulse 8s ease-in-out infinite;
+    filter: blur(34px);
     pointer-events: none;
   }
 
   .sidebar-modern__surface {
     position: absolute;
     inset: 1px;
-    border-radius: calc(2rem - 1px);
+    border-radius: calc(1.75rem - 1px);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 24%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 22%),
       linear-gradient(
         180deg,
         var(--sidebar-surface-strong) 0%,
@@ -936,8 +974,8 @@
       );
     border: 1px solid var(--sidebar-stroke);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.42),
-      inset 0 -22px 44px rgba(255, 255, 255, 0.04);
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      inset 0 -22px 44px rgba(255, 255, 255, 0.02);
     overflow: hidden;
   }
 
@@ -955,12 +993,10 @@
     background: linear-gradient(
       118deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.24) 18%,
+      rgba(255, 255, 255, 0.12) 18%,
       transparent 36%
     );
-    transform: translateX(-150%);
-    animation: sidebar-shimmer 10s ease-in-out infinite;
-    opacity: 0.55;
+    opacity: 0.28;
     pointer-events: none;
   }
 
@@ -1008,7 +1044,7 @@
   .sidebar-item:hover,
   .sidebar-item.active {
     color: var(--text-main);
-    transform: translateY(-2px);
+    transform: translateY(-1px);
   }
 
   .sidebar-item:hover::before,
@@ -1034,9 +1070,9 @@
     align-items: center;
     justify-content: center;
     border-radius: 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.16);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+    border: 1px solid color-mix(in srgb, var(--accent) 10%, var(--border));
+    background: color-mix(in srgb, var(--bg-card) 90%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
     transition:
       transform 320ms ease,
       box-shadow 320ms ease,
@@ -1053,11 +1089,11 @@
   .sidebar-item:hover .sidebar-item__icon-wrap,
   .sidebar-item.active .sidebar-item__icon-wrap {
     color: var(--accent);
-    transform: translateY(-1px) scale(1.02);
+    transform: translateY(-1px);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.26),
-      0 0 0 1px rgba(255, 255, 255, 0.08),
-      0 0 24px var(--accent-glow);
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 10px 24px -16px var(--accent-glow);
   }
 
   .sidebar-item__label {
@@ -1093,6 +1129,7 @@
       color-mix(in srgb, var(--bg-soft) 86%, white 14%),
       color-mix(in srgb, var(--bg-soft) 60%, transparent)
     );
+    -webkit-backdrop-filter: blur(14px);
     backdrop-filter: blur(14px);
   }
 
@@ -1138,7 +1175,7 @@
 
   .app-shell__layout {
     gap: 0.75rem;
-    padding: 0.75rem;
+    padding: 0.5rem;
   }
 
   .app-shell__sidebar-slot {
@@ -1155,7 +1192,7 @@
   }
 
   .app-shell__main {
-    border-radius: 1.5rem;
+    border-radius: 1rem;
   }
 }
 
@@ -1210,6 +1247,9 @@
   .text-accent {
     color: var(--accent);
   }
+  .text-accent-strong {
+    color: var(--accent-strong);
+  }
   .bg-main {
     background: var(--bg-main);
   }
@@ -1221,6 +1261,9 @@
   }
   .bg-accent {
     background: var(--accent);
+  }
+  .bg-accent-strong {
+    background: var(--accent-strong);
   }
   .border-border {
     border-color: var(--border);
@@ -1237,5 +1280,89 @@
 
   .mobile-bottom-safe {
     padding-bottom: calc(5.75rem + env(safe-area-inset-bottom));
+  }
+
+  /* Touch target utilities (WCAG AA: 48×48px minimum) */
+  .touch-target {
+    min-height: 3rem; /* 48px */
+    min-width: 3rem;
+  }
+  .touch-target-sm {
+    min-height: 2.75rem; /* 44px for dense UIs */
+    min-width: 2.75rem;
+  }
+
+  /* ============================================================
+     NO-OVERLAY / NO-OVERFLOW UTILITIES
+     --------------------------------------------------------
+     These rules guarantee that dense KPI cards, list rows, and
+     chart containers never bleed into neighbouring cells.
+     Apply the matching `data-no-overlap` / `data-stats-grid` to
+     a parent; children that opt in via `data-cell` get the
+     truncation behaviour automatically.
+     ============================================================ */
+  [data-no-overlap="true"] {
+    container-type: inline-size;
+  }
+  [data-no-overlap="true"] > * {
+    min-width: 0;
+  }
+  [data-stats-grid="true"] {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  [data-stats-grid="true"] > * {
+    min-width: 0;
+    min-height: 110px;
+  }
+
+  /* Stable numeric layout: prevents digit width jumps when values change. */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Force a single line + ellipsis for any cell labelled "single-line". */
+  .single-line {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Right-align numerics in RTL too (digits always flow LTR). */
+  .num-cell {
+    direction: ltr;
+    unicode-bidi: isolate;
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Card surface that always reserves space for the icon column. */
+  .stat-cell {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  /* Recharts: stop legends from overflowing the chart card. */
+  .recharts-legend-wrapper {
+    max-width: 100% !important;
+  }
+  .recharts-legend-item {
+    margin-inline-end: 0.75rem !important;
+  }
+  .recharts-cartesian-axis-tick-value {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  /* Scrollbar inside chart legends lists. */
+  .legend-scroll {
+    max-height: 120px;
+    overflow-y: auto;
+    scrollbar-width: thin;
   }
 }

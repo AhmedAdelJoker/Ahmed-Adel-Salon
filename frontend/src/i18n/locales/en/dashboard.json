@@ -1,0 +1,65 @@
+{
+  "title": "Executive Dashboard",
+  "subtitle": "Real-time salon performance overview",
+  "revenue": {
+    "today": "Today's Revenue",
+    "thisWeek": "This Week Revenue",
+    "thisMonth": "This Month Revenue",
+    "growth": "Growth Rate",
+    "target": "Daily Target"
+  },
+  "appointments": {
+    "total": "Total Appointments",
+    "completed": "Completed",
+    "pending": "Pending",
+    "cancelled": "Cancelled",
+    "noShow": "No Shows",
+    "upcoming": "Upcoming Appointments"
+  },
+  "staff": {
+    "active": "Active Barbers",
+    "onShift": "On Shift",
+    "offline": "Offline",
+    "performance": "Team Performance"
+  },
+  "customers": {
+    "new": "New Customers",
+    "returning": "Returning Customers",
+    "total": "Total Customers",
+    "vip": "VIP Customers"
+  },
+  "actions": {
+    "pos": "Smart POS",
+    "bookings": "Booking Management",
+    "customers": "Customer CRM",
+    "inventory": "Elite Inventory",
+    "expenses": "Financial Ledger",
+    "reports": "Detailed Reports",
+    "settings": "Settings"
+  },
+  "shift": {
+    "open": "Open Shift",
+    "close": "Close Shift",
+    "status": "Shift Status",
+    "openingCash": "Opening Cash",
+    "closingCash": "Closing Cash",
+    "active": "Active",
+    "inactive": "Standby"
+  },
+  "charts": {
+    "revenue": "Revenue Chart",
+    "appointments": "Appointments Chart",
+    "services": "Top Services",
+    "staffPerformance": "Staff Performance"
+  },
+  "insights": {
+    "title": "Luxe Insights",
+    "aiActive": "AI Strategist Active",
+    "generateAudit": "Generate Analytical Audit"
+  },
+  "quickSearch": {
+    "placeholder": "Smart search across Barber Luxe ecosystem...",
+    "scanning": "AI Scanning",
+    "quickLaunch": "Quick Launch"
+  }
+}

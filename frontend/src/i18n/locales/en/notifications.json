@@ -1,0 +1,51 @@
+{
+  "title": "Notifications",
+  "subtitle": "Manage all system notifications",
+  "all": "All",
+  "unread": "Unread",
+  "read": "Read",
+  "markAllRead": "Mark All as Read",
+  "markAllUnread": "Mark All as Unread",
+  "deleteAll": "Delete All",
+  "types": {
+    "booking": "Booking",
+    "bookingConfirmed": "Booking Confirmed",
+    "bookingCancelled": "Booking Cancelled",
+    "bookingReminder": "Booking Reminder",
+    "payment": "Payment",
+    "paymentReceived": "Payment Received",
+    "paymentFailed": "Payment Failed",
+    "shift": "Shift",
+    "shiftOpened": "Shift Opened",
+    "shiftClosed": "Shift Closed",
+    "lowStock": "Low Stock",
+    "newCustomer": "New Customer",
+    "customerBirthday": "Customer Birthday",
+    "review": "Review",
+    "system": "System",
+    "promotion": "Promotion"
+  },
+  "actions": {
+    "view": "View",
+    "dismiss": "Dismiss",
+    "archive": "Archive",
+    "reply": "Reply",
+    "settings": "Settings"
+  },
+  "empty": {
+    "title": "No Notifications",
+    "subtitle": "New notifications will appear here"
+  },
+  "preferences": {
+    "title": "Notification Preferences",
+    "email": "Email",
+    "sms": "SMS",
+    "push": "Push Notifications",
+    "whatsapp": "WhatsApp",
+    "inApp": "In-App",
+    "marketing": "Marketing",
+    "reminders": "Reminders",
+    "system": "System",
+    "save": "Save Preferences"
+  }
+}

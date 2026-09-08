@@ -1,0 +1,69 @@
+{
+  "title": "Customer Management",
+  "subtitle": "Customer database and visit history",
+  "list": {
+    "title": "Customer List",
+    "search": "Search customer...",
+    "filter": "Filter",
+    "addNew": "Add New Customer",
+    "import": "Import",
+    "export": "Export"
+  },
+  "profile": {
+    "title": "Customer Profile",
+    "personalInfo": "Personal Information",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "phone": "Phone",
+    "email": "Email",
+    "birthday": "Birthday",
+    "gender": "Gender",
+    "notes": "Notes",
+    "address": "Address"
+  },
+  "history": {
+    "title": "Visit History",
+    "visits": "Visits",
+    "appointments": "Appointments",
+    "invoices": "Invoices",
+    "services": "Services",
+    "products": "Products",
+    "totalSpent": "Total Spent",
+    "lastVisit": "Last Visit",
+    "visitCount": "Visit Count"
+  },
+  "loyalty": {
+    "title": "Loyalty Program",
+    "points": "Points",
+    "tier": "Tier",
+    "earned": "Points Earned",
+    "redeemed": "Points Redeemed",
+    "expiry": "Expiry Date",
+    "rewards": "Rewards"
+  },
+  "preferences": {
+    "title": "Preferences",
+    "preferredStaff": "Preferred Staff",
+    "preferredServices": "Preferred Services",
+    "communicationChannel": "Communication Channel",
+    "marketingConsent": "Marketing Consent"
+  },
+  "actions": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "book": "Book Appointment",
+    "message": "Send Message",
+    "call": "Call",
+    "whatsapp": "WhatsApp",
+    "email": "Email",
+    "addNote": "Add Note"
+  },
+  "filters": {
+    "all": "All",
+    "active": "Active",
+    "inactive": "Inactive",
+    "vip": "VIP",
+    "new": "New This Month",
+    "birthday": "Birthday This Week"
+  }
+}

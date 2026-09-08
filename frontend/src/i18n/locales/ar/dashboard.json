@@ -1,0 +1,65 @@
+{
+  "title": "لوحة التحكم التنفيذية",
+  "subtitle": "ملخص أداء الصالون في الوقت الفعلي",
+  "revenue": {
+    "today": "إيرادات اليوم",
+    "thisWeek": "إيرادات هذا الأسبوع",
+    "thisMonth": "إيرادات هذا الشهر",
+    "growth": "معدل النمو",
+    "target": "الهدف اليومي"
+  },
+  "appointments": {
+    "total": "إجمالي المواعيد",
+    "completed": "مكتملة",
+    "pending": "قيد الانتظار",
+    "cancelled": "ملغية",
+    "noShow": "عدم الحضور",
+    "upcoming": "المواعيد القادمة"
+  },
+  "staff": {
+    "active": "الحلاقون النشطون",
+    "onShift": "في الوردية",
+    "offline": "غير متصلين",
+    "performance": "أداء الفريق"
+  },
+  "customers": {
+    "new": "عملاء جدد",
+    "returning": "عملاء عائدون",
+    "total": "إجمالي العملاء",
+    "vip": "عملاء VIP"
+  },
+  "actions": {
+    "pos": "نقطة البيع الذكية",
+    "bookings": "إدارة الحجوزات",
+    "customers": "قاعدة العملاء",
+    "inventory": "المخزون الفاخر",
+    "expenses": "سجل التكاليف",
+    "reports": "التقارير التفصيلية",
+    "settings": "الإعدادات"
+  },
+  "shift": {
+    "open": "فتح الوردية",
+    "close": "إغلاق الوردية",
+    "status": "حالة الوردية",
+    "openingCash": "رصيد الافتتاح",
+    "closingCash": "رصيد الإغلاق",
+    "active": "نشطة",
+    "inactive": "غير نشطة"
+  },
+  "charts": {
+    "revenue": "مخطط الإيرادات",
+    "appointments": "مخطط المواعيد",
+    "services": "أفضل الخدمات",
+    "staffPerformance": "أداء الفريق"
+  },
+  "insights": {
+    "title": "رؤى Luxe",
+    "aiActive": "المخطط الاستراتيجي بالذكاء الاصطناعي نشط",
+    "generateAudit": "إنشاء تدقيق تحليلي"
+  },
+  "quickSearch": {
+    "placeholder": "البحث الذكي في منظومة Barber Luxe العالمية...",
+    "scanning": "فحص بالذكاء الاصطناعي",
+    "quickLaunch": "Quick Launch"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "title": "إدارة الحجوزات",
+  "subtitle": "تنظيم مواعيد العملاء بسلاسة",
+  "newBooking": "حجز جديد",
+  "upcoming": "المواعيد القادمة",
+  "today": "مواعيد اليوم",
+  "calendar": "التقويم",
+  "list": "قائمة",
+  "filters": {
+    "date": "التاريخ",
+    "barber": "الحلاق",
+    "service": "الخدمة",
+    "status": "الحالة",
+    "search": "بحث..."
+  },
+  "status": {
+    "pending": "قيد الانتظار",
+    "confirmed": "مؤكد",
+    "completed": "مكتمل",
+    "cancelled": "ملغي",
+    "noShow": "لم يحضر",
+    "inProgress": "قيد التنفيذ"
+  },
+  "form": {
+    "customer": "العميل",
+    "selectCustomer": "اختر عميل",
+    "newCustomer": "عميل جديد",
+    "service": "الخدمة",
+    "selectService": "اختر خدمة",
+    "barber": "الحلاق",
+    "selectBarber": "اختر حلاق",
+    "date": "التاريخ",
+    "time": "الوقت",
+    "duration": "المدة",
+    "notes": "ملاحظات",
+    "create": "إنشاء حجز",
+    "update": "تحديث الحجز",
+    "cancel": "إلغاء"
+  },
+  "actions": {
+    "edit": "تعديل",
+    "delete": "حذف",
+    "confirm": "تأكيد",
+    "complete": "إكمال",
+    "cancel": "إلغاء",
+    "reschedule": "إعادة جدولة",
+    "view": "عرض"
+  },
+  "empty": {
+    "title": "لا توجد حجوزات",
+    "subtitle": "ابدأ بإنشاء حجز جديد"
+  }
+}

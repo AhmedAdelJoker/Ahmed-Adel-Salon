@@ -1,0 +1,77 @@
+{
+  "title": "التقارير والتحليلات",
+  "subtitle": "رؤى شاملة لأداء الصالون",
+  "dashboard": {
+    "title": "لوحة تقارير",
+    "revenue": "الإيرادات",
+    "appointments": "المواعيد",
+    "staff": "الموظفون",
+    "customers": "العملاء",
+    "services": "الخدمات",
+    "products": "المنتجات"
+  },
+  "financial": {
+    "title": "التقارير المالية",
+    "revenue": "تقرير الإيرادات",
+    "expenses": "تقرير المصروفات",
+    "profit": "الربح والخسارة",
+    "cashflow": "التدفق النقدي",
+    "invoices": "الفواتير",
+    "payments": "المدفوعات",
+    "taxes": "الضرائب"
+  },
+  "operational": {
+    "title": "تقارير التشغيل",
+    "appointments": "المواعيد",
+    "capacity": "السعة والاستغلال",
+    "staffPerformance": "أداء الموظفين",
+    "servicePopularity": "شعبية الخدمات",
+    "peakHours": "ساعات الذروة",
+    "noShows": "عدم الحضور"
+  },
+  "employee": {
+    "title": "تقارير الموظفين",
+    "sales": "مبيعات الموظف",
+    "commission": "العمولات",
+    "attendance": "الحضور والانصراف",
+    "productivity": "الإنتاجية",
+    "payroll": "كشوف المرتبات"
+  },
+  "customer": {
+    "title": "تقارير العملاء",
+    "newCustomers": "عملاء جدد",
+    "retention": "الاحتفاظ بالعملاء",
+    "lifetimeValue": "قيمة العميل",
+    "segments": "شرائح العملاء",
+    "birthdays": "أعياد الميلاد"
+  },
+  "inventory": {
+    "title": "تقارير المخزون",
+    "stockLevels": "مستويات المخزون",
+    "lowStock": "مخزون منخفض",
+    "movements": "الحركات",
+    "valuation": "تقييم المخزون",
+    "suppliers": "الموردين"
+  },
+  "filters": {
+    "dateRange": "النطاق الزمني",
+    "today": "اليوم",
+    "yesterday": "أمس",
+    "thisWeek": "هذا الأسبوع",
+    "lastWeek": "الأسبوع الماضي",
+    "thisMonth": "هذا الشهر",
+    "lastMonth": "الشهر الماضي",
+    "custom": "مخصص",
+    "staff": "الموظف",
+    "service": "الخدمة",
+    "category": "الفئة",
+    "location": "الموقع"
+  },
+  "actions": {
+    "export": "تصدير",
+    "print": "طباعة",
+    "email": "إرسال بالبريد",
+    "schedule": "جدولة",
+    "refresh": "تحديث"
+  }
+}

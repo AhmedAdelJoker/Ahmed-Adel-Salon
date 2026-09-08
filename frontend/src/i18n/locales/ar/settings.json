@@ -1,0 +1,85 @@
+{
+  "title": "الإعدادات",
+  "subtitle": "تخصيص إعدادات الصالون والتفضيلات",
+  "general": "عام",
+  "business": "النشاط التجاري",
+  "notifications": "الإشعارات",
+  "appearance": "المظهر",
+  "security": "الأمان",
+  "integrations": "التكاملات",
+  "backup": "النسخ الاحتياطي",
+  "sections": {
+    "account": "الحساب",
+    "profile": "الملف الشخصي",
+    "preferences": "التفضيلات",
+    "businessInfo": "معلومات النشاط",
+    "workingHours": "ساعات العمل",
+    "holidays": "العطلات",
+    "services": "الخدمات",
+    "employees": "الموظفون",
+    "roles": "الأدوار والصلاحيات",
+    "pos": "نقطة البيع",
+    "inventory": "المخزون",
+    "loyalty": "برنامج الولاء",
+    "marketing": "التسويق",
+    "api": "API و Webhooks"
+  },
+  "businessSettings": {
+    "shopName": "اسم الصالون",
+    "shopPhone": "رقم الصالون",
+    "shopEmail": "بريد الصالون الإلكتروني",
+    "shopAddress": "عنوان الصالون",
+    "shopWhatsApp": "واتساب الصالون",
+    "timezone": "المنطقة الزمنية",
+    "currency": "العملة",
+    "language": "اللغة الافتراضية",
+    "workingHours": "ساعات العمل",
+    "holidays": "العطلات",
+    "save": "حفظ إعدادات النشاط"
+  },
+  "notificationSettings": {
+    "email": "البريد الإلكتروني",
+    "sms": "رسائل SMS",
+    "whatsapp": "واتساب",
+    "push": "إشعارات فورية",
+    "channels": "قنوات الإشعارات",
+    "defaultChannel": "القناة الافتراضية",
+    "templates": "قوالب الرسائل",
+    "save": "حفظ إعدادات الإشعارات"
+  },
+  "smtpSettings": {
+    "host": "SMTP Host",
+    "port": "SMTP Port",
+    "username": "SMTP Username",
+    "password": "SMTP Password",
+    "fromEmail": "From Email",
+    "useTLS": "Use TLS",
+    "testConnection": "اختبار الاتصال",
+    "save": "حفظ إعدادات SMTP"
+  },
+  "appearanceSettings": {
+    "theme": "الثيم",
+    "lightMode": "فاتح",
+    "darkMode": "داكن",
+    "systemDefault": "افتراضي النظام",
+    "primaryColor": "اللون الأساسي",
+    "fontFamily": "خط الكتابة",
+    "animations": "التحركات",
+    "compactMode": "الوضع المدمج",
+    "save": "حفظ المظهر"
+  },
+  "securitySettings": {
+    "twoFactor": "المصادقة الثنائية",
+    "passwordPolicy": "سياسة كلمة المرور",
+    "sessionTimeout": "انتهاء الجلسة",
+    "loginHistory": "سجل الدخول",
+    "apiKeys": "مفاتيح API",
+    "save": "حفظ الأمان"
+  },
+  "actions": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "reset": "إعادة تعيين",
+    "test": "اختبار"
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "title": "Smart POS",
+  "subtitle": "Seamless sales and payment management",
+  "cart": {
+    "title": "Cart",
+    "empty": "Cart is empty",
+    "addItem": "Add Product/Service",
+    "quantity": "Qty",
+    "price": "Price",
+    "discount": "Discount",
+    "total": "Total",
+    "subtotal": "Subtotal",
+    "tax": "Tax",
+    "grandTotal": "Grand Total"
+  },
+  "customer": {
+    "title": "Customer",
+    "select": "Select Customer",
+    "walkIn": "Walk-in",
+    "search": "Search customer...",
+    "newCustomer": "New Customer",
+    "loyaltyPoints": "Loyalty Points",
+    "credit": "Credit"
+  },
+  "payment": {
+    "title": "Payment",
+    "cash": "Cash",
+    "card": "Card",
+    "wallet": "Wallet",
+    "loyalty": "Loyalty Points",
+    "split": "Split Payment",
+    "amount": "Amount",
+    "change": "Change",
+    "reference": "Reference",
+    "complete": "Complete Sale"
+  },
+  "services": {
+    "title": "Services",
+    "add": "Add Service",
+    "duration": "Duration",
+    "staff": "Staff"
+  },
+  "products": {
+    "title": "Products",
+    "add": "Add Product",
+    "stock": "Stock",
+    "barcode": "Barcode"
+  },
+  "actions": {
+    "hold": "Hold",
+    "resume": "Resume",
+    "void": "Void",
+    "refund": "Refund",
+    "receipt": "Receipt",
+    "print": "Print",
+    "email": "Email",
+    "whatsapp": "WhatsApp"
+  },
+  "shift": {
+    "open": "Open Shift",
+    "close": "Close Shift",
+    "openingCash": "Opening Cash",
+    "closingCash": "Closing Cash",
+    "expectedCash": "Expected Cash",
+    "variance": "Variance",
+    "summary": "Shift Summary"
+  },
+  "discounts": {
+    "title": "Discounts",
+    "percentage": "Percentage",
+    "fixed": "Fixed Amount",
+    "reason": "Reason",
+    "apply": "Apply",
+    "remove": "Remove"
+  }
+}
