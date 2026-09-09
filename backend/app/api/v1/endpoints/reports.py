@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Query, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.models.barber import Barber
+from app.models.employee import Employee
 from app.models.invoice import Invoice
 from app.models.service import Service
 from app.models.service_session import ServiceSession
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
 @router.get("/overview", response_model=ReportOverviewRead)
 def reports_overview(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "manager")),
+    current_user: User = Depends(require_roles("admin", "manager", "owner")),
 ):
     total_revenue = db.query(func.coalesce(func.sum(Invoice.total_amount), 0)).scalar() or 0
     total_invoices = db.query(func.count(Invoice.id)).scalar() or 0
@@ -51,14 +51,14 @@ def reports_overview(
 
     top_barbers_rows = (
         db.query(
-            Barber.id.label("barber_id"),
-            Barber.display_name.label("barber_name"),
+            Employee.id.label("barber_id"),
+            Employee.full_name.label("barber_name"),
             func.count(ServiceSession.id).label("sessions_count"),
             func.coalesce(func.sum(Invoice.total_amount), 0).label("total_revenue"),
         )
-        .join(ServiceSession, ServiceSession.barber_id == Barber.id, isouter=True)
+        .join(ServiceSession, ServiceSession.barber_id == Employee.id, isouter=True)
         .join(Invoice, Invoice.session_id == ServiceSession.id, isouter=True)
-        .group_by(Barber.id, Barber.display_name)
+        .group_by(Employee.id, Employee.full_name)
         .order_by(func.coalesce(func.sum(Invoice.total_amount), 0).desc())
         .limit(5)
         .all()

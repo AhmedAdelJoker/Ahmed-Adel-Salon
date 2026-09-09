@@ -6,7 +6,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.db.session import get_db
-from app.api.deps import require_owner_or_manager
+from app.api.deps import require_owner_or_manager, require_any_staff
 from app.models.user import User
 from app.models.employee import Employee
 from app.models.payroll_record import PayrollRecord
@@ -24,6 +24,7 @@ def list_payrolls(
     db: Session = Depends(get_db),
     month: Optional[int] = None,
     year: Optional[int] = None,
+    employee_id: Optional[int] = None,
     current_user: User = Depends(require_owner_or_manager)
 ):
     query = db.query(PayrollRecord)
@@ -31,11 +32,49 @@ def list_payrolls(
         query = query.filter(PayrollRecord.period_month == month)
     if year:
         query = query.filter(PayrollRecord.period_year == year)
+    if employee_id:
+        query = query.filter(PayrollRecord.employee_id == employee_id)
     return query.order_by(PayrollRecord.created_at.desc()).all()
+
+
+@router.get("/all", response_model=List[PayrollRead])
+def list_all_payrolls(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_manager)
+):
+    return db.query(PayrollRecord).order_by(PayrollRecord.created_at.desc()).all()
 
 from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
 from decimal import Decimal
+
+from app.services import payroll_service
+
+@router.get("/expected-net")
+def get_expected_net(
+    employee_id: Optional[int] = None,
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_staff)
+):
+    # If not owner/manager, can only see their own
+    target_id = employee_id
+    if current_user.role not in ["owner", "manager", "admin"]:
+        # Find employee linked to this user
+        emp = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+        if not emp:
+            raise HTTPException(status_code=404, detail="Employee record not found for this user")
+        target_id = emp.id
+    
+    if not target_id:
+        raise HTTPException(status_code=400, detail="employee_id is required for managers/owners")
+        
+    now = datetime.now()
+    m = month or now.month
+    y = year or now.year
+    
+    return payroll_service.calculate_expected_net_salary(db, target_id, m, y)
 
 @router.post("/calculate", response_model=List[PayrollRead])
 def calculate_payroll(
@@ -62,53 +101,23 @@ def calculate_payroll(
             PayrollRecord.period_year == req.year
         ).first()
         
-        if existing and existing.status != "cancelled":
+        if existing and existing.status != "cancelled" and existing.status != "draft":
             results.append(existing)
             continue
             
-        # Calculate Commission
-        commission_amount = Decimal("0.00")
+        # Use the smart calculation service
+        calc = payroll_service.calculate_expected_net_salary(db, emp.id, req.month, req.year)
         
-        if emp.job_title == "barber":
-            # Direct commissions from InvoiceItems
-            comm_sum = db.query(func.sum(InvoiceItem.commission_amount)).join(Invoice).filter(
-                InvoiceItem.employee_id == emp.id,
-                Invoice.created_at >= start_date,
-                Invoice.created_at < end_date
-            ).scalar()
-            commission_amount = Decimal(str(comm_sum or 0))
-            
-        elif emp.job_title == "barber_assistant" and emp.receives_commission:
-            # Commission based on the barber they assist
-            if emp.assistant_of_barber_id:
-                # Sum of total_price of services performed by the assisted barber
-                barber_sales = db.query(func.sum(InvoiceItem.total_price)).join(Invoice).filter(
-                    InvoiceItem.employee_id == emp.assistant_of_barber_id,
-                    InvoiceItem.item_type == "service",
-                    Invoice.created_at >= start_date,
-                    Invoice.created_at < end_date
-                ).scalar()
-                
-                if barber_sales:
-                    rate = Decimal(str(emp.assistant_commission_rate or 0)) / Decimal("100")
-                    commission_amount = (Decimal(str(barber_sales)) * rate).quantize(Decimal("0.01"))
+        commission_amount = calc["commission_amount"]
+        advance_amount = calc["advance_amount"]
+        bonus = calc["attendance_bonus"] + calc["discipline_bonus"]
+        deductions = calc["fixed_deductions"] + calc["auto_deduction"]
+        net_salary = calc["net_salary"]
 
-        base_salary = emp.base_salary or 0
-        bonus = emp.fixed_bonus or 0
-        deductions = emp.default_deductions or 0
-        
-        # Calculate pending advances
-        pending_advances_sum = db.query(func.sum(SalaryAdvance.amount)).filter(
-            SalaryAdvance.employee_id == emp.id,
-            SalaryAdvance.is_deducted == False,
-            SalaryAdvance.advance_date < end_date
-        ).scalar()
-        advance_amount = Decimal(str(pending_advances_sum or 0))
-        
-        net_salary = Decimal(str(base_salary)) + commission_amount + Decimal(str(bonus)) - Decimal(str(deductions)) - advance_amount
-        
-        if existing: # if cancelled, we can reuse or update
+        if existing: # if draft or cancelled, we can reuse or update
              existing.commission_amount = commission_amount
+             existing.bonus_amount = bonus
+             existing.deduction_amount = deductions
              existing.advance_amount = advance_amount
              existing.net_salary = net_salary
              existing.status = "calculated"
@@ -116,11 +125,11 @@ def calculate_payroll(
         else:
             new_record = PayrollRecord(
                 employee_id=emp.id,
-                employee_name_snapshot=emp.full_name or emp.display_name or "Unknown Staff",
+                employee_name_snapshot=emp.full_name or emp.display_name or "موظف غير معروف",
                 role_snapshot=emp.job_title.upper() if emp.job_title else "STAFF",
                 period_month=req.month,
                 period_year=req.year,
-                base_salary=base_salary, 
+                base_salary=emp.base_salary, 
                 commission_amount=commission_amount,
                 bonus_amount=bonus,
                 deduction_amount=deductions,
@@ -244,6 +253,24 @@ def update_payroll(
     for key, value in update_data.items():
         setattr(record, key, value)
     
+    db.commit()
+    db.refresh(record)
+    return record
+
+@router.post("/{payroll_id}/audit", response_model=PayrollRead)
+def audit_payroll(
+    payroll_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_manager)
+):
+    record = db.query(PayrollRecord).filter(PayrollRecord.id == payroll_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Payroll record not found")
+    
+    if record.status == "paid":
+        raise HTTPException(status_code=400, detail="Cannot audit paid payroll")
+        
+    record.status = "audited"
     db.commit()
     db.refresh(record)
     return record

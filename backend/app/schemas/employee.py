@@ -4,6 +4,11 @@ from datetime import datetime, date
 from typing import Optional, List, Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator, AliasPath
 from pydantic.alias_generators import to_camel
+from pydantic import AliasChoices
+
+# Helper to accept both snake_case and camelCase
+def _camel_alias(field_name: str) -> str:
+    return to_camel(field_name)
 
 class EmployeeBase(BaseModel):
     full_name: str
@@ -36,6 +41,9 @@ class EmployeeBase(BaseModel):
     base_salary: Decimal = Decimal("0.00")
     commission_rate: Decimal = Decimal("0.00")
     fixed_bonus: Decimal = Decimal("0.00")
+    bonus_min_attendance_percent: Decimal = Decimal("0.00")
+    enable_attendance_auto_deduction: bool = True
+    discipline_bonus: Decimal = Decimal("0.00")
     default_deductions: Decimal = Decimal("0.00")
     payment_method: Optional[str] = None
     wallet_number: Optional[str] = None
@@ -50,13 +58,26 @@ class EmployeeBase(BaseModel):
     user_id: Optional[int] = None
 
     model_config = ConfigDict(
-        alias_generator=to_camel,
+        from_attributes=True,
         populate_by_name=True,
-        from_attributes=True
+        alias_generator=to_camel,
+        extra="ignore",
     )
 
 class EmployeeCreate(EmployeeBase):
-    pass
+    # Allow both camelCase and snake_case on creation
+    # Extended fields for optional login creation (handled in endpoint, not stored in employees table directly beyond has_login_account/user_id)
+    username: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    service_ids: Optional[List[int]] = Field(default=None, alias="serviceIds")  # allow frontend serviceIds
+    # also accept serviceIds snake
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        alias_generator=to_camel,
+        extra="ignore",
+    )
 
 class EmployeeUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -89,6 +110,9 @@ class EmployeeUpdate(BaseModel):
     base_salary: Optional[Decimal] = None
     commission_rate: Optional[Decimal] = None
     fixed_bonus: Optional[Decimal] = None
+    bonus_min_attendance_percent: Optional[Decimal] = None
+    enable_attendance_auto_deduction: Optional[bool] = None
+    discipline_bonus: Optional[Decimal] = None
     default_deductions: Optional[Decimal] = None
     payment_method: Optional[str] = None
     wallet_number: Optional[str] = None
@@ -101,12 +125,19 @@ class EmployeeUpdate(BaseModel):
 
     has_login_account: Optional[bool] = None
     user_id: Optional[int] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    service_ids: Optional[List[int]] = Field(default=None, alias="serviceIds")
 
     model_config = ConfigDict(
-        alias_generator=to_camel,
+        from_attributes=True,
         populate_by_name=True,
-        from_attributes=True
+        alias_generator=to_camel,
+        extra="ignore",
     )
+
+from app.schemas.service import ServiceRead
 
 class EmployeeRead(EmployeeBase):
     id: int
@@ -115,11 +146,13 @@ class EmployeeRead(EmployeeBase):
     
     # Computed or linked fields
     assistant_of_name: Optional[str] = None
+    services: List[ServiceRead] = []
 
     model_config = ConfigDict(
-        alias_generator=to_camel,
+        from_attributes=True,
         populate_by_name=True,
-        from_attributes=True
+        alias_generator=to_camel,
+        extra="ignore",
     )
 
 class EmployeeListItem(BaseModel):
@@ -134,10 +167,9 @@ class EmployeeListItem(BaseModel):
     commission_rate: Decimal
     assistant_of_name: Optional[str] = None
     profile_image_url: Optional[str] = None
+    service_ids: List[int] = []
 
     model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
         from_attributes=True
     )
 

@@ -2,7 +2,7 @@ from app.db.session import SessionLocal
 import app.db.base  # This will import all models
 from app.models.user import User
 from app.models.business_settings import BusinessSettings
-from app.models.barber import Barber
+from app.models.employee import Employee
 from app.models.service import Service
 from app.models.service_category import ServiceCategory
 from app.models.product import Product
@@ -15,29 +15,61 @@ def seed_data():
     db = SessionLocal()
 
     try:
-        # ✅ Admin
-        if not db.query(User).first():
+        # ✅ Admin & Accountant
+        if not db.query(User).filter(User.username == "admin").first():
             admin = User(
                 username="admin",
                 hashed_password=get_password_hash("252525"),
-                full_name="Admin",
-                role="admin",
+                full_name="المالك (Principal Owner)",
+                role="owner",
                 is_active=True
             )
             db.add(admin)
-            print("✅ Admin created")
+            print("✅ Admin/Owner created")
 
-        # ✅ Barbers
-        if not db.query(Barber).first():
-            barbers = [
-                Barber(display_name="أحمد علي"),
-                Barber(display_name="محمد حسن"),
-                Barber(display_name="محمود صابر"),
+        if not db.query(User).filter(User.username == "accountant").first():
+            accountant = User(
+                username="accountant",
+                hashed_password=get_password_hash("252525"),
+                full_name="المحاسب المالي (Financial Accountant)",
+                role="accountant",
+                is_active=True
+            )
+            db.add(accountant)
+            print("✅ Accountant created")
+
+        # ✅ Employees (replacing legacy Barbers)
+        if not db.query(Employee).first():
+            employees = [
+                Employee(
+                    full_name="أحمد علي",
+                    display_name="أحمد علي (Master Barber)",
+                    phone_primary="01000000001",
+                    job_title="barber",
+                    is_active=True,
+                    commission_rate=Decimal("15.00")
+                ),
+                Employee(
+                    full_name="محمد حسن",
+                    display_name="محمد حسن (Beard Specialist)",
+                    phone_primary="01000000002",
+                    job_title="barber",
+                    is_active=True,
+                    commission_rate=Decimal("15.00")
+                ),
+                Employee(
+                    full_name="محمود صابر",
+                    display_name="محمود صابر (Skin Care Expert)",
+                    phone_primary="01000000003",
+                    job_title="barber",
+                    is_active=True,
+                    commission_rate=Decimal("15.00")
+                ),
             ]
-            db.add_all(barbers)
-            print("✅ Barbers created")
+            db.add_all(employees)
+            print("✅ Employees created")
 
-        # ✅ Services
+        # ✅ Service categories
         if not db.query(ServiceCategory).first():
             categories = [
                 ServiceCategory(name="Hair", name_ar="شعر", icon="✂️", sort_order=1),
@@ -48,6 +80,7 @@ def seed_data():
             db.add_all(categories)
             print("✅ Service categories created")
 
+        # ✅ Services
         if not db.query(Service).first():
             hair_category = db.query(ServiceCategory).filter(ServiceCategory.name_ar == "شعر").first()
             beard_category = db.query(ServiceCategory).filter(ServiceCategory.name_ar == "ذقن").first()

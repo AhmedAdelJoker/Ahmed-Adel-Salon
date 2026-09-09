@@ -31,6 +31,7 @@ class BusinessSettings(Base):
     allow_instapay = Column(Boolean, nullable=False, default=True)
     allow_bank_card = Column(Boolean, nullable=False, default=True)
     working_hours = Column(JSON, nullable=True)
+    shift_auto_close_grace_period = Column(Integer, nullable=False, default=30)  # Minutes after closing time before auto-close
     landing_hero_title = Column(String(500), nullable=True)
     landing_hero_subtitle = Column(Text, nullable=True)
     landing_about_title = Column(String(500), nullable=True)
@@ -79,6 +80,10 @@ class BusinessSettings(Base):
     social_instagram = Column(String(500), nullable=True)
     social_tiktok = Column(String(500), nullable=True)
     social_youtube = Column(String(500), nullable=True)
+    
+    # Loyalty System Configuration
+    loyalty_settings = Column(JSON, nullable=True) # {enabled: bool, tiers: [], points_per_egp: float, etc}
+    
     public_site_snapshot = Column(JSON, nullable=True)
     public_site_published_at = Column(DateTime(timezone=True), nullable=True)
 

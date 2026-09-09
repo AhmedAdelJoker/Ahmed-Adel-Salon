@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 from typing import List, Optional
 
@@ -12,47 +12,27 @@ from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
 from app.models.expense import Expense
 from app.models.business_settings import BusinessSettings
+from app.services.pos_shift_service import auto_close_expired_shifts, is_within_working_hours
 
 router = APIRouter(prefix="/pos-shifts", tags=["POS Shifts"])
 
-def _is_within_working_hours(db: Session) -> bool:
-    settings = db.query(BusinessSettings).first()
-    if not settings or not settings.working_hours:
-        return True # Default to open if no settings
-    
-    now = datetime.now()
-    day_name = now.strftime("%A").lower()
-    day_config = settings.working_hours.get(day_name)
-    
-    # Check if the day is marked as open
-    if not day_config or not day_config.get("is_open"):
-        return False
-        
-    start_str = day_config.get("open_time")
-    end_str = day_config.get("close_time")
-    
-    if not start_str or not end_str:
-        return True
-        
-    try:
-        # Time strings are typically "HH:MM"
-        start_time = datetime.strptime(start_str, "%H:%M").time()
-        end_time = datetime.strptime(end_str, "%H:%M").time()
-        current_time = now.time()
-        
-        # Handle overnight shifts (e.g., 22:00 to 02:00)
-        if start_time <= end_time:
-            return start_time <= current_time <= end_time
-        else: # Crosses midnight
-            return current_time >= start_time or current_time <= end_time
-    except Exception:
-        return True
+@router.post("/auto-close-expired")
+def auto_close_expired_shifts_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner)
+):
+    """Trigger global auto-close check for all shifts."""
+    count = auto_close_expired_shifts(db)
+    return {"status": "ok", "closed_shifts": count}
 
 @router.get("/current")
 def get_current_shift(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner)
 ):
+    # Proactively check and close all expired shifts
+    auto_close_expired_shifts(db)
+
     shift = db.query(PosShift).options(joinedload(PosShift.user)).filter(
         PosShift.user_id == current_user.id,
         PosShift.status == "open"
@@ -66,7 +46,7 @@ def open_shift(
     current_user: User = Depends(require_cashier_manager_owner)
 ):
     # Check working hours
-    if not _is_within_working_hours(db):
+    if not is_within_working_hours(db):
         # We allow it but maybe a warning is better? 
         # User requested it to be "connected" with working hours.
         # Let's be strict but allow an override if requested in the future.
@@ -221,3 +201,31 @@ def list_shifts(
     current_user: User = Depends(require_cashier_manager_owner)
 ):
     return db.query(PosShift).options(joinedload(PosShift.user)).filter(PosShift.user_id == current_user.id).order_by(PosShift.id.desc()).all()
+
+
+@router.get("/total-balance")
+def get_total_cash_balance(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner)
+):
+    """Returns the total expected cash balance in the shop drawer (opening + sales)."""
+    # Sum up all currently open shifts
+    open_shifts = db.query(PosShift).filter(PosShift.status == "open").all()
+    
+    total_opening = Decimal("0.00")
+    if open_shifts:
+        total_opening = sum(Decimal(str(s.opening_cash)) for s in open_shifts)
+    
+    # Calculate sales for these shifts
+    total_sales = Decimal("0.00")
+    for s in open_shifts:
+        invoices = db.query(Invoice).filter(
+            Invoice.created_at >= s.opened_at,
+            Invoice.created_by_user_id == s.user_id
+        ).all()
+        # Only cash sales affect the physical drawer
+        cash_sales = sum(Decimal(str(inv.total_amount)) for inv in invoices if (inv.payment_method or "").upper() == "CASH")
+        total_sales += cash_sales
+
+    # Return as float to ensure JSON compatibility
+    return {"total_balance": float(total_opening + total_sales)}

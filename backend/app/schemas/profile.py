@@ -15,6 +15,9 @@ class ProfileRead(BaseModel):
     barber_id: Optional[int] = None
     is_active: bool
     created_at: datetime
+    profile_image_url: Optional[str] = None
+    display_name: Optional[str] = None
+    bio_ar: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -22,6 +25,8 @@ class ProfileRead(BaseModel):
 class ProfileUpdate(BaseModel):
     full_name: Optional[str] = Field(default=None, max_length=255)
     email: Optional[EmailStr] = Field(default=None)
+    display_name: Optional[str] = Field(default=None, max_length=255)
+    bio_ar: Optional[str] = Field(default=None)
 
 
 class ChangePasswordPayload(BaseModel):

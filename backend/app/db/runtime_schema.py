@@ -18,6 +18,15 @@ def _ensure_column(connection, table_name: str, column_name: str, ddl: str) -> N
         connection.execute(text(ddl))
 
 
+def _ensure_index(connection, index_name: str, ddl: str) -> None:
+    try:
+        rows = connection.execute(text(f"SELECT name FROM sqlite_master WHERE type='index' AND name='{index_name}'")).fetchall()
+        if not rows:
+            connection.execute(text(ddl))
+    except Exception:
+        pass
+
+
 def ensure_runtime_schema() -> None:
     Base.metadata.create_all(bind=engine)
 
@@ -83,6 +92,102 @@ def ensure_runtime_schema() -> None:
             "weight",
             "ALTER TABLE products ADD COLUMN weight NUMERIC(10, 2)",
         )
+
+        _ensure_column(
+            connection,
+            "invoices",
+            "is_closed",
+            "ALTER TABLE invoices ADD COLUMN is_closed BOOLEAN DEFAULT 0",
+        )
+        _ensure_column(
+            connection,
+            "invoices",
+            "closed_at",
+            "ALTER TABLE invoices ADD COLUMN closed_at DATETIME",
+        )
+        _ensure_column(
+            connection,
+            "invoices",
+            "closed_by_user_id",
+            "ALTER TABLE invoices ADD COLUMN closed_by_user_id INTEGER",
+        )
+        _ensure_column(
+            connection,
+            "invoices",
+            "is_draft",
+            "ALTER TABLE invoices ADD COLUMN is_draft BOOLEAN DEFAULT 0",
+        )
+        _ensure_column(
+            connection,
+            "invoices",
+            "draft_saved_at",
+            "ALTER TABLE invoices ADD COLUMN draft_saved_at DATETIME",
+        )
+
+        # Add user_id to notifications table
+        _ensure_column(
+            connection,
+            "notifications",
+            "user_id",
+            "ALTER TABLE notifications ADD COLUMN user_id INTEGER",
+        )
+
+        _ensure_column(
+            connection,
+            "employee_presence_logs",
+            "is_late",
+            "ALTER TABLE employee_presence_logs ADD COLUMN is_late BOOLEAN DEFAULT 0",
+        )
+        _ensure_column(
+            connection,
+            "employee_presence_logs",
+            "late_reason",
+            "ALTER TABLE employee_presence_logs ADD COLUMN late_reason VARCHAR(500)",
+        )
+        _ensure_column(
+            connection,
+            "employee_presence_logs",
+            "late_minutes",
+            "ALTER TABLE employee_presence_logs ADD COLUMN late_minutes INTEGER DEFAULT 0",
+        )
+        _ensure_column(
+            connection,
+            "employee_presence_logs",
+            "source",
+            "ALTER TABLE employee_presence_logs ADD COLUMN source VARCHAR(30) DEFAULT 'manual'",
+        )
+        _ensure_column(
+            connection,
+            "products",
+            "image_url",
+            "ALTER TABLE products ADD COLUMN image_url VARCHAR(500)",
+        )
+        _ensure_column(
+            connection,
+            "expenses",
+            "invoice_image_url",
+            "ALTER TABLE expenses ADD COLUMN invoice_image_url VARCHAR(500)",
+        )
+        _ensure_column(
+            connection,
+            "expenses",
+            "recipient_name",
+            "ALTER TABLE expenses ADD COLUMN recipient_name VARCHAR(255)",
+        )
+
+        _ensure_index(connection, "ix_invoices_created_at", "CREATE INDEX ix_invoices_created_at ON invoices (created_at)")
+        _ensure_index(connection, "ix_invoices_barber_created", "CREATE INDEX ix_invoices_barber_created ON invoices (barber_id, created_at)")
+        _ensure_index(connection, "ix_expenses_expense_date", "CREATE INDEX ix_expenses_expense_date ON expenses (expense_date)")
+        _ensure_index(connection, "ix_expenses_created_at", "CREATE INDEX ix_expenses_created_at ON expenses (created_at)")
+        _ensure_index(connection, "ix_appointments_date_status_barber", "CREATE INDEX ix_appointments_date_status_barber ON appointments (appointment_date, status, barber_id)")
+        _ensure_index(connection, "ix_customers_is_deleted", "CREATE INDEX ix_customers_is_deleted ON customers (is_deleted)")
+        _ensure_index(connection, "ix_invoice_items_invoice_id", "CREATE INDEX ix_invoice_items_invoice_id ON invoice_items (invoice_id)")
+        _ensure_index(connection, "ix_cash_transactions_date", "CREATE INDEX ix_cash_transactions_date ON cash_transactions (transaction_date)")
+
+        # Create new tables for attendance archives and penalties
+        from app.models.employee_presence_log import AttendanceArchive, AttendancePenalty
+        AttendanceArchive.__table__.create(connection, checkfirst=True)
+        AttendancePenalty.__table__.create(connection, checkfirst=True)
 
         connection.execute(
             text("UPDATE products SET unit = 'g' WHERE unit IS NULL OR unit = '' OR unit = 'pcs'")

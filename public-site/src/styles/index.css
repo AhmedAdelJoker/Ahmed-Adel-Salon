@@ -4,11 +4,57 @@
 @theme {
   /* تأمين مساحة السكرول بار لمنع اهتزاز المحتوى عند فتح الـ Dialogs */
   --scrollbar-gutter: stable;
-  /* ── Typography ────────────────────────────────────────── */
+
+  /* ── Typography (RTL-first Arabic + Latin) ────────────── */
+  /* Self-hosted via @fontsource/* — no external network dependency */
   --font-sans:
-    "Alexandria", "IBM Plex Sans Arabic", "Cairo", system-ui, sans-serif;
-  --font-display: "Alexandria", "IBM Plex Sans Arabic", system-ui, sans-serif;
+    "Cairo", "Tajawal", "Segoe UI", "Tahoma", "Arial", system-ui, -apple-system,
+    "Helvetica Neue", sans-serif;
+  --font-display:
+    "Tajawal", "Cairo", "Segoe UI", "Tahoma", "Arial", system-ui, -apple-system,
+    "Helvetica Neue", sans-serif;
+  --font-arabic: "Cairo", "Tajawal", "Segoe UI", "Tahoma", "Arial", sans-serif;
+  --font-latin:
+    "Cairo", system-ui, -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
   --font-mono: "JetBrains Mono", "Cascadia Code", monospace;
+
+  /* ── Spacing scale (4px base, golden ratio progression) ── */
+  --spacing-xs: 0.25rem; /*  4px */
+  --spacing-sm: 0.5rem; /*   8px */
+  --spacing-md: 0.75rem; /*  12px */
+  --spacing-base: 1rem; /*    16px */
+  --spacing-lg: 1.5rem; /*   24px */
+  --spacing-xl: 2rem; /*     32px */
+  --spacing-2xl: 3rem; /*    48px */
+  --spacing-3xl: 4rem; /*    64px */
+  --spacing-4xl: 6rem; /*    96px */
+  --spacing-5xl: 8rem; /*   128px */
+
+  /* ── Border radius scale (smooth progression) ───────────── */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  --radius-3xl: 2.5rem;
+  --radius-4xl: 3.5rem;
+
+  /* ── Shadow scale (layered, gold-tinted) ─────────────────── */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-gold: 0 20px 50px -10px rgba(212, 175, 55, 0.3);
+  --shadow-gold-lg: 0 30px 80px -20px rgba(212, 175, 55, 0.5);
+
+  /* ── Motion tokens ───────────────────────────────────────── */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 500ms;
+  --duration-slower: 800ms;
 
   /* ── Color aliases → CSS vars ───────────────────────────── */
   --color-main: var(--bg-main);
@@ -132,75 +178,75 @@
     color-scheme: light;
 
     /* Backgrounds */
-    --bg-main: #f2f3f7;
-    --bg-soft: #f8f9fb;
+    --bg-main: #FAFAF7;
+    --bg-soft: #F5F5F2;
     --bg-card: #ffffff;
     --bg-elevated: #ffffff;
-    --bg-overlay: rgba(255, 255, 255, 0.62);
+    --bg-overlay: rgba(255, 255, 255, 0.75);
     --bg-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
 
     /* Text */
-    --text-main: #0f172a;
-    --text-secondary: #334155;
-    --text-muted: #64748b;
-    --text-subtle: rgba(100, 116, 139, 0.45);
+    --text-main: #1A1510;
+    --text-secondary: #4A3F35;
+    --text-muted: #8C7A61;
+    --text-subtle: rgba(140, 122, 97, 0.45);
     --text-inverse: #ffffff;
     --text-on-accent: #ffffff;
 
     /* Borders */
-    --border: rgba(15, 23, 42, 0.07);
-    --border-2: rgba(15, 23, 42, 0.12);
-    --border-3: rgba(15, 23, 42, 0.2);
-    --border-accent: rgba(109, 40, 217, 0.25);
-    --border-focus: rgba(109, 40, 217, 0.5);
+    --border: rgba(26, 21, 16, 0.07);
+    --border-2: rgba(26, 21, 16, 0.12);
+    --border-3: rgba(26, 21, 16, 0.2);
+    --border-accent: rgba(212, 175, 55, 0.25);
+    --border-focus: rgba(212, 175, 55, 0.5);
 
-    /* Accent — violet */
-    --accent: #6d28d9;
-    --accent-2: #5b21b6;
-    --accent-dark: #4c1d95;
-    --accent-light: #7c3aed;
-    --accent-soft: rgba(109, 40, 217, 0.1);
-    --accent-subtle: rgba(109, 40, 217, 0.055);
-    --accent-glow: rgba(109, 40, 217, 0.2);
+    /* Accent — Champagne Gold */
+    --accent: #D4AF37;
+    --accent-2: #B08D26;
+    --accent-dark: #8A6D1B;
+    --accent-light: #E5C366;
+    --accent-soft: rgba(212, 175, 55, 0.1);
+    --accent-subtle: rgba(212, 175, 55, 0.055);
+    --accent-glow: rgba(212, 175, 55, 0.2);
 
     /* Semantic */
-    --success: #059669;
-    --success-soft: rgba(5, 150, 105, 0.1);
-    --danger: #dc2626;
-    --danger-soft: rgba(220, 38, 38, 0.1);
-    --warning: #d97706;
-    --warning-soft: rgba(217, 119, 6, 0.1);
-    --info: #2563eb;
-    --info-soft: rgba(37, 99, 235, 0.1);
+    --success: #10B981;
+    --success-soft: rgba(16, 185, 129, 0.1);
+    --danger: #EF4444;
+    --danger-soft: rgba(239, 68, 68, 0.1);
+    --warning: #F59E0B;
+    --warning-soft: rgba(245, 158, 11, 0.1);
+    --info: #3B82F6;
+    --info-soft: rgba(59, 130, 246, 0.1);
 
     /* Sidebar */
-    --theme-sidebar-bg: #f8f9fb;
-    --theme-sidebar-text: #475569;
-    --theme-sidebar-hover: rgba(109, 40, 217, 0.08);
-    --theme-sidebar-active: rgba(109, 40, 217, 0.12);
-    --theme-sidebar-active-border: #6d28d9;
-    --theme-sidebar-border: rgba(15, 23, 42, 0.07);
+    --theme-sidebar-bg: #F5F5F2;
+    --theme-sidebar-text: #4A3F35;
+    --theme-sidebar-hover: rgba(212, 175, 55, 0.08);
+    --theme-sidebar-active: rgba(212, 175, 55, 0.12);
+    --theme-sidebar-active-border: #D4AF37;
+    --theme-sidebar-border: rgba(26, 21, 16, 0.07);
 
     /* Topbar */
-    --theme-topbar-bg: rgba(255, 255, 255, 0.78);
-    --theme-topbar-border: rgba(15, 23, 42, 0.07);
+    --theme-topbar-bg: rgba(255, 255, 255, 0.85);
+    --theme-topbar-border: rgba(26, 21, 16, 0.07);
 
     /* Card */
     --theme-card-bg: #ffffff;
-    --theme-card-text: #0f172a;
-    --theme-muted-text: #64748b;
+    --theme-card-text: #1A1510;
+    --theme-muted-text: #8C7A61;
 
     /* Buttons */
-    --theme-button-primary: #6d28d9;
-    --theme-button-primary-hover: #5b21b6;
+    --theme-button-primary: #D4AF37;
+    --theme-button-primary-hover: #B08D26;
 
     /* Sidebar shorthand */
     --sb-bg: var(--theme-sidebar-bg);
     --sb-bg-2: var(--theme-sidebar-bg);
     --sb-text: var(--theme-sidebar-text);
-    --sb-text-hover: #0f172a;
+    --sb-text-hover: #1A1510;
     --sb-text-active: var(--theme-sidebar-active-border);
-    --sb-icon: #94a3b8;
+    --sb-icon: #8C7A61;
     --sb-icon-active: var(--theme-sidebar-active-border);
     --sb-hover-bg: var(--theme-sidebar-hover);
     --sb-active-bg: var(--theme-sidebar-active);
@@ -211,104 +257,104 @@
     --grad-page:
       radial-gradient(
         ellipse 60% 40% at 8% -4%,
-        rgba(109, 40, 217, 0.07),
+        rgba(212, 175, 55, 0.07),
         transparent 55%
       ),
       radial-gradient(
         ellipse 40% 30% at 92% 96%,
-        rgba(124, 58, 237, 0.04),
+        rgba(176, 141, 38, 0.04),
         transparent 45%
       ),
-      linear-gradient(180deg, #f8f9fb 0%, #f2f3f7 100%);
-    --grad-card: linear-gradient(160deg, #ffffff 0%, #fafafa 100%);
+      linear-gradient(180deg, #FAFAF7 0%, #F5F5F2 100%);
+    --grad-card: linear-gradient(160deg, #ffffff 0%, #FAFAF7 100%);
     --grad-accent: linear-gradient(
       135deg,
-      #6d28d9 0%,
-      #7c3aed 60%,
-      #8b5cf6 100%
+      #D4AF37 0%,
+      #E5C366 60%,
+      #F2D58E 100%
     );
     --grad-accent-h: linear-gradient(
       135deg,
-      #5b21b6 0%,
-      #6d28d9 60%,
-      #7c3aed 100%
+      #B08D26 0%,
+      #D4AF37 60%,
+      #E5C366 100%
     );
   }
 
-  /* ── Dark theme ───────────────────────────────────────── */
+  /* ── Dark theme (Midnight Gold) ───────────────────────── */
   .dark,
   [data-theme="dark"] {
     color-scheme: dark;
 
     /* Backgrounds */
-    --bg-main: #080808;
-    --bg-soft: #111111;
-    --bg-card: #141414;
-    --bg-elevated: #1a1a1a;
-    --bg-overlay: rgba(12, 12, 12, 0.78);
+    --bg-main: #09090B;
+    --bg-soft: #121214;
+    --bg-card: #17171A;
+    --bg-elevated: #1C1C1F;
+    --bg-overlay: rgba(9, 9, 11, 0.85);
 
     /* Text */
-    --text-main: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-muted: #94a3b8;
+    --text-main: #F8FAFC;
+    --text-secondary: #CBD5E1;
+    --text-muted: #94A3B8;
     --text-subtle: #475569;
-    --text-inverse: #0f172a;
-    --text-on-accent: #0d1117;
+    --text-inverse: #09090B;
+    --text-on-accent: #09090B;
 
     /* Borders */
-    --border: rgba(255, 255, 255, 0.07);
-    --border-2: rgba(255, 255, 255, 0.11);
-    --border-3: rgba(255, 255, 255, 0.17);
-    --border-accent: rgba(34, 211, 238, 0.25);
-    --border-focus: rgba(34, 211, 238, 0.5);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-2: rgba(255, 255, 255, 0.12);
+    --border-3: rgba(255, 255, 255, 0.18);
+    --border-accent: rgba(212, 175, 55, 0.3);
+    --border-focus: rgba(212, 175, 55, 0.6);
 
-    /* Accent — cyan */
-    --accent: #22d3ee;
-    --accent-2: #06b6d4;
-    --accent-dark: #0891b2;
-    --accent-light: #67e8f9;
-    --accent-soft: rgba(34, 211, 238, 0.1);
-    --accent-subtle: rgba(34, 211, 238, 0.055);
-    --accent-glow: rgba(34, 211, 238, 0.18);
+    /* Accent — Champagne Gold */
+    --accent: #D4AF37;
+    --accent-2: #B08D26;
+    --accent-dark: #8A6D1B;
+    --accent-light: #E5C366;
+    --accent-soft: rgba(212, 175, 55, 0.12);
+    --accent-subtle: rgba(212, 175, 55, 0.06);
+    --accent-glow: rgba(212, 175, 55, 0.25);
 
     /* Semantic */
-    --success: #34d399;
-    --success-soft: rgba(52, 211, 153, 0.1);
-    --danger: #f87171;
-    --danger-soft: rgba(248, 113, 113, 0.1);
-    --warning: #fbbf24;
-    --warning-soft: rgba(251, 191, 36, 0.1);
-    --info: #60a5fa;
-    --info-soft: rgba(96, 165, 250, 0.1);
+    --success: #10B981;
+    --success-soft: rgba(16, 185, 129, 0.1);
+    --danger: #EF4444;
+    --danger-soft: rgba(239, 68, 68, 0.1);
+    --warning: #F59E0B;
+    --warning-soft: rgba(245, 158, 11, 0.1);
+    --info: #3B82F6;
+    --info-soft: rgba(59, 130, 246, 0.1);
 
     /* Sidebar */
-    --theme-sidebar-bg: #0d0d0d;
-    --theme-sidebar-text: #94a3b8;
-    --theme-sidebar-hover: rgba(34, 211, 238, 0.08);
-    --theme-sidebar-active: rgba(34, 211, 238, 0.12);
-    --theme-sidebar-active-border: #22d3ee;
-    --theme-sidebar-border: rgba(255, 255, 255, 0.07);
+    --theme-sidebar-bg: #0C0C0E;
+    --theme-sidebar-text: #94A3B8;
+    --theme-sidebar-hover: rgba(212, 175, 55, 0.1);
+    --theme-sidebar-active: rgba(212, 175, 55, 0.15);
+    --theme-sidebar-active-border: #D4AF37;
+    --theme-sidebar-border: rgba(255, 255, 255, 0.08);
 
     /* Topbar */
-    --theme-topbar-bg: rgba(10, 10, 10, 0.82);
-    --theme-topbar-border: rgba(255, 255, 255, 0.07);
+    --theme-topbar-bg: rgba(9, 9, 11, 0.85);
+    --theme-topbar-border: rgba(255, 255, 255, 0.08);
 
     /* Card */
-    --theme-card-bg: #141414;
-    --theme-card-text: #f1f5f9;
-    --theme-muted-text: #94a3b8;
+    --theme-card-bg: #17171A;
+    --theme-card-text: #F8FAFC;
+    --theme-muted-text: #94A3B8;
 
     /* Buttons */
-    --theme-button-primary: #22d3ee;
-    --theme-button-primary-hover: #06b6d4;
+    --theme-button-primary: #D4AF37;
+    --theme-button-primary-hover: #B08D26;
 
     /* Sidebar shorthand */
     --sb-bg: var(--theme-sidebar-bg);
     --sb-bg-2: var(--theme-sidebar-bg);
     --sb-text: var(--theme-sidebar-text);
-    --sb-text-hover: #f1f5f9;
+    --sb-text-hover: #F8FAFC;
     --sb-text-active: var(--theme-sidebar-active-border);
-    --sb-icon: #64748b;
+    --sb-icon: #64748B;
     --sb-icon-active: var(--theme-sidebar-active-border);
     --sb-hover-bg: var(--theme-sidebar-hover);
     --sb-active-bg: var(--theme-sidebar-active);
@@ -319,27 +365,27 @@
     --grad-page:
       radial-gradient(
         ellipse 60% 40% at 8% -4%,
-        rgba(34, 211, 238, 0.07),
+        rgba(212, 175, 55, 0.08),
         transparent 55%
       ),
       radial-gradient(
         ellipse 40% 30% at 92% 96%,
-        rgba(6, 182, 212, 0.04),
+        rgba(176, 141, 38, 0.05),
         transparent 45%
       ),
-      linear-gradient(180deg, #0b0b0b 0%, #080808 100%);
-    --grad-card: linear-gradient(160deg, #181818 0%, #121212 100%);
+      linear-gradient(180deg, #09090B 0%, #121214 100%);
+    --grad-card: linear-gradient(160deg, #1C1C1F 0%, #17171A 100%);
     --grad-accent: linear-gradient(
       135deg,
-      #22d3ee 0%,
-      #38bdf8 60%,
-      #67e8f9 100%
+      #D4AF37 0%,
+      #E5C366 60%,
+      #F2D58E 100%
     );
     --grad-accent-h: linear-gradient(
       135deg,
-      #06b6d4 0%,
-      #22d3ee 60%,
-      #38bdf8 100%
+      #B08D26 0%,
+      #D4AF37 60%,
+      #E5C366 100%
     );
   }
 
@@ -366,26 +412,99 @@
     font-size: 16px;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    direction: rtl;
   }
 
   body {
     direction: rtl;
     font-family: var(--font-sans);
-    font-size: 0.9375rem; /* 15px — slightly tighter for Arabic */
-    line-height: 1.65;
-    letter-spacing: 0.005em;
-    background: var(--grad-page);
-    color: var(--text-main);
+    font-size: 1rem; /* 16px — base size for readable Arabic */
+    line-height: 1.7; /* Slightly looser for Arabic readability */
+    letter-spacing: 0;
+    font-feature-settings: "kern", "liga", "calt", "ss01";
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-feature-settings:
-      "kern" 1,
-      "liga" 1,
-      "calt" 1;
+    text-anchor: end;
+  }
+
+  /* ── Arabic Display Utilities ──────────────────────────── */
+  .text-display-xl {
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 7vw, 5.5rem);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    font-weight: 900;
+  }
+  .text-display-lg {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 4rem);
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    font-weight: 800;
+  }
+  .text-display-md {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 3vw, 2.5rem);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+  }
+  .text-eyebrow {
+    font-family: var(--font-display);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+  }
+  .text-eyebrow-ar {
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Text gradient (gold) ───────────────────────────────── */
+  .text-gradient-gold {
+    background: linear-gradient(
+      135deg,
+      #f5d77a 0%,
+      #d4af37 50%,
+      #b08d26 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* ── Glass surface variants ──────────────────────────── */
+  .surface-glass {
+    background: rgba(23, 23, 26, 0.6);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .surface-glass-strong {
+    background: rgba(23, 23, 26, 0.85);
+    backdrop-filter: blur(28px) saturate(200%);
+    -webkit-backdrop-filter: blur(28px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* ── Section spacing rhythm ───────────────────────────── */
+  .section-rhythm {
+    padding-block: clamp(3.5rem, 8vw, 7rem);
+  }
+  .section-rhythm-sm {
+    padding-block: clamp(2.5rem, 5vw, 4.5rem);
+  }
+
+  /* ── Smooth theme transitions ─────────────────────────── */
+  .theme-transition {
     transition:
-      background var(--duration-slow) var(--ease-smooth),
-      color var(--duration-slow) var(--ease-smooth);
+      background-color var(--duration-slow) var(--ease-out-expo, ease),
+      color var(--duration-slow) var(--ease-out-expo, ease);
   }
 
   /* Native form elements inherit font */
@@ -1438,6 +1557,19 @@
 ────────────────────────────────────────────────────────────── */
 
 @layer utilities {
+  /* ── RTL (Arabic) icon mirroring ───────────────────────── */
+  /* Mirrors directional icons in RTL contexts */
+  [dir="rtl"] .rtl-flip {
+    transform: scaleX(-1);
+  }
+  /* Logical property shortcuts */
+  .ms-auto { margin-inline-start: auto; }
+  .me-auto { margin-inline-end: auto; }
+  .ps-4 { padding-inline-start: 1rem; }
+  .pe-4 { padding-inline-end: 1rem; }
+  .ps-6 { padding-inline-start: 1.5rem; }
+  .pe-6 { padding-inline-end: 1.5rem; }
+
   /* Line clamp */
   .line-clamp-1 {
     display: -webkit-box;

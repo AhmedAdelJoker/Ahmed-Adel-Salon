@@ -4,6 +4,7 @@ from sqlalchemy import Column, Integer, String, Boolean, Numeric, Text, DateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
+from app.models.employee_service_link import employee_services
 
 class Employee(Base):
     __tablename__ = "employees"
@@ -47,6 +48,9 @@ class Employee(Base):
     base_salary = Column(Numeric(10, 2), nullable=False, default=0)
     commission_rate = Column(Numeric(5, 2), nullable=False, default=0) # percentage
     fixed_bonus = Column(Numeric(10, 2), nullable=False, default=0)
+    bonus_min_attendance_percent = Column(Numeric(5, 2), nullable=False, default=0) # e.g., 95%
+    enable_attendance_auto_deduction = Column(Boolean, nullable=False, default=True)
+    discipline_bonus = Column(Numeric(10, 2), nullable=False, default=0) # bonus if no delays/absences
     default_deductions = Column(Numeric(10, 2), nullable=False, default=0)
     payment_method = Column(String(30), nullable=True) # cash, wallet, bank
     wallet_number = Column(String(30), nullable=True)
@@ -75,13 +79,20 @@ class Employee(Base):
     )
     
     working_hours = relationship("EmployeeWorkingHour", back_populates="employee", cascade="all, delete-orphan")
+    services = relationship("Service", secondary=employee_services, back_populates="employees")
     time_offs = relationship("EmployeeTimeOff", back_populates="employee", cascade="all, delete-orphan")
     presence_logs = relationship("EmployeePresenceLog", back_populates="employee", cascade="all, delete-orphan")
+    attendance_archives = relationship("AttendanceArchive", back_populates="employee", cascade="all, delete-orphan")
+    attendance_penalties = relationship("AttendancePenalty", back_populates="employee", cascade="all, delete-orphan")
     payroll_records = relationship("PayrollRecord", back_populates="employee")
     reviews = relationship("Review", back_populates="employee")
 
     # Self-relationship for assistant
     assistant_of = relationship("Employee", remote_side=[id], backref="assistants")
+
+    appointments = relationship("Appointment", back_populates="barber")
+    invoices = relationship("Invoice", back_populates="barber")
+    sessions = relationship("ServiceSession", back_populates="barber")
 
 
 

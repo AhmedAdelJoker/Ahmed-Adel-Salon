@@ -52,15 +52,19 @@ python -m uvicorn app.main:app --reload
 
 1.  انتقل لمجلد الفرونت:
 
-    ```bash
-    cd frontend
-    cd public-site
+        ```bash
 
-    ```
+cd frontend
+cd public-site
+
+        ```
 
 2.  نصّب المكتبات:
     ```bash
     npm install
+    npm run lint -- --fix
+    npm run lint
+    npx tsc --noEmit
     ```
 3.  إعداد ملف البيئة `.env`:
     - تأكد من أن `VITE_API_URL` يشير إلى خادم الباك إند (مثلاً `http://localhost:8000/api/v1`).
@@ -184,29 +188,7 @@ _٢٠٢٦_
 - عدم تعطيل الوظائف
 - إجراء التغييرات تدريجيًا وبشكل آمن
 - شرح كل قرار بإيجاز
-  /\*
-  from app.db.session import SessionLocal
-  from app.models.user import User
-  from passlib.context import CryptContext
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-db = SessionLocal()
-
-user = User(
-username="admin",
-hashed_password=pwd_context.hash("123456"),
-full_name="Admin",
-role="admin",
-is_active=True
-)
-
-db.add(user)
-db.commit()
-db.close()
-
-print("✅ Admin user created")
-\*/
 git add .
 git commit -m "Update"
 git push

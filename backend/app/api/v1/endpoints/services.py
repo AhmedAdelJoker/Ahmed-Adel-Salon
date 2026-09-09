@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile
 from sqlalchemy.orm import Session, joinedload
+import os
+import uuid
+from pathlib import Path
 
 from app.db.session import get_db
 from app.api.deps import require_any_staff
@@ -10,8 +13,23 @@ from app.models.service_category import ServiceCategory
 from app.models.service_product import ServiceProduct
 from app.schemas.inventory import ServiceProductRead
 from app.schemas.service import ServiceCreate, ServiceRead, ServiceUpdate
+from app.utils.media import process_image_content, get_upload_path
 
 router = APIRouter(prefix="/services", tags=["Services"])
+
+
+@router.post("/upload-image")
+async def upload_service_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_any_staff),
+):
+    """
+    Uploads a service image and returns the URL.
+    """
+    upload_dir = get_upload_path("business")
+    content = await file.read()
+    filename = process_image_content(content, file.filename, upload_dir)
+    return {"url": f"/uploads/business/{filename}"}
 
 
 def _serialize_ingredient(row: ServiceProduct) -> ServiceProductRead:

@@ -49,7 +49,11 @@ class InvoiceRead(BaseModel):
     appointment_id: Optional[int] = None
     customer_id: int
     barber_id: Optional[int] = None
+    customer_name: Optional[str] = None
+    barber_name: Optional[str] = None
     payment_method: str
+    subtotal_amount: Decimal = Decimal("0.00")
+    discount_amount: Decimal = Decimal("0.00")
     total_amount: Decimal
     pdf_path: Optional[str] = None
     created_at: datetime

@@ -1,15 +1,34 @@
 {
-  "short_name": "Barber Luxe",
-  "name": "Barber Luxe | Professional Salon OS",
+  "name": "Salon Pro — Royal Grooming",
+  "short_name": "Salon Pro",
+  "description": "Book your royal grooming experience at premium barbershops.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#09090B",
+  "theme_color": "#09090B",
+  "lang": "ar",
+  "dir": "rtl",
+  "categories": ["lifestyle", "business", "booking"],
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "/favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "type": "image/x-icon",
+      "purpose": "any"
     }
   ],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#0F172A",
-  "background_color": "#0F172A"
+  "shortcuts": [
+    {
+      "name": "Book Appointment",
+      "short_name": "Book",
+      "url": "/book"
+    },
+    {
+      "name": "Home",
+      "short_name": "Home",
+      "url": "/"
+    }
+  ]
 }

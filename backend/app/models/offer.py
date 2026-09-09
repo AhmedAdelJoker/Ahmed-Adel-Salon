@@ -30,3 +30,8 @@ class Offer(Base):
         back_populates="offer",
         cascade="all, delete-orphan",
     )
+    offer_products = relationship(
+        "OfferProduct",
+        back_populates="offer",
+        cascade="all, delete-orphan",
+    )

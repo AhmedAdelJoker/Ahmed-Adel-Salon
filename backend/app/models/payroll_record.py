@@ -10,8 +10,8 @@ class PayrollRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     
     # Linking to employee
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)
     
     # Snapshots for historical accuracy
     employee_name_snapshot = Column(String(255), nullable=False)
@@ -30,11 +30,11 @@ class PayrollRecord(Base):
     payment_method = Column(String(50), nullable=True)
     payment_date = Column(DateTime(timezone=True), nullable=True)
     
-    status = Column(String(30), nullable=False, default="draft") # draft, calculated, paid, cancelled
+    status = Column(String(30), nullable=False, default="draft") # draft, calculated, audited, paid, cancelled
     notes = Column(Text, nullable=True)
     
-    expense_id = Column(Integer, ForeignKey("expenses.id"), nullable=True)
-    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    expense_id = Column(Integer, ForeignKey("expenses.id"), nullable=True, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

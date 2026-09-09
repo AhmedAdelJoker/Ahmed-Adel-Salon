@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from app.models.employee_service_link import employee_services
 
 from app.db.base_class import Base
 
@@ -27,6 +28,7 @@ class Service(Base):
     appointment_services = relationship("AppointmentService", back_populates="service")
     invoice_items = relationship("InvoiceItem", back_populates="service")
     category_rel = relationship("ServiceCategory", back_populates="services")
+    employees = relationship("Employee", secondary=employee_services, back_populates="services")
     ingredients = relationship(
         "ServiceProduct",
         back_populates="service",

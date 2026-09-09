@@ -2,8 +2,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
-from app.core.roles import UserRole
+from app.api.deps import get_db, require_cashier_manager_owner
 from app.models.user import User
 from app.schemas.activity_log import PaginatedActivityLogsRead
 from app.services.activity_log_service import list_activity_logs
@@ -15,6 +14,8 @@ router = APIRouter(prefix="/activity-logs", tags=["Activity Logs"])
 def get_activity_logs(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=200),
+    skip: int | None = Query(default=None),
+    limit: int | None = Query(default=None),
     action: str | None = Query(default=None),
     entity_type: str | None = Query(default=None),
     user_id: int | None = Query(default=None),
@@ -22,8 +23,13 @@ def get_activity_logs(
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles(UserRole.ADMIN, UserRole.MANAGER)),
+    _: User = Depends(require_cashier_manager_owner),
 ):
+    # Handle skip/limit if provided by frontend
+    if skip is not None and limit is not None:
+        page_size = limit
+        page = (skip // limit) + 1
+
     data = list_activity_logs(
         db,
         page=page,

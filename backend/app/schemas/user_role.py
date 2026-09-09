@@ -21,6 +21,23 @@ class UserCreate(BaseModel):
         return validate_password_strength(value)
 
 
+class UserUpdate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=100)
+    password: Optional[str] = ""
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: str = "cashier"
+    barber_id: Optional[int] = None
+    is_active: bool = True
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: Optional[str]) -> Optional[str]:
+        if value and value != "":
+            return validate_password_strength(value)
+        return value or None
+
+
 class UserRead(BaseModel):
     id: int
     username: str
@@ -30,6 +47,8 @@ class UserRead(BaseModel):
     barber_id: Optional[int] = None
     is_active: bool
     created_at: datetime
+    profile_image_url: Optional[str] = None
+    job_title: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

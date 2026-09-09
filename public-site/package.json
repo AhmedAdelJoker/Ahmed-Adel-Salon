@@ -5,27 +5,35 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build && node scripts/prerender.mjs",
+    "build:vite": "vite build",
+    "prerender": "node scripts/prerender.mjs",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.18.0",
+    "@fontsource/cairo": "^5.3.0",
+    "@fontsource/tajawal": "^5.3.0",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "axios": "^1.6.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "framer-motion": "^10.16.4",
     "lucide-react": "^0.292.0",
-    "axios": "^1.6.0",
-    "clsx": "^2.1.1",
-    "tailwind-merge": "^3.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
-    "@radix-ui/react-tooltip": "^1.2.8",
-    "@radix-ui/react-slot": "^1.2.4",
-    "class-variance-authority": "^0.7.1"
+    "react-router-dom": "^6.18.0",
+    "tailwind-merge": "^3.0.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.2",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.0.1",
     "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3",
     "vite": "^8.0.12"
   }
 }

@@ -11,6 +11,14 @@ class OfferServiceRead(BaseModel):
     price: Decimal
 
 
+class OfferProductRead(BaseModel):
+    id: int
+    product_id: int
+    quantity: Decimal
+    product_name: str
+    product_price: Decimal
+
+
 class OfferBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     name_ar: Optional[str] = Field(default=None, max_length=255)
@@ -27,6 +35,7 @@ class OfferBase(BaseModel):
     is_public: bool = True
     is_active: bool = True
     service_ids: list[int] = []
+    products: list[dict] = [] # List of {product_id, quantity}
 
 
 class OfferCreate(OfferBase):
@@ -55,5 +64,6 @@ class OfferRead(BaseModel):
     is_active: bool
     created_at: datetime
     services: list[OfferServiceRead] = []
+    offer_products: list[OfferProductRead] = []
 
     model_config = ConfigDict(from_attributes=True)

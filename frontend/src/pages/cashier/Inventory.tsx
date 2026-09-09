@@ -44,8 +44,6 @@ import { useInventoryData } from "@/features/inventory/hooks/useInventoryData";
 import { useInventoryForm } from "@/features/inventory/hooks/useInventoryForm";
 import {
   UNIT_OPTIONS,
-  DEFAULT_FORM,
-  DEFAULT_STOCK_FORM,
   normalizeUnit,
   getUnitMeta,
   formatQuantity,

@@ -44,7 +44,7 @@ class CashTransactionCreate(BaseModel):
 
 class CashTransactionOut(BaseModel):
     id: int
-    transaction_no: str
+    transaction_no: Optional[str] = None
     type: str
     direction: str
     amount: float
@@ -55,6 +55,7 @@ class CashTransactionOut(BaseModel):
     reference_no: Optional[str] = None
     notes: Optional[str] = None
     is_voided: int
+    transaction_date: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

@@ -11,7 +11,7 @@ class ServiceSession(Base):
     id = Column(Integer, primary_key=True, index=True)
     appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True)
     customer_id = Column(Integer, ForeignKey("customers.customer_id"), nullable=False)
-    barber_id = Column(Integer, ForeignKey("barbers.id"), nullable=False)
+    barber_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
     status = Column(String(30), nullable=False, default="active")
     notes = Column(Text, nullable=True)
     total_price = Column(Numeric(10, 2), nullable=False, default=0)
@@ -20,6 +20,6 @@ class ServiceSession(Base):
 
     appointment = relationship("Appointment")
     customer = relationship("Customer", back_populates="sessions")
-    barber = relationship("Barber", back_populates="sessions")
+    barber = relationship("Employee", back_populates="sessions")
     created_by_user = relationship("User")
     products = relationship("SessionProduct", back_populates="session", cascade="all, delete-orphan")

@@ -1,25 +1,27 @@
 import logging
 from decimal import Decimal
 from datetime import date, datetime, timedelta
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.customer import Customer
-from app.models.barber import Barber
+from app.models.employee import Employee
 from app.models.service import Service
+from app.models.service_category import ServiceCategory
 from app.models.appointment import Appointment
 from app.models.appointment_service import AppointmentService
 from app.models.business_settings import BusinessSettings
-from app.models.barber_working_hour import BarberWorkingHour
-from app.models.barber_time_off import BarberTimeOff
+from app.models.employee_working_hour import EmployeeWorkingHour
+from app.models.employee_time_off import EmployeeTimeOff
 from app.models.notification import Notification
 
 from app.schemas.booking import PublicBookingCreate, PublicBookingResponse
 from app.core.config import settings
 from app.core.rate_limit import rate_limit
+from app.services import booking_scheduler
 from app.services.meta_whatsapp_service import send_booking_confirmation_template
 
 router = APIRouter(prefix="/public", tags=["Public Booking"])
@@ -28,10 +30,11 @@ logger = logging.getLogger(__name__)
 
 def _get_or_create_customer(db: Session, payload: PublicBookingCreate) -> Customer:
     customer = db.query(Customer).filter(Customer.phone == payload.phone).first()
+    last_name = payload.last_name or ""
 
     if customer:
         customer.first_name = payload.first_name
-        customer.last_name = payload.last_name
+        customer.last_name = last_name
         customer.email = payload.email
         db.add(customer)
         db.flush()
@@ -39,7 +42,7 @@ def _get_or_create_customer(db: Session, payload: PublicBookingCreate) -> Custom
 
     customer = Customer(
         first_name=payload.first_name,
-        last_name=payload.last_name,
+        last_name=last_name,
         phone=payload.phone,
         email=payload.email,
     )
@@ -98,6 +101,8 @@ def _rebuild_appointment_services_public(
     appointment.total_estimated_duration_minutes = total_duration
 
 
+from app.models.offer import Offer
+
 @router.get(
     "/booking-catalog",
     dependencies=[
@@ -120,30 +125,90 @@ def get_booking_catalog(
         .order_by(Service.id.asc())
         .all()
     )
-    barbers = db.query(Barber).order_by(Barber.id.asc()).all()
+    barbers = (
+        db.query(Employee)
+        .filter(Employee.is_active == True, Employee.show_in_booking == True)
+        .order_by(Employee.id.asc())
+        .all()
+    )
+    try:
+        categories = (
+            db.query(ServiceCategory)
+            .filter(ServiceCategory.is_active == True)
+            .order_by(ServiceCategory.sort_order.asc())
+            .all()
+        )
+    except Exception as e:
+        logger.error(f"Error fetching categories: {e}")
+        categories = []
+    
+    # NEW: Fetch Public Offers/Bundles
+    try:
+        offers = (
+            db.query(Offer)
+            .filter(Offer.is_active == True)
+            .filter(Offer.is_public == True)
+            .order_by(Offer.id.desc())
+            .all()
+        )
+    except Exception as e:
+        logger.error(f"Error fetching offers: {e}")
+        offers = []
 
     return {
         "business": {
             "salon_name": settings_row.salon_name if settings_row else "SalonPro",
             "shop_phone": settings_row.shop_phone if settings_row else None,
             "shop_whatsapp": settings_row.shop_whatsapp if settings_row else None,
+            "address": settings_row.address if settings_row else None,
+            "logo_url": settings_row.logo_url if settings_row else None,
+            "working_hours": settings_row.working_hours if settings_row else None,
         },
         "services": [
             {
                 "id": s.id,
                 "name": s.name,
+                "name_ar": s.name_ar,
                 "price": float(s.price or 0),
                 "duration_minutes": int(getattr(s, "duration_minutes", 30) or 30),
+                "description_ar": getattr(s, "description_ar", ""),
+                "image_url": getattr(s, "image_url", None),
+                "category_id": getattr(s, "category_id", None),
             }
             for s in services
+        ],
+        "categories": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "name_ar": c.name_ar,
+                "icon": c.icon,
+            }
+            for c in categories
         ],
         "barbers": [
             {
                 "id": b.id,
-                "display_name": b.display_name,
+                "display_name": b.display_name or b.full_name,
+                "job_title": b.job_title,
+                "profile_image_url": b.profile_image_url,
+                "bio_ar": getattr(b, "bio_ar", ""),
             }
             for b in barbers
         ],
+        "offers": [
+            {
+                "id": o.id,
+                "name": o.name,
+                "name_ar": o.name_ar,
+                "description_ar": o.description_ar,
+                "offer_price": float(o.offer_price or 0),
+                "original_price": float(o.original_price or 0),
+                "discount_percentage": float(o.discount_percentage or 0),
+                "image_url": o.image_url,
+            }
+            for o in offers
+        ]
     }
 
 
@@ -160,92 +225,38 @@ def get_booking_catalog(
     ],
 )
 def get_time_slots(
-    barber_id: int = Query(...),
+    barber_id: Optional[int] = Query(None),
     booking_date: date = Query(...),
-    service_ids: List[int] = Query(default=[]),
+    service_ids: List[int] = Query(default=[], alias="service_ids[]"),
     db: Session = Depends(get_db),
 ):
-    barber = db.query(Barber).filter(Barber.id == barber_id).first()
-    if not barber:
-        raise HTTPException(status_code=404, detail="الحلاق غير موجود")
-
-    # تحقق من الإجازة
-    off_day = (
-        db.query(BarberTimeOff)
-        .filter(
-            BarberTimeOff.barber_id == barber_id,
-            BarberTimeOff.off_date == booking_date,
+    if barber_id:
+        barbers = db.query(Employee).filter(Employee.id == barber_id).all()
+        if not barbers:
+            raise HTTPException(status_code=404, detail="الحلاق غير موجود")
+    else:
+        barbers = (
+            db.query(Employee)
+            .filter(Employee.is_active == True, Employee.show_in_booking == True)
+            .all()
         )
-        .first()
-    )
-    if off_day:
-        return {"available_slots": []}
-
-    # weekday() في Python:
-    # Monday=0 ... Sunday=6
-    day_of_week = booking_date.weekday()
-
-    working_hour = (
-        db.query(BarberWorkingHour)
-        .filter(
-            BarberWorkingHour.barber_id == barber_id,
-            BarberWorkingHour.day_of_week == day_of_week,
-            BarberWorkingHour.is_active == True,
-        )
-        .first()
-    )
-    if not working_hour:
-        return {"available_slots": []}
 
     # احسب مدة الخدمات المختارة
+    total_duration = 30
     if service_ids:
         services = db.query(Service).filter(Service.id.in_(service_ids)).all()
         total_duration = sum(
             int(getattr(service, "duration_minutes", 30) or 30)
             for service in services
         )
-    else:
-        total_duration = 30
 
-    booked_appointments = (
-        db.query(Appointment)
-        .filter(
-            Appointment.barber_id == barber_id,
-            Appointment.appointment_date == booking_date,
-            Appointment.status.in_(["pending", "confirmed"]),
-        )
-        .order_by(Appointment.appointment_time.asc())
-        .all()
+    available_slots = booking_scheduler.list_available_slots(
+        db,
+        booking_date=booking_date,
+        total_duration_minutes=total_duration,
+        barbers=barbers,
+        strict_schedule=True,
     )
-
-    busy_intervals = []
-    for appointment in booked_appointments:
-        appt_start = datetime.combine(booking_date, appointment.appointment_time)
-        appt_end = appt_start + timedelta(
-            minutes=int(appointment.total_estimated_duration_minutes or 30)
-        )
-        busy_intervals.append((appt_start, appt_end))
-
-    current = datetime.combine(booking_date, working_hour.start_time)
-    end_dt = datetime.combine(booking_date, working_hour.end_time)
-
-    slot_step = 30  # نتحرك كل نصف ساعة
-    available_slots = []
-
-    while current + timedelta(minutes=total_duration) <= end_dt:
-        slot_start = current
-        slot_end = current + timedelta(minutes=total_duration)
-
-        has_conflict = False
-        for busy_start, busy_end in busy_intervals:
-            if slot_start < busy_end and slot_end > busy_start:
-                has_conflict = True
-                break
-
-        if not has_conflict:
-            available_slots.append(slot_start.time().strftime("%H:%M"))
-
-        current += timedelta(minutes=slot_step)
 
     return {"available_slots": available_slots}
 
@@ -274,9 +285,53 @@ def create_public_booking(
             detail="يجب اختيار خدمة واحدة على الأقل",
         )
 
-    barber = db.query(Barber).filter(Barber.id == payload.barber_id).first()
-    if not barber:
-        raise HTTPException(status_code=404, detail="الحلاق غير موجود")
+    # احسب مدة الخدمات المختارة
+    total_duration = 0
+    for s_item in payload.services:
+        s_model = db.query(Service).filter(Service.id == s_item.service_id).first()
+        if s_model:
+            total_duration += (getattr(s_model, "duration_minutes", 30) or 30) * s_item.quantity
+    if total_duration == 0: total_duration = 30
+
+    if payload.barber_id:
+        barber = db.query(Employee).filter(Employee.id == payload.barber_id).first()
+        if not barber:
+            raise HTTPException(status_code=404, detail="الحلاق غير موجود")
+        
+        # تحقق من التوفر لهذا الحلاق تحديداً
+        available_barbers = booking_scheduler.get_available_barbers_for_slot(
+            db,
+            booking_date=payload.appointment_date,
+            appointment_time=payload.appointment_time,
+            total_duration_minutes=total_duration,
+            barbers=[barber],
+            strict_schedule=True,
+        )
+        if not available_barbers:
+            raise HTTPException(
+                status_code=409,
+                detail="هذا الموعد لم يعد متاحاً مع هذا الحلاق، اختر وقتاً آخر",
+            )
+    else:
+        # البحث عن أي حلاق متاح
+        barbers = db.query(Employee).filter(
+            Employee.is_active == True,
+            Employee.show_in_booking == True
+        ).all()
+        
+        try:
+            barber = booking_scheduler.auto_assign_barber(
+                db,
+                booking_date=payload.appointment_date,
+                appointment_time=payload.appointment_time,
+                total_duration_minutes=total_duration,
+                barbers=barbers,
+                strict_schedule=True,
+                no_barber_detail="عذراً، لا يوجد حلاق متاح في هذا الوقت"
+            )
+        except HTTPException as e:
+            raise e
+
     appointment_dt = datetime.combine(payload.appointment_date, payload.appointment_time)
     if appointment_dt <= datetime.now():
         raise HTTPException(
@@ -284,28 +339,11 @@ def create_public_booking(
             detail="لا يمكن إنشاء حجز في وقت ماضٍ",
         )
 
-    # منع الحجز في نفس الوقت لنفس الحلاق
-    existing = (
-        db.query(Appointment)
-        .filter(
-            Appointment.barber_id == payload.barber_id,
-            Appointment.appointment_date == payload.appointment_date,
-            Appointment.appointment_time == payload.appointment_time,
-            Appointment.status.in_(["pending", "confirmed"]),
-        )
-        .first()
-    )
-    if existing:
-        raise HTTPException(
-            status_code=409,
-            detail="هذا الموعد محجوز بالفعل، اختر وقتًا آخر",
-        )
-
     customer = _get_or_create_customer(db, payload)
 
     appointment = Appointment(
         customer_id=customer.customer_id,
-        barber_id=payload.barber_id,
+        barber_id=barber.id,
         appointment_date=payload.appointment_date,
         appointment_time=payload.appointment_time,
         status="pending",
@@ -330,7 +368,7 @@ def create_public_booking(
     manager_notification = Notification(
         user_role="manager",
         title="حجز جديد",
-        message=f"تم إنشاء حجز جديد مع الحلاق {barber.display_name}",
+        message=f"تم إنشاء حجز جديد مع الحلاق {barber.display_name or barber.full_name}",
     )
     barber_notification = Notification(
         user_role="barber",
@@ -351,7 +389,7 @@ def create_public_booking(
             customer_name=f"{customer.first_name} {customer.last_name}".strip(),
             appointment_date=str(appointment.appointment_date),
             appointment_time=str(appointment.appointment_time),
-            barber_name=barber.display_name,
+            barber_name=barber.display_name or barber.full_name,
             appointment_id=appointment.id,
         )
         db.commit()

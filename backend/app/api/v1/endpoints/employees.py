@@ -10,33 +10,22 @@ import shutil
 from app.db.session import get_db
 from app.api.deps import require_owner_or_manager, require_any_staff
 from app.models.employee import Employee
+from app.models.service import Service
 from app.models.user import User
 from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeRead, EmployeeListItem
+from app.utils.media import process_image_content, get_upload_path
+from app.core.security import get_password_hash
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
 @router.post("/upload-image")
-def upload_employee_image(
+async def upload_employee_image(
     file: UploadFile = File(...),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    # Validate file type
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="يجب أن يكون الملف صورة")
-    
-    # Ensure directory exists
-    os.makedirs("uploads/profiles", exist_ok=True)
-    
-    # Generate unique filename
-    ext = os.path.splitext(file.filename)[1]
-    filename = f"{uuid.uuid4()}{ext}"
-    file_path = os.path.join("uploads/profiles", filename)
-    
-    # Save file
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    # Return URL (relative to base URL)
+    upload_dir = get_upload_path("profiles")
+    content = await file.read()
+    filename = process_image_content(content, file.filename, upload_dir)
     return {"url": f"/uploads/profiles/{filename}"}
 
 @router.get("", response_model=List[EmployeeListItem])
@@ -46,7 +35,7 @@ def list_employees(
     job_title: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
 ):
-    query = db.query(Employee).options(joinedload(Employee.assistant_of))
+    query = db.query(Employee).options(joinedload(Employee.assistant_of), joinedload(Employee.services))
     
     if job_title:
         query = query.filter(Employee.job_title == job_title)
@@ -55,10 +44,11 @@ def list_employees(
     
     employees = query.order_by(Employee.display_order.asc(), Employee.id.desc()).all()
     
-    # Map assistant_of name
+    # Map assistant_of name and service_ids
     for emp in employees:
         if emp.assistant_of:
             emp.assistant_of_name = emp.assistant_of.full_name
+        emp.service_ids = [s.id for s in emp.services]
             
     return employees
 
@@ -68,7 +58,11 @@ def get_employee(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    employee = db.query(Employee).options(joinedload(Employee.assistant_of)).filter(Employee.id == employee_id).first()
+    employee = db.query(Employee).options(
+        joinedload(Employee.assistant_of), 
+        joinedload(Employee.services)
+    ).filter(Employee.id == employee_id).first()
+    
     if not employee:
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
     
@@ -76,6 +70,22 @@ def get_employee(
         employee.assistant_of_name = employee.assistant_of.full_name
         
     return employee
+
+@router.post("/{employee_id}/services")
+def set_employee_services(
+    employee_id: int,
+    service_ids: List[int],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_manager),
+):
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    
+    services = db.query(Service).filter(Service.id.in_(service_ids)).all()
+    employee.services = services
+    db.commit()
+    return {"status": "success"}
 
 @router.post("", response_model=EmployeeRead, status_code=status.HTTP_201_CREATED)
 def create_employee(
@@ -89,8 +99,50 @@ def create_employee(
         if not parent:
             raise HTTPException(status_code=400, detail="الحلاق المسؤول غير موجود")
 
-    employee = Employee(**payload.model_dump())
+    data = payload.model_dump(exclude={"username", "password", "role", "service_ids"}, exclude_unset=False)
+    # Remove None service helper
+    # Handle login account creation if requested
+    username = payload.username
+    password = payload.password
+    role_val = payload.role
+
+    linked_user_id = None
+    if payload.has_login_account and username:
+        existing = db.query(User).filter(User.username == username).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="اسم المستخدم موجود مسبقاً")
+        if not password:
+            raise HTTPException(status_code=400, detail="كلمة المرور مطلوبة لحساب الدخول")
+        new_user = User(
+            username=username,
+            hashed_password=get_password_hash(password),
+            full_name=data.get("full_name"),
+            role=role_val or "employee",
+        )
+        db.add(new_user)
+        db.flush()  # get id
+        linked_user_id = new_user.id
+        data["user_id"] = linked_user_id
+        # also link back via barber_id for convenience
+        # new_user.barber_id will be set after employee creation
+
+    employee = Employee(**{k: v for k, v in data.items() if hasattr(Employee, k)})
     db.add(employee)
+    db.flush()
+    # Link user -> employee if created
+    if linked_user_id:
+        usr = db.query(User).filter(User.id == linked_user_id).first()
+        if usr:
+            usr.barber_id = employee.id
+    # Handle services if provided inline
+    svc_ids = payload.service_ids or payload.model_dump().get("serviceIds")
+    # also check raw serviceIds from alias
+    if svc_ids:
+        try:
+            services = db.query(Service).filter(Service.id.in_(svc_ids)).all()
+            employee.services = services
+        except Exception:
+            pass
     db.commit()
     db.refresh(employee)
     return employee
@@ -106,7 +158,16 @@ def update_employee(
     if not employee:
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
 
-    update_data = payload.model_dump(exclude_unset=True)
+    raw = payload.model_dump(exclude_unset=True)
+    # Extract login-related fields before generic update
+    username = raw.pop("username", None)
+    password = raw.pop("password", None)
+    role_val = raw.pop("role", None)
+    svc_ids = raw.pop("service_ids", None)
+    # also pop camel alias if present
+    raw.pop("serviceIds", None)
+
+    update_data = raw
     
     # Check assistant_of_barber_id
     if "assistant_of_barber_id" in update_data and update_data["assistant_of_barber_id"]:
@@ -115,7 +176,54 @@ def update_employee(
             raise HTTPException(status_code=400, detail="الحلاق المسؤول غير موجود")
 
     for field, value in update_data.items():
-        setattr(employee, field, value)
+        if hasattr(employee, field):
+            setattr(employee, field, value)
+
+    # Handle user account update/creation
+    has_login = update_data.get("has_login_account", employee.has_login_account)
+    if has_login:
+        if employee.user_id:
+            usr = db.query(User).filter(User.id == employee.user_id).first()
+            if usr:
+                if username:
+                    # check uniqueness
+                    exists = db.query(User).filter(User.username == username, User.id != usr.id).first()
+                    if exists:
+                        raise HTTPException(status_code=400, detail="اسم المستخدم موجود مسبقاً")
+                    usr.username = username
+                if password:
+                    usr.hashed_password = get_password_hash(password)
+                if role_val:
+                    usr.role = role_val
+                usr.full_name = employee.full_name
+                usr.barber_id = employee.id
+        else:
+            # create new user if username provided
+            if username and password:
+                exists = db.query(User).filter(User.username == username).first()
+                if exists:
+                    raise HTTPException(status_code=400, detail="اسم المستخدم موجود مسبقاً")
+                new_user = User(
+                    username=username,
+                    hashed_password=get_password_hash(password),
+                    full_name=employee.full_name,
+                    role=role_val or "employee",
+                    barber_id=employee.id,
+                )
+                db.add(new_user)
+                db.flush()
+                employee.user_id = new_user.id
+            elif username and not password:
+                # allow creation without password? require it
+                raise HTTPException(status_code=400, detail="كلمة المرور مطلوبة لإنشاء حساب الدخول")
+
+    # Handle services linking if provided
+    if svc_ids is not None:
+        try:
+            services = db.query(Service).filter(Service.id.in_(svc_ids)).all()
+            employee.services = services
+        except Exception:
+            pass
 
     db.commit()
     db.refresh(employee)
@@ -134,6 +242,3 @@ def delete_employee(
     db.delete(employee)
     db.commit()
     return None
-
-
-

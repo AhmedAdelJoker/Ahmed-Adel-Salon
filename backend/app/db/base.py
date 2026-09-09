@@ -4,16 +4,21 @@ from app.db.base_class import Base  # noqa
 from app.models.user import User  # noqa
 from app.models.barber import Barber  # noqa
 from app.models.customer import Customer  # noqa
+from app.models.customer_cancellation_log import CustomerCancellationLog  # noqa
+from app.models.booking_audit_log import BookingAuditLog  # noqa
 from app.models.employee import Employee  # noqa
 from app.models.preference import Preference  # noqa
 from app.models.notification_log import NotificationLog  # noqa
 from app.models.activity_log import ActivityLog  # noqa
+from app.models.audit_log_core import AuditLog  # noqa
+from app.models.employee_document import EmployeeDocument  # noqa
 
 # Core business models
 from app.models.service import Service  # noqa
 from app.models.service_category import ServiceCategory  # noqa
 from app.models.offer import Offer  # noqa
 from app.models.offer_service import OfferService  # noqa
+from app.models.offer_product import OfferProduct  # noqa
 from app.models.appointment import Appointment  # noqa
 from app.models.appointment_service import AppointmentService  # noqa
 from app.models.invoice import Invoice  # noqa
@@ -43,6 +48,7 @@ from app.models.barber_presence_log import BarberPresenceLog  # noqa
 from app.models.employee_working_hour import EmployeeWorkingHour  # noqa
 from app.models.employee_time_off import EmployeeTimeOff  # noqa
 from app.models.employee_presence_log import EmployeePresenceLog  # noqa
+from app.models.leave_request import LeaveRequest  # noqa
 from app.models.notification import Notification  # noqa
 
 # Supporting / approval models

@@ -1,1 +1,22 @@
-{}
+{
+  "financial_rules": {
+    "taxRate": 0.0,
+    "cashierDiscountLimit": 50.0,
+    "requireDiscountReason": true,
+    "requireManagerApprovalAboveLimit": true,
+    "requireOpenShiftForInvoices": true,
+    "lockInvoicesAfterShiftClose": true,
+    "allowNegativeInventory": false,
+    "enableProductCostTracking": true,
+    "enableExpenseApproval": true,
+    "maxCashDiscrepancyWithoutNote": 0.0,
+    "defaultPaymentMethod": "cash",
+    "enabledPaymentMethods": {
+      "cash": true,
+      "card": true,
+      "wallet": true,
+      "instapay": true,
+      "mada": false
+    }
+  }
+}

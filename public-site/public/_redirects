@@ -1,0 +1,4 @@
+# Netlify _redirects (alternative to netlify.toml)
+# SPA fallback for client-side routing
+/salon/*  /index.html  200
+/book      /index.html  200

@@ -21,9 +21,9 @@ def require_roles(*allowed_roles):
 
 
 require_owner = require_roles("admin", "owner")
-require_owner_or_manager = require_roles("admin", "owner", "manager")
-require_cashier_manager_owner = require_roles("cashier", "manager", "admin", "owner")
-require_any_staff = require_roles("cashier", "barber", "manager", "admin", "owner")
+require_owner_or_manager = require_roles("admin", "owner", "manager", "accountant")
+require_cashier_manager_owner = require_roles("cashier", "manager", "admin", "owner", "accountant")
+require_any_staff = require_roles("cashier", "barber", "manager", "admin", "owner", "accountant")
 require_barber_only = require_roles("barber")
 
 

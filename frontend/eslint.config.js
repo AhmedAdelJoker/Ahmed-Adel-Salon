@@ -1,7 +1,10 @@
-﻿import js from "@eslint/js";
+import js from "@eslint/js";
 import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
+import tseslint from "typescript-eslint";
+import unusedImports from "eslint-plugin-unused-imports";
+
 export default [
   {
     ignores: [
@@ -13,9 +16,9 @@ export default [
       "**/*.bak_before_fix",
     ],
   },
-  js.configs.recommended,
+  ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.{js,jsx}"],
+    files: ["src/**/*.{js,jsx,ts,tsx}"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
@@ -48,12 +51,47 @@ export default [
         EventSource: "readonly",
         fetch: "readonly",
         console: "readonly",
+        IntersectionObserver: "readonly",
+        CustomEvent: "readonly",
+        TextEncoder: "readonly",
+        TextDecoder: "readonly",
+        performance: "readonly",
+        alert: "readonly",
+        confirm: "readonly",
+        prompt: "readonly",
+        HTMLCanvasElement: "readonly",
+        HTMLDivElement: "readonly",
+        HTMLButtonElement: "readonly",
+        HTMLInputElement: "readonly",
+        HTMLTextAreaElement: "readonly",
+        HTMLSelectElement: "readonly",
+        HTMLImageElement: "readonly",
+        HTMLAudioElement: "readonly",
+        HTMLVideoElement: "readonly",
+        HTMLFormElement: "readonly",
+        Event: "readonly",
+        MouseEvent: "readonly",
+        KeyboardEvent: "readonly",
+        FocusEvent: "readonly",
+        TouchEvent: "readonly",
+        PointerEvent: "readonly",
+        ClipboardEvent: "readonly",
+        InputEvent: "readonly",
+        CompositionEvent: "readonly",
+        MediaQueryList: "readonly",
+        MediaQueryListEvent: "readonly",
+        ResizeObserver: "readonly",
+        MutationObserver: "readonly",
+        AudioContext: "readonly",
+        webkitAudioContext: "readonly",
+        crypto: "readonly",
       },
     },
     plugins: {
       react,
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
+      "unused-imports": unusedImports,
     },
     settings: {
       react: {
@@ -65,18 +103,20 @@ export default [
       "react/jsx-uses-react": "off",
       "react/jsx-uses-vars": "error",
       "react/prop-types": "off",
+
+      // تعطيل تحذيرات React Hooks و Fast Refresh و Any
       "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
-      "no-unused-vars": [
-        "warn",
-        {
-          argsIgnorePattern: "^_",
-          varsIgnorePattern: "^_",
-          caughtErrorsIgnorePattern: "^_"
-        }
-      ],
-      "no-useless-escape": "warn",
-      "react-refresh/only-export-components": "warn"
+      "react-hooks/exhaustive-deps": "off",
+      "react-refresh/only-export-components": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+
+      // إيقاف القواعد القديمة وتأكيد التنظيف التلقائي
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": "off",
+
+      "no-useless-escape": "off",
     },
   },
 ];

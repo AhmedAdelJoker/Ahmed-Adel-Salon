@@ -1,5 +1,4 @@
 from __future__ import annotations
-from fastapi.middleware.cors import CORSMiddleware
 
 import csv
 from collections import defaultdict
@@ -8,7 +7,9 @@ from decimal import Decimal
 from io import BytesIO, StringIO
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import arabic_reshaper
+from bidi.algorithm import get_display
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -17,7 +18,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import (
@@ -29,14 +30,18 @@ from app.api.deps import (
 from app.api.v1.endpoints.invoices import _ensure_invoice_pdf_path
 from app.db.session import get_db
 from app.models.appointment import Appointment
+from app.models.business_settings import BusinessSettings
 from app.models.customer import Customer
+from app.models.employee import Employee
 from app.models.expense import Expense
 from app.models.invoice import Invoice
+from app.models.invoice_item import InvoiceItem
 from app.models.payroll_record import PayrollRecord
 from app.models.product import Product
 from app.models.service import Service
 from app.models.user import User
 from app.services.activity_service import log_activity
+from app.utils.arabic_pdf import fix_arabic, ensure_pdf_font
 
 router = APIRouter(prefix="/exports", tags=["Exports"])
 
@@ -45,8 +50,6 @@ EXCEL_MEDIA_TYPE = (
 )
 CSV_MEDIA_TYPE = "text/csv; charset=utf-8"
 PDF_MEDIA_TYPE = "application/pdf"
-PDF_FONT_NAME = "SalonArabic"
-ARIAL_FONT_PATH = Path(r"C:\Windows\Fonts\arial.ttf")
 
 
 def _safe_float(value) -> float:
@@ -121,13 +124,14 @@ def _make_streaming_response(
     media_type: str,
     filename: str,
     is_empty: bool = False,
-) -> StreamingResponse:
+) -> Response:
     payload.seek(0)
+    content = payload.getvalue()
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
         "X-Export-Empty": "1" if is_empty else "0",
     }
-    return StreamingResponse(payload, media_type=media_type, headers=headers)
+    return Response(content=content, media_type=media_type, headers=headers)
 
 
 def _make_excel_response(
@@ -201,15 +205,6 @@ def _make_csv_response(
     )
 
 
-def _ensure_pdf_font() -> str:
-    if PDF_FONT_NAME in pdfmetrics.getRegisteredFontNames():
-        return PDF_FONT_NAME
-    if ARIAL_FONT_PATH.exists():
-        pdfmetrics.registerFont(TTFont(PDF_FONT_NAME, str(ARIAL_FONT_PATH)))
-        return PDF_FONT_NAME
-    return "Helvetica"
-
-
 def _build_table_pdf(
     *,
     title: str,
@@ -217,17 +212,17 @@ def _build_table_pdf(
     columns: list[str],
     rows: list[list],
 ) -> BytesIO:
-    font_name = _ensure_pdf_font()
+    font_name = ensure_pdf_font()
     output = BytesIO()
     page_width, page_height = A4
     pdf = canvas.Canvas(output, pagesize=A4)
 
     def draw_page_header(current_y: float) -> float:
         pdf.setFont(font_name, 16)
-        pdf.drawRightString(page_width - 18 * mm, current_y, title)
+        pdf.drawRightString(page_width - 18 * mm, current_y, fix_arabic(title))
         current_y -= 8 * mm
         pdf.setFont(font_name, 10)
-        pdf.drawRightString(page_width - 18 * mm, current_y, subtitle)
+        pdf.drawRightString(page_width - 18 * mm, current_y, fix_arabic(subtitle))
         current_y -= 10 * mm
         return current_y
 
@@ -237,14 +232,14 @@ def _build_table_pdf(
 
     pdf.setFont(font_name, 10)
     for label, x_pos in zip(columns, header_positions):
-        pdf.drawRightString(x_pos, y, label)
+        pdf.drawRightString(x_pos, y, fix_arabic(label))
     y -= 4 * mm
     pdf.line(15 * mm, y, 195 * mm, y)
     y -= 7 * mm
 
     if not rows:
         pdf.setFont(font_name, 11)
-        pdf.drawRightString(page_width - 18 * mm, y, "لا توجد بيانات مطابقة للفلاتر")
+        pdf.drawRightString(page_width - 18 * mm, y, fix_arabic("لا توجد بيانات مطابقة للفلاتر"))
     else:
         pdf.setFont(font_name, 9)
         for row in rows:
@@ -253,7 +248,7 @@ def _build_table_pdf(
                 y = draw_page_header(page_height - 20 * mm)
                 pdf.setFont(font_name, 10)
                 for label, x_pos in zip(columns, header_positions):
-                    pdf.drawRightString(x_pos, y, label)
+                    pdf.drawRightString(x_pos, y, fix_arabic(label))
                 y -= 4 * mm
                 pdf.line(15 * mm, y, 195 * mm, y)
                 y -= 7 * mm
@@ -261,7 +256,7 @@ def _build_table_pdf(
 
             values = ["" if value is None else str(value) for value in row]
             for value, x_pos in zip(values, header_positions):
-                pdf.drawRightString(x_pos, y, value[:28])
+                pdf.drawRightString(x_pos, y, fix_arabic(value[:28]))
             y -= 6 * mm
 
     pdf.save()
@@ -293,6 +288,8 @@ def _active_label(is_active: bool | None) -> str:
 
 
 def _invoice_status_label(invoice: Invoice) -> str:
+    if not invoice.appointment:
+        return "صادرة"
     appointment_status = _clean_text(getattr(invoice.appointment, "status", ""))
     if appointment_status == "completed":
         return "مكتملة"
@@ -769,24 +766,39 @@ def _revenue_rows(
         start_date,
         end_date,
     )
-    invoices = (
-        db.query(Invoice)
-        .options(joinedload(Invoice.appointment))
-        .order_by(Invoice.created_at.asc())
-        .all()
-    )
+    
+    # 1. Fetch Invoices
+    inv_query = db.query(Invoice).options(joinedload(Invoice.appointment))
+    if effective_start:
+        inv_query = inv_query.filter(Invoice.created_at >= datetime.combine(effective_start, datetime.min.time()))
+    if effective_end:
+        inv_query = inv_query.filter(Invoice.created_at <= datetime.combine(effective_end, datetime.max.time()))
+    
+    invoices = inv_query.order_by(Invoice.created_at.asc()).all()
+
+    # 2. Fetch Expenses
+    exp_query = db.query(Expense)
+    if effective_start:
+        exp_query = exp_query.filter(Expense.expense_date >= datetime.combine(effective_start, datetime.min.time()))
+    if effective_end:
+        exp_query = exp_query.filter(Expense.expense_date <= datetime.combine(effective_end, datetime.max.time()))
+    
+    expenses_list = exp_query.all()
 
     grouped = defaultdict(lambda: {"revenue": 0.0, "expenses": 0.0, "invoice_count": 0})
+    
     for invoice in invoices:
         invoice_date = invoice.created_at.date() if invoice.created_at else None
         if not invoice_date:
             continue
-        if effective_start and invoice_date < effective_start:
-            continue
-        if effective_end and invoice_date > effective_end:
-            continue
         grouped[invoice_date]["revenue"] += _safe_float(invoice.total_amount)
         grouped[invoice_date]["invoice_count"] += 1
+        
+    for exp in expenses_list:
+        exp_date = exp.expense_date.date() if exp.expense_date else exp.created_at.date()
+        if not exp_date:
+            continue
+        grouped[exp_date]["expenses"] += _safe_float(exp.amount)
 
     rows = []
     for current_date in sorted(grouped.keys()):
@@ -1412,6 +1424,126 @@ def export_daily_report_pdf(
     )
 
 
+@router.get("/reports/strategic-growth/pdf")
+def export_strategic_growth_report_pdf(
+    start_date: str | None = Query(default=None),
+    end_date: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner),
+):
+    parsed_start = _parse_optional_date(start_date) or (date.today() - timedelta(days=30))
+    parsed_end = _parse_optional_date(end_date) or date.today()
+    
+    settings = db.query(BusinessSettings).first()
+    salon_name = settings.salon_name if settings else "SalonPro"
+    
+    # 1. Financial Stats
+    invoices = db.query(Invoice).options(joinedload(Invoice.appointment)).filter(
+        Invoice.created_at >= datetime.combine(parsed_start, datetime.min.time()),
+        Invoice.created_at <= datetime.combine(parsed_end, datetime.max.time())
+    ).all()
+    
+    # Filter out cancelled in Python
+    invoices = [inv for inv in invoices if _invoice_status_label(inv) != "ملغية"]
+    
+    total_revenue = sum(_safe_float(inv.total_amount) for inv in invoices)
+    total_discount = sum(_safe_float(inv.discount_amount) for inv in invoices)
+    invoice_count = len(invoices)
+    avg_ticket = total_revenue / invoice_count if invoice_count > 0 else 0.0
+    
+    # 2. Top Services
+    top_services = db.query(
+        InvoiceItem.service_name,
+        func.count(InvoiceItem.id).label('count'),
+        func.coalesce(func.sum(InvoiceItem.total_price), 0).label('revenue')
+    ).join(Invoice).outerjoin(Appointment).filter(
+        Invoice.created_at >= datetime.combine(parsed_start, datetime.min.time()),
+        Invoice.created_at <= datetime.combine(parsed_end, datetime.max.time()),
+        or_(Appointment.status != "cancelled", Appointment.id.is_(None)),
+        InvoiceItem.service_id.isnot(None)
+    ).group_by(InvoiceItem.service_name).order_by(func.count(InvoiceItem.id).desc()).limit(5).all()
+    
+    # 3. Team Performance
+    team_perf = db.query(
+        Employee.full_name,
+        func.count(Invoice.id).label('count'),
+        func.coalesce(func.sum(Invoice.total_amount), 0).label('revenue')
+    ).join(Invoice, Invoice.barber_id == Employee.id).outerjoin(Appointment, Invoice.appointment_id == Appointment.id).filter(
+        Invoice.created_at >= datetime.combine(parsed_start, datetime.min.time()),
+        Invoice.created_at <= datetime.combine(parsed_end, datetime.max.time()),
+        or_(Appointment.status != "cancelled", Appointment.id.is_(None))
+    ).group_by(Employee.id, Employee.full_name).order_by(func.sum(Invoice.total_amount).desc()).all()
+
+    # Build PDF
+    font_name = ensure_pdf_font()
+    output = BytesIO()
+    page_width, page_height = A4
+    pdf = canvas.Canvas(output, pagesize=A4)
+    
+    def draw_header():
+        pdf.setFillColorRGB(0.05, 0.05, 0.2) # Deep indigo
+        pdf.rect(0, page_height - 40*mm, page_width, 40*mm, fill=1, stroke=0)
+        pdf.setFillColorRGB(1, 1, 1)
+        pdf.setFont(font_name, 22)
+        pdf.drawRightString(page_width - 20*mm, page_height - 20*mm, fix_arabic(f"تقرير النمو الاستراتيجي - {salon_name}"))
+        pdf.setFont(font_name, 10)
+        pdf.drawRightString(page_width - 20*mm, page_height - 30*mm, fix_arabic(f"الفترة: {parsed_start} إلى {parsed_end}"))
+    
+    draw_header()
+    y = page_height - 55*mm
+    
+    # Section 1: KPIs
+    pdf.setFillColorRGB(0, 0, 0)
+    pdf.setFont(font_name, 16)
+    pdf.drawRightString(page_width - 20*mm, y, fix_arabic("ملخص الأداء المالي"))
+    y -= 10*mm
+    
+    pdf.setFont(font_name, 12)
+    stats = [
+        (f"إجمالي الإيرادات: {_safe_float(total_revenue):,.2f} ج.م", f"عدد الفواتير: {invoice_count}"),
+        (f"متوسط قيمة الفاتورة: {_safe_float(avg_ticket):,.2f} ج.م", f"إجمالي الخصومات: {_safe_float(total_discount):,.2f} ج.م")
+    ]
+    for left, right in stats:
+        pdf.drawRightString(page_width - 25*mm, y, fix_arabic(left))
+        pdf.drawRightString(page_width - 110*mm, y, fix_arabic(right))
+        y -= 8*mm
+        
+    y -= 10*mm
+    pdf.line(20*mm, y, page_width - 20*mm, y)
+    y -= 10*mm
+    
+    # Section 2: Services
+    pdf.setFont(font_name, 16)
+    pdf.drawRightString(page_width - 20*mm, y, fix_arabic("الخدمات الأكثر طلباً"))
+    y -= 10*mm
+    pdf.setFont(font_name, 11)
+    for s in top_services:
+        text = f"{s.service_name or 'N/A'}: {s.count} عملية (صافي: {_safe_float(s.revenue):,.2f} ج.م)"
+        pdf.drawRightString(page_width - 25*mm, y, fix_arabic(text))
+        y -= 7*mm
+        
+    y -= 10*mm
+    pdf.setFont(font_name, 16)
+    pdf.drawRightString(page_width - 20*mm, y, fix_arabic("أداء فريق العمل"))
+    y -= 10*mm
+    pdf.setFont(font_name, 11)
+    for p in team_perf:
+        text = f"{p.full_name or 'N/A'}: {p.count} عملية (إجمالي مبيعات: {_safe_float(p.revenue):,.2f} ج.م)"
+        pdf.drawRightString(page_width - 25*mm, y, fix_arabic(text))
+        y -= 7*mm
+
+    pdf.setFont(font_name, 8)
+    pdf.drawCentredString(page_width/2, 15*mm, fix_arabic("تم توليد هذا التقرير التنفيذي بواسطة نظام الذكاء الاصطناعي للإدارة"))
+    
+    pdf.save()
+    output.seek(0)
+    return _make_streaming_response(
+        output,
+        media_type=PDF_MEDIA_TYPE,
+        filename=_build_filename("strategic_growth_audit", "pdf"),
+    )
+
+
 @router.get("/invoices/{invoice_id}/pdf")
 def export_invoice_pdf(
     invoice_id: int,
@@ -1450,21 +1582,104 @@ def export_invoice_pdf(
     )
 
 
+def _build_payslip_pdf(record: PayrollRecord) -> BytesIO:
+    font_name = _ensure_pdf_font()
+    output = BytesIO()
+    page_width, page_height = A4
+    pdf = canvas.Canvas(output, pagesize=A4)
+
+    def draw_header():
+        pdf.setFont(font_name, 18)
+        pdf.drawRightString(page_width - 20 * mm, page_height - 25 * mm, "كشف مفردات المرتب (Payslip)")
+        pdf.setFont(font_name, 10)
+        pdf.drawRightString(page_width - 20 * mm, page_height - 32 * mm, f"تاريخ الإصدار: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        pdf.line(15 * mm, page_height - 35 * mm, page_width - 15 * mm, page_height - 35 * mm)
+
+    draw_header()
+    y = page_height - 45 * mm
+
+    # Employee Info Box
+    pdf.setFont(font_name, 12)
+    pdf.drawRightString(page_width - 20 * mm, y, f"اسم الموظف: {record.employee_name_snapshot}")
+    pdf.drawRightString(100 * mm, y, f"الفترة: {record.period_month} / {record.period_year}")
+    y -= 8 * mm
+    pdf.drawRightString(page_width - 20 * mm, y, f"الوظيفة: {record.role_snapshot or 'Staff'}")
+    pdf.drawRightString(100 * mm, y, f"حالة الصرف: {'تم الصرف' if record.status == 'paid' else 'قيد الانتظار'}")
+    
+    y -= 15 * mm
+    pdf.line(15 * mm, y, page_width - 15 * mm, y)
+    y -= 10 * mm
+
+    # Earnings vs Deductions Table
+    pdf.setFont(font_name, 14)
+    pdf.drawRightString(page_width - 20 * mm, y, "الاستحقاقات (+)")
+    pdf.drawRightString(page_width - 110 * mm, y, "الاستقطاعات (-)")
+    y -= 8 * mm
+    pdf.setFont(font_name, 11)
+    
+    start_y = y
+    # Earnings
+    earnings = [
+        ("الراتب الأساسي", record.base_salary),
+        ("العمولات", record.commission_amount),
+        ("المكافآت والحوافز", record.bonus_amount),
+    ]
+    for label, amount in earnings:
+        pdf.drawRightString(page_width - 25 * mm, y, label)
+        pdf.drawString(110 * mm, y, f"{float(amount or 0):,.2f}")
+        y -= 7 * mm
+    
+    y = start_y
+    # Deductions
+    deductions = [
+        ("الخصومات الإدارية", record.deduction_amount),
+        ("السلف والمسحوبات", record.advance_amount),
+    ]
+    for label, amount in deductions:
+        pdf.drawRightString(page_width - 115 * mm, y, label)
+        pdf.drawString(20 * mm, y, f"{float(amount or 0):,.2f}")
+        y -= 7 * mm
+
+    y = min(y, start_y - 30 * mm)
+    y -= 10 * mm
+    pdf.line(15 * mm, y, page_width - 15 * mm, y)
+    y -= 10 * mm
+    
+    # Net Salary
+    pdf.setFont(font_name, 16)
+    pdf.drawRightString(page_width - 20 * mm, y, "إجمالي صافي المستحقات:")
+    pdf.drawString(20 * mm, y, f"{float(record.net_salary or 0):,.2f} ج.م")
+    
+    y -= 20 * mm
+    pdf.setFont(font_name, 10)
+    if record.notes:
+        pdf.drawRightString(page_width - 20 * mm, y, f"ملاحظات: {record.notes}")
+        y -= 10 * mm
+
+    pdf.setFont(font_name, 9)
+    pdf.drawCentredString(page_width / 2, 20 * mm, "تم إنشاء هذا المستند آلياً بواسطة نظام إدارة الصالون")
+
+    pdf.save()
+    output.seek(0)
+    return output
+
+
 @router.get("/payroll/{payroll_id}/pdf")
 def export_payroll_pdf(
     payroll_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner),
+    current_user: User = Depends(require_owner_or_manager),
 ):
-    pdf_buffer = _build_note_pdf(
-        title="كشف الرواتب",
-        note="ميزة كشوف الرواتب غير مفعلة في المشروع الحالي لعدم وجود بيانات رواتب محفوظة.",
-    )
+    record = db.query(PayrollRecord).filter(PayrollRecord.id == payroll_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="سجل الراتب غير موجود")
+    
+    pdf_buffer = _build_payslip_pdf(record)
+    
     return _make_streaming_response(
         pdf_buffer,
         media_type=PDF_MEDIA_TYPE,
-        filename=_build_filename("payroll_payslip", "pdf", str(payroll_id)),
-        is_empty=True,
+        filename=_build_filename(f"payslip_{record.employee_name_snapshot}", "pdf", f"{record.period_year}_{record.period_month}"),
     )
 
 

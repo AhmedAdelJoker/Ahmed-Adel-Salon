@@ -9,17 +9,17 @@ class SalaryAdvance(Base):
     __tablename__ = "salary_advances"
     id = Column(Integer, primary_key=True, index=True)
     
-    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)
     amount = Column(Numeric(10, 2), nullable=False)
     description = Column(Text, nullable=True)
     advance_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
     # Tracking status
-    is_deducted = Column(Boolean, default=False, nullable=False)
-    payroll_record_id = Column(Integer, ForeignKey("payroll_records.id"), nullable=True)
+    is_deducted = Column(Boolean, default=False, nullable=False, index=True)
+    payroll_record_id = Column(Integer, ForeignKey("payroll_records.id"), nullable=True, index=True)
     
     # Metadata
-    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

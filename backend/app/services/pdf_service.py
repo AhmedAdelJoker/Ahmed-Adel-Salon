@@ -2,6 +2,7 @@ from pathlib import Path
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
+from app.utils.arabic_pdf import fix_arabic, ensure_pdf_font
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -24,6 +25,7 @@ def generate_invoice_pdf(invoice, items, customer, barber=None, shop_name="Salon
     إنشاء PDF للفواتير وإرجاع المسار النهائي
     """
     ensure_pdf_dir()
+    font_name = ensure_pdf_font()
 
     filename = f"invoice_{invoice.invoice_no}.pdf"
     file_path = PDF_DIR / filename
@@ -34,76 +36,77 @@ def generate_invoice_pdf(invoice, items, customer, barber=None, shop_name="Salon
     y = height - 20 * mm
 
     # Header
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(20 * mm, y, "Invoice / فاتورة")
+    c.setFont(font_name, 18)
+    c.drawRightString(width - 20 * mm, y, fix_arabic("Invoice / فاتورة"))
     y -= 10 * mm
 
-    c.setFont("Helvetica", 11)
-    c.drawString(20 * mm, y, f"Shop: {shop_name}")
+    c.setFont(font_name, 11)
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"المحل: {shop_name}"))
     y -= 6 * mm
     if shop_phone:
-        c.drawString(20 * mm, y, f"Phone: {shop_phone}")
+        c.drawRightString(width - 20 * mm, y, fix_arabic(f"الهاتف: {shop_phone}"))
         y -= 6 * mm
 
-    c.drawString(20 * mm, y, f"Invoice No: {invoice.invoice_no}")
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"رقم الفاتورة: {invoice.invoice_no}"))
     y -= 6 * mm
-    c.drawString(20 * mm, y, f"Date: {invoice.created_at.strftime('%Y-%m-%d %H:%M')}")
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"التاريخ: {invoice.created_at.strftime('%Y-%m-%d %H:%M')}"))
     y -= 10 * mm
 
     # Customer info
     customer_name = f"{customer.first_name or ''} {customer.last_name or ''}".strip()
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(20 * mm, y, "Customer")
+    c.setFont(font_name, 12)
+    c.drawRightString(width - 20 * mm, y, fix_arabic("بيانات العميل"))
     y -= 6 * mm
 
-    c.setFont("Helvetica", 11)
-    c.drawString(20 * mm, y, f"Name: {customer_name}")
+    c.setFont(font_name, 11)
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"الاسم: {customer_name}"))
     y -= 6 * mm
-    c.drawString(20 * mm, y, f"Phone: {customer.phone or '-'}")
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"الهاتف: {customer.phone or '-'}"))
     y -= 6 * mm
 
     if barber:
-        c.drawString(20 * mm, y, f"Barber: {barber.display_name}")
+        b_name = barber.display_name or barber.full_name
+        c.drawRightString(width - 20 * mm, y, fix_arabic(f"الموظف: {b_name}"))
         y -= 8 * mm
     else:
         y -= 2 * mm
 
     # Table Header
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(20 * mm, y, "Service")
-    c.drawString(100 * mm, y, "Qty")
-    c.drawString(125 * mm, y, "Unit Price")
-    c.drawString(160 * mm, y, "Total")
+    c.setFont(font_name, 11)
+    c.drawRightString(50 * mm, y, fix_arabic("الخدمة"))
+    c.drawRightString(100 * mm, y, fix_arabic("الكمية"))
+    c.drawRightString(135 * mm, y, fix_arabic("سعر الوحدة"))
+    c.drawRightString(170 * mm, y, fix_arabic("الإجمالي"))
     y -= 5 * mm
 
     c.line(20 * mm, y, 190 * mm, y)
     y -= 6 * mm
 
     # Items
-    c.setFont("Helvetica", 10)
+    c.setFont(font_name, 10)
     for item in items:
-        c.drawString(20 * mm, y, str(item.service_name))
-        c.drawString(100 * mm, y, str(item.quantity))
-        c.drawString(125 * mm, y, f"{float(item.unit_price):.2f}")
-        c.drawString(160 * mm, y, f"{float(item.total_price):.2f}")
+        c.drawRightString(50 * mm, y, fix_arabic(str(item.service_name)))
+        c.drawRightString(100 * mm, y, fix_arabic(str(item.quantity)))
+        c.drawRightString(135 * mm, y, fix_arabic(f"{float(item.unit_price):.2f}"))
+        c.drawRightString(170 * mm, y, fix_arabic(f"{float(item.total_price):.2f}"))
         y -= 6 * mm
 
         # لو الصفحة امتلأت
         if y < 30 * mm:
             c.showPage()
             y = height - 20 * mm
-            c.setFont("Helvetica", 10)
+            c.setFont(font_name, 10)
 
     y -= 6 * mm
     c.line(20 * mm, y, 190 * mm, y)
     y -= 8 * mm
 
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(20 * mm, y, f"Total Amount: {float(invoice.total_amount):.2f} EGP")
+    c.setFont(font_name, 12)
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"المبلغ الإجمالي: {float(invoice.total_amount):.2f} EGP"))
 
     y -= 15 * mm
-    c.setFont("Helvetica", 10)
-    c.drawString(20 * mm, y, "Thank you for your visit / شكرًا لزيارتكم")
+    c.setFont(font_name, 10)
+    c.drawRightString(width - 20 * mm, y, fix_arabic("Thank you for your visit / شكرًا لزيارتكم"))
 
     c.save()
 
@@ -115,6 +118,7 @@ def generate_cash_receipt_pdf(transaction, settings=None):
     إنشاء إيصال PDF لحركة خزنة وإرجاع المسار النهائي.
     """
     ensure_receipt_dir()
+    font_name = ensure_pdf_font()
 
     filename = f"receipt_TX_{transaction.id}.pdf"
     file_path = RECEIPT_DIR / filename
@@ -127,41 +131,41 @@ def generate_cash_receipt_pdf(transaction, settings=None):
     shop_phone = getattr(settings, "shop_phone", None)
     currency = getattr(settings, "currency", None) or "EGP"
 
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(20 * mm, y, "Cash Receipt / إيصال خزنة")
+    c.setFont(font_name, 18)
+    c.drawRightString(width - 20 * mm, y, fix_arabic("Cash Receipt / إيصال خزنة"))
     y -= 12 * mm
 
-    c.setFont("Helvetica", 11)
-    c.drawString(20 * mm, y, f"Shop: {shop_name}")
+    c.setFont(font_name, 11)
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"المحل: {shop_name}"))
     y -= 6 * mm
     if shop_phone:
-        c.drawString(20 * mm, y, f"Phone: {shop_phone}")
+        c.drawRightString(width - 20 * mm, y, fix_arabic(f"الهاتف: {shop_phone}"))
         y -= 6 * mm
 
-    c.drawString(20 * mm, y, f"Receipt No: TX-{transaction.id}")
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"رقم الإيصال: TX-{transaction.id}"))
     y -= 6 * mm
     tx_date = getattr(transaction, "transaction_date", None) or getattr(transaction, "created_at", None)
     if tx_date:
-        c.drawString(20 * mm, y, f"Date: {tx_date.strftime('%Y-%m-%d %H:%M')}")
+        c.drawRightString(width - 20 * mm, y, fix_arabic(f"التاريخ: {tx_date.strftime('%Y-%m-%d %H:%M')}"))
         y -= 6 * mm
 
-    c.drawString(20 * mm, y, f"Direction: {transaction.direction}")
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"الاتجاه: {transaction.direction}"))
     y -= 6 * mm
-    c.drawString(20 * mm, y, f"Type: {transaction.type}")
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"النوع: {transaction.type}"))
     y -= 6 * mm
-    c.drawString(20 * mm, y, f"Payment Method: {transaction.payment_method or 'cash'}")
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"طريقة الدفع: {transaction.payment_method or 'cash'}"))
     y -= 10 * mm
 
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(20 * mm, y, f"Amount: {float(transaction.amount):.2f} {currency}")
+    c.setFont(font_name, 12)
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"المبلغ: {float(transaction.amount):.2f} {currency}"))
     y -= 10 * mm
 
-    c.setFont("Helvetica", 10)
+    c.setFont(font_name, 10)
     if getattr(transaction, "reference_no", None):
-        c.drawString(20 * mm, y, f"Reference: {transaction.reference_no}")
+        c.drawRightString(width - 20 * mm, y, fix_arabic(f"المرجع: {transaction.reference_no}"))
         y -= 6 * mm
     if getattr(transaction, "notes", None):
-        c.drawString(20 * mm, y, f"Notes: {transaction.notes}")
+        c.drawRightString(width - 20 * mm, y, fix_arabic(f"ملاحظات: {transaction.notes}"))
         y -= 6 * mm
 
     c.save()

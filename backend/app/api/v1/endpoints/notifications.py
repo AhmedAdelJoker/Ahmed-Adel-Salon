@@ -50,8 +50,19 @@ manager = ConnectionManager()
 
 
 @router.get("", response_model=list[NotificationRead])
-def get_notifications(db: Session = Depends(get_db), current_user: User = Depends(require_any_staff)):
-    return db.query(Notification).filter(Notification.user_role == current_user.role).order_by(Notification.id.desc()).all()
+def get_notifications(
+    page: int = 1,
+    page_size: int = 20,
+    unread_only: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_staff),
+):
+    query = db.query(Notification).filter(
+        Notification.user_id == current_user.id
+    )
+    if unread_only:
+        query = query.filter(Notification.is_read == False)
+    return query.order_by(Notification.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
 
 @router.patch("/{notification_id}/read")

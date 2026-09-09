@@ -18,6 +18,7 @@ class InvoiceItem(Base):
     quantity = Column(Integer, nullable=False, default=1)
     unit_price = Column(Numeric(10, 2), nullable=False, default=0)
     total_price = Column(Numeric(10, 2), nullable=False, default=0)
+    commission_amount = Column(Numeric(10, 2), nullable=True, default=0)
 
     invoice = relationship("Invoice", back_populates="items")
     service = relationship("Service", back_populates="invoice_items")

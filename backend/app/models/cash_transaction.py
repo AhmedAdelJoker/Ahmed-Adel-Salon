@@ -17,9 +17,24 @@ class CashTransaction(Base):
     reference_no = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
     is_voided = Column(Boolean, default=False)
+    balance_after = Column(Numeric(10, 2), nullable=True)
     transaction_date = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    customer_id = Column(Integer, ForeignKey("customers.customer_id"), nullable=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     
-    created_by_user = relationship("User")
+    reference_type = Column(String(50), nullable=True)
+    reference_id = Column(Integer, nullable=True)
+    
+    void_reason = Column(String(255), nullable=True)
+    voided_at = Column(DateTime(timezone=True), nullable=True)
+    voided_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    created_by_user = relationship("User", foreign_keys=[created_by_user_id])
+    user = relationship("User", foreign_keys=[user_id])
+    customer = relationship("Customer")
+    employee = relationship("Employee")

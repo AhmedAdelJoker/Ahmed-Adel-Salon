@@ -22,13 +22,14 @@ class Appointment(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     customer_id = Column(Integer, ForeignKey("customers.customer_id"), nullable=False)
-    barber_id = Column(Integer, ForeignKey("barbers.id"), nullable=False)
+    barber_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
 
     appointment_date = Column(Date, nullable=False)
     appointment_time = Column(Time, nullable=False)
 
     status = Column(String(30), nullable=False, default="pending")
     notes = Column(Text, nullable=True)
+    cancellation_reason = Column(Text, nullable=True)
 
     total_estimated_price = Column(Numeric(10, 2), nullable=False, default=0)
     total_estimated_duration_minutes = Column(Integer, nullable=False, default=0)
@@ -51,8 +52,10 @@ class Appointment(Base):
         nullable=False,
     )
 
+    booking_source = Column(String(50), default="shop") # 'shop' or 'online'
+
     customer = relationship("Customer", back_populates="appointments")
-    barber = relationship("Barber", back_populates="appointments")
+    barber = relationship("Employee", back_populates="appointments")
 
     services = relationship(
         "AppointmentService",

@@ -8,7 +8,7 @@ from typing import Optional
 class UserBase(BaseModel):
     username: str
     full_name: str | None = None
-    email: EmailStr | None = None
+    email: str | None = None
     role: str
     is_active: bool = True
 
@@ -20,7 +20,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     username: str | None = None
     full_name: str | None = None
-    email: EmailStr | None = None
+    email: str | None = None
     role: str | None = None
     is_active: bool | None = None
     password: str | None = None
@@ -63,7 +63,7 @@ class UserProfileRead(BaseModel):
     id: int
     username: str
     full_name: str | None = None
-    email: EmailStr | None = None
+    email: str | None = None
     role: str
     is_active: bool = True
 
@@ -73,4 +73,4 @@ class UserProfileRead(BaseModel):
 class UserProfileUpdate(BaseModel):
     username: str | None = None
     full_name: str | None = None
-    email: EmailStr | None = None
+    email: str | None = None

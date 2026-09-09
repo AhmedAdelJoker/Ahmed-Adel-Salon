@@ -30,6 +30,8 @@ def universal_search(
 
     # 1. Search Customers (Visible to all staff)
     customers = db.query(Customer).filter(
+        Customer.is_deleted == False
+    ).filter(
         or_(
             Customer.first_name.ilike(search_term),
             Customer.last_name.ilike(search_term),

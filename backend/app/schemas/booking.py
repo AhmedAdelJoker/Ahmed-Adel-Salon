@@ -11,11 +11,18 @@ class PublicBookingServiceItem(BaseModel):
 
 class PublicBookingCreate(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
-    last_name: str = Field(..., min_length=1, max_length=100)
+    last_name: Optional[str] = Field(default=None, max_length=100)
     phone: str = Field(..., min_length=5, max_length=30)
     email: Optional[EmailStr] = None
 
-    barber_id: int
+    @field_validator("email", mode="before")
+    @classmethod
+    def empty_string_to_none(cls, v):
+        if v == "":
+            return None
+        return v
+
+    barber_id: Optional[int] = None
     appointment_date: date
     appointment_time: time
     notes: Optional[str] = Field(default=None, max_length=1000)

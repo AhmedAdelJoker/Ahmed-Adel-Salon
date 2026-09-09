@@ -60,7 +60,6 @@ export default function Dashboard() {
    
   const [currentShift, setCurrentShift] = useState<any>(null);
   const [showOpenShift, setShowOpenShift] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showCloseShift, setShowCloseShift] = useState(false);
   const [openingCash, setOpeningCash] = useState("0");
 

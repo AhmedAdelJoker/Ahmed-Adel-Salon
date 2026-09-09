@@ -1,8 +1,8 @@
 from datetime import date, time, datetime
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, validator
 
 
 class AppointmentServiceItemCreate(BaseModel):
@@ -33,8 +33,15 @@ class AppointmentCreate(BaseModel):
     appointment_date: date
     appointment_time: time
     notes: Optional[str] = None
+    booking_source: Optional[str] = "shop"
     services: List[AppointmentServiceItemCreate]
 
+    @validator("appointment_time", pre=True)
+    def parse_time(cls, v):
+        if isinstance(v, str):
+            if len(v) == 5: # HH:MM
+                return f"{v}:00"
+        return v
 
 class AppointmentUpdate(BaseModel):
     customer_id: int
@@ -42,7 +49,15 @@ class AppointmentUpdate(BaseModel):
     appointment_date: date
     appointment_time: time
     notes: Optional[str] = None
+    booking_source: Optional[str] = "shop"
     services: List[AppointmentServiceItemCreate]
+
+    @validator("appointment_time", pre=True)
+    def parse_time(cls, v):
+        if isinstance(v, str):
+            if len(v) == 5: # HH:MM
+                return f"{v}:00"
+        return v
 
 
 class AppointmentMovePayload(BaseModel):
@@ -54,6 +69,7 @@ class AppointmentMovePayload(BaseModel):
 
 class AppointmentStatusUpdate(BaseModel):
     status: str
+    cancellation_reason: Optional[str] = None
 
 
 class AppointmentAssignBarberPayload(BaseModel):
@@ -61,10 +77,16 @@ class AppointmentAssignBarberPayload(BaseModel):
 
 
 class AppointmentFastWalkinCreate(BaseModel):
-    phone: str = Field(..., min_length=5, max_length=30)
-    first_name: str = Field(..., min_length=1, max_length=100)
-    service_id: int
+    phone: Optional[str] = Field(None, min_length=5, max_length=30)
+    first_name: Optional[str] = Field(None, max_length=100)
+    customer_id: Optional[int] = None
+    service_id: Optional[int] = None
+    service_ids: Optional[List[int]] = None
     employee_id: Optional[int] = None
+    appointment_date: Optional[str] = None
+    appointment_time: Optional[str] = None
+    notes: Optional[str] = None
+    booking_source: Optional[str] = "shop"
 
 
 class AppointmentRead(BaseModel):
@@ -75,6 +97,8 @@ class AppointmentRead(BaseModel):
     appointment_time: time
     status: str
     notes: Optional[str] = None
+    cancellation_reason: Optional[str] = None
+    booking_source: Optional[str] = "shop"
     total_estimated_price: Decimal
     total_estimated_duration_minutes: int
     confirmation_sent: bool
@@ -84,8 +108,26 @@ class AppointmentRead(BaseModel):
     updated_at: datetime
 
     customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
     barber_name: Optional[str] = None
 
     services: List[AppointmentServiceItemRead] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BarberAppointmentStats(BaseModel):
+    total: int = 0
+    in_progress: int = 0
+    ready_for_payment: int = 0
+    completed: int = 0
+    cancelled: int = 0
+    invoiced: int = 0
+
+
+class BarberAppointmentsResponse(BaseModel):
+    employee_id: Optional[int] = None
+    employee_name: str
+    barber: Optional[dict] = None
+    appointments: List[AppointmentRead] = []
+    stats: BarberAppointmentStats

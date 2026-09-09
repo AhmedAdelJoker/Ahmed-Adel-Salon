@@ -20,9 +20,10 @@ def _bookings_query(db: Session, current_user: User):
         .order_by(Appointment.id.desc())
     )
     if current_user.role == "barber":
-        if not current_user.employee_id:
+        barber_id = getattr(current_user, "barber_id", None) or getattr(current_user, "employee_id", None)
+        if not barber_id:
             return []
-        query = query.filter(Appointment.employee_id == current_user.employee_id)
+        query = query.filter(Appointment.barber_id == barber_id)
     return query.all()
 
 
@@ -69,7 +70,9 @@ def get_booking(
     )
     if not booking:
         raise HTTPException(status_code=404, detail="الحجز غير موجود")
-    if current_user.role == "barber" and current_user.employee_id != booking.employee_id:
+    
+    barber_id = getattr(current_user, "barber_id", None) or getattr(current_user, "employee_id", None)
+    if current_user.role == "barber" and barber_id != booking.barber_id:
         raise HTTPException(status_code=403, detail="ليس لديك صلاحية لهذا الحجز")
     return _appointment_to_read(db, booking)
 

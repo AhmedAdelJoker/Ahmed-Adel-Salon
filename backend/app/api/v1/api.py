@@ -49,11 +49,19 @@ from app.api.v1.endpoints.employee_reports import router as employee_reports_rou
 from app.api.v1.endpoints.employee_documents import router as employee_documents_router
 from app.api.v1.endpoints.cashbox import router as cashbox_router
 from app.api.v1.endpoints.search import router as search_router
+from app.api.v1.endpoints.owner import router as owner_router
+from app.api.v1.endpoints.audit import router as audit_router
+from app.api.v1.endpoints.shop_settings import router as shop_settings_router
 from app.api.v1.endpoints.dashboard_core import router as dashboard_core_router
 
 api_router = APIRouter()
 
-# api_router.include_router(auth_router)
+# Include specific/specialized routers first to avoid shadowing by dynamic parameters
+api_router.include_router(employee_documents_router)
+api_router.include_router(booking_pos_bridge.router, tags=['bookings-pos-bridge'])
+api_router.include_router(invoice_adjustment_requests.router, tags=['invoice-adjustment-requests'])
+
+# Include general routers
 api_router.include_router(auth_router)
 api_router.include_router(search_router)
 api_router.include_router(employees_router)
@@ -61,13 +69,18 @@ api_router.include_router(profile_router)
 api_router.include_router(customers_router)
 api_router.include_router(services_router)
 api_router.include_router(barbers_router)
+
 api_router.include_router(appointments_router)
 api_router.include_router(bookings_router)
 api_router.include_router(sessions_router)
 api_router.include_router(invoices_router)
+api_router.include_router(cashbox_router)
 api_router.include_router(reports_router)
 api_router.include_router(preferences_router)
 api_router.include_router(dashboard_router)
+api_router.include_router(owner_router)
+api_router.include_router(audit_router)
+api_router.include_router(shop_settings_router)
 api_router.include_router(barber_router, prefix="/barber", tags=["barber"])
 api_router.include_router(activity_logs_router)
 api_router.include_router(business_settings_router)
@@ -97,13 +110,4 @@ api_router.include_router(security_settings_router)
 api_router.include_router(financial_rules_router)
 api_router.include_router(exports_runtime_router)
 api_router.include_router(employee_reports_router)
-api_router.include_router(employee_documents_router)
-api_router.include_router(cashbox_router, prefix="/cashbox", tags=["cashbox"])
-api_router.include_router(dashboard_core_router, prefix="/dashboard-core", tags=["dashboard-core"])
-
-api_router.include_router(invoice_adjustment_requests.router, tags=['invoice-adjustment-requests'])
-
-api_router.include_router(booking_pos_bridge.router, tags=['bookings-pos-bridge'])
-
-
-
+api_router.include_router(dashboard_core_router)

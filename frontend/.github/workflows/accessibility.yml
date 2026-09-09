@@ -1,0 +1,225 @@
+name: Accessibility Audit
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  FRONTEND_DIR: 'frontend'
+
+jobs:
+  a11y-unit:
+    name: Unit Accessibility Tests (Vitest + axe-core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci
+      
+      - name: Run unit accessibility tests
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run test:a11y -- --run
+        env:
+          CI: true
+
+  a11y-e2e:
+    name: E2E Accessibility Tests (Playwright + axe-core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npx playwright install --with-deps chromium firefox webkit
+      
+      - name: Build frontend
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run build
+      
+      - name: Run E2E accessibility tests
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npx playwright test --config=playwright.a11y.config.ts
+        env:
+          CI: true
+      
+      - name: Upload accessibility test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-e2e-results
+          path: |
+            ${{ env.FRONTEND_DIR }}/test-results/
+            !${{ env.FRONTEND_DIR }}/test-results/**/*.png
+          retention-days: 7
+      
+      - name: Upload accessibility HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-e2y-html-report
+          path: ${{ env.FRONTEND_DIR }}/test-results/a11y-html/
+          retention-days: 7
+
+  a11y-lint:
+    name: Accessibility Lint (eslint-plugin-jsx-a11y)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci
+      
+      - name: Run accessibility lint
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run lint:a11y
+
+  a11y-report:
+    name: Generate Accessibility Report
+    runs-on: ubuntu-latest
+    needs: [a11y-unit, a11y-e2e, a11y-lint]
+    if: always()
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download unit test results
+        uses: actions/download-artifact@v4
+        with:
+          name: a11y-unit-results
+          path: unit-results
+      
+      - name: Download E2E test results
+        uses: actions/download-artifact@v4
+        with:
+          name: a11y-e2e-results
+          path: e2e-results
+      
+      - name: Generate summary report
+        run: |
+          echo "# Accessibility Audit Report" > a11y-report.md
+          echo "" >> a11y-report.md
+          echo "## Summary" >> a11y-report.md
+          echo "" >> a11y-report.md
+          echo "| Check | Status |" >> a11y-report.md
+          echo "|-------|--------|" >> a11y-report.md
+          
+          # Check unit tests
+          if [ -f unit-results/junit.xml ]; then
+            UNIT_PASS=$(grep -c 'testcase' unit-results/junit.xml || echo 0)
+            UNIT_FAIL=$(grep -c 'failure' unit-results/junit.xml || echo 0)
+            echo "| Unit Tests | $([ $UNIT_FAIL -eq 0 ] && echo '✅ Pass' || echo '❌ Fail') |" >> a11y-report.md
+          else
+            echo "| Unit Tests | ⚠️ No Results |" >> a11y-report.md
+          fi
+          
+          # Check E2E tests
+          if [ -f e2e-results/junit.xml ]; then
+            E2E_PASS=$(grep -c 'testcase' e2e-results/junit.xml || echo 0)
+            E2E_FAIL=$(grep -c 'failure' e2e-results/junit.xml || echo 0)
+            echo "| E2E Tests | $([ $E2E_FAIL -eq 0 ] && echo '✅ Pass' || echo '❌ Fail') |" >> a11y-report.md
+          else
+            echo "| E2E Tests | ⚠️ No Results |" >> a11y-report.md
+          fi
+          
+          echo "" >> a11y-report.md
+          echo "## Details" >> a11y-report.md
+          echo "" >> a11y-report.md
+          echo "Full reports available as artifacts." >> a11y-report.md
+      
+      - name: Upload final report
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-report
+          path: a11y-report.md
+          retention-days: 30
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('a11y-report.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            })
+
+  # Fail the workflow if any accessibility check fails
+  a11y-gate:
+    name: Accessibility Gate
+    runs-on: ubuntu-latest
+    needs: [a11y-unit, a11y-e2e, a11y-lint]
+    if: always()
+    steps:
+      - name: Check unit tests
+        if: needs.a11y-unit.result != 'success'
+        run: |
+          echo "❌ Unit accessibility tests failed"
+          exit 1
+      
+      - name: Check E2E tests
+        if: needs.a11y-e2e.result != 'success'
+        run: |
+          echo "❌ E2E accessibility tests failed"
+          exit 1
+      
+      - name: Check lint
+        if: needs.a11y-lint.result != 'success'
+        run: |
+          echo "❌ Accessibility lint failed"
+          exit 1
+      
+      - name: All checks passed
+        if: needs.a11y-unit.result == 'success' && needs.a11y-e2e.result == 'success' && needs.a11y-lint.result == 'success'
+        run: |
+          echo "✅ All accessibility checks passed"

@@ -11,7 +11,7 @@ from app.models.employee_time_off import EmployeeTimeOff
 from app.models.employee_working_hour import EmployeeWorkingHour
 from app.models.service import Service
 
-ACTIVE_BOOKING_STATUSES = ("pending", "confirmed")
+ACTIVE_BOOKING_STATUSES = ("pending", "confirmed", "waiting")
 
 
 @dataclass
@@ -86,20 +86,16 @@ def _build_busy_intervals(
     appointments = (
         db.query(Appointment)
         .filter(
-            Appointment.employee_id == employee_id,
+            Appointment.barber_id == employee_id,
             Appointment.appointment_date == booking_date,
             Appointment.status.in_(ACTIVE_BOOKING_STATUSES),
         )
-        .order_by(Appointment.start_at.asc(), Appointment.id.asc())
+        .order_by(Appointment.appointment_time.asc(), Appointment.id.asc())
         .all()
     )
 
     busy_intervals: list[tuple[datetime, datetime]] = []
     for appointment in appointments:
-        if appointment.start_at and appointment.end_at:
-            busy_intervals.append((appointment.start_at, appointment.end_at))
-            continue
-
         start_at = datetime.combine(booking_date, appointment.appointment_time)
         end_at = start_at + timedelta(
             minutes=int(appointment.total_estimated_duration_minutes or 30)
@@ -193,10 +189,16 @@ def _build_employee_day_schedule(
         booking_date=booking_date,
     )
 
+    start_dt = datetime.combine(booking_date, start_time)
+    end_dt = datetime.combine(booking_date, end_time)
+    
+    if end_dt <= start_dt:
+        end_dt += timedelta(days=1)
+
     return EmployeeDaySchedule(
         employee=employee,
-        start_at=datetime.combine(booking_date, start_time),
-        end_at=datetime.combine(booking_date, end_time),
+        start_at=start_dt,
+        end_at=end_dt,
         busy_intervals=busy_intervals,
         day_load=day_load,
     )

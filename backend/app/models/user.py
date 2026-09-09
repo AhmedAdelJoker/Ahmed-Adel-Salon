@@ -15,15 +15,16 @@ class User(Base):
 
     full_name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
+    profile_image_url = Column(String(255), nullable=True)
 
     role = Column(String(30), nullable=False, default="cashier")
-    barber_id = Column(Integer, ForeignKey("barbers.id"), nullable=True)
+    barber_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
 
     is_active = Column(Boolean, nullable=False, default=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    barber = relationship("Barber", back_populates="users")
+    barber = relationship("Employee", foreign_keys=[barber_id])
     employee = relationship(
         "Employee",
         back_populates="linked_user",
@@ -44,6 +45,20 @@ class User(Base):
         foreign_keys="NotificationLog.created_by_user_id",
     )
 
+    notifications = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
     @property
     def employee_id(self):
         return self.employee.id if self.employee else None
+
+    @property
+    def display_name(self):
+        return self.employee.display_name if self.employee else None
+
+    @property
+    def bio_ar(self):
+        return self.employee.bio_ar if self.employee else None

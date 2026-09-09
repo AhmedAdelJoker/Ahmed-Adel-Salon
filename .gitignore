@@ -8,3 +8,16 @@ public-site/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+node_modules
+.venv/
+dist/
+build/
+dist-electron/
+__pycache__/
+*.py[cod]
+*.db
+*.sqlite3
+uploads/
+generated_invoices/
+generated_receipts/
+runtime_data/

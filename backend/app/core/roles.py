@@ -2,18 +2,21 @@ from enum import Enum
 
 
 class UserRole(str, Enum):
+    OWNER = "owner"
     ADMIN = "admin"
     MANAGER = "manager"
     CASHIER = "cashier"
     BARBER = "barber"
+    ACCOUNTANT = "accountant"
 
 
 ROLE_ALIASES = {
-    "owner": UserRole.ADMIN.value,
+    "owner": UserRole.OWNER.value,
     "admin": UserRole.ADMIN.value,
     "manager": UserRole.MANAGER.value,
     "cashier": UserRole.CASHIER.value,
     "barber": UserRole.BARBER.value,
+    "accountant": UserRole.ACCOUNTANT.value,
 }
 
 
