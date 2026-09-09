@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.models.employee import Employee
 from app.models.invoice import Invoice
+from app.models.invoice_item import InvoiceItem
 from app.models.service import Service
 from app.models.service_session import ServiceSession
 from app.models.user import User
@@ -34,35 +35,48 @@ def reports_overview(
 
     average_invoice = float(total_revenue) / int(total_invoices) if total_invoices else 0
 
+    # NOTE: ServiceSession has no service_id and Invoice has no session_id,
+    # so top services are aggregated from sold invoice items instead.
     top_services_rows = (
         db.query(
             Service.id.label("service_id"),
             Service.name.label("service_name"),
-            func.count(ServiceSession.id).label("sessions_count"),
-            func.coalesce(func.sum(Invoice.total_amount), 0).label("total_revenue"),
+            func.count(InvoiceItem.id).label("sessions_count"),
+            func.coalesce(func.sum(InvoiceItem.total_price), 0).label("total_revenue"),
         )
-        .join(ServiceSession, ServiceSession.service_id == Service.id, isouter=True)
-        .join(Invoice, Invoice.session_id == ServiceSession.id, isouter=True)
+        .join(InvoiceItem, InvoiceItem.service_id == Service.id, isouter=True)
         .group_by(Service.id, Service.name)
-        .order_by(func.coalesce(func.sum(Invoice.total_amount), 0).desc())
+        .order_by(func.coalesce(func.sum(InvoiceItem.total_price), 0).desc())
         .limit(5)
         .all()
     )
 
-    top_barbers_rows = (
-        db.query(
-            Employee.id.label("barber_id"),
-            Employee.full_name.label("barber_name"),
-            func.count(ServiceSession.id).label("sessions_count"),
-            func.coalesce(func.sum(Invoice.total_amount), 0).label("total_revenue"),
-        )
-        .join(ServiceSession, ServiceSession.barber_id == Employee.id, isouter=True)
-        .join(Invoice, Invoice.session_id == ServiceSession.id, isouter=True)
-        .group_by(Employee.id, Employee.full_name)
-        .order_by(func.coalesce(func.sum(Invoice.total_amount), 0).desc())
-        .limit(5)
+    # NOTE: revenue per barber comes from Invoice.barber_id; aggregated
+    # separately to avoid fan-out between sessions and invoices.
+    sessions_per_barber = dict(
+        db.query(ServiceSession.barber_id, func.count(ServiceSession.id))
+        .group_by(ServiceSession.barber_id)
         .all()
     )
+    revenue_per_barber = dict(
+        db.query(Invoice.barber_id, func.coalesce(func.sum(Invoice.total_amount), 0))
+        .filter(Invoice.barber_id.isnot(None))
+        .group_by(Invoice.barber_id)
+        .all()
+    )
+    top_barbers_rows = sorted(
+        (
+            {
+                "barber_id": emp_id,
+                "barber_name": emp_name,
+                "sessions_count": int(sessions_per_barber.get(emp_id, 0)),
+                "total_revenue": float(revenue_per_barber.get(emp_id, 0) or 0),
+            }
+            for emp_id, emp_name in db.query(Employee.id, Employee.full_name).all()
+        ),
+        key=lambda r: r["total_revenue"],
+        reverse=True,
+    )[:5]
 
     payment_methods_rows = (
         db.query(
@@ -89,10 +103,10 @@ def reports_overview(
         ],
         top_barbers=[
             TopBarberRead(
-                barber_id=row.barber_id,
-                barber_name=row.barber_name,
-                sessions_count=int(row.sessions_count or 0),
-                total_revenue=float(row.total_revenue or 0),
+                barber_id=row["barber_id"],
+                barber_name=row["barber_name"],
+                sessions_count=int(row["sessions_count"] or 0),
+                total_revenue=float(row["total_revenue"] or 0),
             )
             for row in top_barbers_rows
         ],
