@@ -3,7 +3,7 @@ import { Calendar, Clock, Edit3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn, formatTime12h } from "@/lib/core/utils";
+import { formatTime12h } from "@/lib/core/utils";
 import {
   getBookingCustomerName,
   timeOnly,

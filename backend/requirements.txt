@@ -18,3 +18,6 @@ slowapi>=0.1.9
 pandas>=2.0.0
 openpyxl>=3.1.0
 Pillow==10.4.0
+apscheduler==3.11.2
+pytest==9.1.1
+httpx==0.28.1
