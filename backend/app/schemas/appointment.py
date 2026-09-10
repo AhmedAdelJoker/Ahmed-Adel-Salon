@@ -2,7 +2,7 @@ from datetime import date, time, datetime
 from decimal import Decimal
 from typing import Optional, List, Any
 
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class AppointmentServiceItemCreate(BaseModel):
@@ -36,7 +36,8 @@ class AppointmentCreate(BaseModel):
     booking_source: Optional[str] = "shop"
     services: List[AppointmentServiceItemCreate]
 
-    @validator("appointment_time", pre=True)
+    @field_validator("appointment_time", mode="before")
+    @classmethod
     def parse_time(cls, v):
         if isinstance(v, str):
             if len(v) == 5: # HH:MM
@@ -52,7 +53,8 @@ class AppointmentUpdate(BaseModel):
     booking_source: Optional[str] = "shop"
     services: List[AppointmentServiceItemCreate]
 
-    @validator("appointment_time", pre=True)
+    @field_validator("appointment_time", mode="before")
+    @classmethod
     def parse_time(cls, v):
         if isinstance(v, str):
             if len(v) == 5: # HH:MM

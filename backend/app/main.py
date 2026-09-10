@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,7 +13,20 @@ from app.core.config import settings
 from app.db.runtime_schema import ensure_runtime_schema
 from app.db.seed import seed_data
 
-app = FastAPI(title=settings.PROJECT_NAME)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    ensure_runtime_schema()
+    seed_data()
+    print("Server started. Background scheduler for POS shifts is active.")
+    yield
+    try:
+        scheduler.shutdown(wait=False)
+    except Exception:
+        pass
+
+
+app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
 
 
 # --- Background Tasks ---
@@ -41,23 +55,6 @@ scheduler.add_job(
     replace_existing=True,
 )
 scheduler.start()
-
-
-# ✅ startup/shutdown events
-@app.on_event("startup")
-def startup_event():
-    ensure_runtime_schema()
-    seed_data()
-    print("Server started. Background scheduler for POS shifts is active.")
-
-
-@app.on_event("shutdown")
-def shutdown_event():
-    try:
-        scheduler.shutdown(wait=False)
-    except Exception:
-        pass
-
 
 
 def _resolve_uploads_dir() -> Path:

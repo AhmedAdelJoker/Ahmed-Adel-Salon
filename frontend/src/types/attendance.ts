@@ -5,6 +5,7 @@ export interface AttendanceRecord {
   id?: number | string;
   employee_id?: number | string;
   employee_name?: string;
+  full_name?: string;
   barber_name?: string;
   status?: string;
   created_at?: string;
@@ -24,7 +25,7 @@ export interface AttendanceRecord {
     label: string;
     color: string;
   };
-  payroll?: Record<string, unknown>;
+  payroll?: Record<string, any>;
   [key: string]: unknown;
 }
 

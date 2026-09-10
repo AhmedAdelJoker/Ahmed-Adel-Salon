@@ -1,13 +1,11 @@
 import { useAuth } from "@/context/AuthContext";
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import type {
   AttendanceNotification,
   AttendanceRecord,
   AttendanceSettingsForm,
   LeaveRecord,
-  WorkingHours,
 } from "@/types/attendance";
-import type { EmployeeRecord } from "@/types/employee";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -27,7 +25,8 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useAttendanceData } from "@/features/attendance/hooks/useAttendanceData";
 import {
   UserCheck,
   Clock,
@@ -60,13 +59,7 @@ import {
 } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import api from "@/services/api";
-import { adaptList } from "@/services/apiAdapter";
 import { toast } from "react-hot-toast";
-import {
-  calculateAdvancedHours,
-  calculatePayroll,
-  analyzeProductivity,
-} from "@/lib/domain/attendance";
 import { cn } from "@/lib/core/utils";
 import {
   PageHeader,
@@ -101,22 +94,28 @@ const statusColors = {
 const AttendanceManagement = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
-  const employeeIdFilter = searchParams.get("employeeId");
-
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const {
+    records,
+    employees,
+    workingHours,
+    loading,
+    searchTerm,
+    setSearchTerm,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+    calendarMonth,
+    setCalendarMonth,
+    fetchAttendance,
+    fetchEmployees,
+    fetchWorkingHours,
+    todayRecords,
+    processedData,
+    archiveRecords,
+    lateEmployees,
+  } = useAttendanceData();
   const [activeViewMode, setActiveViewMode] = useState("dashboard");
-  const [startDate, setStartDate] = useState(
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split("T")[0],
-  );
-  const [endDate, setEndDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [regEmployeeId, setRegEmployeeId] = useState("");
   const [regStatus, setRegStatus] = useState("in");
@@ -133,7 +132,6 @@ const AttendanceManagement = () => {
     reason: "",
   });
   const [leaveFilter, setLeaveFilter] = useState("all");
-  const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [notifications, setNotifications] = useState<AttendanceNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifPermission, setNotifPermission] = useState(
@@ -145,76 +143,11 @@ const AttendanceManagement = () => {
     close_time: "22:00",
     late_threshold: 15,
   });
-  const [workingHours, setWorkingHours] = useState<WorkingHours>({});
-
   const isOwner = ["OWNER", "ADMIN"].includes(
     String(user?.role || "").toUpperCase(),
   );
 
-  // Fetch Functions
-  const fetchAttendance = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/barber-presence/current");
-      const data = res.data || [];
-      setRecords(
-        data.map((record) => ({
-          id: record.employee_id,
-          employee_id: record.employee_id,
-          employee_name:
-            record.employee_name ||
-            record.employee?.full_name ||
-            "موظف غير معروف",
-          status: record.current_status,
-          created_at: record.last_log?.created_at,
-          stats: record.last_log?.stats || {
-            totalHours: 0,
-            lateMinutes: 0,
-            overtime: 0,
-            breakMinutes: 0,
-          },
-          isComplete: record.current_status === "out",
-          is_late: record.is_late,
-          late_reason: record.late_reason,
-          all_logs: record.logs_today || [],
-        })),
-      );
-    } catch (err) {
-      console.error("Attendance fetch error:", err);
-      toast.error("فشل تحميل سجلات الحضور");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
-  const fetchEmployees = useCallback(async () => {
-    try {
-      const res = await api.get("/employees");
-      setEmployees(
-        adaptList(res).map((emp) => ({
-          ...emp,
-          full_name: emp.full_name || emp.display_name || emp.name || "موظف",
-        })),
-      );
-    } catch (err) {
-      console.error("Failed to fetch employees", err);
-    }
-  }, []);
-
-  const fetchWorkingHours = useCallback(async () => {
-    try {
-      const res = await api.get("/barber-presence/working-hours");
-      setWorkingHours(res.data?.working_hours || {});
-    } catch (err) {
-      console.error("Failed to fetch working hours:", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAttendance();
-    fetchEmployees();
-    fetchWorkingHours();
-  }, [fetchAttendance, fetchEmployees, fetchWorkingHours]);
 
   const handleManualRegister = async () => {
     if (!regEmployeeId) return toast.error("يرجى اختيار الموظف");
@@ -426,73 +359,7 @@ const AttendanceManagement = () => {
     }
   };
 
-  // Data Processing
-  const todayRecords = useMemo(() => {
-    const todayStr = new Date().toISOString().split("T")[0];
-    const todayLogs = records.filter((r) => r.created_at?.startsWith(todayStr));
-    const grouped: Record<string, AttendanceRecord[]> = {};
-    todayLogs.forEach((rec) => {
-      const id = rec.employee_id as string;
-      if (!grouped[id]) grouped[id] = [];
-      grouped[id].push(rec);
-    });
-    return Object.keys(grouped).map((empId) => {
-      const empRecords = grouped[empId];
-      const employee = employees.find(
-        (e) => String(e.id) === String(empId),
-      ) || { full_name: empRecords[0].employee_name };
-      const stats = calculateAdvancedHours(empRecords);
-      const ai = analyzeProductivity(stats);
-      return { ...empRecords[0], id: empId, stats, ai, all_logs: empRecords };
-    });
-  }, [records, employees]);
 
-  const processedData = useMemo(() => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const monthLogs = records.filter((r) =>
-      r.created_at?.startsWith(currentMonth),
-    );
-    const grouped: Record<string, AttendanceRecord[]> = {};
-    monthLogs.forEach((rec) => {
-      const id = rec.employee_id as string;
-      if (!grouped[id]) grouped[id] = [];
-      grouped[id].push(rec);
-    });
-    return Object.keys(grouped).map((empId) => {
-      const empRecords = grouped[empId];
-      const employee = employees.find(
-        (e) => String(e.id) === String(empId),
-      ) || { full_name: empRecords[0].employee_name };
-      const stats = calculateAdvancedHours(empRecords);
-      const payroll = calculatePayroll(employee, stats);
-      const ai = analyzeProductivity(stats);
-      return {
-        ...empRecords[0],
-        id: empId,
-        stats,
-        payroll,
-        ai,
-        all_logs: empRecords,
-        full_name: employee.full_name,
-      };
-    });
-  }, [records, employees]);
-
-  const archiveRecords = useMemo(() => {
-    return records.filter((r) => {
-      const recDate = r.created_at?.split("T")[0] ?? "";
-      const matchesDate = recDate >= startDate && recDate <= endDate;
-      const matchesSearch = (r.employee_name || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-      const matchesEmployee = employeeIdFilter
-        ? String(r.employee_id) === String(employeeIdFilter)
-        : true;
-      return matchesDate && matchesSearch && matchesEmployee;
-    });
-  }, [records, searchTerm, employeeIdFilter, startDate, endDate]);
-
-  const lateEmployees = todayRecords.filter((r) => (r.stats?.lateMinutes ?? 0) > 0);
 
   // Alert check
   useEffect(() => {
@@ -773,7 +640,7 @@ const AttendanceManagement = () => {
                             name: "متأخر",
                             value:
                               todayRecords.filter(
-                                (r) => r.stats?.lateMinutes > 0,
+                                (r) => (r.stats?.lateMinutes ?? 0) > 0,
                               ).length || 0,
                             color: "#f59e0b",
                           },
@@ -1016,13 +883,13 @@ const AttendanceManagement = () => {
                       <p
                         className={cn(
                           "text-xs font-black uppercase",
-                          rec.stats.lateMinutes > 0
+                          (rec.stats?.lateMinutes ?? 0) > 0
                             ? "text-red-500"
                             : "text-emerald-600",
                         )}
                       >
-                        {rec.stats.lateMinutes > 0
-                          ? `تأخير: ${rec.stats.lateMinutes} دقيقة`
+                        {(rec.stats?.lateMinutes ?? 0) > 0
+                          ? `تأخير: ${rec.stats?.lateMinutes ?? 0} دقيقة`
                           : "انضباط ممتاز"}
                       </p>
                       <Button
@@ -1296,14 +1163,14 @@ const AttendanceManagement = () => {
                       <div className="flex gap-2">
                         <Badge
                           variant={
-                            emp.stats?.lateMinutes > 0
+                            (emp.stats?.lateMinutes ?? 0) > 0
                               ? "danger"
                               : "secondary"
                           }
                           className="text-[9px] font-black"
                         >
-                          {emp.stats?.lateMinutes > 0
-                            ? `${emp.stats.lateMinutes} دقيقة تأخير`
+                          {(emp.stats?.lateMinutes ?? 0) > 0
+                            ? `${emp.stats?.lateMinutes ?? 0} دقيقة تأخير`
                             : "بدون تأخير"}
                         </Badge>
                         <Badge

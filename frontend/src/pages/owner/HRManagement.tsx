@@ -5,7 +5,7 @@ import api from "@/services/api";
 import { toast } from "react-hot-toast";
 import { useUI } from "@/context/UIContext";
 import type { EmployeeRecord, DocumentRecord } from "@/types/employee";
-import type { ServiceRecord } from "@/types/catalog";
+import { useHrData, useEmployeeDocuments } from "@/features/hr";
 import {
   User,
   Phone,
@@ -30,7 +30,6 @@ import {
   X,
   Activity,
   Trash2,
-  Banknote,
   Search,
   Archive,
   ArrowRight,
@@ -41,10 +40,8 @@ import {
   Building2,
   LayoutGrid,
   List as ListIcon,
-  Crown,
   MoreVertical,
   Eye,
-  Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,7 +69,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import employeeDocumentService from "@/services/employeeDocumentService";
-import { normalizeListResponse } from "@/services/apiAdapter";
 import { motion, AnimatePresence } from "framer-motion";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
 import EmptyState from "@/components/shared/EmptyState";
@@ -85,352 +81,22 @@ import {
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
 
-const JOB_TITLES = [
-  { value: "owner", label: "المالك والمستثمر (Principal Owner)" },
-  { value: "manager", label: "مدير عمليات التشغيل (Operations Manager)" },
-  {
-    value: "accountant",
-    label: "المحاسب المالي والإداري (Financial & Admin Accountant)",
-  },
-  {
-    value: "barber",
-    label: "أخصائي حلاقة وتصفيف الشعر وعناية باللحية (Master Barber)",
-  },
-  { value: "colorist", label: "أخصائي تلوين ومعالجة الشعر (Color Specialist)" },
-  {
-    value: "esthetician",
-    label: "أخصائي عناية بالبشرة والوجه (Skin Care Expert)",
-  },
-  {
-    value: "barber_assistant",
-    label: "مساعد فني / مسؤول تحضير (Technical Assistant)",
-  },
-  { value: "cashier", label: "كاشير ومسؤول صندوق (Cashier & POS)" },
-  {
-    value: "receptionist",
-    label: "منسق تجربة العملاء (Guest Experience Coordinator)",
-  },
-  { value: "cleaner", label: "مسؤول مرافق وتعقيم (Sanitation Officer)" },
-  { value: "other", label: "أخرى" },
-];
-
-const JOB_TITLE_BLUEPRINTS = {
-  manager: {
-    eyebrow: "قيادة استراتيجية",
-    title: "مدير تنفيذي",
-    summary:
-      "المسؤول عن تحقيق الأهداف التشغيلية، قيادة الفريق، واعتماد التقارير الإدارية والخصومات.",
-    focus: ["إدارة العمليات", "اعتماد التقارير", "تطوير الفريق"],
-    accent: "bg-indigo-600",
-    colors: { primary: "indigo", secondary: "slate" },
-    icon: Briefcase,
-    cardBg: "bg-indigo-50/10",
-    badgeClass: "bg-indigo-100/50 text-indigo-700 border-indigo-200",
-  },
-  accountant: {
-    eyebrow: "حوكمة مالية",
-    title: "المراقب المالي",
-    summary:
-      "صلاحية كاملة لمراجعة التدفقات النقدية، تقديم التقارير التحليلية، وتدقيق كشوف الرواتب قبل التنفيذ.",
-    focus: ["التدقيق المالي", "تحليل الربحية", "الرقابة النقدية"],
-    accent: "bg-slate-800",
-    colors: { primary: "slate", secondary: "indigo" },
-    icon: Banknote,
-    cardBg: "bg-slate-100/10",
-    badgeClass: "bg-slate-900 text-white border-slate-900",
-  },
-  barber: {
-    eyebrow: "هندسة المظهر",
-    title: "Master Barber",
-    summary:
-      "خبير شامل في فنون الحلاقة، تصفيف الشعر، ونحت اللحية بأعلى معايير الإتقان.",
-    focus: ["قص وتصفيف الشعر", "نحت اللحية", "علاجات الشعر"],
-    accent: "bg-amber-500",
-    colors: { primary: "amber", secondary: "orange" },
-    icon: Scissors,
-    cardBg: "bg-amber-50/10",
-    badgeClass: "bg-amber-100 text-amber-700 border-amber-200",
-  },
-  cashier: {
-    eyebrow: "إدارة النقدية",
-    title: "مسؤول الصندوق",
-    summary:
-      "إدارة عمليات الدفع، إغلاق الورديات، والتأكد من مطابقة المبالغ النقدية.",
-    focus: ["نقاط البيع", "تحصيل المدفوعات", "تقفيل الوردية"],
-    accent: "bg-emerald-600",
-    colors: { primary: "emerald", secondary: "teal" },
-    icon: Receipt,
-    cardBg: "bg-emerald-50/10",
-    badgeClass: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  },
-  colorist: {
-    eyebrow: "فن الألوان",
-    title: "خبير الصبغ",
-    summary:
-      "أخصائي في كيمياء الألوان ومعالجة الشعر التالف بأحدث البروتوكولات الصحية.",
-    focus: ["صبغ الشعر", "معالجة البروتين", "كيمياء الألوان"],
-    accent: "bg-purple-600",
-    colors: { primary: "purple", secondary: "pink" },
-    icon: Sparkles,
-    cardBg: "bg-purple-50/10",
-    badgeClass: "bg-purple-100 text-purple-700 border-purple-200",
-  },
-  esthetician: {
-    eyebrow: "صحة البشرة",
-    title: "أخصائي تجميل",
-    summary:
-      "تقديم خدمات تنظيف البشرة العميق والترطيب الفاخر باستخدام تقنيات Spa المتقدمة.",
-    focus: ["تنظيف البشرة", "أقنعة النضارة", "مساج الوجه"],
-    accent: "bg-emerald-500",
-    colors: { primary: "emerald", secondary: "blue" },
-    icon: Sparkles,
-    cardBg: "bg-emerald-50/10",
-    badgeClass: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  },
-  barber_assistant: {
-    eyebrow: "إسناد فني",
-    title: "مساعد فني",
-    summary:
-      "دعم لوجستي وفني كامل لخبراء الحلاقة، ضمان راحة العميل في منطقة الغسيل والتحضير.",
-    focus: ["تحضير العميل", "تقنيات الغسيل", "تنظيم الأدوات"],
-    accent: "bg-emerald-500",
-    colors: { primary: "emerald", secondary: "teal" },
-    icon: UserPlus,
-    cardBg: "bg-emerald-50/10",
-    badgeClass: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  },
-  receptionist: {
-    eyebrow: "إدارة التجربة",
-    title: "سفير الخدمة",
-    summary: "نقطة الاتصال الأولى لضمان رحلة عميل سلسة، من الحجز وحتى الوداع.",
-    focus: ["لباقة الاستقبال", "إدارة الحجوزات", "تحليل الرضا"],
-    accent: "bg-cyan-500",
-    colors: { primary: "cyan", secondary: "blue" },
-    icon: Phone,
-    cardBg: "bg-cyan-50/10",
-    badgeClass: "bg-cyan-100 text-cyan-700 border-cyan-200",
-  },
-  cleaner: {
-    eyebrow: "معايير السلامة",
-    title: "مشرف الصحة",
-    summary:
-      "المسؤول عن بيئة العمل المعقمة، سلامة المرافق، والمظهر العام للصالون.",
-    focus: ["تعقيم مستمر", "صحة المرافق", "إدارة المستهلكات"],
-    accent: "bg-teal-600",
-    colors: { primary: "gray", secondary: "teal" },
-    icon: Trash2,
-    cardBg: "bg-teal-50/10",
-    badgeClass: "bg-teal-100 text-teal-700 border-teal-200",
-  },
-  owner: {
-    eyebrow: "القيادة العليا",
-    title: "المالك المستثمر",
-    summary: "المسؤول عن الرؤية الاستراتيجية وتوسع العلامة التجارية.",
-    focus: ["الرؤية الشاملة", "توسع الأعمال", "الرقابة الكلية"],
-    accent: "bg-slate-900",
-    colors: { primary: "slate", secondary: "gray" },
-    icon: Crown,
-    cardBg: "bg-slate-100/10",
-    badgeClass: "bg-slate-900 text-white border-slate-900",
-  },
-  other: {
-    eyebrow: "كادر مخصص",
-    title: "موظف خاص",
-    summary: "مهام إضافية وتخصصات نادرة حسب متطلبات نمو العمل.",
-    focus: ["مرونة المهام"],
-    accent: "bg-slate-400",
-    colors: { primary: "slate", secondary: "gray" },
-    icon: User,
-    cardBg: "bg-slate-50/10",
-    badgeClass: "bg-slate-100 text-slate-600 border-slate-200",
-  },
-};
-
-const EMPLOYMENT_TYPES = [
-  { value: "full_time", label: "دوام كامل" },
-  { value: "part_time", label: "دوام جزئي" },
-  { value: "temporary", label: "مؤقت" },
-];
-
-const ROLES = [
-  { value: "owner", label: "Owner (المالك المستثمر)" },
-  { value: "manager", label: "Manager (المدير التنفيذي)" },
-  { value: "accountant", label: "Accountant (المحاسب المالي)" },
-  { value: "cashier", label: "Cashier (الكاشير)" },
-  { value: "barber", label: "Barber (حلاق)" },
-  { value: "barber_assistant", label: "Barber Assistant (مساعد الحلاق)" },
-];
-
-const ASSISTANT_TASKS = [
-  "غسيل الشعر",
-  "تجهيز العميل",
-  "تنظيف الأدوات",
-  "تحضير الكرسي",
-  "مساعدة في الخدمات الطويلة",
-  "تنظيف منطقة العمل",
-  "أخرى",
-];
-
-const defaultForm = {
-  fullName: "",
-  displayName: "",
-  phonePrimary: "",
-  phoneSecondary: "",
-  profileImageUrl: "",
-  bioAr: "",
-  bioEn: "",
-  nationalId: "",
-  birthDate: "",
-  governorate: "",
-  city: "",
-  detailedAddress: "",
-  personalNotes: "",
-  jobTitle: "barber",
-  department: "",
-  employmentType: "full_time",
-  hireDate: new Date().toISOString().split("T")[0],
-  status: "active",
-  showInPos: true,
-  showInBooking: true,
-  displayOrder: 0,
-  baseSalary: 0,
-  commissionRate: 0,
-  fixedBonus: 0,
-  defaultDeductions: 0,
-  paymentMethod: "cash",
-  walletNumber: "",
-  bankAccount: "",
-  assistantOfBarberId: "",
-  assistantTasksJson: [],
-  receivesCommission: false,
-  assistantCommissionRate: 0,
-  hasLoginAccount: false,
-  username: "",
-  password: "",
-  role: "employee",
-  serviceIds: [],
-};
-
-const FORM_TABS = [
-  { id: "personal", label: "الهوية الشخصية", icon: User },
-  { id: "work", label: "المسار الوظيفي", icon: Briefcase },
-  { id: "skills", label: "المؤهلات والخدمات", icon: Scissors },
-  { id: "financial", label: "الهيكل المالي", icon: DollarSign },
-  { id: "assistant", label: "نظام المساعدين", icon: UserPlus },
-  { id: "documents", label: "الأرشيف الرقمي", icon: FileText },
-  { id: "system", label: "بوابة النظام", icon: ShieldCheck },
-];
-
-const FIELD_LABEL_CLASS =
-  "flex items-center gap-2 text-[10px] font-black tracking-widest text-slate-500 uppercase";
-const FIELD_INPUT_CLASS =
-  "h-12 rounded-xl border-slate-200 bg-white/50 px-4 font-bold text-slate-900 shadow-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100";
-const FIELD_TEXTAREA_CLASS =
-  "w-full rounded-xl border-slate-200 bg-white/50 p-4 text-sm font-bold text-slate-900 shadow-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100 resize-none";
-const FIELD_SELECT_CLASS =
-  "h-12 rounded-xl border-slate-200 bg-white/50 px-4 font-bold text-slate-900 shadow-sm focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100";
-
-const getJobTitleLabel = (value) =>
-  JOB_TITLES.find((item) => item.value === value)?.label || value || "غير محدد";
-
-const isCustomJobTitleValue = (value) =>
-  !JOB_TITLES.some((item) => item.value === value);
-
-const deriveDateOnly = (value) => {
-  if (!value) return "";
-  if (typeof value === "string") {
-    if (value.includes("T")) return value.split("T")[0];
-    if (value.includes(" ")) return value.split(" ")[0];
-  }
-  return value;
-};
-
-const normalizeEmployeeRecord = (employee: EmployeeRecord = {}) => {
-  const fullName =
-    employee.fullName ||
-    employee.full_name ||
-    employee.displayName ||
-    employee.display_name ||
-    "موظف";
-  const displayName =
-    employee.displayName || employee.display_name || fullName || "";
-  const status =
-    employee.status ||
-    (employee.isActive === false || employee.is_active === false
-      ? "suspended"
-      : "active");
-  const jobTitle =
-    employee.jobTitle || employee.job_title || employee.role || "barber";
-
-  return {
-    ...employee,
-    id: employee.id ?? employee.employee_id ?? employee.employeeId,
-    fullName,
-    displayName,
-    phonePrimary: employee.phonePrimary || employee.phone_primary || "",
-    phoneSecondary: employee.phoneSecondary || employee.phone_secondary || "",
-    profileImageUrl:
-      employee.profileImageUrl || employee.profile_image_url || "",
-    bioAr: employee.bioAr || employee.bio_ar || "",
-    bioEn: employee.bioEn || employee.bio_en || "",
-    nationalId: employee.nationalId || employee.national_id || "",
-    birthDate: deriveDateOnly(employee.birthDate || employee.birth_date),
-    governorate: employee.governorate || "",
-    city: employee.city || "",
-    detailedAddress:
-      employee.detailedAddress || employee.detailed_address || "",
-    personalNotes: employee.personalNotes || employee.personal_notes || "",
-    jobTitle,
-    department: employee.department || "",
-    employmentType:
-      employee.employmentType || employee.employment_type || "full_time",
-    hireDate: deriveDateOnly(
-      employee.hireDate || employee.hire_date || employee.created_at,
-    ),
-    status,
-    showInPos: employee.showInPos ?? employee.show_in_pos ?? true,
-    showInBooking: employee.showInBooking ?? employee.show_in_booking ?? true,
-    displayOrder: Number(employee.displayOrder ?? employee.display_order ?? 0),
-    baseSalary: Number(employee.baseSalary ?? employee.base_salary ?? 0),
-    commissionRate: Number(
-      employee.commissionRate ?? employee.commission_rate ?? 0,
-    ),
-    fixedBonus: Number(employee.fixedBonus ?? employee.fixed_bonus ?? 0),
-    defaultDeductions: Number(
-      employee.defaultDeductions ?? employee.default_ded_uctions ?? 0,
-    ),
-    paymentMethod: employee.paymentMethod || employee.payment_method || "cash",
-    walletNumber: employee.walletNumber || employee.wallet_number || "",
-    bankAccount: employee.bankAccount || employee.bank_account || "",
-    assistantOfBarberId: String(
-      employee.assistantOfBarberId ?? employee.assistant_of_barber_id ?? "",
-    ),
-    assistantTasksJson: Array.isArray(
-      employee.assistantTasksJson ?? employee.assistant_tasks_json,
-    )
-      ? (employee.assistantTasksJson ?? employee.assistant_tasks_json)
-      : [],
-    receivesCommission:
-      employee.receivesCommission ?? employee.receives_commission ?? false,
-    assistantCommissionRate: Number(
-      employee.assistantCommissionRate ??
-        employee.assistant_commission_rate ??
-        0,
-    ),
-    hasLoginAccount: Boolean(
-      employee.hasLoginAccount ??
-      employee.has_login_account ??
-      employee.username ??
-      employee.user_id,
-    ),
-    username: employee.username || "",
-    password: employee.password || "",
-    role: employee.role || "barber",
-    serviceIds: Array.isArray(employee.services)
-      ? employee.services.map((s) => s.id)
-      : employee.serviceIds || [],
-  };
-};
+import {
+  JOB_TITLES,
+  JOB_TITLE_BLUEPRINTS,
+  EMPLOYMENT_TYPES,
+  ROLES,
+  ASSISTANT_TASKS,
+  FORM_TABS,
+  defaultForm,
+  FIELD_LABEL_CLASS,
+  FIELD_INPUT_CLASS,
+  FIELD_TEXTAREA_CLASS,
+  FIELD_SELECT_CLASS,
+  getJobTitleLabel,
+  isCustomJobTitleValue,
+  normalizeEmployeeRecord,
+} from "@/features/hr";
 
 const HRManagement = () => {
   const navigate = useNavigate();
@@ -441,11 +107,27 @@ const HRManagement = () => {
   void _user;
   void _highlightedEmployeeId;
 
-  const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
-  const [allServices, setAllServices] = useState<ServiceRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    employees,
+    allServices,
+    loading,
+    searchTerm,
+    setSearchTerm,
+    activeView,
+    setActiveView,
+    filteredEmployees,
+    stats,
+    fetchEmployees,
+  } = useHrData();
+  const {
+    employeeDocs,
+    expiringDocs,
+    docLoading,
+    setDocLoading,
+    fetchDocuments,
+    fetchExpiringDocs,
+  } = useEmployeeDocuments();
   const [isActionLoading, setIsActionLoading] = useState(false);
-  const [activeView, setActiveView] = useState("cards");
   const [activeTab, setActiveTab] = useState("personal");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState<EmployeeRecord | null>(null);
@@ -453,10 +135,6 @@ const HRManagement = () => {
   const [formData, setFormData] = useState<EmployeeRecord>(defaultForm as EmployeeRecord);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [employeeDocs, setEmployeeDocs] = useState<DocumentRecord[]>([]);
-  const [expiringDocs, setExpiringDocs] = useState<DocumentRecord[]>([]);
-  const [docLoading, setDocLoading] = useState(false);
   const [customJobTitle, setCustomJobTitle] = useState(false);
 
   // Dynamic Tabs based on Role
@@ -503,83 +181,13 @@ const HRManagement = () => {
     }));
   }, [formData.jobTitle]);
 
-  const fetchDocuments = async (empId) => {
-    try {
-      setDocLoading(true);
-      const res = await employeeDocumentService.list(empId);
-      setEmployeeDocs(res.items || []);
-    } catch (_error) {
-      toast.error("فشل تحميل المستندات");
-    } finally {
-      setDocLoading(false);
-    }
-  };
-
-  const fetchExpiringDocs = async () => {
-    try {
-      const res = await employeeDocumentService.getExpiring(15);
-      setExpiringDocs(res.items || []);
-    } catch (_error) {
-      console.error("Expiring docs fetch error:", _error);
-    }
-  };
-
   useEffect(() => {
     if (editingEmp && activeTab === "documents") {
       fetchDocuments(editingEmp.id);
     }
-  }, [editingEmp, activeTab]);
+  }, [editingEmp, activeTab, fetchDocuments]);
 
-  useEffect(() => {
-    fetchExpiringDocs();
-  }, []);
 
-  const filteredEmployees = useMemo(() => {
-    let result = employees.filter((emp) => emp.status === "active");
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      result = result.filter(
-        (emp) =>
-          emp.fullName?.toLowerCase().includes(q) ||
-          emp.phonePrimary?.includes(q) ||
-          emp.jobTitle?.toLowerCase().includes(q),
-      );
-    }
-    return result;
-  }, [employees, searchTerm]);
-
-  const stats = useMemo(() => {
-    const active = employees.filter((e) => e.status === "active").length;
-    const barbers = employees.filter(
-      (e) => e.jobTitle === "barber" && e.status === "active",
-    ).length;
-    const assistants = employees.filter(
-      (e) => e.jobTitle === "barber_assistant" && e.status === "active",
-    ).length;
-    return { active, assistants, barbers, total: employees.length };
-  }, [employees]);
-
-  const fetchEmployees = async () => {
-    try {
-      setLoading(true);
-      const [empRes, servRes] = await Promise.all([
-        api.get("/employees"),
-        api.get("/services", { params: { limit: 1000 } }),
-      ]);
-      setEmployees(
-        normalizeListResponse(empRes).items.map(normalizeEmployeeRecord),
-      );
-      setAllServices(servRes.data || []);
-    } catch (_error) {
-      toast.error("فشل تحميل بيانات الموظفين");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
 
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
