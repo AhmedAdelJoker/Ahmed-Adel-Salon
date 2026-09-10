@@ -88,8 +88,13 @@ def close_shift(
         raise HTTPException(status_code=400, detail="الوردية مغلقة بالفعل")
 
     # Aggregate Data
+    # NOTE: 1s tolerance on the lower bound. SQLite stores server-side
+    # CURRENT_TIMESTAMP without microseconds while bound datetimes carry
+    # ".000000", so same-second invoices would string-compare as older
+    # than opened_at and silently drop out of the close aggregates.
+    shift_start = shift.opened_at - timedelta(seconds=1)
     invoices = db.query(Invoice).filter(
-        Invoice.created_at >= shift.opened_at,
+        Invoice.created_at >= shift_start,
         Invoice.created_by_user_id == shift.user_id
     ).all()
     
