@@ -74,3 +74,17 @@ src/
 
 ### ⏳ Phase 5 — حماية الهيكل
 - `ARCHITECTURE.md` + قواعد eslint تمنع الاستيرادات العكسية
+
+### Phase 3 progress (2026-09-10)
+- [x] Bookings: pages/cashier/Bookings.tsx 2418 -> 747 lines; new features/bookings/components/* (9 files) + hooks/useBookingsBoard + utils/board + barrel
+- [x] HR: pages/owner/HRManagement.tsx 2355 -> ~1980 lines; unified features/hr (utils/constants, utils/helpers, hooks/useHrData, hooks/useEmployeeForm, hooks/useEmployeeDocuments, components/*, types, barrel); page consumes shared utils + data hooks
+- [x] Attendance: pages/manager/AttendanceManagement.tsx data layer wired to features/attendance (hooks/useAttendanceData + utils); fixed AttendanceRecord type gaps (missing full_name, payroll typed unknown)
+- [x] Deleted orphaned components/bookings/* (5 files, -1132 lines, unused)
+- [x] Verify: frontend tsc 0 + eslint 0 + build green + vitest 16/16
+
+### Backend tests (2026-09-10) — 61 green
+- [x] tests/: auth, services, bookings, invoices, pos-shifts, customers, expenses, offers, payroll, products, shift-lifecycle, customer-write, appointments, dashboard, reports
+- [x] Bugs found by tests: reports/overview 500 (phantom service_id/session_id columns, fixed); shift-close drops same-second invoices on sqlite (1s tolerance fix); drafts counted in revenue in 7 aggregates (now excluded: close, daily-summary, total-balance, owner/manager/cashier summaries, reports overview)
+- [x] RBAC pinned: payroll + reports/overview forbidden for cashier (403)
+- [x] CI (.github/workflows/ci.yml): added pytest/httpx/apscheduler to requirements (were missing), fixed eslint-9 lint script, gated lint + typecheck + test:run + build
+- [x] Pydantic v1 @validator -> @field_validator; FastAPI on_event -> lifespan
