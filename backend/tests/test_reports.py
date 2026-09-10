@@ -52,6 +52,20 @@ def test_overview_aggregates_payment_methods(client, db_session):
     assert methods.get("card") == 200
 
 
+def test_overview_excludes_drafts(client, db_session):
+    headers = _owner_headers(client, db_session)
+    c1 = _seed_customer(db_session, phone="01007770000")
+    _seed_invoice(db_session, c1.customer_id, 100, "INV-REP-D1")
+    _seed_invoice(db_session, c1.customer_id, 9000, "INV-REP-D2", is_draft=True)
+
+    resp = client.get("/api/v1/reports/overview", headers=headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["total_revenue"] == 100
+    assert body["total_invoices"] == 1
+    assert body["average_invoice"] == 100
+
+
 def test_overview_top_services_from_sold_items(client, db_session):
     headers = _owner_headers(client, db_session)
     service = Service(name="Haircut", price=Decimal("150"))

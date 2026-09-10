@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query, Depends
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -24,8 +24,10 @@ def reports_overview(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "manager", "owner")),
 ):
-    total_revenue = db.query(func.coalesce(func.sum(Invoice.total_amount), 0)).scalar() or 0
-    total_invoices = db.query(func.count(Invoice.id)).scalar() or 0
+    # Drafts are not sales: exclude from all revenue aggregates
+    non_draft = Invoice.is_draft == False
+    total_revenue = db.query(func.coalesce(func.sum(Invoice.total_amount), 0)).filter(non_draft).scalar() or 0
+    total_invoices = db.query(func.count(Invoice.id)).filter(non_draft).scalar() or 0
     done_sessions = (
         db.query(func.count(ServiceSession.id))
         .filter(ServiceSession.status.in_(["completed", "completed_unpaid", "checked_out"]))
@@ -37,16 +39,20 @@ def reports_overview(
 
     # NOTE: ServiceSession has no service_id and Invoice has no session_id,
     # so top services are aggregated from sold invoice items instead.
+    # Draft items are excluded via CASE so zero-rows are preserved.
+    item_revenue = case((Invoice.is_draft == False, InvoiceItem.total_price), else_=0)
+    item_count = case((Invoice.is_draft == False, 1), else_=0)
     top_services_rows = (
         db.query(
             Service.id.label("service_id"),
             Service.name.label("service_name"),
-            func.count(InvoiceItem.id).label("sessions_count"),
-            func.coalesce(func.sum(InvoiceItem.total_price), 0).label("total_revenue"),
+            func.sum(item_count).label("sessions_count"),
+            func.coalesce(func.sum(item_revenue), 0).label("total_revenue"),
         )
         .join(InvoiceItem, InvoiceItem.service_id == Service.id, isouter=True)
+        .join(Invoice, Invoice.id == InvoiceItem.invoice_id, isouter=True)
         .group_by(Service.id, Service.name)
-        .order_by(func.coalesce(func.sum(InvoiceItem.total_price), 0).desc())
+        .order_by(func.coalesce(func.sum(item_revenue), 0).desc())
         .limit(5)
         .all()
     )
@@ -60,7 +66,7 @@ def reports_overview(
     )
     revenue_per_barber = dict(
         db.query(Invoice.barber_id, func.coalesce(func.sum(Invoice.total_amount), 0))
-        .filter(Invoice.barber_id.isnot(None))
+        .filter(Invoice.barber_id.isnot(None), non_draft)
         .group_by(Invoice.barber_id)
         .all()
     )
@@ -83,6 +89,7 @@ def reports_overview(
             Invoice.payment_method.label("payment_method"),
             func.coalesce(func.sum(Invoice.total_amount), 0).label("total_amount"),
         )
+        .filter(non_draft)
         .group_by(Invoice.payment_method)
         .all()
     )

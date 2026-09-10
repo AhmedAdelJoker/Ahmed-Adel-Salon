@@ -95,7 +95,8 @@ def close_shift(
     shift_start = shift.opened_at - timedelta(seconds=1)
     invoices = db.query(Invoice).filter(
         Invoice.created_at >= shift_start,
-        Invoice.created_by_user_id == shift.user_id
+        Invoice.created_by_user_id == shift.user_id,
+        Invoice.is_draft == False,
     ).all()
     
     total_sales = Decimal("0.00")
@@ -185,7 +186,8 @@ def get_daily_summary(
     
     invoices = db.query(Invoice).filter(
         Invoice.created_at >= start_of_day,
-        Invoice.created_at <= end_of_day
+        Invoice.created_at <= end_of_day,
+        Invoice.is_draft == False,
     ).all()
     
     return {
@@ -221,12 +223,15 @@ def get_total_cash_balance(
     if open_shifts:
         total_opening = sum(Decimal(str(s.opening_cash)) for s in open_shifts)
     
-    # Calculate sales for these shifts
+    # Calculate sales for these shifts (drafts excluded; 1s tolerance
+    # for the sqlite datetime-precision trap, see close_shift)
     total_sales = Decimal("0.00")
     for s in open_shifts:
+        shift_start = s.opened_at - timedelta(seconds=1)
         invoices = db.query(Invoice).filter(
-            Invoice.created_at >= s.opened_at,
-            Invoice.created_by_user_id == s.user_id
+            Invoice.created_at >= shift_start,
+            Invoice.created_by_user_id == s.user_id,
+            Invoice.is_draft == False,
         ).all()
         # Only cash sales affect the physical drawer
         cash_sales = sum(Decimal(str(inv.total_amount)) for inv in invoices if (inv.payment_method or "").upper() == "CASH")

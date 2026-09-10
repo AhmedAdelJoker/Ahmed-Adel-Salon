@@ -18,13 +18,14 @@ def _seed_customer(db_session, first_name="Sara", phone="01001234567", is_delete
     return customer
 
 
-def _seed_invoice(db_session, customer_id, total, invoice_no):
+def _seed_invoice(db_session, customer_id, total, invoice_no, is_draft=False):
     invoice = Invoice(
         invoice_no=invoice_no,
         customer_id=customer_id,
         payment_method="cash",
         subtotal_amount=Decimal(str(total)),
         total_amount=Decimal(str(total)),
+        is_draft=is_draft,
     )
     db_session.add(invoice)
     db_session.commit()
@@ -59,6 +60,19 @@ def test_owner_summary_aggregates_seeds(client, db_session):
     assert body["customersCount"] == 1
     assert body["invoicesCount"] == 2
     assert body["totalRevenue"] == 300.75
+
+
+def test_owner_summary_excludes_drafts(client, db_session):
+    headers = _owner_headers(client, db_session)
+    c1 = _seed_customer(db_session, phone="01006660000")
+    _seed_invoice(db_session, c1.customer_id, 100, "INV-DASH-D1")
+    _seed_invoice(db_session, c1.customer_id, 5000, "INV-DASH-D2", is_draft=True)
+
+    resp = client.get("/api/v1/dashboard/owner-summary", headers=headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["invoicesCount"] == 1
+    assert body["totalRevenue"] == 100
 
 
 def test_owner_summary_forbidden_for_cashier(client, db_session):

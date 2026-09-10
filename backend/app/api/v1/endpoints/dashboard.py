@@ -39,7 +39,8 @@ def owner_summary(
     appointments_count = db.query(Appointment).count()
     sessions_count = db.query(ServiceSession).count()
     products_count = db.query(Product).count()
-    invoices = db.query(Invoice).all()
+    # Drafts are not sales: exclude from revenue/count aggregates
+    invoices = db.query(Invoice).filter(Invoice.is_draft == False).all()
     invoices_count = len(invoices)
 
     notifications_count = (
@@ -67,7 +68,8 @@ def manager_summary(
     appointments_count = db.query(Appointment).count()
     sessions = db.query(ServiceSession).all()
     products_count = db.query(Product).count()
-    invoices = db.query(Invoice).all()
+    # Drafts are not sales: exclude from revenue aggregates
+    invoices = db.query(Invoice).filter(Invoice.is_draft == False).all()
 
     notifications_count = (
         db.query(Notification)
@@ -110,9 +112,10 @@ def cashier_summary(
     if today_appointments > 0:
         cancellation_rate = (today_cancellations / today_appointments) * 100
 
-    # Today's invoices
+    # Today's invoices (drafts are not sales)
     today_invoices = db.query(Invoice).filter(
-        Invoice.created_at >= today_start, Invoice.created_at <= today_end
+        Invoice.created_at >= today_start, Invoice.created_at <= today_end,
+        Invoice.is_draft == False,
     ).all()
     
     # Today's total sales
