@@ -117,6 +117,19 @@ export default [
       "unused-imports/no-unused-vars": "off",
 
       "no-useless-escape": "off",
+
+      // Architectural boundary: absolute @/ alias only, no relative parent imports
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["../*"],
+              message: "Use the @/ alias instead of relative parent imports.",
+            },
+          ],
+        },
+      ],
     },
   },
 ];

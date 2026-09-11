@@ -88,3 +88,9 @@ src/
 - [x] RBAC pinned: payroll + reports/overview forbidden for cashier (403)
 - [x] CI (.github/workflows/ci.yml): added pytest/httpx/apscheduler to requirements (were missing), fixed eslint-9 lint script, gated lint + typecheck + test:run + build
 - [x] Pydantic v1 @validator -> @field_validator; FastAPI on_event -> lifespan
+
+### Plan close-out (2026-09-11)
+- [x] Phase 3 finished: Bookings (747), HR (770), Attendance (567) pages wired to features/* modules
+- [x] Phase 4/5 formal: ARCHITECTURE.md written; eslint no-restricted-imports bans ../ (zero violations)
+- [x] Backend suite: 88 tests green; 7 production bugs fixed via tests
+- [x] Deferred (explicit): Postgres parity run, full POS E2E, useEmployeeForm state wiring
