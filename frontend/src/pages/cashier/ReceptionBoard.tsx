@@ -5,31 +5,13 @@ import {
   RefreshCw,
   Phone,
   User,
-  Zap,
   UserPlus,
-  UserCheck,
-  Play,
   Search,
   Check,
   Scissors,
-  Sparkles,
   Star,
-  History,
-  TrendingUp,
-  Monitor,
-  Wallet,
   AlertCircle,
-  ChevronLeft,
-  ArrowUpRight,
-  X,
-  Edit3,
   Trash2,
-  Timer,
-  GripVertical,
-  CalendarDays,
-  Wifi,
-  WifiOff,
-  CheckCheck,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
@@ -54,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatTime12h, formatCurrency, cn } from "@/lib/core/utils";
+import { formatCurrency, cn } from "@/lib/core/utils";
 import {
   Dialog,
   DialogContent,
@@ -63,124 +45,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CardSkeleton } from "@/components/ui/skeleton";
-import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
-import { PageHeader } from "@/components/shared/PremiumUI";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { AnimatePresence } from "framer-motion";
+import {
+  COLUMNS,
+  useReceptionBoard,
+  BoardColumn,
+  ReceptionHeader,
+  ReceptionKpis,
+  ReceptionToolbar,
+  DonePanel,
+} from "@/features/reception";
 
-const COLUMNS = [
-  {
-    key: "waiting",
-    title: "قائمة الانتظار",
-    desc: "بانتظار دورهم أو تأكيد حضورهم",
-    icon: Clock,
-    statuses: ["waiting", "pending", "confirmed"],
-    targetStatus: "waiting",
-    theme: {
-      text: "text-amber-600 dark:text-amber-400",
-      headerBg: "bg-amber-50 dark:bg-amber-500/10",
-      border: "border-amber-200 dark:border-amber-500/20",
-      iconBg:
-        "bg-white text-amber-500 dark:bg-white/5 dark:text-amber-400 border border-amber-200/60 dark:border-amber-500/20",
-      count: "bg-amber-500 text-white shadow-sm shadow-amber-500/30",
-      dot: "bg-amber-500",
-      dropRing: "ring-amber-500/40",
-    },
-  },
-  {
-    key: "in_service",
-    title: "قيد الخدمة",
-    desc: "عملاء يتلقون خدماتهم حالياً",
-    icon: Scissors,
-    statuses: ["in_progress"],
-    targetStatus: "in_progress",
-    theme: {
-      text: "text-indigo-600 dark:text-indigo-400",
-      headerBg: "bg-indigo-50 dark:bg-indigo-500/10",
-      border: "border-indigo-200 dark:border-indigo-500/20",
-      iconBg:
-        "bg-white text-indigo-500 dark:bg-white/5 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-500/20",
-      count: "bg-indigo-500 text-white shadow-sm shadow-indigo-500/30",
-      dot: "bg-indigo-500",
-      dropRing: "ring-indigo-500/40",
-    },
-  },
-  {
-    key: "review",
-    title: "المراجعة المالية",
-    desc: "بانتظار مراجعة الفاتورة النهائية",
-    icon: Sparkles,
-    statuses: ["completed"],
-    targetStatus: "completed",
-    theme: {
-      text: "text-emerald-600 dark:text-emerald-400",
-      headerBg: "bg-emerald-50 dark:bg-emerald-500/10",
-      border: "border-emerald-200 dark:border-emerald-500/20",
-      iconBg:
-        "bg-white text-emerald-500 dark:bg-white/5 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/20",
-      count: "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30",
-      dot: "bg-emerald-500",
-      dropRing: "ring-emerald-500/40",
-    },
-  },
-  {
-    key: "cashier",
-    title: "صندوق الدفع",
-    desc: "بانتظار العميل عند الكاشير",
-    icon: Wallet,
-    statuses: ["ready_for_payment"],
-    targetStatus: "ready_for_payment",
-    theme: {
-      text: "text-sky-600 dark:text-sky-400",
-      headerBg: "bg-sky-50 dark:bg-sky-500/10",
-      border: "border-sky-200 dark:border-sky-500/20",
-      iconBg:
-        "bg-white text-sky-500 dark:bg-white/5 dark:text-sky-400 border border-sky-200/60 dark:border-sky-500/20",
-      count: "bg-sky-500 text-white shadow-sm shadow-sky-500/30",
-      dot: "bg-sky-500",
-      dropRing: "ring-sky-500/40",
-    },
-  },
-];
 
-const EmptyState = ({ icon: Icon, title, desc }: any) => (
-  <div className="flex flex-col items-center justify-center h-32 sm:h-40 text-center p-4 sm:p-6 border-2 border-dashed border-border/40 rounded-2xl sm:rounded-3xl bg-soft/30 opacity-60">
-    <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white dark:bg-white/5 flex items-center justify-center mb-2 sm:mb-3 shadow-sm border border-border/40">
-      <Icon size={18} className="text-muted sm:hidden" />
-      <Icon size={22} className="hidden text-muted sm:block" />
-    </div>
-    <h4 className="text-xs sm:text-sm font-black text-main mb-0.5 sm:mb-1 tracking-tight">
-      {title}
-    </h4>
-    <p className="text-[9px] sm:text-xs font-bold text-muted">{desc}</p>
-  </div>
-);
 
-function getWaitMinutes(appt: Record<string, unknown> | null | undefined, now: number): number | null {
-  if (!appt) return null;
-  const status = String(appt.status || "").toLowerCase();
-  let start: Date | null = null;
-  if (status === "in_progress") {
-    if (appt.updated_at) start = new Date(String(appt.updated_at));
-  } else {
-    const dateStr = appt.appointment_date;
-    const timeStr = String(appt.appointment_time || "").slice(0, 5);
-    if (dateStr && timeStr) start = new Date(`${dateStr}T${timeStr}:00`);
-  }
-  if (!start || isNaN(start.getTime())) return null;
-  return Math.floor((now - start.getTime()) / 60000);
-}
-
-function formatWait(mins: number | null | undefined): string | null {
-  if (mins == null || mins < 0) return null;
-  if (mins < 1) return "الآن";
-  if (mins < 60) return `منذ ${mins} د`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m ? `منذ ${h} س ${m} د` : `منذ ${h} س`;
-}
 
 export default function ReceptionBoard() {
   const navigate = useNavigate();
@@ -193,14 +71,8 @@ export default function ReceptionBoard() {
   const [assigningAppt, setAssigningAppt] = useState<any>(null);
    
   const [cancelAppt, setCancelAppt] = useState<any>(null);
-  const [showDone, setShowDone] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [barberFilter, setBarberFilter] = useState("all");
    
-  const [draggingId, setDraggingId] = useState<any>(null);
    
-  const [dropCol, setDropCol] = useState<any>(null);
-  const [now, setNow] = useState(() => Date.now());
 
    
   const [fastClientData, setFastClientData] = useState<any>({
@@ -226,6 +98,25 @@ export default function ReceptionBoard() {
   const assignMutation = useAssignBarber();
 
   const loading = appointmentsFetching && appointments.length === 0;
+  const {
+    searchTerm,
+    setSearchTerm,
+    barberFilter,
+    setBarberFilter,
+    showDone,
+    setShowDone,
+    draggingId,
+    setDraggingId,
+    dropCol,
+    setDropCol,
+    now,
+    waitingList,
+    inServiceList,
+    reviewList,
+    atCashierList,
+    doneList,
+    kpis,
+  } = useReceptionBoard(appointments);
 
   const refresh = useCallback(() => {
     queryClient.invalidateQueries();
@@ -250,11 +141,6 @@ export default function ReceptionBoard() {
       socket.removeEventListener("message", handleMessage);
     };
   }, [socket, queryClient]);
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(t);
-  }, []);
 
   useEffect(() => {
     if ((fastClientData.phone ?? "").length >= 10) {
@@ -289,81 +175,6 @@ export default function ReceptionBoard() {
     }
   }, [fastClientData.phone]);
 
-  const q = searchTerm.trim().toLowerCase();
-
-  const filteredAppointments = useMemo(() => {
-    const list = appointments || [];
-    if (!q && barberFilter === "all") return list;
-    return list.filter((a) => {
-      if (barberFilter !== "all" && String(a.barber_id) !== barberFilter)
-        return false;
-      if (q) {
-        const hay =
-          `${a.customer_name || ""} ${a.customer_phone || ""}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [appointments, q, barberFilter]);
-
-  const waitingList = useMemo(
-    () =>
-      filteredAppointments.filter((a) =>
-        ["waiting", "pending", "confirmed"].includes(a.status?.toLowerCase()),
-      ),
-    [filteredAppointments],
-  );
-  const inServiceList = useMemo(
-    () =>
-      filteredAppointments.filter(
-        (a) => a.status?.toLowerCase() === "in_progress",
-      ),
-    [filteredAppointments],
-  );
-  const reviewList = useMemo(
-    () =>
-      filteredAppointments.filter(
-        (a) => a.status?.toLowerCase() === "completed",
-      ),
-    [filteredAppointments],
-  );
-  const atCashierList = useMemo(
-    () =>
-      filteredAppointments.filter(
-        (a) => a.status?.toLowerCase() === "ready_for_payment",
-      ),
-    [filteredAppointments],
-  );
-  const doneList = useMemo(
-    () =>
-      filteredAppointments.filter((a) =>
-        ["done"].includes(a.status?.toLowerCase()),
-      ),
-    [filteredAppointments],
-  );
-
-  const kpis = useMemo(() => {
-    const all = appointments || [];
-    const active = all.filter((a) => a.status?.toLowerCase() !== "cancelled");
-    const done = all.filter((a) => a.status?.toLowerCase() === "done");
-    const revenue = done.reduce(
-      (sum, a) => sum + Number(a.total_estimated_price || 0),
-      0,
-    );
-    return {
-      total: active.length,
-      waiting: active.filter((a) =>
-        ["waiting", "pending", "confirmed"].includes(a.status?.toLowerCase()),
-      ).length,
-      inService: active.filter((a) => a.status?.toLowerCase() === "in_progress")
-        .length,
-      cashier: active.filter(
-        (a) => a.status?.toLowerCase() === "ready_for_payment",
-      ).length,
-      done: done.length,
-      revenue,
-    };
-  }, [appointments]);
 
   const filteredServices = useMemo(() => {
     if (activeCategory === "الكل") return services;
@@ -500,144 +311,25 @@ export default function ReceptionBoard() {
 
   return (
     <div className="erp-page-container space-y-6 pb-16 relative" dir="rtl">
-      {/* ── HEADER ── */}
-      <PageHeader className={undefined}
-        title="لوحة التحكم والعمليات"
-        subtitle="متابعة دقيقة لمسار العميل داخل الصالون"
-        badge={connected ? "متصل مباشر" : "غير متصل"}
-        icon={Monitor}
-        actions={
-          <div className="flex items-center gap-3 flex-wrap">
-            <div
-              className={cn(
-                "hidden lg:flex items-center gap-2 px-3 h-11 rounded-xl border text-[11px] font-black transition-all",
-                connected
-                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                  : "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400",
-              )}
-            >
-              {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
-              {connected ? "الاتصال الحي يعمل" : "إعادة الاتصال..."}
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={refresh}
-              aria-label="تحديث البيانات"
-              title="تحديث البيانات"
-              className="h-11 w-11 rounded-xl"
-            >
-              <RefreshCw
-                size={18}
-                className={appointmentsFetching ? "animate-spin" : ""}
-              />
-            </Button>
-            <Button
-              onClick={() => setIsFastClientModalOpen(true)}
-              className="h-11 px-8 rounded-xl font-black bg-primary text-white shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3 text-sm"
-            >
-              <UserPlus size={20} /> تسجيل عميل سريع
-            </Button>
-          </div>
-        }
+      <ReceptionHeader
+        connected={connected}
+        appointmentsFetching={appointmentsFetching}
+        onRefresh={refresh}
+        onNewClient={() => setIsFastClientModalOpen(true)}
       />
 
-      {/* ── KPI STATS ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
-        <KpiCard
-          label="إجمالي اليوم"
-          value={kpis.total}
-          icon={CalendarDays}
-          className="text-primary bg-primary/10"
-        />
-        <KpiCard
-          label="قيد الانتظار"
-          value={kpis.waiting}
-          icon={Clock}
-          className="text-amber-600 dark:text-amber-400 bg-amber-500/10"
-        />
-        <KpiCard
-          label="قيد الخدمة"
-          value={kpis.inService}
-          icon={Scissors}
-          className="text-indigo-600 dark:text-indigo-400 bg-indigo-500/10"
-        />
-        <KpiCard
-          label="بالصندوق"
-          value={kpis.cashier}
-          icon={Wallet}
-          className="text-sky-600 dark:text-sky-400 bg-sky-500/10"
-        />
-        <KpiCard
-          label="مكتمل اليوم"
-          value={kpis.done}
-          icon={CheckCheck}
-          className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
-        />
-        <KpiCard
-          label="إيراد اليوم"
-          value={formatCurrency(kpis.revenue)}
-          icon={TrendingUp}
-          className="text-success bg-success/10"
-        />
-      </div>
+      <ReceptionKpis kpis={kpis} />
 
-      {/* ── TOOLBAR ── */}
-      <div className="surface-toolbar flex flex-col md:flex-row flex-wrap gap-2 md:items-center justify-between">
-        <div className="relative w-full lg:w-auto lg:flex-1 lg:max-w-md min-w-0">
-          <Search
-            size={16}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted"
-          />
-          <Input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="بحث فوري بالاسم أو الهاتف..."
-            className="h-11 pr-11 pl-4 rounded-xl"
-            aria-label="بحث في المواعيد"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm("")}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-main transition-colors"
-              aria-label="مسح البحث"
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3 flex-wrap w-full lg:w-auto">
-          <Select value={barberFilter} onValueChange={setBarberFilter}>
-            <SelectTrigger className="h-11 w-full lg:w-52 bg-soft border-border rounded-xl font-bold text-xs">
-              <SelectValue placeholder="كل الخبراء" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="font-bold">
-                كل الخبراء
-              </SelectItem>
-              {barbers.map((b) => (
-                <SelectItem
-                  key={b.id}
-                  value={String(b.id)}
-                  className="font-bold"
-                >
-                  {b.display_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant={showDone ? "primary" : "outline"}
-            onClick={() => setShowDone((v) => !v)}
-            className="h-11 px-4 rounded-xl font-black text-xs flex-1 lg:flex-none"
-          >
-            <History size={15} className="ml-1" />
-            مكتمل اليوم ({doneList.length})
-          </Button>
-        </div>
-      </div>
+      <ReceptionToolbar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        barberFilter={barberFilter}
+        onBarberFilter={setBarberFilter}
+        barbers={barbers}
+        showDone={showDone}
+        onToggleDone={() => setShowDone((v) => !v)}
+        doneCount={doneList.length}
+      />
 
       {/* ── KANBAN BOARD ── */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:gap-4">
@@ -661,47 +353,7 @@ export default function ReceptionBoard() {
         ))}
       </div>
 
-      {/* ── DONE TODAY PANEL ── */}
-      <AnimatePresence>
-        {showDone && (
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 12 }}
-            className="rounded-[2rem] border border-border/60 bg-card/60 backdrop-blur-xl p-5 sm:p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-main">مكتمل اليوم</h3>
-                  <p className="text-[10px] font-bold text-muted">
-                    {doneList.length} عميل تم إنجاز خدمته
-                  </p>
-                </div>
-              </div>
-              <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none font-black rounded-lg px-3 py-1">
-                {formatCurrency(kpis.revenue)}
-              </Badge>
-            </div>
-            {doneList.length === 0 ? (
-              <EmptyState
-                icon={CheckCheck}
-                title="لا مكتملة اليوم"
-                desc="لم يتم إنهاء أي خدمة حتى الآن."
-              />
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-                {doneList.map((a) => (
-                  <DoneCard key={a.id} appt={a} />
-                ))}
-              </div>
-            )}
-          </motion.section>
-        )}
-      </AnimatePresence>
+      <DonePanel show={showDone} list={doneList} revenue={kpis.revenue} />
 
       {/* ── MODALS ── */}
       <Dialog
@@ -1077,381 +729,6 @@ export default function ReceptionBoard() {
   );
 }
 
-function KpiCard({ label, value, icon: Icon, className }: any) {
-  return (
-    <div className="group relative rounded-xl border border-border/60 bg-card p-2.5 sm:p-4 shadow-soft transition-all duration-300 hover:shadow-premium hover:-translate-y-0.5 overflow-hidden">
-      <div className="flex items-center gap-2 sm:gap-3">
-        <div
-          className={cn(
-            "w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0",
-            className,
-          )}
-        >
-          <Icon size={14} className="sm:hidden" />
-          <Icon size={18} className="hidden sm:block" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[8px] sm:text-[10px] font-black text-muted uppercase tracking-widest truncate">
-            {label}
-          </div>
-          <div className="text-sm sm:text-lg font-black text-main tabular-nums truncate">
-            {value}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function BoardColumn({
-  col,
-  items,
-  loading,
-  now,
-  draggingId,
-  dropCol,
-  setDropCol,
-  onDrop,
-  onEdit,
-  onCancel,
-  onReassign,
-  onUpdateStatus,
-}: any) {
-  const isOver = dropCol === col.key;
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    if (dropCol !== col.key) setDropCol(col.key);
-  };
 
-  return (
-    <div
-      className={cn(
-        "flex flex-col h-full rounded-[2rem] border overflow-hidden bg-card/60 backdrop-blur-xl shadow-soft transition-all duration-300 min-h-0",
-        col.theme.border,
-        isOver && cn("ring-2 ring-inset bg-soft/80", col.theme.dropRing),
-      )}
-      onDragOver={handleDragOver}
-      onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropCol(null);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        const id = e.dataTransfer.getData("text/plain");
-        onDrop(id, col.key);
-      }}
-    >
-      {/* Column Header */}
-      <div
-        className={cn(
-          "shrink-0 p-3 sm:p-5 border-b flex items-center justify-between gap-2 sm:gap-3",
-          col.theme.headerBg,
-          col.theme.border,
-        )}
-      >
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div
-            className={cn(
-              "p-1.5 sm:p-2 rounded-lg sm:rounded-xl shadow-sm shrink-0",
-              col.theme.iconBg,
-            )}
-          >
-            <col.icon size={14} className="sm:hidden" />
-            <col.icon size={16} className="hidden sm:block" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-xs sm:text-sm font-black text-main truncate">
-              {col.title}
-            </h3>
-            <p className="hidden sm:block text-[10px] font-bold text-muted truncate">
-              {col.desc}
-            </p>
-          </div>
-        </div>
-        <Badge
-          className={cn(
-            "rounded-lg px-3 py-1 text-[11px] font-black shrink-0",
-            col.theme.count,
-          )}
-        >
-          {items.length}
-        </Badge>
-      </div>
-
-      {/* Column Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-2 sm:p-3 space-y-2 sm:space-y-3">
-        {loading ? (
-          <>
-            <CardSkeleton />
-            <CardSkeleton />
-            <CardSkeleton />
-          </>
-        ) : items.length === 0 ? (
-          <EmptyState
-            icon={col.icon}
-            title="القائمة فارغة"
-            desc="لا يوجد عملاء في هذه المرحلة حالياً."
-          />
-        ) : (
-          items.map((appt) => (
-            <AppointmentCard
-              key={appt.id}
-              appt={appt}
-              col={col}
-              now={now}
-              dragging={draggingId === appt.id}
-              onEdit={() => onEdit(appt)}
-              onCancel={() => onCancel(appt)}
-              onReassign={() => onReassign(appt)}
-              onUpdateStatus={onUpdateStatus}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function AppointmentCard({
-  appt,
-  col,
-  now,
-  dragging,
-  onEdit,
-  onCancel,
-  onReassign,
-  onUpdateStatus,
-}: any) {
-  const isOnline = appt.booking_source === "online";
-  const status = String(appt.status || "").toLowerCase();
-  const waitMins = getWaitMinutes(appt, now);
-  const waitLabel = formatWait(waitMins);
-  const timeLabel = appt.appointment_time
-    ? formatTime12h(String(appt.appointment_time).slice(0, 5))
-    : "—";
-
-  return (
-    <motion.div
-      layout
-      draggable
-      onDragStart={(e) => {
-        const dragEvent = e as unknown as React.DragEvent;
-        dragEvent.dataTransfer.setData("text/plain", String(appt.id));
-        dragEvent.dataTransfer.effectAllowed = "move";
-      }}
-      initial={{ opacity: 0, y: 14, scale: 0.97 }}
-      animate={{
-        opacity: 1,
-        y: 0,
-        scale: 1,
-        rotate: dragging ? 1.5 : 0,
-      }}
-      exit={{ opacity: 0, scale: 0.92 }}
-      whileHover={{ y: -3 }}
-      className={cn(
-        "p-3 sm:p-4 bg-card border border-border/60 rounded-xl sm:rounded-[1.5rem] flex flex-col gap-3 sm:gap-4 transition-all duration-300 relative overflow-hidden group shadow-soft hover:shadow-premium hover:border-accent/30 cursor-grab active:cursor-grabbing",
-        dragging && "opacity-60 ring-2 ring-accent/30 shadow-2xl",
-      )}
-    >
-      {/* Drag Handle */}
-      <div className="absolute top-3 left-3 text-muted/30 opacity-0 group-hover:opacity-100 transition-opacity">
-        <GripVertical size={16} />
-      </div>
-
-      {/* Top Row */}
-      <div className="flex justify-between items-start gap-3 pt-1">
-        <div className="min-w-0 space-y-2 flex-1">
-          <h4 className="font-black text-base text-main truncate leading-tight group-hover:text-accent transition-colors">
-            {appt.customer_name || "عميل مجهول"}
-          </h4>
-          <div className="flex items-center gap-2 text-[11px] font-bold text-muted min-w-0">
-            <Phone size={12} className="text-muted/60 shrink-0" />
-            <span className="truncate" dir="ltr">
-              {appt.customer_phone || "غير متوفر"}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {(appt.services || []).slice(0, 1).map((s, i) => (
-              <Badge
-                key={i}
-                variant="outline"
-                className="text-[10px] font-black text-muted flex items-center gap-1.5 uppercase tracking-tighter bg-soft border-border/40 px-2 py-0.5 rounded-lg"
-              >
-                <Zap size={10} className="text-accent" />{" "}
-                {s.service_name_snapshot || "خدمة عامة"}
-              </Badge>
-            ))}
-            {appt.services?.length > 1 && (
-              <Badge
-                variant="outline"
-                className="text-[9px] font-black text-accent bg-accent/5 border-accent/10 px-1.5 py-0.5 rounded-lg"
-              >
-                +{appt.services.length - 1} أخرى
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col items-end gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 text-[11px] font-black text-main bg-soft px-3 py-1 rounded-xl border border-border/40 shadow-sm tabular-nums">
-            <Clock size={12} className="text-accent" />
-            {timeLabel}
-          </div>
-          {isOnline && (
-            <Badge className="bg-sky-500/10 text-sky-600 dark:text-sky-400 text-[9px] font-black h-5 px-2 rounded-lg border border-sky-500/20 uppercase tracking-widest">
-              ONLINE
-            </Badge>
-          )}
-          {waitLabel && (
-            <Badge
-              className={cn(
-                "text-[9px] font-black h-5 px-2 rounded-lg border uppercase tracking-widest",
-                (waitMins ?? 0) > 20
-                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
-                  : (waitMins ?? 0) > 10
-                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-              )}
-            >
-              <Timer size={10} className="ml-1" />
-              {waitLabel}
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      {/* Barber Row */}
-      <div className="flex items-center justify-between p-3 bg-soft/50 rounded-[1.25rem] border border-border/40 group-hover:bg-card group-hover:border-accent/10 transition-all duration-300">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <EmployeeAvatar
-            name={appt.barber_name}
-            size="sm"
-            className="h-8 w-8 shrink-0"
-           imageUrl={undefined} role={undefined} />
-          <div className="min-w-0">
-            <p className="text-[9px] font-black text-muted uppercase leading-none mb-1 tracking-widest">
-              الخبير
-            </p>
-            <p
-              className="text-xs font-black text-main truncate group-hover:text-accent transition-colors"
-              title={appt.barber_name}
-            >
-              {appt.barber_name || "توزيع تلقائي"}
-            </p>
-          </div>
-        </div>
-        <ChevronLeft
-          size={14}
-          className="text-muted group-hover:text-accent transition-all group-hover:translate-x-[-2px] shrink-0"
-        />
-      </div>
-
-      {/* Actions */}
-      <div className="pt-1 space-y-2.5">
-        {col.key === "waiting" &&
-          status !== "done" &&
-          status !== "cancelled" && (
-            <>
-              {status === "waiting" ? (
-                <Button
-                  onClick={() => onUpdateStatus(appt.id, "in_progress")}
-                  className="w-full h-11 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 font-black text-xs hover:scale-[1.02] transition-all"
-                >
-                  <Play size={15} className="ml-2" fill="currentColor" /> توجيه
-                  للخبير
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => onUpdateStatus(appt.id, "waiting")}
-                  className="w-full h-11 rounded-xl bg-amber-500 text-white shadow-lg shadow-amber-500/20 font-black text-xs hover:scale-[1.02] transition-all"
-                >
-                  <UserCheck size={15} className="ml-2" /> تأكيد الوصول
-                </Button>
-              )}
-
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={onEdit}
-                  className="flex-1 h-10 rounded-xl bg-white dark:bg-white/5 text-muted hover:text-primary border border-border/40 transition-all flex items-center justify-center gap-2 text-[11px] font-black"
-                >
-                  <Edit3 size={13} className="text-primary" /> تعديل
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={onCancel}
-                  className="flex-1 h-10 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-600 hover:text-white border border-rose-500/10 transition-all flex items-center justify-center gap-2 text-[11px] font-black"
-                >
-                  <Trash2 size={13} /> إلغاء
-                </Button>
-              </div>
-            </>
-          )}
-
-        {col.key === "in_service" && (
-          <Button
-            onClick={() => onUpdateStatus(appt.id, "completed")}
-            className="w-full h-11 rounded-xl bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 font-black text-xs hover:scale-[1.02] transition-all"
-          >
-            <CheckCircle2 size={15} className="ml-2" /> إنهاء وإرسال للاستقبال
-          </Button>
-        )}
-
-        {col.key === "review" && (
-          <Button
-            onClick={() => onUpdateStatus(appt.id, "ready_for_payment")}
-            className="w-full h-11 rounded-xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 font-black text-xs hover:scale-[1.02] transition-all"
-          >
-            تأكيد جاهزية الدفع <ArrowUpRight size={15} className="mr-2" />
-          </Button>
-        )}
-
-        {col.key === "cashier" && (
-          <div className="w-full h-11 rounded-xl bg-sky-500/5 border border-sky-500/20 flex items-center justify-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
-            <span className="text-[10px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-widest">
-              قيد التحصيل الآن
-            </span>
-          </div>
-        )}
-
-        <Button
-          variant="ghost"
-          onClick={onReassign}
-          className="w-full h-10 text-[11px] font-black text-muted hover:text-accent hover:bg-white/5 rounded-xl border border-dashed border-border/40 hover:border-accent/40 transition-all"
-        >
-          <RefreshCw size={13} className="ml-2" /> تغيير خبير الخدمة
-        </Button>
-      </div>
-    </motion.div>
-  );
-}
-
-function DoneCard({ appt }: any) {
-  return (
-    <div className="p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border border-emerald-500/15 bg-emerald-500/5 flex items-center gap-2 sm:gap-3">
-      <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
-        <CheckCheck size={12} className="sm:hidden" />
-        <CheckCheck size={16} className="hidden sm:block" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] sm:text-xs font-black text-main truncate">
-          {appt.customer_name || "عميل مجهول"}
-        </p>
-        <p className="text-[8px] sm:text-[10px] font-bold text-muted truncate">
-          {appt.barber_name || "توزيع تلقائي"}
-        </p>
-      </div>
-      <div className="text-left shrink-0">
-        <p className="text-[10px] sm:text-xs font-black text-emerald-600 tabular-nums">
-          {formatCurrency(appt.total_estimated_price)}
-        </p>
-        <p className="text-[8px] sm:text-[9px] font-bold text-muted">
-          {appt.appointment_time
-            ? formatTime12h(String(appt.appointment_time).slice(0, 5))
-            : "—"}
-        </p>
-      </div>
-    </div>
-  );
-}
