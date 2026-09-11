@@ -25,8 +25,8 @@ export default defineConfig({
   webServer: [
     {
       command:
-        '"../backend/.venv/Scripts/python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8000',
-      url: 'http://127.0.0.1:8000/',
+        '"../backend/.venv/Scripts/python.exe" -u ../backend/e2e_server.py',
+      url: 'http://127.0.0.1:18001/',
       cwd: '../backend',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,

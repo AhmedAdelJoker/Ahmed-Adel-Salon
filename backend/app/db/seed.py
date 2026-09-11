@@ -8,6 +8,7 @@ from app.models.service_category import ServiceCategory
 from app.models.product import Product
 from app.models.expense import Expense
 from app.core.security import get_password_hash
+from app.core.config import settings as app_settings
 from decimal import Decimal
 
 
@@ -16,16 +17,18 @@ def seed_data():
 
     try:
         # ✅ Admin & Accountant
-        if not db.query(User).filter(User.username == "admin").first():
+        # NOTE: admin credentials come from FIRST_SUPERUSER[_PASSWORD] env
+        # (see backend/.env) — never hardcode them here.
+        if not db.query(User).filter(User.username == app_settings.FIRST_SUPERUSER).first():
             admin = User(
-                username="admin",
-                hashed_password=get_password_hash("252525"),
+                username=app_settings.FIRST_SUPERUSER,
+                hashed_password=get_password_hash(app_settings.FIRST_SUPERUSER_PASSWORD),
                 full_name="المالك (Principal Owner)",
                 role="owner",
                 is_active=True
             )
             db.add(admin)
-            print("✅ Admin/Owner created")
+            print("[seed] Admin/Owner created")
 
         if not db.query(User).filter(User.username == "accountant").first():
             accountant = User(
@@ -36,7 +39,7 @@ def seed_data():
                 is_active=True
             )
             db.add(accountant)
-            print("✅ Accountant created")
+            print("[seed] Accountant created")
 
         # ✅ Employees (replacing legacy Barbers)
         if not db.query(Employee).first():
@@ -67,7 +70,7 @@ def seed_data():
                 ),
             ]
             db.add_all(employees)
-            print("✅ Employees created")
+            print("[seed] Employees created")
 
         # ✅ Service categories
         if not db.query(ServiceCategory).first():
@@ -78,7 +81,7 @@ def seed_data():
                 ServiceCategory(name="Care", name_ar="عناية", icon="🧴", sort_order=4),
             ]
             db.add_all(categories)
-            print("✅ Service categories created")
+            print("[seed] Service categories created")
 
         # ✅ Services
         if not db.query(Service).first():
@@ -93,7 +96,7 @@ def seed_data():
                 Service(name="صبغة شعر", name_ar="صبغة شعر", category="شعر", category_id=hair_category.id if hair_category else None, price=Decimal("200.00"), duration_minutes=60),
             ]
             db.add_all(services)
-            print("✅ Services created")
+            print("[seed] Services created")
 
         # ✅ Products
         if not db.query(Product).first():
@@ -103,7 +106,7 @@ def seed_data():
                 Product(name="كريم حلاقة", category="حلاقة", unit="g", weight=Decimal("500.00"), quantity=Decimal("4000.00"), sell_price=Decimal("35.00"), cost_price=Decimal("0.07")),
             ]
             db.add_all(products)
-            print("✅ Products created")
+            print("[seed] Products created")
 
         # ✅ Expenses
         if not db.query(Expense).first():
@@ -113,7 +116,7 @@ def seed_data():
                 Expense(amount=100, category="أدوات", description="شراء مقصات جديدة"),
             ]
             db.add_all(expenses)
-            print("✅ Expenses created")
+            print("[seed] Expenses created")
 
         # ✅ Business settings
         if not db.query(BusinessSettings).first():
@@ -131,13 +134,13 @@ def seed_data():
                 manager_discount_limit_value=100,
             )
             db.add(settings)
-            print("✅ Settings created")
+            print("[seed] Settings created")
 
         db.commit()
 
     except Exception as e:
         db.rollback()
-        print("❌ Seeder error:", e)
+        print("[seed] ERROR:", e)
 
     finally:
         db.close()
