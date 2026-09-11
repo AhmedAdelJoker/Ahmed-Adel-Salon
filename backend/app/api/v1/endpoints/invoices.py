@@ -683,7 +683,14 @@ def update_draft_invoice(
         raise HTTPException(status_code=404, detail="المسودة غير موجودة")
     
     draft.customer_id = payload.customer_id or draft.customer_id
-    draft.barber_id = payload.barber_id or draft.barber_id
+    # NOTE: InvoiceManualCreate has no barber_id field; barber comes from
+    # the first item's employee_id (same as manual create).
+    first_employee = next(
+        (it.employee_id for it in (payload.items or []) if it.employee_id),
+        None,
+    )
+    if first_employee:
+        draft.barber_id = first_employee
     draft.payment_method = payload.payment_method or draft.payment_method
     draft.draft_saved_at = datetime.utcnow()
     
@@ -698,11 +705,22 @@ def update_draft_invoice(
             price = item_data.unit_price
             line_total = price * qty
             total += line_total
+            # NOTE: InvoiceManualCreate has no service_name field; resolve
+            # from the catalog like manual create does.
+            resolved_name = "��"
+            if item_data.item_type == "service" and item_data.service_id:
+                svc = db.query(Service).filter(Service.id == item_data.service_id).first()
+                if svc:
+                    resolved_name = svc.name
+            elif item_data.item_type == "product" and item_data.product_id:
+                prod = db.query(Product).filter(Product.id == item_data.product_id).first()
+                if prod:
+                    resolved_name = prod.name
             item = InvoiceItem(
                 invoice_id=draft.id,
                 service_id=item_data.service_id,
                 product_id=item_data.product_id,
-                service_name=item_data.service_name or "بند",
+                service_name=resolved_name,
                 quantity=qty,
                 unit_price=price,
                 total_price=line_total,
