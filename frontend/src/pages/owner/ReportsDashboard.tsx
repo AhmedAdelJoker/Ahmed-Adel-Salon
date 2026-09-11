@@ -52,14 +52,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn, formatCurrency, formatNumber } from "@/lib/core/utils";
 import {
-  StatCard as StatCardDisplay,
-  CurrencyStatCard,
-} from "@/components/shared/DisplayComponents";
-import {
   PageHeader,
   PremiumCard,
   ContentPanel,
   SkeletonCard,
+  StatCard,
 } from "@/components/shared/PremiumUI";
 
 const KPI_CONFIG = [
@@ -234,52 +231,45 @@ export default function ReportsDashboard() {
 
   return (
     <div className="erp-page space-y-6 pb-8" dir="rtl">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-gradient-to-br from-primary to-primary/70 rounded-2xl flex items-center justify-center shadow-lg">
-            <LayoutDashboard className="text-inverse w-7 h-7" />
+      <PageHeader
+        title={`أهلاً بك، ${displayName}`}
+        subtitle={scopeLabel}
+        badge="لوحة القيادة التنفيذية"
+        icon={LayoutDashboard}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={period} onValueChange={handlePeriodChange}>
+              <SelectTrigger className="h-10 rounded-xl">
+                <SelectValue placeholder="الفترة" />
+              </SelectTrigger>
+              <SelectContent>
+                {PERIODS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant={employeeId ? "outline" : "primary"}
+              onClick={() => navigate("/owner")}
+              className="h-10 rounded-xl px-4 hidden sm:inline-flex"
+            >
+              المكتب الرئيسي
+            </Button>
+            {employeeId && (
+              <Badge variant="info" size="sm" className="rounded-xl px-3 py-1.5">
+                {employeeName || `الموظف #${employeeId}`}
+              </Badge>
+            )}
+            <Button onClick={loadData} variant="outline" className="h-10 rounded-xl" disabled={loading}>
+              <Loader2 className={cn("ml-2 h-4 w-4", loading ? "animate-spin" : "")} />
+              <span className="hidden sm:inline">تحديث</span>
+            </Button>
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-main tracking-tight">
-              أهلاً بك، {displayName} 👋
-            </h1>
-            <p className="text-sm text-muted font-bold">
-              {scopeLabel}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={period} onValueChange={handlePeriodChange}>
-            <SelectTrigger className="h-10 rounded-xl">
-              <SelectValue placeholder="الفترة" />
-            </SelectTrigger>
-            <SelectContent>
-              {PERIODS.map((p) => (
-                <SelectItem key={p.value} value={p.value}>
-                  {p.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant={employeeId ? "outline" : "primary"}
-            onClick={() => navigate("/owner")}
-            className="h-10 rounded-xl px-4 hidden sm:inline-flex"
-          >
-            المكتب الرئيسي
-          </Button>
-          {employeeId && (
-            <Badge variant="info" size="sm" className="rounded-xl px-3 py-1.5">
-              {employeeName || `الموظف #${employeeId}`}
-            </Badge>
-          )}
-          <Button onClick={loadData} variant="outline" className="h-10 rounded-xl" disabled={loading}>
-            <Loader2 className={cn("ml-2 h-4 w-4", loading ? "animate-spin" : "")} />
-            تحديث
-          </Button>
-        </div>
-      </div>
+        }
+        className={undefined}
+      />
 
       {/* Demo Banner */}
       {isDemo && !loading && (
@@ -297,7 +287,6 @@ export default function ReportsDashboard() {
             const rawTrend = stats[kpi.trendKey];
             const isValidTrend = typeof rawTrend === 'number' && isFinite(rawTrend) && rawTrend !== 0;
             const trendVariant = isValidTrend ? getTrendVariant(rawTrend) : undefined;
-            const isCurrency = kpi.key.includes("revenue") || kpi.key.includes("expense") || kpi.key.includes("profit");
             const cardProps = {
               label: kpi.label,
               value: formatStatValue(kpi.key, value),
@@ -306,10 +295,8 @@ export default function ReportsDashboard() {
               delay: idx * 0.04,
               trend: trendVariant,
               trendValue: isValidTrend ? `${Math.abs(rawTrend)}%` : undefined,
-              hint: undefined,
-              className: undefined,
             };
-            return isCurrency ? <CurrencyStatCard key={kpi.key} {...cardProps} value={value} /> : <StatCardDisplay key={kpi.key} {...cardProps} />;
+            return <StatCard key={kpi.key} {...cardProps} />;
           })}
         </div>
       </ContentPanel>

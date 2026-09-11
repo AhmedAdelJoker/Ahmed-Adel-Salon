@@ -52,6 +52,39 @@ def list_employees(
             
     return employees
 
+@router.get("/archive", response_model=List[EmployeeListItem])
+def list_archived_employees(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_manager),
+    q: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(1000, ge=1, le=2000),
+):
+    """List archived employees (suspended/resigned). Owner and Manager can view."""
+    archived_statuses = ["suspended", "resigned"]
+    query = db.query(Employee).options(
+        joinedload(Employee.assistant_of), joinedload(Employee.services)
+    ).filter(Employee.status.in_(archived_statuses))
+
+    if status and status in archived_statuses:
+        query = query.filter(Employee.status == status)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            (Employee.full_name.ilike(like)) | (Employee.phone_primary.ilike(like))
+        )
+
+    employees = query.order_by(Employee.id.desc()).offset(skip).limit(limit).all()
+
+    for emp in employees:
+        if emp.assistant_of:
+            emp.assistant_of_name = emp.assistant_of.full_name
+        emp.service_ids = [s.id for s in emp.services]
+
+    return employees
+
+
 @router.get("/{employee_id}", response_model=EmployeeRead)
 def get_employee(
     employee_id: int,

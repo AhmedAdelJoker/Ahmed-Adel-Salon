@@ -317,7 +317,7 @@ export default function CashierDashboard() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <StatCard
           label="مبيعات اليوم"
           value={formatCurrency(summary?.today_sales || 0)}
@@ -348,7 +348,7 @@ export default function CashierDashboard() {
          trend={undefined} trendValue={undefined} />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 overflow-hidden">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="الحجوزات"
           value={summary?.today_appointments || 0}
@@ -381,7 +381,7 @@ export default function CashierDashboard() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 overflow-hidden">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
             {quickActions.map((action, idx) => (
               <Link key={idx} to={action.link}>
                 <PremiumCard
@@ -573,22 +573,22 @@ export default function CashierDashboard() {
                   {formatCurrency(summary?.today_sales || 0)}
                 </h2>
               </div>
-              <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/10">
-                <div className="text-center">
-                  <p className="text-[9px] font-bold opacity-70">الفواتير</p>
-                  <p className="text-sm font-black">
+              <div className="grid grid-cols-3 gap-1 border-t border-white/10 pt-4 sm:gap-2">
+                <div className="min-w-0 text-center">
+                  <p className="truncate text-[9px] font-bold opacity-70">الفواتير</p>
+                  <p className="truncate text-sm font-black tabular-nums">
                     {summary?.invoices_count || 0}
                   </p>
                 </div>
-                <div className="text-center">
-                  <p className="text-[9px] font-bold opacity-70">العملاء</p>
-                  <p className="text-sm font-black">
+                <div className="min-w-0 text-center">
+                  <p className="truncate text-[9px] font-bold opacity-70">العملاء</p>
+                  <p className="truncate text-sm font-black tabular-nums">
                     {summary?.customers_count || 0}
                   </p>
                 </div>
-                <div className="text-center">
-                  <p className="text-[9px] font-bold opacity-70">الوردية</p>
-                  <p className="text-sm font-black">
+                <div className="min-w-0 text-center">
+                  <p className="truncate text-[9px] font-bold opacity-70">الوردية</p>
+                  <p className="truncate text-sm font-black tabular-nums">
                     #{summary?.current_shift_id || "---"}
                   </p>
                 </div>

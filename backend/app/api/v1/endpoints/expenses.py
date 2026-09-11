@@ -12,6 +12,7 @@ from app.api.deps import require_cashier_manager_owner, require_owner_or_manager
 from app.models.user import User
 from app.models.expense import Expense
 from app.schemas.expense import ExpenseCreate, ExpenseRead, ExpenseSummary, ExpenseArchiveResponse
+from app.utils.expense_labels import expense_label_ar
 from app.utils.media import process_image_content, get_upload_path
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
@@ -198,7 +199,14 @@ def get_expenses_summary(
         func.count(Expense.id).label("cnt")
     ).group_by(Expense.category).order_by(func.sum(Expense.amount).desc()).all()
 
-    categories = [{"name": r.category, "value": float(r.total)} for r in cat_rows]
+    categories = [
+        {
+            "name": r.category,
+            "label_ar": expense_label_ar(r.category),
+            "value": float(r.total),
+        }
+        for r in cat_rows
+    ]
     top_category = cat_rows[0].category if cat_rows else None
     top_amount = float(cat_rows[0].total) if cat_rows else 0
 
@@ -215,6 +223,7 @@ def get_expenses_summary(
         "month_total": float(month_total),
         "year_total": float(year_total),
         "top_category": top_category,
+        "top_category_ar": expense_label_ar(top_category) if top_category else None,
         "top_amount": top_amount,
         "status_breakdown": status_breakdown,
     }

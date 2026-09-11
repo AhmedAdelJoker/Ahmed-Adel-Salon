@@ -41,6 +41,18 @@ const QUICK_LINKS = [
     to: "/owner/reports",
     category: "المالية",
   },
+  {
+    icon: TrendingUp,
+    label: "التقارير المالية",
+    to: "/owner/financial",
+    category: "المالية",
+  },
+  {
+    icon: Wallet,
+    label: "أرشيف الفواتير",
+    to: "/invoices/archive",
+    category: "المالية",
+  },
 ];
 
 export default function CommandPalette() {

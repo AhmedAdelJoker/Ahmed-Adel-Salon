@@ -64,7 +64,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Cell, Legend, Pie, PieChart } from "recharts";
 
 const SYSTEM_LINKS = [
-  { label: "الموارد البشرية", icon: Users, desc: "بيانات الموظف والراتب الأساسي", color: "bg-indigo-500", href: "/owner/hr" },
+  { label: "الموارد البشرية", icon: Users, desc: "بيانات الموظف والراتب الأساسي", color: "bg-primary", href: "/owner/hr" },
   { label: "الحضور", icon: Clock, desc: "الانضباط يحسب الحوافز والخصومات", color: "bg-emerald-500", href: "/attendance" },
   { label: "المصروفات", icon: TrendingDown, desc: "صرف الراتب ينشئ مصروف تلقائي", color: "bg-rose-500", href: "/expenses" },
   { label: "الخزنة", icon: Wallet, desc: "الصرف يخصم من رصيد الخزنة", color: "bg-amber-500", href: "/owner/cashbox" },
@@ -197,7 +197,7 @@ export default function Payroll() {
             <Button variant="outline" onClick={()=>exportService.downloadExcel("/exports/payroll/excel","payroll_report",period as unknown as Record<string, unknown>)} className="h-11 rounded-xl px-4 text-xs font-black"><FileSpreadsheet size={16} className="ml-1.5 text-success" /><span className="hidden sm:inline">Excel</span></Button>
             <Button variant="outline" onClick={()=>setIsAdvanceModalOpen(true)} className="h-11 rounded-xl px-4 text-xs font-black text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-600 hover:text-white"><MinusCircle size={16} className="ml-1.5" /> سلفة</Button>
             <Button variant="outline" onClick={()=>navigate("/owner/payroll/archive")} className="h-11 rounded-xl px-4 text-xs font-black"><Archive size={16} className="ml-1.5" /> الأرشيف</Button>
-            <Button onClick={handleCalculate} disabled={loading} className="h-11 rounded-xl px-6 bg-slate-900 hover:bg-slate-800 text-white font-black shadow-lg"><RefreshCw size={16} className="ml-1.5" /> تحديث الحسابات</Button>
+            <Button onClick={handleCalculate} disabled={loading} className="h-11 rounded-xl px-6 bg-primary hover:bg-primary-strong text-white font-black shadow-lg"><RefreshCw size={16} className="ml-1.5" /> تحديث الحسابات</Button>
           </div>
         }
       />
@@ -206,15 +206,15 @@ export default function Payroll() {
       <PremiumCard noPadding className="overflow-hidden border-dashed bg-gradient-to-br from-card via-card to-soft/20">
         <div className="p-4 sm:p-5 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-slate-900 text-white flex items-center justify-center"><Building2 size={16} /></div>
+            <div className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center"><Building2 size={16} /></div>
             <div><h3 className="text-sm font-black text-main">ترابط الرواتب بالنظام</h3><p className="text-[11px] font-bold text-muted">كل راتب هو حلقة وصل بين الحضور والعمولات والخزنة</p></div>
-            <Badge className="mr-auto hidden sm:flex rounded-full bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-black">تكامل تلقائي</Badge>
+            <Badge className="mr-auto hidden rounded-full border-primary/20 bg-primary-soft text-primary text-[10px] font-black sm:flex">تكامل تلقائي</Badge>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {SYSTEM_LINKS.map(l=>(
-              <button key={l.label} onClick={()=>navigate(l.href)} className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-right hover:border-slate-900 hover:shadow-md transition-all">
+              <button key={l.label} onClick={()=>navigate(l.href)} className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-right hover:border-primary hover:shadow-md transition-all">
                 <div className={cn("h-10 w-10 rounded-xl text-white flex items-center justify-center shrink-0", l.color)}><l.icon size={18} /></div>
-                <div className="min-w-0 flex-1"><div className="text-xs font-black text-main flex items-center gap-1">{l.label} <ArrowUpRight size={12} className="text-muted group-hover:text-slate-900" /></div><div className="text-[10px] font-bold text-muted leading-tight mt-0.5 line-clamp-2">{l.desc}</div></div>
+                <div className="min-w-0 flex-1"><div className="text-xs font-black text-main flex items-center gap-1">{l.label} <ArrowUpRight size={12} className="text-muted group-hover:text-primary" /></div><div className="text-[10px] font-bold text-muted leading-tight mt-0.5 line-clamp-2">{l.desc}</div></div>
               </button>
             ))}
           </div>
@@ -224,28 +224,28 @@ export default function Payroll() {
       {/* Staff Snapshot - Responsive */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-black flex items-center gap-2"><span className="h-8 w-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Users size={14} /></span> الكادر الحالي</h2>
+          <h2 className="flex items-center gap-2 text-sm font-black"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-soft text-primary"><Users size={14} /></span> الكادر الحالي</h2>
           <span className="text-[11px] font-bold text-muted">{employees.length} موظف • اضغط للفلترة</span>
         </div>
         <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar xl:grid xl:grid-cols-5 xl:overflow-visible">
           {employees.slice(0,10).map(emp=>{
             const row = payrollRows.find(r=> (r.employee_id||r.employeeId)===emp.id);
             return (
-              <Card key={emp.id} onClick={()=>navigate(`/owner/payroll?employeeId=${emp.id}&employeeName=${encodeURIComponent(emp.full_name||emp.fullName||"")}`)} className={cn("min-w-[200px] lg:min-w-0 p-4 rounded-2xl border bg-card hover:border-indigo-200 hover:shadow-md cursor-pointer transition-all shrink-0", String(employeeIdFilter)===String(emp.id) && "ring-2 ring-indigo-500 border-indigo-200 bg-indigo-50/30")}>
+              <Card key={emp.id} onClick={()=>navigate(`/owner/payroll?employeeId=${emp.id}&employeeName=${encodeURIComponent(emp.full_name||emp.fullName||"")}`)} className={cn("min-w-[200px] shrink-0 cursor-pointer rounded-2xl border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-md lg:min-w-0", String(employeeIdFilter)===String(emp.id) && "border-primary/40 bg-primary-soft/40 ring-2 ring-primary/40")}>
                 <div className="flex flex-col items-center text-center gap-3">
                   <div className="relative">
                     <img src={emp.profile_image_url ? (typeof emp.profile_image_url === "string" && emp.profile_image_url.startsWith("http")? emp.profile_image_url : `${api.defaults.baseURL?.replace("/api/v1","")}${emp.profile_image_url}`) : `https://ui-avatars.com/api/?name=${encodeURIComponent(String(emp.full_name||"M"))}&background=random`} alt={String(emp.full_name||"")} className="h-14 w-14 rounded-2xl object-cover border-2 border-white shadow" />
-                    <span className={cn("absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white", emp.status==="active"?"bg-emerald-500":"bg-slate-400")} />
+                    <span className={cn("absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white", emp.status==="active"?"bg-success":"bg-muted")} />
                   </div>
                   <div className="space-y-0.5 w-full">
                     <div className="text-xs font-black text-main truncate">{emp.full_name || emp.fullName}</div>
-                    <div className="text-[10px] font-bold text-muted uppercase truncate">{String(emp.job_title || emp.jobTitle || "موظف")}</div>
+                    <div className="truncate text-[10px] font-bold uppercase text-muted">{String(emp.job_title || emp.jobTitle || "موظف")}</div>
                   </div>
                   <div className="w-full pt-2 border-t border-border/40 flex justify-between text-[11px]">
                     <span className="text-muted font-bold">الأساسي</span><span className="font-black text-main">{money(emp.base_salary)}</span>
                   </div>
                   <div className="w-full flex justify-between text-[11px]">
-                    <span className="text-muted font-bold">الصافي</span><span className="font-black text-indigo-600">{money(row?.net_salary || 0)}</span>
+                    <span className="text-muted font-bold">الصافي</span>                    <span className="font-black text-primary">{money(row?.net_salary || 0)}</span>
                   </div>
                 </div>
               </Card>
@@ -268,7 +268,7 @@ export default function Payroll() {
               <SelectContent>{YEARS.map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="mt-4 p-4 rounded-2xl bg-slate-900 text-white">
+          <div className="mt-4 p-4 rounded-2xl bg-primary text-white">
             <div className="text-[10px] font-black text-white/60 uppercase">إجمالي كتلة الرواتب</div>
             <div className="text-2xl font-black tabular-nums mt-1">{money(summary?.total_net_salary)}</div>
             <div className="flex gap-2 mt-2 text-[10px] font-bold">
@@ -279,11 +279,11 @@ export default function Payroll() {
         </PremiumCard>
         <PremiumCard className="xl:col-span-5 p-5 min-w-0">
           <h3 className="text-xs font-black uppercase tracking-widest text-muted mb-4">تحليل التكاليف</h3>
-          <div className="h-[220px] w-full min-w-[350px]">
+          <div className="h-[220px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={[{name:"الأساسي", value:toNumber(summary?.total_base_salary)}, {name:"العمولات", value:toNumber(summary?.total_commissions)}, {name:"المكافآت", value:toNumber(summary?.total_bonuses)}]} cx="50%" cy="50%" innerRadius={48} outerRadius={72} paddingAngle={4} dataKey="value">
-                  <Cell fill="#0f172a" /><Cell fill="#0ea5e9" /><Cell fill="#10b981" />
+                  <Cell fill="var(--primary)" /><Cell fill="var(--info)" /><Cell fill="var(--success)" />
                 </Pie>
                 <RechartsTooltip formatter={v=>money(v)} contentStyle={{borderRadius:12, border:"1px solid var(--border)", fontWeight:800}} />
                 <Legend iconType="circle" wrapperStyle={{fontSize:11, fontWeight:800}} />
@@ -292,7 +292,7 @@ export default function Payroll() {
           </div>
         </PremiumCard>
         <div className="xl:col-span-4 grid grid-cols-2 gap-3 min-w-0">
-          <PremiumCard className="p-4 border-l-4 border-slate-900">
+          <PremiumCard className="p-4 border-l-4 border-primary">
             <div className="text-[10px] font-black text-muted uppercase">الأساسي</div>
             <div className="text-lg font-black tabular-nums">{money(summary?.total_base_salary)}</div>
             <div className="text-[10px] font-bold text-muted">{summary?.employees_count || 0} موظف</div>
@@ -313,8 +313,8 @@ export default function Payroll() {
       </div>
 
       {employeeIdFilter && (
-        <PremiumCard className="p-4 bg-indigo-50/50 border-indigo-200 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-          <div><div className="text-[10px] font-black text-indigo-600 uppercase">فلترة موظف</div><div className="font-black text-main">{employeeNameFilter || `موظف #${employeeIdFilter}`}</div></div>
+        <PremiumCard className="flex flex-col gap-3 border-primary/20 bg-primary-soft/40 p-4 sm:flex-row sm:items-center justify-between">
+          <div><div className="text-[10px] font-black uppercase text-primary">فلترة موظف</div><div className="font-black text-main">{employeeNameFilter || `موظف #${employeeIdFilter}`}</div></div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={()=>navigate(`/owner/hr?employeeId=${employeeIdFilter}`)} className="rounded-xl font-black">ملف الموظف</Button>
             <Button variant="outline" size="sm" onClick={()=>navigate("/owner/payroll")} className="rounded-xl font-black">إلغاء الفلترة</Button>
@@ -369,7 +369,7 @@ export default function Payroll() {
                     <td className="px-4 py-4 text-sm font-black text-sky-600 tabular-nums">{money(row.commission_amount)}</td>
                     <td className="px-4 py-4 text-center text-sm font-black text-emerald-600 tabular-nums">+{money(row.bonus_amount)}</td>
                     <td className="px-4 py-4 text-center text-sm font-black text-rose-600 tabular-nums">-{money(toNumber(row.deduction_amount)+toNumber(row.advance_amount))}</td>
-                    <td className="px-4 py-4 text-center"><span className="text-base font-black tabular-nums bg-slate-900 text-white px-3 py-1 rounded-full">{money(row.net_salary)}</span></td>
+                    <td className="px-4 py-4 text-center"><span className="text-base font-black tabular-nums bg-primary text-white px-3 py-1 rounded-full">{money(row.net_salary)}</span></td>
                     <td className="px-4 py-4 text-center"><StatusBadge status={row.status} /></td>
                     <td className="px-4 py-4">
                       <div className="flex items-center justify-center gap-1">
@@ -405,7 +405,7 @@ export default function Payroll() {
                   <div className="rounded-xl bg-emerald-50 p-2"><div className="text-[9px] font-black text-muted uppercase">إضافات</div><div className="font-black text-emerald-600">+{money(row.bonus_amount)}</div></div>
                   <div className="rounded-xl bg-rose-50 p-2"><div className="text-[9px] font-black text-muted uppercase">خصومات</div><div className="font-black text-rose-600">-{money(toNumber(row.deduction_amount)+toNumber(row.advance_amount))}</div></div>
                 </div>
-                <div className="flex items-center justify-between bg-slate-900 text-white rounded-xl p-3">
+                <div className="flex items-center justify-between bg-primary text-white rounded-xl p-3">
                   <span className="text-[10px] font-black text-white/60 uppercase">الصافي</span><span className="font-black">{money(row.net_salary)}</span>
                 </div>
                 <div className="flex gap-2">
@@ -445,7 +445,7 @@ export default function Payroll() {
       {/* Modals - keep existing but styled */}
       <Dialog open={isEditModalOpen} onOpenChange={(o)=>!o&&closeEditModal()}>
         <DialogContent className="max-w-3xl rounded-[1.5rem] p-0 overflow-hidden max-h-[90vh] flex flex-col" dir="rtl">
-          <DialogHeader className="p-6 bg-slate-900 text-white shrink-0">
+          <DialogHeader className="p-6 bg-primary text-white shrink-0">
             <DialogTitle className="text-xl font-black flex items-center gap-3"><span className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center"><Pencil size={16} /></span> تعديل بنود الراتب</DialogTitle>
             <DialogDescription className="text-white/60 text-xs font-bold">مراجعة يدوية للفترة {editingRecord?.period_month}/{editingRecord?.period_year}</DialogDescription>
           </DialogHeader>
@@ -464,15 +464,15 @@ export default function Payroll() {
                   </Select>
                 </Field>
               </div>
-              <Field label="ملاحظات"><textarea rows={2} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} className="w-full rounded-xl border border-border bg-soft p-3 text-sm font-bold focus:border-slate-900 outline-none resize-none" placeholder="سبب التعديل..." /></Field>
-              <div className="rounded-2xl bg-slate-900 text-white p-4 flex items-center justify-between">
+              <Field label="ملاحظات"><textarea rows={2} value={editData.notes} onChange={e=>setEditData({...editData, notes:e.target.value})} className="w-full rounded-xl border border-border bg-soft p-3 text-sm font-bold outline-none resize-none focus:border-primary" placeholder="سبب التعديل..." /></Field>
+              <div className="rounded-2xl bg-primary text-white p-4 flex items-center justify-between">
                 <span className="text-[10px] font-black text-white/60 uppercase">الصافي الجديد</span><span className="text-xl font-black">{money(editedNetSalary)}</span>
               </div>
             </div>
           )}
           <DialogFooter className="p-4 border-t border-border bg-soft/20 gap-2 shrink-0">
             <Button variant="outline" onClick={closeEditModal} className="flex-1 h-11 rounded-xl font-black">إلغاء</Button>
-            <Button onClick={handleSaveEdit} disabled={isSavingEdit} className="flex-1 h-11 rounded-xl bg-slate-900 text-white font-black">{isSavingEdit?"جاري الحفظ...":"اعتماد"}</Button>
+            <Button onClick={handleSaveEdit} disabled={isSavingEdit} className="flex-1 h-11 rounded-xl bg-primary text-white font-black">{isSavingEdit?"جاري الحفظ...":"اعتماد"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -519,7 +519,7 @@ export default function Payroll() {
 
       <Dialog open={isExpectedModalOpen} onOpenChange={setIsExpectedModalOpen}>
         <DialogContent className="max-w-lg rounded-[1.5rem] p-0 overflow-hidden" dir="rtl">
-          <DialogHeader className="p-6 bg-sky-900 text-white">
+          <DialogHeader className="bg-info p-6 text-white">
             <DialogTitle className="text-lg font-black">تحليل الانضباط</DialogTitle>
             <DialogDescription className="text-white/60 text-xs">تأثير الحضور على الحوافز</DialogDescription>
           </DialogHeader>
@@ -534,10 +534,10 @@ export default function Payroll() {
                 <div className="flex justify-between p-3 rounded-xl bg-sky-50 border border-sky-100"><span className="text-sm font-bold text-sky-800">حافز انضباط</span><span className="font-black text-sky-600">+{money(expectedData.discipline_bonus ?? 0)}</span></div>
                 <div className="flex justify-between p-3 rounded-xl bg-rose-50 border border-rose-100"><span className="text-sm font-bold text-rose-800">خصم غياب</span><span className="font-black text-rose-600">-{money(expectedData.auto_deduction ?? 0)}</span></div>
               </div>
-              <div className="rounded-2xl bg-slate-900 text-white p-4 flex justify-between items-center"><span className="text-xs font-bold text-white/60">الصافي المتوقع</span><span className="text-xl font-black">{money(expectedData.net_salary ?? 0)}</span></div>
+              <div className="rounded-2xl bg-primary text-white p-4 flex justify-between items-center"><span className="text-xs font-bold text-white/60">الصافي المتوقع</span><span className="text-xl font-black">{money(expectedData.net_salary ?? 0)}</span></div>
             </div>
           )}
-          <DialogFooter className="p-4"><Button onClick={()=>setIsExpectedModalOpen(false)} className="w-full h-11 rounded-xl bg-slate-100 text-slate-900 font-black">إغلاق</Button></DialogFooter>
+          <DialogFooter className="p-4"><Button variant="outline" onClick={()=>setIsExpectedModalOpen(false)} className="h-11 w-full rounded-xl font-black">إغلاق</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

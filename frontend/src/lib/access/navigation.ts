@@ -154,7 +154,7 @@ export const NAV_ITEMS = [
     label: "المستخدمون والصلاحيات",
     shortLabel: "المستخدمون",
     hint: "التحكم في الأدوار والدخول",
-    to: "/owner/users",
+    to: "/owner/settings?tab=users",
     icon: "KeyRound",
     roles: ["owner"],
     keywords: ["users", "roles", "permissions", "المستخدمون", "الصلاحيات"],
@@ -170,13 +170,23 @@ export const NAV_ITEMS = [
     keywords: ["business", "settings", "salon", "الإعدادات", "النشاط"],
   },
   {
+    key: "accountant",
+    label: "المركز المالي",
+    shortLabel: "المالية",
+    hint: "متابعة الحسابات والمصروفات",
+    to: "/accountant",
+    icon: "Wallet",
+    roles: ["accountant"],
+    keywords: ["accountant", "finance", "المحاسب", "المالية"],
+  },
+  {
     key: "preferences",
     label: "التفضيلات",
     shortLabel: "التفضيلات",
     hint: "الثيم واللغة والتنبيهات",
-    to: "/preferences",
+    to: "/settings",
     icon: "SlidersHorizontal",
-    roles: ["owner", "manager", "cashier", "barber"],
+    roles: ["owner", "manager", "cashier", "barber", "accountant"],
     keywords: ["preferences", "theme", "language", "التفضيلات", "اللغة"],
   },
   {
@@ -184,19 +194,26 @@ export const NAV_ITEMS = [
     label: "الملف الشخصي",
     shortLabel: "الملف",
     hint: "بيانات الحساب",
-    to: "/profile",
+    to: "/settings",
     icon: "UserCircle",
-    roles: ["owner", "manager", "cashier", "barber"],
+    roles: ["owner", "manager", "cashier", "barber", "accountant"],
     keywords: ["profile", "account", "الملف", "الحساب"],
   },
 ];
 
+export function normalizeNavRole(role: unknown): string {
+  return String(role ?? "").trim().toLowerCase();
+}
+
 export function getNavigationItems(role) {
-  return NAV_ITEMS.filter((item) => item.roles.includes(role));
+  const normalized = normalizeNavRole(role);
+  return NAV_ITEMS.filter((item) =>
+    item.roles.map((r) => normalizeNavRole(r)).includes(normalized),
+  );
 }
 
 export function getDashboardPath(role) {
-  switch (role) {
+  switch (normalizeNavRole(role)) {
     case "barber":
       return "/barber";
     case "cashier":
@@ -204,9 +221,12 @@ export function getDashboardPath(role) {
     case "manager":
       return "/manager";
     case "owner":
+    case "admin":
       return "/owner";
+    case "accountant":
+      return "/accountant";
     default:
-      return "/profile";
+      return "/settings";
   }
 }
 
@@ -220,7 +240,7 @@ export function buildQuickLinks(role) {
       label: "الحجز العام",
       shortLabel: "الحجز العام",
       hint: "فتح صفحة حجز العملاء",
-      to: "/booking",
+      to: "/bookings",
       icon: "Sparkles",
       roles: ["owner", "manager", "cashier", "barber"],
       keywords: ["booking", "public", "reserve", "الحجز", "العميل"],

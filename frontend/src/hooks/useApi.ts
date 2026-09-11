@@ -14,6 +14,7 @@ import type { PaginatedParams, PaginatedResult } from "@/types/common";
 
 const queryKeys = {
   employees: ["employees"],
+  employeesArchive: ["employees", "archive"],
   products: ["products"],
   invoices: ["invoices"],
   services: ["services"],
@@ -27,6 +28,10 @@ type AnyRecord = Record<string, any>;
 
 function fetchEmployees(params?: PaginatedParams): Promise<unknown> {
   return api.get("/employees", { params }).then((r) => r.data);
+}
+
+function fetchEmployeesArchive(params?: PaginatedParams): Promise<unknown> {
+  return api.get("/employees/archive", { params }).then((r) => r.data);
 }
 
 function fetchProducts(params?: PaginatedParams): Promise<unknown> {
@@ -64,6 +69,18 @@ export function useEmployees<T = unknown>(
   return useQuery<T>({
     queryKey: [...queryKeys.employees, params],
     queryFn: () => fetchEmployees(params) as Promise<T>,
+    staleTime: 60_000,
+    ...options,
+  });
+}
+
+export function useEmployeesArchive<T = unknown>(
+  params: PaginatedParams = {},
+  options: QueryOpts<T> = {},
+) {
+  return useQuery<T>({
+    queryKey: [...queryKeys.employeesArchive, params],
+    queryFn: () => fetchEmployeesArchive(params) as Promise<T>,
     staleTime: 60_000,
     ...options,
   });

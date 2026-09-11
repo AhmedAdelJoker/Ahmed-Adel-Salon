@@ -27,6 +27,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/core/utils";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -154,71 +162,71 @@ const ManagerDashboard = () => {
           }
           noPadding
         >
-          <div className="table-wrapper no-scrollbar">
-            <table className="w-full text-right">
-              <thead>
-                <tr className="border-b border-border bg-soft/50">
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-border bg-soft/50">
+                  <TableHead className="px-4 py-4 text-right text-[10px] font-black uppercase tracking-widest text-muted sm:px-6">
                     الخبير
-                  </th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted text-center">
+                  </TableHead>
+                  <TableHead className="px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted">
                     الحالة
-                  </th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted text-center">
+                  </TableHead>
+                  <TableHead className="hidden px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted md:table-cell">
                     العمولة
-                  </th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted text-center">
+                  </TableHead>
+                  <TableHead className="hidden px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted lg:table-cell">
                     تاريخ القيد
-                  </th>
-                  <th className="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted">
+                  </TableHead>
+                  <TableHead className="px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted sm:px-6">
                     إجراء
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-border/40">
                 {barberRows.map((barber) => (
-                  <tr
+                  <TableRow
                     key={barber.id}
                     className="group transition-all hover:bg-soft/30"
                   >
-                    <td className="px-6 py-4">
+                    <TableCell className="px-4 py-4 sm:px-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-primary-soft border border-primary/10 flex items-center justify-center text-primary font-black text-xs shadow-sm group-hover:scale-110 transition-transform">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/10 bg-primary-soft text-xs font-black text-primary shadow-sm transition-transform group-hover:scale-110">
                           {barber.display_name?.charAt(0) || "U"}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-black text-main text-sm truncate">
+                          <p className="truncate text-sm font-black text-main">
                             {barber.display_name || "غير محدد"}
                           </p>
-                          <p className="text-[9px] font-bold text-muted uppercase">
+                          <p className="text-[9px] font-bold uppercase text-muted">
                             خبير معتمد
                           </p>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-center">
                       <Badge
                         variant={barber.is_active ? "success" : "secondary"}
-                        className="h-5 px-2 font-black text-[8px] uppercase tracking-widest"
+                        className="h-5 px-2 text-[8px] font-black uppercase tracking-widest"
                       >
                         {barber.is_active ? "نشط" : "غير متصل"}
                       </Badge>
-                    </td>
-                    <td className="px-6 py-4 text-center">
+                    </TableCell>
+                    <TableCell className="hidden px-4 py-4 text-center md:table-cell">
                       <span className="text-xs font-black text-primary">
                         {barber.commission_rate || 0}%
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="text-[10px] font-bold text-muted tabular-nums">
+                    </TableCell>
+                    <TableCell className="hidden px-4 py-4 text-center lg:table-cell">
+                      <span className="text-[10px] font-bold tabular-nums text-muted">
                         {barber.created_at
                           ? new Date(barber.created_at).toLocaleDateString(
                               "ar-EG",
                             )
                           : "---"}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-center sm:px-6">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -230,11 +238,11 @@ const ManagerDashboard = () => {
                           strokeWidth={3}
                         />
                       </Button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </ContentPanel>
 
@@ -267,7 +275,7 @@ const ManagerDashboard = () => {
                 <button
                   key={i}
                   onClick={() => navigate(btn.to)}
-                  className="w-full p-4 rounded-2xl border border-border bg-white/50 hover:bg-white hover:shadow-md transition-all text-right flex items-center justify-between group"
+                  className="group flex w-full items-center justify-between rounded-2xl border border-border bg-card/60 p-4 text-right transition-all hover:bg-card hover:shadow-md"
                 >
                   <div className="flex items-center gap-4">
                     <div
@@ -322,7 +330,8 @@ const ManagerDashboard = () => {
                   </div>
                   <Button
                     onClick={() => navigate("/approvals")}
-                    className="w-full h-11 rounded-xl bg-warning hover:bg-warning-strong text-white font-black text-xs uppercase tracking-widest gap-2"
+                    variant="warning"
+                    className="h-11 w-full gap-2 rounded-xl text-xs font-black uppercase tracking-widest"
                   >
                     عرض الطلبات <ArrowRight size={16} />
                   </Button>

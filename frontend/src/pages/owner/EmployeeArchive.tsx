@@ -13,7 +13,8 @@ import {
   Filter,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { useEmployees, useInvalidateEmployees } from "@/hooks/useApi";
+import { useEmployeesArchive, useInvalidateEmployees } from "@/hooks/useApi";
+import { normalizeEmployeeRecord } from "@/features/hr/utils/helpers";
 import api from "@/services/api";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
@@ -66,13 +67,13 @@ export default function EmployeeArchive() {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; [key: string]: unknown } | null>(null);
 
-const { data, isLoading } = useEmployees<{ id: string; status: string; fullName: string; phonePrimary?: string; jobTitle?: string; hireDate?: string }[]>(
+const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fullName: string; phonePrimary?: string; jobTitle?: string; hireDate?: string }[]>(
     { limit: 1000 },
     {
-      select: (employees) =>
-        employees.filter(
-          (e) => e.status === "suspended" || e.status === "resigned",
-        ),
+      select: (rows) => {
+        const list = Array.isArray(rows) ? rows : (rows as unknown as { items?: unknown[] })?.items ?? [];
+        return (list as unknown[]).map((e) => normalizeEmployeeRecord(e));
+      },
     },
   );
 

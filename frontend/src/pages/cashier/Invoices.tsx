@@ -600,7 +600,7 @@ export default function Invoices() {
               <Button
                 variant="outline"
                 className="h-10 rounded-xl px-3"
-                onClick={() => navigate("/invoice-archive")}
+                onClick={() => navigate("/invoices/archive")}
               >
                 <Archive size={14} className="ml-1.5" />
                 <span className="hidden sm:inline">الأرشيف</span>

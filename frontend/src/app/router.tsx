@@ -29,8 +29,10 @@ const PAGE_TITLES = Object.freeze({
   "/owner": "التقارير الإحصائية",
   "/owner/employee-reports": "تقارير الموظفين",
   "/owner/hr": "إدارة الموارد البشرية",
+  "/owner/hr/archive": "أرشيف الموظفين",
   "/owner/permissions": "صلاحيات الوصول",
   "/owner/financial": "التقارير المالية",
+  "/owner/reports": "التقارير التشغيلية",
   "/owner/daily-summary": "الملخص التشغيلي اليومي",
   "/owner/financial-rules": "القواعد المالية",
   "/owner/alerts": "التنبيهات الذكية",
@@ -42,6 +44,11 @@ const PAGE_TITLES = Object.freeze({
   "/owner/users": "إدارة المستخدمين",
   "/owner/services": "إدارة الخدمات",
   "/owner/adjustment-requests": "طلبات التعديل",
+  "/owner/business-settings": "إعدادات النشاط",
+  "/owner/working-hours": "ساعات العمل",
+  "/owner/loyalty-settings": "نظام الولاء",
+  "/owner/website-settings": "إعدادات الموقع",
+  "/owner/customers/archive": "أرشيف العملاء",
   "/reception-board": "لوحة الاستقبال",
   "/manager": "لوحة المدير",
   "/settings": "الإعدادات الشخصية",
@@ -49,16 +56,26 @@ const PAGE_TITLES = Object.freeze({
 
   "/approvals": "مركز الموافقات",
   "/activity-logs": "سجلات النشاط",
+  "/accountant": "المركز المالي",
   "/cashier": "لوحة الكاشير",
   "/pos": "نقطة البيع",
   "/bookings": "الحجوزات",
   "/customers": "العملاء",
   "/invoices": "الفواتير",
+  "/invoices/archive": "أرشيف الفواتير",
   "/inventory": "المخزون",
+  "/inventory/archive": "أرشيف المخزن",
+  "/inventory/bundles": "باقات المنتجات",
   "/expenses": "المصروفات",
   "/expenses/archive": "أرشيف المصروفات",
   "/owner/expenses/archive": "أرشيف المصروفات",
   "/barber": "لوحة الحلاق",
+  "/barber/workstation": "محطة العمل",
+  "/barber/clients": "عملائي",
+  "/barber/earnings": "أرباحي",
+  "/barber/availability": "جدولي",
+  "/barber/profile": "ملفي الشخصي",
+  "/barber/bookings": "حجوزاتي",
   "/profile": "الملف الشخصي",
   "/login": "دخول النظام الآمن",
 });
@@ -66,10 +83,16 @@ const PAGE_TITLES = Object.freeze({
 const PAGE_SUBTITLES = Object.freeze({
   "/owner": "نظرة تشغيلية شاملة على الأداء اليومي.",
   "/manager": "متابعة التشغيل والفريق والنتائج.",
+  "/accountant": "المركز المالي ومتابعة الحسابات.",
   "/customers": "إدارة بيانات العملاء وسجل الزيارات.",
   "/owner/services": "إدارة الخدمات والأسعار والتصنيفات.",
   "/bookings": "إدارة الحجوزات والمواعيد.",
   "/invoices": "الفواتير وتفاصيلها وإعادة الطباعة.",
+  "/invoices/archive": "أرشيف الفواتير الشهري والإغلاقات.",
+  "/inventory/archive": "سجل حركة المخزن والمنتجات المؤرشفة.",
+  "/owner/customers/archive": "العملاء المؤرشفون واستعادتهم.",
+  "/owner/reports": "تحليل الأداء التشغيلي المتقدم.",
+  "/owner/business-settings": "بيانات الصالون والفاتورة والحجز العام.",
   "/owner/daily-summary": "الملخص التشغيلي الشامل لكافة الورديات والمصروفات.",
   "/owner/financial": "تحليل الإيرادات والمصروفات ومؤشرات الأداء.",
   "/pos": "إصدار الفواتير وإدارة المبيعات المباشرة.",
@@ -107,6 +130,22 @@ const ServicesManagement = lazy(
 const InvoiceAdjustmentRequests = lazy(
   () => import("@/pages/owner/InvoiceAdjustmentRequests"),
 );
+const BusinessSettingsPage = lazy(
+  () => import("@/pages/owner/BusinessSettingsPage"),
+);
+const OperationalReports = lazy(
+  () => import("@/pages/owner/OperationalReports"),
+);
+const WorkingHoursPanel = lazy(
+  () => import("@/pages/owner/WorkingHoursPanel"),
+);
+const LoyaltySettingsPanel = lazy(
+  () => import("@/pages/owner/LoyaltySettingsPanel"),
+);
+const WebsiteSettingsPanel = lazy(
+  () => import("@/pages/owner/WebsiteSettingsPanel"),
+);
+const CustomerArchive = lazy(() => import("@/pages/owner/CustomerArchive"));
 // Manager Pages
 const ManagerDashboard = lazy(
   () => import("@/pages/manager/ManagerDashboard"),
@@ -124,10 +163,34 @@ const CashierDashboard = lazy(
   () => import("@/pages/cashier/CashierDashboard"),
 );
 const Customers = lazy(() => import("@/pages/cashier/Customers"));
+const CustomerDetail = lazy(() => import("@/pages/cashier/CustomerDetail"));
 const Invoices = lazy(() => import("@/pages/cashier/Invoices"));
+const InvoiceArchivePage = lazy(
+  () => import("@/pages/cashier/InvoiceArchivePage"),
+);
+const SuppliesArchive = lazy(
+  () => import("@/pages/cashier/SuppliesArchive"),
+);
+const ProductBundles = lazy(
+  () => import("@/pages/cashier/ProductBundles"),
+);
 const Schedule = lazy(() => import("@/pages/cashier/Schedule"));
 
 const BarberDashboard = lazy(() => import("@/pages/barber/BarberDashboard"));
+const BarberWorkStation = lazy(
+  () => import("@/pages/barber/BarberWorkStation"),
+);
+const BarberClients = lazy(() => import("@/pages/barber/BarberClients"));
+const BarberEarnings = lazy(() => import("@/pages/barber/BarberEarnings"));
+const BarberAvailability = lazy(
+  () => import("@/pages/barber/BarberAvailability"),
+);
+const BarberProfile = lazy(() => import("@/pages/barber/BarberProfile"));
+const BarberBookings = lazy(() => import("@/pages/barber/BarberBookings"));
+
+const AccountantDashboard = lazy(
+  () => import("@/pages/accountant/AccountantDashboard"),
+);
 
 // Operations
 const ReceptionBoard = lazy(() => import("@/pages/cashier/ReceptionBoard"));
@@ -136,7 +199,10 @@ const Settings = lazy(() => import("@/pages/common/Settings"));
 const ROLES = Object.freeze({
   OWNER: ["OWNER", "ADMIN"],
   MANAGEMENT: ["OWNER", "ADMIN", "MANAGER"],
+  FINANCE: ["OWNER", "ADMIN", "ACCOUNTANT"],
+  FINANCE_MGMT: ["OWNER", "ADMIN", "MANAGER", "ACCOUNTANT"],
   FRONT_DESK: ["OWNER", "ADMIN", "MANAGER", "CASHIER"],
+  FRONT_DESK_ACC: ["OWNER", "ADMIN", "MANAGER", "CASHIER", "ACCOUNTANT"],
   OPERATIONS: ["OWNER", "ADMIN", "MANAGER", "CASHIER", "BARBER"],
   BARBER_ONLY: ["BARBER"],
 });
@@ -343,40 +409,23 @@ export default function AppRouter() {
               <Route element={<RequireAuth allowedRoles={ROLES.OWNER} />}>
                 <Route path="/owner" element={<OwnerDashboard />} />
                 <Route
-                  path="/owner/employee-reports"
-                  element={<EmployeeReports />}
-                />
-                <Route
                   path="/dashboard"
                   element={<Navigate to="/owner" replace />}
                 />
-                <Route path="/owner/hr" element={<HRManagement />} />
-                <Route path="/owner/hr/archive" element={<EmployeeArchive />} />
                 <Route
                   path="/owner/permissions"
                   element={<PermissionsManagement />}
-                />
-                <Route path="/owner/financial" element={<FinancialReports />} />
-                <Route
-                  path="/owner/daily-summary"
-                  element={<DailySummaryReport />}
                 />
                 <Route
                   path="/owner/financial-rules"
                   element={<FinancialRules />}
                 />
                 <Route path="/owner/alerts" element={<SmartAlerts />} />
-                <Route path="/owner/payroll" element={<Payroll />} />
-                <Route
-                  path="/owner/payroll/archive"
-                  element={<PayrollArchive />}
-                />
                 <Route path="/owner/settings" element={<OwnerSettings />} />
                 <Route
                   path="/owner/connected-pages"
                   element={<ConnectedPages />}
                 />
-                <Route path="/owner/cashbox" element={<Cashbox />} />
                 <Route
                   path="/owner/preferences"
                   element={
@@ -392,24 +441,101 @@ export default function AppRouter() {
                   element={<ServicesManagement />}
                 />
                 <Route
+                  path="/owner/business-settings"
+                  element={<BusinessSettingsPage />}
+                />
+                <Route
+                  path="/owner/website-settings"
+                  element={
+                    <WebsiteSettingsPanel
+                      onSaved={() => {}}
+                      onChangeDraft={() => {}}
+                    />
+                  }
+                />
+              </Route>
+
+              {/* HR: Sidebar promises MANAGER — Route matches Sidebar */}
+              <Route
+                element={
+                  <RequireAuth
+                    allowedRoles={[...ROLES.OWNER, "MANAGER"]}
+                  />
+                }
+              >
+                <Route path="/owner/hr" element={<HRManagement />} />
+                <Route path="/owner/hr/archive" element={<EmployeeArchive />} />
+                <Route
+                  path="/owner/working-hours"
+                  element={<WorkingHoursPanel />}
+                />
+                <Route
+                  path="/owner/loyalty-settings"
+                  element={<LoyaltySettingsPanel />}
+                />
+              </Route>
+
+              {/* Finance shared with ACCOUNTANT + MANAGER per Sidebar */}
+              <Route
+                element={<RequireAuth allowedRoles={ROLES.FINANCE_MGMT} />}
+              >
+                <Route path="/owner/payroll" element={<Payroll />} />
+                <Route
+                  path="/owner/payroll/archive"
+                  element={<PayrollArchive />}
+                />
+                <Route
                   path="/owner/adjustment-requests"
                   element={<InvoiceAdjustmentRequests />}
                 />
               </Route>
+              <Route element={<RequireAuth allowedRoles={ROLES.FINANCE} />}>
+                <Route path="/owner/financial" element={<FinancialReports />} />
+                <Route
+                  path="/owner/employee-reports"
+                  element={<EmployeeReports />}
+                />
+                <Route
+                  path="/owner/daily-summary"
+                  element={<DailySummaryReport />}
+                />
+              </Route>
+              <Route
+                element={<RequireAuth allowedRoles={ROLES.FINANCE_MGMT} />}
+              >
+                <Route path="/owner/reports" element={<OperationalReports />} />
+              </Route>
 
-              {/* Shared routes for Owner and Cashier (e.g., Cashbox) */}
+              {/* Cashbox: single definition (fixes duplicate) */}
               <Route
                 element={
-                  <RequireAuth allowedRoles={[...ROLES.OWNER, "CASHIER"]} />
+                  <RequireAuth
+                    allowedRoles={[...ROLES.OWNER, "CASHIER", "ACCOUNTANT"]}
+                  />
                 }
               >
                 <Route path="/owner/cashbox" element={<Cashbox />} />
               </Route>
 
+              {/* Accountant home */}
               <Route
                 element={
                   <RequireAuth
-                    allowedRoles={[...ROLES.MANAGEMENT, "CASHIER"]}
+                    allowedRoles={["OWNER", "ADMIN", "ACCOUNTANT"]}
+                  />
+                }
+              >
+                <Route path="/accountant" element={<AccountantDashboard />} />
+                <Route
+                  path="/accountant-dashboard"
+                  element={<Navigate to="/accountant" replace />}
+                />
+              </Route>
+
+              <Route
+                element={
+                  <RequireAuth
+                    allowedRoles={[...ROLES.MANAGEMENT, "CASHIER", "ACCOUNTANT"]}
                   />
                 }
               >
@@ -431,11 +557,11 @@ export default function AppRouter() {
                 />
               </Route>
 
-              {/* Activity Logs accessible to Management and Cashier for Notifications */}
+              {/* Activity Logs accessible to Management + Cashier + Accountant */}
               <Route
                 element={
                   <RequireAuth
-                    allowedRoles={[...ROLES.MANAGEMENT, "CASHIER"]}
+                    allowedRoles={[...ROLES.MANAGEMENT, "CASHIER", "ACCOUNTANT"]}
                   />
                 }
               >
@@ -451,8 +577,39 @@ export default function AppRouter() {
                 <Route path="/pos" element={<POS />} />
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/invoices" element={<Invoices />} />
+              </Route>
+              <Route
+                element={<RequireAuth allowedRoles={ROLES.FRONT_DESK_ACC} />}
+              >
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/expenses" element={<Expenses />} />
+              </Route>
+
+              {/* Archive + detail routes (fixes broken navigates) */}
+              <Route
+                element={<RequireAuth allowedRoles={ROLES.FRONT_DESK_ACC} />}
+              >
+                <Route path="/customers/:id" element={<CustomerDetail />} />
+                <Route
+                  path="/owner/customers/archive"
+                  element={<CustomerArchive />}
+                />
+                <Route
+                  path="/invoices/archive"
+                  element={<InvoiceArchivePage />}
+                />
+                <Route
+                  path="/invoice-archive"
+                  element={<Navigate to="/invoices/archive" replace />}
+                />
+                <Route
+                  path="/inventory/archive"
+                  element={<SuppliesArchive />}
+                />
+                <Route
+                  path="/inventory/bundles"
+                  element={<ProductBundles />}
+                />
               </Route>
 
               <Route element={<RequireAuth allowedRoles={ROLES.OPERATIONS} />}>
@@ -474,6 +631,18 @@ export default function AppRouter() {
                   path="/barber-dashboard"
                   element={<Navigate to="/barber" replace />}
                 />
+                <Route
+                  path="/barber/workstation"
+                  element={<BarberWorkStation />}
+                />
+                <Route path="/barber/clients" element={<BarberClients />} />
+                <Route path="/barber/earnings" element={<BarberEarnings />} />
+                <Route
+                  path="/barber/availability"
+                  element={<BarberAvailability />}
+                />
+                <Route path="/barber/profile" element={<BarberProfile />} />
+                <Route path="/barber/bookings" element={<BarberBookings />} />
               </Route>
             </Route>
           </Route>
