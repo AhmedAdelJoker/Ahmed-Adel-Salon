@@ -489,11 +489,26 @@ def create_leave(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
+    # NOTE: validate up front — missing fields used to 500 on NOT NULL constraints.
+    if not payload.get("employee_id") or not payload.get("start_date") or not payload.get("end_date"):
+        raise HTTPException(
+            status_code=400,
+            detail="employee_id and start_date and end_date are required",
+        )
+    # NOTE: Date columns need real date objects — raw strings 500 on sqlite.
+    try:
+        start_date = payload["start_date"] if isinstance(payload["start_date"], date) else date.fromisoformat(str(payload["start_date"]))
+        end_date = payload["end_date"] if isinstance(payload["end_date"], date) else date.fromisoformat(str(payload["end_date"]))
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=400,
+            detail="start_date and end_date must be YYYY-MM-DD dates",
+        )
     leave = LeaveRequest(
         employee_id=payload.get("employee_id"),
         type=payload.get("type", "vacation"),
-        start_date=payload.get("start_date"),
-        end_date=payload.get("end_date"),
+        start_date=start_date,
+        end_date=end_date,
         reason=payload.get("reason"),
         status="pending",
     )

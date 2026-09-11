@@ -638,7 +638,12 @@ def create_fast_walkin(payload: AppointmentFastWalkinCreate, db: Session = Depen
         if not customer:
             if not payload.first_name or not payload.phone:
                 raise HTTPException(status_code=422, detail="يرجى توفير بيانات العميل (الاسم والهاتف) أو معرف العميل")
-            customer = Customer(first_name=payload.first_name, phone=payload.phone)
+            # NOTE: last_name is NOT NULL — omitting it used to 500 the request.
+            customer = Customer(
+                first_name=payload.first_name,
+                last_name="",
+                phone=payload.phone,
+            )
             db.add(customer)
             db.flush()
     
