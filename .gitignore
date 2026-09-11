@@ -21,3 +21,5 @@ uploads/
 generated_invoices/
 generated_receipts/
 runtime_data/
+test-results/
+playwright-report/
