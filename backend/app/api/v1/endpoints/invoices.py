@@ -189,7 +189,11 @@ def create_manual_invoice(
     for item in invoice_items_to_add:
         item.invoice_id = invoice.id
         db.add(item)
-    
+    # NOTE: SessionLocal uses autoflush=False, so flush explicitly —
+    # otherwise deduct_stock_for_invoice queries an empty item list and
+    # stock is silently never deducted.
+    db.flush()
+
     # 6. Update Customer Loyalty Data
     update_customer_loyalty(db, customer_id, final_amount)
     
