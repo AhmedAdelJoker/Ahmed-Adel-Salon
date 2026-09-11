@@ -22,8 +22,6 @@ import {
   Legend,
   LineChart,
   Line,
-  AreaChart,
-  Area,
 } from "recharts";
 import { useNavigate } from "react-router-dom";
 import { useAttendanceData } from "@/features/attendance/hooks/useAttendanceData";
@@ -31,16 +29,12 @@ import {
   UserCheck,
   Clock,
   History,
-  AlertCircle,
   Search,
   CalendarDays,
   X,
-  Download,
-  RefreshCw,
   TrendingUp,
   Coffee,
   BarChart3,
-  Settings,
   Plane,
   CheckCircle2,
   XCircle,
@@ -62,7 +56,6 @@ import api from "@/services/api";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/core/utils";
 import {
-  PageHeader,
   PremiumCard,
 } from "@/components/shared/PremiumUI";
 import {
@@ -76,6 +69,14 @@ import {
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  AttendancePageHeader,
+  AttendanceStatsCards,
+  AttendanceViewTabs,
+} from "@/features/attendance/components/AttendanceHeader";
+import AttendanceDashboardView from "@/features/attendance/components/AttendanceDashboardView";
+import AttendanceLoading from "@/features/attendance/components/AttendanceLoading";
+import type { AttendanceViewMode } from "@/features/attendance/types";
 
 const statusLabels = {
   in: "حضور",
@@ -115,7 +116,8 @@ const AttendanceManagement = () => {
     archiveRecords,
     lateEmployees,
   } = useAttendanceData();
-  const [activeViewMode, setActiveViewMode] = useState("dashboard");
+  const [activeViewMode, setActiveViewMode] =
+    useState<AttendanceViewMode>("dashboard");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [regEmployeeId, setRegEmployeeId] = useState("");
   const [regStatus, setRegStatus] = useState("in");
@@ -391,363 +393,33 @@ const AttendanceManagement = () => {
   }, [todayRecords, notifPermission]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen pb-12" dir="rtl">
-        <div className="mx-auto max-w-7xl space-y-5 px-3 pt-4 sm:px-4 lg:px-6">
-          <div className="h-20 rounded-2xl bg-card border border-border animate-pulse" />
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="h-24 rounded-2xl bg-card border border-border animate-pulse"
-              />
-            ))}
-          </div>
-          <div className="h-64 rounded-2xl bg-card border border-border animate-pulse" />
-        </div>
-      </div>
-    );
+    return <AttendanceLoading />;
   }
 
   return (
     <div className="min-h-screen pb-12" dir="rtl">
       <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
-        <PageHeader
-          title="الحضور والانضباط"
-          subtitle="إدارة الحضور، الانضباط، الإجازات، والتحليلات المتقدمة"
-          badge="الموارد البشرية"
-          icon={UserCheck}
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                className="h-10 rounded-xl px-3"
-                onClick={() => setShowSettings(true)}
-              >
-                <Settings size={14} className="ml-1.5" />
-                <span className="hidden sm:inline">الإعدادات</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-10 rounded-xl px-3"
-                onClick={handleExportPDF}
-              >
-                <Download size={14} className="ml-1.5" />
-                <span className="hidden sm:inline">تصدير PDF</span>
-              </Button>
-              <Button
-                onClick={fetchAttendance}
-                className="h-10 rounded-xl px-4"
-              >
-                <RefreshCw size={14} className="ml-1.5" />
-                <span className="hidden sm:inline">تحديث</span>
-              </Button>
-            </div>
-          }
+        <AttendancePageHeader
+          onShowSettings={() => setShowSettings(true)}
+          onExportPDF={handleExportPDF}
+          onRefresh={fetchAttendance}
         />
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <PremiumCard className="group p-3 sm:p-5" delay={0}>
-            <div className="flex items-center gap-3">
-              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success-soft text-success transition-transform group-hover:scale-105 sm:flex">
-                <UserCheck size={18} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[9px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  متواجد الآن
-                </div>
-                <div className="text-lg font-black tabular-nums text-main sm:text-xl">
-                  {todayRecords.length}
-                </div>
-              </div>
-            </div>
-          </PremiumCard>
-          <PremiumCard className="group p-3 sm:p-5" delay={0.1}>
-            <div className="flex items-center gap-3">
-              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-danger-soft text-danger transition-transform group-hover:scale-105 sm:flex">
-                <AlertCircle size={18} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[9px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  المتأخرين
-                </div>
-                <div className="text-lg font-black tabular-nums text-main sm:text-xl">
-                  {lateEmployees.length}
-                </div>
-              </div>
-            </div>
-          </PremiumCard>
-          <PremiumCard className="group p-3 sm:p-5" delay={0.2}>
-            <div className="flex items-center gap-3">
-              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-info-soft text-info transition-transform group-hover:scale-105 sm:flex">
-                <Clock size={18} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[9px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  ساعات اليوم
-                </div>
-                <div className="text-lg font-black tabular-nums text-main sm:text-xl">
-                  {todayRecords
-                    .reduce((s, r) => s + (Number(r.stats?.totalHours) || 0), 0)
-                    .toFixed(1)}
-                </div>
-              </div>
-            </div>
-          </PremiumCard>
-          <PremiumCard className="group p-3 sm:p-5" delay={0.3}>
-            <div className="flex items-center gap-3">
-              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-soft text-warning transition-transform group-hover:scale-105 sm:flex">
-                <TrendingUp size={18} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[9px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  نسبة الحضور
-                </div>
-                <div className="text-lg font-black tabular-nums text-main sm:text-xl">
-                  {todayRecords.length > 0
-                    ? Math.round(
-                        (todayRecords.filter(
-                          (r) => Number(r.stats?.totalHours) > 0,
-                        ).length /
-                          todayRecords.length) *
-                          100,
-                      )
-                    : 0}
-                  %
-                </div>
-              </div>
-            </div>
-          </PremiumCard>
-        </div>
+        <AttendanceStatsCards
+          todayRecords={todayRecords}
+          lateEmployees={lateEmployees}
+        />
 
         {/* Tab Navigation */}
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-2 shadow-soft">
-          {[
-            { id: "dashboard", label: "لوحة التحكم", icon: BarChart3 },
-            { id: "pulse", label: "نبض اليوم", icon: Activity },
-            { id: "monthly", label: "التحليلات", icon: TrendingUp },
-            { id: "leaves", label: "الإجازات", icon: Plane },
-            { id: "calendar", label: "التقويم", icon: CalendarDays },
-            { id: "archive", label: "الأرشيف", icon: History },
-          ].map((mode) => (
-            <button
-              key={mode.id}
-              onClick={() => setActiveViewMode(mode.id)}
-              className={cn(
-                "h-10 flex-1 min-w-[100px] whitespace-nowrap rounded-xl flex items-center justify-center gap-2 font-black text-[10px] transition-all sm:text-xs",
-                activeViewMode === mode.id
-                  ? "bg-primary text-white shadow-md"
-                  : "text-muted hover:bg-soft hover:text-main",
-              )}
-            >
-              <mode.icon size={14} /> {mode.label}
-            </button>
-          ))}
-        </div>
+        <AttendanceViewTabs
+          activeViewMode={activeViewMode}
+          onChange={setActiveViewMode}
+        />
 
         {/* Dashboard View */}
         {activeViewMode === "dashboard" && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-5"
-          >
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              {/* Weekly Attendance Chart */}
-              <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-5 shadow-soft">
-                <h3 className="text-sm font-black text-main mb-4 flex items-center gap-2">
-                  <BarChart3 size={16} className="text-primary" /> الحضور
-                  الأسبوعي
-                </h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={[
-                        { name: "الأحد", حضور: 5, تأخير: 1 },
-                        { name: "الإثنين", حضور: 4, تأخير: 2 },
-                        { name: "الثلاثاء", حضور: 6, تأخير: 0 },
-                        { name: "الأربعاء", حضور: 5, تأخير: 1 },
-                        { name: "الخميس", حضور: 4, تأخير: 3 },
-                        { name: "الجمعة", حضور: 3, تأخير: 0 },
-                        { name: "السبت", حضور: 2, تأخير: 1 },
-                      ]}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="currentColor"
-                        className="opacity-10"
-                      />
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: "12px",
-                          border: "1px solid var(--border)",
-                          fontSize: "12px",
-                        }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="حضور"
-                        stroke="#10b981"
-                        fill="#10b981"
-                        fillOpacity={0.15}
-                        strokeWidth={2}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="تأخير"
-                        stroke="#f59e0b"
-                        fill="#f59e0b"
-                        fillOpacity={0.15}
-                        strokeWidth={2}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Status Distribution Pie */}
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-                <h3 className="text-sm font-black text-main mb-4 flex items-center gap-2">
-                  <Coffee size={16} className="text-orange-500" /> توزيع الحالات
-                </h3>
-                <div className="h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          {
-                            name: "متواجد",
-                            value:
-                              todayRecords.filter(
-                                (r) =>
-                                  Number(r.stats?.totalHours) > 0 &&
-                                  !r.isComplete,
-                              ).length || 1,
-                            color: "#10b981",
-                          },
-                          {
-                            name: "مكتمل",
-                            value:
-                              todayRecords.filter((r) => r.isComplete).length ||
-                              1,
-                            color: "#6366f1",
-                          },
-                          {
-                            name: "متأخر",
-                            value:
-                              todayRecords.filter(
-                                (r) => (r.stats?.lateMinutes ?? 0) > 0,
-                              ).length || 0,
-                            color: "#f59e0b",
-                          },
-                        ].filter((d) => d.value > 0)}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={40}
-                        outerRadius={70}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {[
-                          { name: "متواجد", color: "#10b981" },
-                          { name: "مكتمل", color: "#6366f1" },
-                          { name: "متأخر", color: "#f59e0b" },
-                        ].map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: "12px",
-                          border: "1px solid var(--border)",
-                          fontSize: "12px",
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex justify-center gap-4 mt-2">
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] font-bold text-muted">
-                      متواجد
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
-                    <span className="text-[10px] font-bold text-muted">
-                      مكتمل
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                    <span className="text-[10px] font-bold text-muted">
-                      متأخر
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Activity */}
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-              <h3 className="text-sm font-black text-main mb-4 flex items-center gap-2">
-                <Clock size={16} className="text-primary" /> آخر النشاطات
-              </h3>
-              <div className="space-y-2">
-                {todayRecords.slice(0, 5).map((rec, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="flex items-center justify-between rounded-xl bg-soft/50 p-3 hover:bg-soft transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <EmployeeAvatar
-                        name={rec.employee_name || rec.barber_name}
-                        size="sm"
-                        status={rec.isComplete ? "inactive" : "active"}
-                      />
-                      <div>
-                        <p className="text-xs font-black text-main">
-                          {rec.employee_name || rec.barber_name}
-                        </p>
-                        <p className="text-[9px] font-bold text-muted">
-                          {new Date(String(rec.created_at || "")).toLocaleTimeString(
-                            "ar-EG",
-                            { hour: "2-digit", minute: "2-digit" },
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge
-                      variant={
-                        (rec.stats?.lateMinutes ?? 0) > 0 ? "danger" : "secondary"
-                      }
-                      className="text-[9px] font-black"
-                    >
-                      {(rec.stats?.lateMinutes ?? 0) > 0
-                        ? `متأخر ${rec.stats?.lateMinutes ?? 0}د`
-                        : "طبيعي"}
-                    </Badge>
-                  </motion.div>
-                ))}
-                {todayRecords.length === 0 && (
-                  <div className="text-center py-8">
-                    <Activity size={40} className="mx-auto mb-3 text-muted" />
-                    <p className="text-base font-black text-main">
-                      لا توجد نشاطات اليوم
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
+          <AttendanceDashboardView todayRecords={todayRecords} />
         )}
 
         {/* Pulse View */}

@@ -24,3 +24,8 @@ export type { HrStats, HrViewMode } from "@/features/hr/types";
 export { useHrData } from "@/features/hr/hooks/useHrData";
 export { useEmployeeForm } from "@/features/hr/hooks/useEmployeeForm";
 export { useEmployeeDocuments } from "@/features/hr/hooks/useEmployeeDocuments";
+export { default as HrStatsGrid } from "@/features/hr/components/HrStatsGrid";
+export { default as HrToolbar } from "@/features/hr/components/HrToolbar";
+export { default as ExpiringDocsAlert } from "@/features/hr/components/ExpiringDocsAlert";
+export { default as EmployeeCardGrid } from "@/features/hr/components/EmployeeCardGrid";
+export { default as EmployeeTable } from "@/features/hr/components/EmployeeTable";

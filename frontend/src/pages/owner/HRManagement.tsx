@@ -11,7 +11,6 @@ import {
   Phone,
   Calendar,
   TrendingUp,
-  Users,
   Scissors,
   Plus,
   Pencil,
@@ -21,7 +20,6 @@ import {
   ShieldCheck,
   ShieldAlert,
   CheckCircle2,
-  XCircle,
   Clock,
   MapPin,
   FileText,
@@ -30,7 +28,6 @@ import {
   X,
   Activity,
   Trash2,
-  Search,
   Archive,
   ArrowRight,
   ArrowLeft,
@@ -38,9 +35,6 @@ import {
   Fingerprint,
   Wallet,
   Building2,
-  LayoutGrid,
-  List as ListIcon,
-  MoreVertical,
   Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -60,23 +54,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+
+
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import employeeDocumentService from "@/services/employeeDocumentService";
 import { motion, AnimatePresence } from "framer-motion";
-import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
-import EmptyState from "@/components/shared/EmptyState";
 import { validateImageSize } from "@/lib/media/upload";
 import {
   PageHeader,
-  PremiumCard,
-  StatCard,
 } from "@/components/shared/PremiumUI";
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
@@ -93,9 +78,13 @@ import {
   FIELD_INPUT_CLASS,
   FIELD_TEXTAREA_CLASS,
   FIELD_SELECT_CLASS,
-  getJobTitleLabel,
   isCustomJobTitleValue,
   normalizeEmployeeRecord,
+  HrStatsGrid,
+  HrToolbar,
+  ExpiringDocsAlert,
+  EmployeeCardGrid,
+  EmployeeTable,
 } from "@/features/hr";
 
 const HRManagement = () => {
@@ -1291,43 +1280,7 @@ const HRManagement = () => {
         loading={isActionLoading}
       />
 
-      {/* ═══ EXPIRING DOCUMENTS ALERT ═══ */}
-      {expiringDocs.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="p-6 rounded-[2.5rem] bg-rose-600 text-white shadow-xl shadow-rose-200 flex items-center justify-between border-4 border-white/20"
-        >
-          <div className="flex items-center gap-5">
-            <div className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center animate-pulse">
-              <ShieldAlert size={32} />
-            </div>
-            <div>
-              <h3 className="text-xl font-black">تنبيه صلاحية المستندات</h3>
-              <p className="text-xs font-bold opacity-80 mt-1">
-                يوجد {expiringDocs.length} مستندات شارفت على الانتهاء خلال الـ
-                15 يوماً القادمة.
-              </p>
-            </div>
-          </div>
-          <div className="flex -space-x-4 space-x-reverse">
-            {expiringDocs.slice(0, 3).map((doc: DocumentRecord, i) => (
-              <div
-                key={i}
-                title={`${doc.employeeName}: ${doc.title}`}
-                className="h-12 w-12 rounded-xl border-4 border-rose-600 bg-white text-rose-600 flex items-center justify-center font-black text-xs shadow-lg"
-              >
-                {(doc as DocumentRecord).employeeName?.substring(0, 1)}
-              </div>
-            ))}
-            {expiringDocs.length > 3 && (
-              <div className="h-12 w-12 rounded-xl border-4 border-rose-600 bg-slate-900 text-white flex items-center justify-center font-black text-[10px] shadow-lg">
-                +{expiringDocs.length - 3}
-              </div>
-            )}
-          </div>
-        </motion.div>
-      )}
+      <ExpiringDocsAlert expiringDocs={expiringDocs} />
 
       {/* ═══ HEADER SECTION ═══ */}
       <PageHeader
@@ -1355,339 +1308,31 @@ const HRManagement = () => {
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="إجمالي الكادر"
-          value={stats.total}
-          icon={Users}
-          variant="secondary"
-          delay={0}
-        />
-        <StatCard
-          label="نشط حالياً"
-          value={stats.active}
-          icon={CheckCircle2}
-          variant="success"
-          delay={0.05}
-        />
-        <StatCard
-          label="خبراء الحلاقة"
-          value={stats.barbers}
-          icon={Scissors}
-          variant="warning"
-          delay={0.1}
-        />
-        <StatCard
-          label="فريق الدعم"
-          value={stats.assistants}
-          icon={UserPlus}
-          variant="primary"
-          delay={0.15}
-        />
-      </div>
+      <HrStatsGrid stats={stats} />
 
       {/* ═══ FILTER & SEARCH ═══ */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="relative flex-1 max-w-md group">
-          <Search
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-accent transition-colors"
-            size={18}
-          />
-          <Input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="ابحث باسم الموظف أو المسمى الوظيفي..."
-            className="h-14 rounded-2xl border-border bg-card/80 pr-12 text-sm font-bold shadow-sm focus:border-accent focus:bg-card"
-          />
-        </div>
-        <div className="flex items-center gap-2 rounded-2xl bg-card/60 border border-border p-1.5 shadow-sm">
-          <button
-            onClick={() => setActiveView("cards")}
-            className={cn(
-              "flex h-11 items-center gap-2 rounded-xl px-5 text-[11px] font-black transition-all",
-              activeView === "cards"
-                ? "bg-accent text-white shadow-lg"
-                : "text-muted hover:bg-card",
-            )}
-          >
-            <LayoutGrid size={16} /> عرض الشبكة
-          </button>
-          <button
-            onClick={() => setActiveView("table")}
-            className={cn(
-              "flex h-11 items-center gap-2 rounded-xl px-5 text-[11px] font-black transition-all",
-              activeView === "table"
-                ? "bg-accent text-white shadow-lg"
-                : "text-muted hover:bg-card",
-            )}
-          >
-            <ListIcon size={16} /> عرض القائمة
-          </button>
-        </div>
-      </div>
+      <HrToolbar
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        activeView={activeView}
+        setActiveView={setActiveView}
+      />
 
       {/* ═══ EMPLOYEE CONTENT ═══ */}
       <AnimatePresence mode="wait">
         {activeView === "cards" ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-          >
-            {filteredEmployees.length === 0 ? (
-              <div className="col-span-full">
-                <EmptyState
-                  icon={Users}
-                  title="لا يوجد كوادر مطابقة"
-                  description="جرب تعديل كلمات البحث أو أضف موظفاً جديداً للمنظومة."
-                  action={
-                    <Button onClick={openCreate} className="rounded-xl bg-accent text-white font-black">
-                      <Plus size={16} className="ml-2"/> إضافة موظف جديد
-                    </Button>
-                  }
-                />
-              </div>
-            ) : filteredEmployees.map((emp) => {
-              const bp =
-                JOB_TITLE_BLUEPRINTS[emp.jobTitle ?? ""] ||
-                JOB_TITLE_BLUEPRINTS.other;
-              const statusActive = emp.status === "active";
-              return (
-                <motion.div
-                  key={emp.id}
-                  layout
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  whileHover={{ y: -4 }}
-                  className="group relative flex flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-soft hover:shadow-premium transition-all duration-300"
-                >
-                  {/* Top accent bar */}
-                  <div className={cn("h-1.5 w-full", bp.accent)} />
-                  {/* Hover glow */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-b from-accent/[0.04] via-transparent to-transparent pointer-events-none" />
-                  <div className="relative flex flex-1 flex-col p-6 sm:p-7 gap-5">
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 flex-1 gap-4">
-                        <div className="relative shrink-0">
-                          <div className="rounded-2xl ring-2 ring-border/50 shadow-lg overflow-hidden bg-soft">
-                            <EmployeeAvatar
-                              imageUrl={emp.profileImageUrl || emp.profile_image_url}
-                              name={emp.fullName}
-                              size="xl"
-                              className=""
-                            />
-                          </div>
-                          <div className={cn("absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-[3px] border-card shadow-md flex items-center justify-center", statusActive ? "bg-emerald-500" : "bg-rose-500")}>
-                            <div className={cn("h-2 w-2 rounded-full bg-white", statusActive && "animate-pulse")} />
-                          </div>
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-1.5">
-                          <h3 className="text-[15px] sm:text-[17px] font-black text-main leading-tight line-clamp-1">
-                            {emp.fullName}
-                          </h3>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest border",
-                                isCustomJobTitleValue(emp.jobTitle)
-                                  ? "bg-accent/10 text-accent border-accent/20"
-                                  : bp.badgeClass,
-                              )}
-                            >
-                              {isCustomJobTitleValue(emp.jobTitle) && emp.jobTitle ? emp.jobTitle : bp.title}
-                            </Badge>
-                            <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black border", statusActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200")}>
-                              {statusActive ? <CheckCircle2 size={10} /> : <XCircle size={10} />} {statusActive ? "نشط" : "معلّق"}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] font-bold text-muted">
-                            <span className="inline-flex items-center gap-1"><Calendar size={11} /> {emp.hireDate ? new Date(emp.hireDate).toLocaleDateString("ar-EG") : "—"}</span>
-                            {emp.employmentType && <span className="hidden sm:inline">• {EMPLOYMENT_TYPES.find(t=>t.value===emp.employmentType)?.label || emp.employmentType}</span>}
-                          </div>
-                        </div>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl bg-soft text-muted hover:bg-card hover:text-accent border border-border/50 shrink-0">
-                            <MoreVertical size={16} />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 border-border shadow-premium bg-card">
-                          <DropdownMenuItem onClick={() => openEdit(emp)} className="rounded-xl font-bold py-3">
-                            <Pencil size={16} className="ml-3 text-accent" /> تعديل الملف
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate(`/owner/payroll?employeeId=${emp.id}`)} className="rounded-xl font-bold py-3">
-                            <DollarSign size={16} className="ml-3 text-emerald-600" /> كشف الراتب
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate(`/attendance?employeeId=${emp.id}`)} className="rounded-xl font-bold py-3">
-                            <Clock size={16} className="ml-3 text-sky-600" /> سجل الحضور
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openEmployeeQuickView(emp.id as string | number)} className="rounded-xl font-bold py-3">
-                            <Eye size={16} className="ml-3 text-indigo-600" /> عرض سريع
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator className="my-2" />
-                          <DropdownMenuItem onClick={() => setDeleteTarget(emp)} className="rounded-xl font-bold py-3 text-rose-600">
-                            <XCircle size={16} className="ml-3" /> {emp.status === "active" ? "تعطيل الملف" : "تفعيل الملف"}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-
-                    {/* Decorative separator */}
-                    <div className="h-px bg-gradient-to-r from-border via-border/50 to-transparent" />
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="group/stat rounded-2xl bg-soft border border-border/60 p-3 sm:p-4 hover:border-accent/20 hover:bg-card transition-colors">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center"><Wallet size={14} /></div>
-                          <span className="text-[9px] font-black text-muted uppercase tracking-widest">الراتب الأساسي</span>
-                        </div>
-                        <div className="text-[15px] font-black text-main">
-                          {Number(emp.baseSalary).toLocaleString("ar-EG")} <span className="text-[10px] font-bold text-muted">ج.م</span>
-                        </div>
-                      </div>
-                      <div className="group/stat rounded-2xl bg-soft border border-border/60 p-3 sm:p-4 hover:border-accent/20 hover:bg-card transition-colors">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center"><TrendingUp size={14} /></div>
-                          <span className="text-[9px] font-black text-muted uppercase tracking-widest">العمولة</span>
-                        </div>
-                        <div className="text-[15px] font-black text-main">
-                          {emp.commissionRate} <span className="text-[10px] font-bold text-muted">%</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Contact & Actions */}
-                    <div className="mt-auto space-y-3">
-                      <div className="flex items-center gap-3 rounded-2xl bg-accent/[0.06] border border-accent/10 p-3">
-                        <div className="h-9 w-9 rounded-xl bg-accent text-white flex items-center justify-center shadow-sm shrink-0">
-                          <Phone size={15} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[10px] font-black text-muted uppercase tracking-widest">الجوال الأساسي</div>
-                          <div className="text-[13px] font-black text-main truncate" dir="ltr">{emp.phonePrimary}</div>
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(emp)} className="h-9 w-9 rounded-xl bg-card border border-border text-muted hover:text-accent hover:border-accent/20 shrink-0">
-                          <Pencil size={14} />
-                        </Button>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={() => openEmployeeQuickView(emp.id as string | number)} className="flex-1 h-10 rounded-xl bg-soft hover:bg-accent hover:text-white text-main font-black text-[11px] border border-border transition-all">
-                          <Eye size={14} className="ml-2" /> معاينة
-                        </Button>
-                        <Button onClick={() => openEdit(emp)} className="flex-1 h-10 rounded-xl bg-accent text-white font-black text-[11px] shadow-lg shadow-accent/20 hover:bg-accent/90">
-                          <Pencil size={14} className="ml-2" /> تعديل
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </motion.div>
+          <EmployeeCardGrid
+            employees={filteredEmployees}
+            onEdit={openEdit}
+            onDelete={setDeleteTarget}
+            onCreate={openCreate}
+          />
         ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
-            <PremiumCard noPadding className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-right min-w-[700px]">
-                <thead>
-                  <tr className="border-b border-border bg-soft/50">
-                    <th className="px-8 py-6 text-[10px] font-black text-muted uppercase tracking-widest">
-                      الموظف
-                    </th>
-                    <th className="px-8 py-6 text-[10px] font-black text-muted uppercase tracking-widest">
-                      المسمى
-                    </th>
-                    <th className="px-8 py-6 text-[10px] font-black text-muted uppercase tracking-widest">
-                      الجوال
-                    </th>
-                    <th className="px-8 py-6 text-[10px] font-black text-muted uppercase tracking-widest">
-                      الراتب
-                    </th>
-                    <th className="px-8 py-6 text-center text-[10px] font-black text-muted uppercase tracking-widest">
-                      الإجراءات
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40">
-                  {filteredEmployees.map((emp) => (
-                    <tr
-                      key={emp.id}
-                      className="group transition-colors hover:bg-soft/30"
-                    >
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-4">
-                          <EmployeeAvatar
-                            imageUrl={
-                              emp.profileImageUrl || emp.profile_image_url
-                            }
-                            name={emp.fullName}
-                            size="sm"
-                          />
-                          <div className="font-black text-main">
-                            {emp.fullName}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-5">
-                        <Badge
-                          variant="outline"
-                          className="rounded-full px-3 py-1 text-[9px] font-black bg-card"
-                        >
-                          {getJobTitleLabel(emp.jobTitle)}
-                        </Badge>
-                      </td>
-                      <td className="px-8 py-5 font-bold text-muted" dir="ltr">
-                        {emp.phonePrimary}
-                      </td>
-                      <td className="px-8 py-5 font-black text-main">
-                        {Number(emp.baseSalary ?? 0).toLocaleString("ar-EG")} ج.م
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className="flex items-center justify-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEdit(emp)}
-                            className="h-10 w-10 rounded-xl text-accent hover:bg-accent/10"
-                          >
-                            <Pencil size={18} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              navigate(`/owner/payroll?employeeId=${emp.id}`)
-                            }
-                            className="h-10 w-10 rounded-xl text-emerald-600 hover:bg-emerald-50"
-                          >
-                            <DollarSign size={18} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteTarget(emp)}
-                            className="h-10 w-10 rounded-xl text-rose-600 hover:bg-rose-50"
-                          >
-                            <Trash2 size={18} />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                </table>
-              </div>
-            </PremiumCard>
-          </motion.div>
+          <EmployeeTable
+            employees={filteredEmployees}
+            onEdit={openEdit}
+            onDelete={setDeleteTarget}
+          />
         )}
       </AnimatePresence>
 
