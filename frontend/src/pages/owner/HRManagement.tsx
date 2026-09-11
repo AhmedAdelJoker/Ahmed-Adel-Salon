@@ -4,60 +4,36 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "@/services/api";
 import { toast } from "react-hot-toast";
 import { useUI } from "@/context/UIContext";
-import type { EmployeeRecord, DocumentRecord } from "@/types/employee";
+import type { EmployeeRecord } from "@/types/employee";
 import { useHrData, useEmployeeDocuments } from "@/features/hr";
 import {
   User,
   Phone,
-  Calendar,
-  TrendingUp,
-  Scissors,
   Plus,
   Pencil,
-  Image as ImageIcon,
-  DollarSign,
-  Briefcase,
-  ShieldCheck,
-  ShieldAlert,
   CheckCircle2,
-  Clock,
-  MapPin,
-  FileText,
   UserPlus,
   Save,
   X,
-  Activity,
-  Trash2,
   Archive,
   ArrowRight,
   ArrowLeft,
   Sparkles,
-  Fingerprint,
-  Wallet,
   Building2,
-  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+
 
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import employeeDocumentService from "@/services/employeeDocumentService";
 import { motion, AnimatePresence } from "framer-motion";
 import { validateImageSize } from "@/lib/media/upload";
 import {
@@ -67,19 +43,19 @@ import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
 
 import {
-  JOB_TITLES,
   JOB_TITLE_BLUEPRINTS,
-  EMPLOYMENT_TYPES,
-  ROLES,
-  ASSISTANT_TASKS,
   FORM_TABS,
   defaultForm,
-  FIELD_LABEL_CLASS,
-  FIELD_INPUT_CLASS,
-  FIELD_TEXTAREA_CLASS,
-  FIELD_SELECT_CLASS,
   isCustomJobTitleValue,
   normalizeEmployeeRecord,
+  PersonalTab,
+  WorkTab,
+  SkillsTab,
+  FinancialTab,
+  AssistantTab,
+  SystemTab,
+  DocumentsTab,
+  ReviewTab,
   HrStatsGrid,
   HrToolbar,
   ExpiringDocsAlert,
@@ -348,906 +324,66 @@ const HRManagement = () => {
     switch (activeTab) {
       case "personal":
         return (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex flex-col items-center gap-5">
-              <div className="relative group">
-                <div className="h-36 w-36 sm:h-40 sm:w-40 overflow-hidden rounded-[1.75rem] border-[5px] border-card bg-soft shadow-xl ring-1 ring-border/50">
-                  {imagePreview ? (
-                    <img
-                      src={imagePreview}
-                      className="h-full w-full object-cover"
-                      alt={formData?.fullName || "صورة الموظف"}
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                        setImagePreview(null);
-                      }}
-                    />
-                  ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted/40 bg-gradient-to-br from-soft to-card">
-                      <div className="h-14 w-14 rounded-2xl bg-card border border-border flex items-center justify-center shadow-sm">
-                        <ImageIcon size={26} className="text-muted/30" />
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest">أضف صورة</span>
-                    </div>
-                  )}
-                  {uploading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-sm">
-                      <div className="h-8 w-8 rounded-full border-2 border-accent/20 border-t-accent animate-spin" />
-                      <span className="text-[9px] font-black text-accent animate-pulse">جاري الرفع...</span>
-                    </div>
-                  )}
-                </div>
-                <label className="absolute -bottom-2 -right-2 flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-accent text-white shadow-lg shadow-accent/20 transition-all hover:scale-105 active:scale-95 border-2 border-card">
-                  {uploading ? <Activity size={18} className="animate-spin" /> : <Plus size={18} strokeWidth={3} />}
-                  <input type="file" className="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} />
-                </label>
-                {imagePreview && !uploading && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImagePreview(null);
-                      setFormData((p) => ({ ...p, profileImageUrl: "" }));
-                    }}
-                    className="absolute -top-2 -left-2 h-8 w-8 rounded-full bg-rose-500 text-white shadow-lg flex items-center justify-center hover:bg-rose-600 transition-colors border-2 border-card"
-                    title="إزالة الصورة"
-                  >
-                    <X size={14} strokeWidth={3} />
-                  </button>
-                )}
-              </div>
-              <div className="text-center space-y-1">
-                <h3 className="text-[17px] font-black text-main leading-tight">
-                  {formData.fullName || "اسم الموظف الجديد"}
-                </h3>
-                <p className="text-[11px] font-bold text-accent uppercase tracking-widest flex items-center justify-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent" /> {currentBlueprint.title}
-                </p>
-                <p className="text-[10px] font-bold text-muted">يُفضل صورة مربعة 500×500 بصيغة JPG أو PNG</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <User size={14} /> الاسم الكامل
-                </label>
-                <Input
-                  value={formData.fullName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, fullName: e.target.value })
-                  }
-                  className={FIELD_INPUT_CLASS}
-                  placeholder="أدخل الاسم الثلاثي..."
-                />
-              </div>
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <Phone size={14} /> الجوال الأساسي
-                </label>
-                <Input
-                  value={formData.phonePrimary}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phonePrimary: e.target.value })
-                  }
-                  className={FIELD_INPUT_CLASS}
-                  dir="ltr"
-                  placeholder="01xxxxxxxxx"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <ShieldCheck size={14} /> رقم الهوية
-                </label>
-                <Input
-                  value={formData.nationalId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nationalId: e.target.value })
-                  }
-                  className={FIELD_INPUT_CLASS}
-                  dir="ltr"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <Calendar size={14} /> تاريخ الميلاد
-                </label>
-                <Input
-                  type="date"
-                  value={formData.birthDate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, birthDate: e.target.value })
-                  }
-                  className={FIELD_INPUT_CLASS}
-                />
-              </div>
-              <div className="md:col-span-2 space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <MapPin size={14} /> العنوان التفصيلي
-                </label>
-                <Input
-                  value={formData.detailedAddress}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      detailedAddress: e.target.value,
-                    })
-                  }
-                  className={FIELD_INPUT_CLASS}
-                />
-              </div>
-              <div className="md:col-span-2 space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <FileText size={14} /> نبذة مهنية (بالعربية)
-                </label>
-                <textarea
-                  value={formData.bioAr}
-                  onChange={(e) =>
-                    setFormData({ ...formData, bioAr: e.target.value })
-                  }
-                  className={FIELD_TEXTAREA_CLASS}
-                  rows={3}
-                />
-              </div>
-            </div>
-          </div>
+          <PersonalTab
+            formData={formData}
+            setFormData={setFormData}
+            imagePreview={imagePreview}
+            setImagePreview={setImagePreview}
+            uploading={uploading}
+            onImageChange={handleImageChange}
+            blueprint={currentBlueprint}
+          />
         );
       case "work":
         return (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <Briefcase size={14} /> المسمى الوظيفي
-                </label>
-                <Select
-                  value={
-                    customJobTitle || isCustomJobTitleValue(formData.jobTitle)
-                      ? "__custom__"
-                      : formData.jobTitle
-                  }
-                  onValueChange={(v) => {
-                    if (v === "__custom__") {
-                      setCustomJobTitle(true);
-                      setFormData((prev) => ({
-                        ...prev,
-                        jobTitle: prev.jobTitle && isCustomJobTitleValue(prev.jobTitle) ? prev.jobTitle : "",
-                        showInBooking: false,
-                      }));
-                    } else {
-                      setCustomJobTitle(false);
-                      setFormData((prev) => ({
-                        ...prev,
-                        jobTitle: v,
-                        showInBooking: v === "barber",
-                      }));
-                    }
-                  }}
-                >
-                  <SelectTrigger className={FIELD_SELECT_CLASS}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl max-h-72 overflow-y-auto">
-                    {JOB_TITLES.map((jt) => (
-                      <SelectItem key={jt.value} value={jt.value}>
-                        {jt.label}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="__custom__" className="font-black text-accent">
-                      ✍️ تسجيل يدوي (مسمى مخصص)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                {(customJobTitle ||
-                  isCustomJobTitleValue(formData.jobTitle)) && (
-                  <Input
-                    value={
-                      isCustomJobTitleValue(formData.jobTitle)
-                        ? formData.jobTitle
-                        : ""
-                    }
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        jobTitle: e.target.value,
-                      })
-                    }
-                    className={`${FIELD_INPUT_CLASS} mt-2`}
-                    placeholder="أدخل المسمى الوظيفي يدوياً (مثال: منسق ورديات)..."
-                  />
-                )}
-              </div>
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <Clock size={14} /> نظام التعاقد
-                </label>
-                <Select
-                  value={formData.employmentType}
-                  onValueChange={(v) =>
-                    setFormData({ ...formData, employmentType: v })
-                  }
-                >
-                  <SelectTrigger className={FIELD_SELECT_CLASS}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {EMPLOYMENT_TYPES.map((et) => (
-                      <SelectItem key={et.value} value={et.value}>
-                        {et.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <Calendar size={14} /> تاريخ الالتحاق
-                </label>
-                <Input
-                  type="date"
-                  value={formData.hireDate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, hireDate: e.target.value })
-                  }
-                  className={FIELD_INPUT_CLASS}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <Activity size={14} /> الحالة الوظيفية
-                </label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(v) => setFormData({ ...formData, status: v })}
-                >
-                  <SelectTrigger className={FIELD_SELECT_CLASS}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem
-                      value="active"
-                      className="text-emerald-600 font-bold"
-                    >
-                      نشط
-                    </SelectItem>
-                    <SelectItem
-                      value="suspended"
-                      className="text-rose-600 font-bold"
-                    >
-                      معلّق
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-soft border border-border">
-                <div>
-                  <div className="text-xs font-black text-main">
-                    الظهور في نقطة البيع
-                  </div>
-                  <div className="text-[10px] font-bold text-muted">
-                    إتاحة الموظف في شاشة الدفع
-                  </div>
-                </div>
-                <Switch
-                  checked={formData.showInPos}
-                  onCheckedChange={(v) =>
-                    setFormData({ ...formData, showInPos: v })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-soft border border-border">
-                <div>
-                  <div className="text-xs font-black text-main">
-                    الظهور في الحجوزات
-                  </div>
-                  <div className="text-[10px] font-bold text-muted">
-                    إتاحة الموظف لجدولة المواعيد
-                  </div>
-                </div>
-                <Switch
-                  checked={formData.showInBooking}
-                  onCheckedChange={(v) =>
-                    setFormData({ ...formData, showInBooking: v })
-                  }
-                />
-              </div>
-            </div>
-          </div>
+          <WorkTab
+            formData={formData}
+            setFormData={setFormData}
+            customJobTitle={customJobTitle}
+            setCustomJobTitle={setCustomJobTitle}
+          />
         );
       case "skills":
         return (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="p-6 rounded-[2rem] bg-accent/5 border border-accent/10 flex items-center gap-6">
-              <div className="h-16 w-16 rounded-2xl bg-accent text-white flex items-center justify-center shadow-lg shrink-0">
-                <Scissors size={32} />
-              </div>
-              <div>
-                <h3 className="text-xl font-black text-main">
-                  المؤهلات والخدمات
-                </h3>
-                <p className="text-xs font-bold text-muted mt-1">
-                  حدد الخدمات التي يتقنها الموظف ليتم عرضها له ديناميكياً في
-                  شاشة الـ POS والحجوزات.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto p-2 custom-scrollbar">
-              {allServices.map((service) => (
-                <button
-                  key={service.id}
-                  onClick={() => {
-                    const currentIds = (formData.serviceIds as (string | number)[]) ?? [];
-                    const sid = service.id as string | number;
-                    const next = currentIds.includes(sid)
-                      ? currentIds.filter((id) => id !== sid)
-                      : [...currentIds, sid];
-                    setFormData({ ...formData, serviceIds: next });
-                  }}
-                  className={cn(
-                    "flex flex-col p-4 rounded-2xl border transition-all text-right group",
-                    ((formData.serviceIds as (string | number)[]) ?? []).includes(service.id as string | number)
-                      ? "bg-accent border-accent text-white shadow-lg shadow-accent/20"
-                      : "bg-card border-border hover:border-accent/40",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "text-[13px] font-black",
-                      ((formData.serviceIds as (string | number)[]) ?? []).includes(service.id as string | number)
-                        ? "text-white"
-                        : "text-main group-hover:text-accent",
-                    )}
-                  >
-                    {service.name_ar || service.name}
-                  </div>
-                  <div
-                    className={cn(
-                      "text-[10px] font-bold mt-1",
-                      ((formData.serviceIds as (string | number)[]) ?? []).includes(service.id as string | number)
-                        ? "text-white/70"
-                        : "text-muted",
-                    )}
-                  >
-                    {service.category} • {service.price} ج.م
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+          <SkillsTab
+            allServices={allServices}
+            formData={formData}
+            setFormData={setFormData}
+          />
         );
       case "financial":
         return (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <DollarSign size={14} /> الراتب الأساسي
-                </label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    value={formData.baseSalary}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        baseSalary: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className={`${FIELD_INPUT_CLASS} pr-12`}
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">
-                    ج.م
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <TrendingUp size={14} /> نسبة العمولة
-                </label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    value={formData.commissionRate}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        commissionRate: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className={`${FIELD_INPUT_CLASS} pr-12`}
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">
-                    %
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <Plus size={14} /> حوافز ثابتة
-                </label>
-                <Input
-                  type="number"
-                  value={formData.fixedBonus}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      fixedBonus: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className={FIELD_INPUT_CLASS}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <Trash2 size={14} /> خصومات دورية
-                </label>
-                <Input
-                  type="number"
-                  value={formData.defaultDeductions}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      defaultDeductions: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className={FIELD_INPUT_CLASS}
-                />
-              </div>
-              <div className="md:col-span-2 space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <Wallet size={14} /> قناة صرف المستحقات
-                </label>
-                <Select
-                  value={formData.paymentMethod}
-                  onValueChange={(v) =>
-                    setFormData({ ...formData, paymentMethod: v })
-                  }
-                >
-                  <SelectTrigger className={FIELD_SELECT_CLASS}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="cash">نقدي (Cash)</SelectItem>
-                    <SelectItem value="wallet">
-                      محفظة إلكترونية (Wallet)
-                    </SelectItem>
-                    <SelectItem value="bank">تحويل بنكي (Bank)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
+          <FinancialTab formData={formData} setFormData={setFormData} />
         );
       case "assistant":
         return (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            {formData.jobTitle !== "barber_assistant" && (
-              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 flex gap-4 text-amber-700">
-                <Activity className="shrink-0" />
-                <p className="text-xs font-bold leading-relaxed">
-                  هذا القسم مخصص فقط للموظفين الذين يعملون بصفة "مساعد حلاق"
-                  لتحديد المشرف والمهام.
-                </p>
-              </div>
-            )}
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  المشرف المباشر (الخبير)
-                </label>
-                <Select
-                  value={String(formData.assistantOfBarberId ?? "")}
-                  onValueChange={(v) =>
-                    setFormData({ ...formData, assistantOfBarberId: v })
-                  }
-                >
-                  <SelectTrigger className={FIELD_SELECT_CLASS}>
-                    <SelectValue placeholder="اختر الخبير المسؤول..." />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {employees
-                      .filter((e) => e.jobTitle === "barber")
-                      .map((b) => (
-                        <SelectItem key={String(b.id ?? "")} value={(b.id ?? "").toString()}>
-                          {b.fullName}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-3">
-                <label className={FIELD_LABEL_CLASS}>المهام التشغيلية</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {ASSISTANT_TASKS.map((task) => (
-                    <button
-                      key={task}
-                      onClick={() => {
-                        const next = (formData.assistantTasksJson ?? []).includes(task)
-                          ? (formData.assistantTasksJson ?? []).filter(
-                              (t) => t !== task,
-                            )
-                          : [...(formData.assistantTasksJson ?? []), task];
-                        setFormData({ ...formData, assistantTasksJson: next });
-                      }}
-                      className={cn(
-                        "px-4 py-2 rounded-xl text-[10px] font-black border transition-all",
-                        (formData.assistantTasksJson ?? []).includes(task)
-                          ? "bg-accent text-white border-accent shadow-lg shadow-accent/20"
-                          : "bg-card text-muted border-border hover:bg-soft",
-                      )}
-                    >
-                      {task}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          <AssistantTab
+            formData={formData}
+            setFormData={setFormData}
+            employees={employees}
+          />
         );
       case "system":
         return (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between p-6 rounded-2xl bg-accent text-white shadow-xl shadow-accent/20">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md">
-                  <Fingerprint size={24} />
-                </div>
-                <div>
-                  <div className="text-sm font-black uppercase tracking-widest">
-                    حساب دخول الموظف
-                  </div>
-                  <div className="text-[10px] font-bold opacity-80 uppercase tracking-widest">
-                    تفعيل الصلاحيات التقنية للمنظومة
-                  </div>
-                </div>
-              </div>
-              <Switch
-                checked={formData.hasLoginAccount}
-                onCheckedChange={(v) =>
-                  setFormData({ ...formData, hasLoginAccount: v })
-                }
-                className="data-[state=checked]:bg-white data-[state=checked]:text-accent"
-              />
-            </div>
-
-            {formData.hasLoginAccount && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-3xl border border-border bg-soft/50">
-                <div className="space-y-2">
-                  <label className={FIELD_LABEL_CLASS}>اسم المستخدم</label>
-                  <Input
-                    value={formData.username}
-                    onChange={(e) =>
-                      setFormData({ ...formData, username: e.target.value })
-                    }
-                    className={FIELD_INPUT_CLASS}
-                    dir="ltr"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className={FIELD_LABEL_CLASS}>كلمة المرور</label>
-                  <Input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    className={FIELD_INPUT_CLASS}
-                    dir="ltr"
-                    placeholder={
-                      editingEmp ? "••••••••" : "أدخل كلمة المرور..."
-                    }
-                  />
-                </div>
-                <div className="md:col-span-2 space-y-2">
-                  <label className={FIELD_LABEL_CLASS}>مستوى الوصول</label>
-                  <Select
-                    value={formData.role}
-                    onValueChange={(v) => setFormData({ ...formData, role: v })}
-                  >
-                    <SelectTrigger className={FIELD_SELECT_CLASS}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      {ROLES.map((r) => (
-                        <SelectItem key={r.value} value={r.value}>
-                          {r.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className={FIELD_LABEL_CLASS}>ملاحظات إدارية</label>
-              <textarea
-                value={formData.personalNotes}
-                onChange={(e) =>
-                  setFormData({ ...formData, personalNotes: e.target.value })
-                }
-                className={FIELD_TEXTAREA_CLASS}
-                rows={4}
-              />
-            </div>
-          </div>
+          <SystemTab
+            formData={formData}
+            setFormData={setFormData}
+            editingEmp={editingEmp}
+          />
         );
       case "documents":
         return (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="p-6 rounded-[2rem] bg-accent/5 border border-accent/10 flex flex-col md:flex-row items-center gap-6">
-              <div className="h-16 w-16 rounded-2xl bg-accent text-white flex items-center justify-center shadow-lg shrink-0">
-                <Archive size={32} />
-              </div>
-              <div className="flex-1 text-center md:text-right">
-                <h3 className="text-xl font-black text-main">
-                  الخزنة الرقمية (Digital Vault)
-                </h3>
-                <p className="text-xs font-bold text-muted mt-1">
-                  أرشفة احترافية لعقود الموظفين، الهويات، والشهادات الصحية مع
-                  تتبع تلقائي للصلاحية.
-                </p>
-              </div>
-              <Button
-                onClick={() => (document.getElementById("doc-upload") as HTMLInputElement | null)?.click()}
-                className="h-12 px-6 rounded-xl bg-accent font-black text-xs uppercase tracking-widest shadow-lg shadow-accent/20"
-              >
-                <Plus size={18} className="ml-2" /> رفع مستند جديد
-                <input
-                  id="doc-upload"
-                  type="file"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const title = prompt(
-                        "عنوان المستند (مثلاً: عقد العمل 2026):",
-                      );
-                      const type = prompt(
-                        "نوع المستند (ID, CONTRACT, HEALTH, CERTIFICATE):",
-                        "CONTRACT",
-                      );
-                      const expiry = prompt(
-                        "تاريخ الانتهاء (YYYY-MM-DD) - اختياري:",
-                      );
-
-                      const fd = new FormData();
-                      fd.append("file", file);
-                      fd.append("title", title || file.name);
-                      fd.append("file_type", type || "OTHER");
-                      if (expiry) fd.append("expiry_date", expiry);
-
-                      if (!editingEmp?.id) {
-                        toast.error("اختر موظفًا أولًا");
-                        return;
-                      }
-                      try {
-                        setDocLoading(true);
-                        await employeeDocumentService.upload(editingEmp.id, fd);
-                        toast.success("تم أرشفة المستند بنجاح");
-                        fetchDocuments(editingEmp.id);
-                      } catch (_err) {
-                        toast.error("فشل رفع المستند");
-                      } finally {
-                        setDocLoading(false);
-                      }
-                    }
-                  }}
-                />
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-              {docLoading ? (
-                <div className="flex justify-center p-12">
-                  <Activity className="animate-spin text-accent" size={32} />
-                </div>
-              ) : employeeDocs.length > 0 ? (
-                employeeDocs.map((doc: DocumentRecord) => (
-                  <div
-                    key={doc.id}
-                    className="group flex items-center justify-between p-5 rounded-[2rem] bg-card border border-border hover:border-accent/40 hover:shadow-xl hover:shadow-accent/5 transition-all"
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className="h-12 w-12 rounded-xl bg-soft text-muted flex items-center justify-center group-hover:bg-accent/5 group-hover:text-accent transition-colors">
-                        <FileText size={24} />
-                      </div>
-                      <div>
-                        <div className="text-sm font-black text-main">
-                          {(doc as DocumentRecord).title || ""}
-                        </div>
-                        <div className="flex items-center gap-3 mt-1">
-                          <Badge
-                            variant="outline"
-                            className="rounded-lg px-2 py-0 text-[8px] font-black uppercase tracking-widest border-border text-muted"
-                          >
-                            {(doc as DocumentRecord).file_type || "OTHER"}
-                          </Badge>
-                          {doc.expiry_date && (
-                            <div
-                              className={cn(
-                                "flex items-center gap-1 text-[9px] font-bold",
-                                new Date(doc.expiry_date) < new Date()
-                                  ? "text-rose-500"
-                                  : "text-emerald-600",
-                              )}
-                            >
-                              <Clock size={10} /> ينتهي في:{" "}
-                              {new Date(doc.expiry_date).toLocaleDateString(
-                                "ar-EG",
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          window.open(`${staticURL}${doc.file_url}`, "_blank")
-                        }
-                        className="h-10 w-10 rounded-xl text-muted hover:bg-accent/5 hover:text-accent"
-                      >
-                        <Eye size={18} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={async () => {
-                          if (confirm("هل أنت متأكد من حذف هذا المستند؟")) {
-                            try {
-                              await employeeDocumentService.remove(doc.id);
-                              toast.success("تم الحذف");
-                              if (editingEmp?.id) fetchDocuments(editingEmp.id);
-                            } catch (_err) {
-                              toast.error("فشل الحذف");
-                            }
-                          }
-                        }}
-                        className="h-10 w-10 rounded-xl text-muted hover:bg-rose-50 hover:text-rose-600"
-                      >
-                        <Trash2 size={18} />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center p-12 rounded-[2rem] border-2 border-dashed border-border/40">
-                  <Archive className="mx-auto text-muted/20 mb-4" size={48} />
-                  <p className="text-xs font-bold text-muted">
-                    لا يوجد مستندات مؤرشفة لهذا الموظف حتى الآن.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+          <DocumentsTab
+            editingEmp={editingEmp}
+            employeeDocs={employeeDocs}
+            docLoading={docLoading}
+            setDocLoading={setDocLoading}
+            onRefreshDocs={(id) => fetchDocuments(id)}
+          />
         );
       case "review":
         return (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="text-center space-y-3">
-              <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-accent/10 text-accent">
-                <CheckCircle2
-                  size={48}
-                  strokeWidth={3}
-                  className="animate-bounce"
-                />
-              </div>
-              <h3 className="text-2xl font-black text-main">
-                مراجعة البيانات النهائية
-              </h3>
-              <p className="text-sm font-bold text-muted">
-                يرجى التدقيق في بيانات الكادر قبل الاعتماد النهائي.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-3xl border border-border bg-soft/30 p-6 space-y-4">
-                <h4 className="text-[10px] font-black text-muted uppercase tracking-[0.2em] border-b border-border pb-2">
-                  الهوية والعمل
-                </h4>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-xs font-bold text-muted">الاسم:</span>
-                    <span className="text-xs font-black text-main">
-                      {formData.fullName}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs font-bold text-muted">
-                      المسمى:
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className="text-[9px] font-black uppercase"
-                    >
-                      {isCustomJobTitleValue(formData.jobTitle) && formData.jobTitle
-                        ? formData.jobTitle
-                        : currentBlueprint.title}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs font-bold text-muted">
-                      الجوال:
-                    </span>
-                    <span className="text-xs font-black text-main" dir="ltr">
-                      {formData.phonePrimary}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-border bg-soft/30 p-6 space-y-4">
-                <h4 className="text-[10px] font-black text-muted uppercase tracking-[0.2em] border-b border-border pb-2">
-                  الهيكل المالي
-                </h4>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-xs font-bold text-muted">
-                      الراتب الأساسي:
-                    </span>
-                    <span className="text-xs font-black text-emerald-600">
-                      {Number(formData.baseSalary ?? 0).toLocaleString()} ج.م
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs font-bold text-muted">
-                      العمولة:
-                    </span>
-                    <span className="text-xs font-black text-main">
-                      {formData.commissionRate}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs font-bold text-muted">
-                      طريقة الصرف:
-                    </span>
-                    <span className="text-xs font-black text-main uppercase">
-                      {formData.paymentMethod}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {formData.hasLoginAccount && (
-                <div className="md:col-span-2 rounded-3xl border border-accent/20 bg-accent/5 p-6 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-accent text-white flex items-center justify-center">
-                      <ShieldCheck size={24} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-main">
-                        حساب النظام جاهز
-                      </h4>
-                      <p className="text-[10px] font-bold text-muted">
-                        اسم المستخدم:{" "}
-                        <span className="font-black text-accent">
-                          {formData.username}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                  <Badge className="bg-accent text-white font-black text-[9px] uppercase tracking-widest">
-                    {formData.role} ACCESS
-                  </Badge>
-                </div>
-              )}
-            </div>
-
-            {!formData.hasLoginAccount &&
-              ["manager", "accountant", "cashier"].includes(
-                formData.jobTitle ?? "",
-              ) && (
-                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 flex items-center gap-4 text-rose-600 animate-pulse">
-                  <ShieldAlert size={20} />
-                  <p className="text-[11px] font-black">
-                    تحذير: لا يمكن لهذا الدور العمل بدون حساب نظام. يرجى العودة
-                    لخطوة "بوابة النظام".
-                  </p>
-                </div>
-              )}
-          </div>
+          <ReviewTab formData={formData} blueprint={currentBlueprint} />
         );
       default:
         return null;

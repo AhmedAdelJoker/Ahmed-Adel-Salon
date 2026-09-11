@@ -26,7 +26,10 @@ export const statusLabels: Record<string, string> = {
   out: "انصراف",
 };
 
-export const statusColors: Record<string, string> = {
+export const statusColors: Record<
+  string,
+  "success" | "warning" | "info" | "danger" | "secondary"
+> = {
   in: "success",
   break: "warning",
   break_end: "info",
