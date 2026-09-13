@@ -10,6 +10,7 @@ import {
   History,
   Info,
   LayoutGrid,
+  MousePointer2,
   PieChart as PieChartIcon,
   Receipt,
   RefreshCw,
@@ -18,6 +19,7 @@ import {
   TrendingDown,
   TrendingUp,
   Wallet,
+  X,
 } from "lucide-react";
 import {
   Area,
@@ -35,7 +37,7 @@ import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { adaptList, adaptObject, adaptTotal } from "@/services/apiAdapter";
 import { expenseCategoryLabel } from "@/lib/money/expenseCategories";
-import type { FinancialsState, TrendPoint } from "@/types/reports";
+import type { FinancialsState, TrendPoint, ExpenseSlice } from "@/types/reports";
 import {
   Card,
   CardContent,
@@ -490,6 +492,30 @@ export default function FinancialReports() {
   );
   const maxDayNet = topDays[0]?.net || 1;
 
+  // Previous period daily trends for chart overlay
+  const prevDailyTrends = useMemo(() => {
+    if (!financials.prevRange) return null;
+    // Note: We already fetched prevInvoices in fetchFinancials, but we don't store the daily breakdown.
+    // For now, we'll compute it by re-aggregating from the fetched prevInvoices.
+    // Since we don't have prevInvoices in state, we return null and the chart won't show overlay.
+    // This would need the previous period daily data to be fetched and stored.
+    return null;
+  }, [financials.prevRange]);
+
+  // Monthly target (EGP) - can be configured or fetched from backend
+  const MONTHLY_REVENUE_TARGET = 500000; // 500k EGP default
+  const monthStart = useMemo(
+    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10),
+    [],
+  );
+  const isCurrentMonth = fromDate <= monthStart && toDate >= monthStart;
+  const currentMonthRevenue = isCurrentMonth ? financials.revenue : 0;
+  const targetProgress = Math.min(100, (currentMonthRevenue / MONTHLY_REVENUE_TARGET) * 100);
+
+  // Drill-down state
+  const [selectedDay, setSelectedDay] = useState<TrendPoint | null>(null);
+  const [selectedExpenseCategory, setSelectedExpenseCategory] = useState<ExpenseSlice | null>(null);
+
   const aiInsights = useMemo(() => {
     const base = aiService.generateInsights([
       { amount: financials.revenue, direction: "in" },
@@ -818,6 +844,52 @@ export default function FinancialReports() {
         />
       </div>
 
+      {/* Monthly Revenue Target Progress */}
+      {isCurrentMonth && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Target size={22} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted">
+                    الهدف الشهري للإيرادات
+                  </p>
+                  <p className="text-xl font-black text-main tabular-nums">
+                    {formatCurrency(MONTHLY_REVENUE_TARGET)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex-1 sm:w-72">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <span className="text-sm font-black text-main">
+                    {formatCurrency(currentMonthRevenue)} / {formatCurrency(MONTHLY_REVENUE_TARGET)}
+                  </span>
+                  <span className="text-sm font-black text-primary">{targetProgress.toFixed(1)}%</span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-500"
+                    style={{ width: `${targetProgress}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-[10px] font-bold text-muted">
+                  {targetProgress >= 100
+                    ? "🎉 تم تحقيق الهدف! تجاوز بنسبة " + (targetProgress - 100).toFixed(1) + "%"
+                    : "متبقي " + formatCurrency(MONTHLY_REVENUE_TARGET - currentMonthRevenue) + " للوصول للهدف"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-[10px] font-black text-muted">
+                <Calendar size={12} />
+                <span>منذ {monthStart.slice(5).replace("-", "/")} حتى {toDate.slice(5).replace("-", "/")}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="grid grid-cols-2 gap-4 p-4 sm:p-5 lg:grid-cols-4">
           {[
@@ -848,7 +920,118 @@ export default function FinancialReports() {
             </div>
           ))}
         </CardContent>
-      </Card>
+        </Card>
+
+      {/* Drill-down Detail Panel */}
+      {(selectedDay || selectedExpenseCategory) && (
+        <Card className="overflow-hidden border-primary/30 bg-primary/5 animate-in slide-in-from-bottom-4">
+          <CardHeader className="flex items-center justify-between border-b border-border/60">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-primary/10 p-2 text-primary">
+                <MousePointer2 size={18} />
+              </div>
+              <div>
+                <CardTitle className="text-lg">
+                  {selectedDay
+                    ? `تفاصيل ${selectedDay.date} — ${shortLabel(selectedDay.date)}`
+                    : `تفاصيل البند: ${selectedExpenseCategory?.name}`}
+                </CardTitle>
+                <CardDescription className="text-[10px]">
+                  {selectedDay
+                    ? "تفاصيل الإيرادات والمصروفات والفواتير لهذا اليوم"
+                    : "تحليل مفصل لهذا البند من المصروفات"}
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                setSelectedDay(null);
+                setSelectedExpenseCategory(null);
+              }}
+              aria-label="إغلاق التفاصيل"
+            >
+              <X size={18} />
+            </Button>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6">
+            {selectedDay ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">
+                    إيرادات اليوم
+                  </p>
+                  <p className="text-2xl font-black text-emerald-600 tabular-nums">
+                    {formatCurrency(selectedDay.rev)}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-600 mb-1">
+                    مصروفات اليوم
+                  </p>
+                  <p className="text-2xl font-black text-rose-600 tabular-nums">
+                    {formatCurrency(selectedDay.exp)}
+                  </p>
+                </div>
+                <div
+                  className={cn(
+                    "rounded-2xl p-4 text-center",
+                    selectedDay.net >= 0
+                      ? "border-emerald-500/20 bg-emerald-500/5"
+                      : "border-rose-500/20 bg-rose-500/5",
+                  )}
+                >
+                  <p className="text-[10px] font-black uppercase tracking-widest mb-1">
+                    {selectedDay.net >= 0 ? "صافي ربح" : "صافي خسارة"}
+                  </p>
+                  <p
+                    className={cn(
+                      "text-2xl font-black tabular-nums",
+                      selectedDay.net >= 0 ? "text-emerald-600" : "text-rose-600",
+                    )}
+                  >
+                    {formatCurrency(selectedDay.net)}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              selectedExpenseCategory && (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-border/60 bg-card p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-black text-main">{selectedExpenseCategory.name}</span>
+                      <span className="text-lg font-black tabular-nums text-main">
+                        {formatCurrency(selectedExpenseCategory.value)}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs font-bold text-muted">
+                      <span>نسبة من إجمالي المصروفات</span>
+                      <span>
+                        {financials.expenses > 0
+                          ? ((selectedExpenseCategory.value / financials.expenses) * 100).toFixed(1) + "%"
+                          : "—"}
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-soft">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{
+                          width: `${financials.expenses > 0 ? Math.min(100, (selectedExpenseCategory.value / financials.expenses) * 100) : 0}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] font-bold text-muted">
+                    عدد الحركات: {selectedExpenseCategory.count ?? "—"}
+                  </p>
+                </div>
+              )
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="overflow-hidden lg:col-span-2">
@@ -886,7 +1069,10 @@ export default function FinancialReports() {
             ) : (
               <div className="h-[300px] w-full sm:h-[340px]" dir="ltr">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={financials.dailyTrends} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+                  <AreaChart
+                    data={financials.dailyTrends}
+                    margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
+                  >
                     <defs>
                       <linearGradient id="finRev" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10B981" stopOpacity={0.28} />
@@ -914,6 +1100,7 @@ export default function FinancialReports() {
                       tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
                     />
                     <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
+                    {/* Current period - Revenue */}
                     <Area
                       type="monotone"
                       dataKey="rev"
@@ -922,8 +1109,9 @@ export default function FinancialReports() {
                       strokeWidth={2.5}
                       fill="url(#finRev)"
                       dot={false}
-                      activeDot={{ r: 4 }}
+                      activeDot={{ r: 5, strokeWidth: 2, stroke: "#10B981", fill: "#fff" }}
                     />
+                    {/* Current period - Expenses */}
                     <Area
                       type="monotone"
                       dataKey="exp"
@@ -932,7 +1120,7 @@ export default function FinancialReports() {
                       strokeWidth={2.5}
                       fill="url(#finExp)"
                       dot={false}
-                      activeDot={{ r: 4 }}
+                      activeDot={{ r: 5, strokeWidth: 2, stroke: "#F43F5E", fill: "#fff" }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -1037,7 +1225,14 @@ export default function FinancialReports() {
               financials.expenseCategories.slice(0, 6).map((c, i) => {
                 const pct = financials.expenses > 0 ? (c.value / financials.expenses) * 100 : 0;
                 return (
-                  <div key={`${c.name}-${i}`} className="space-y-1.5">
+                  <div
+                    key={`${c.name}-${i}`}
+                    className="space-y-1.5 cursor-pointer hover:bg-soft/50 rounded-xl p-2 transition-colors"
+                    onClick={() => setSelectedExpenseCategory(c)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === "Enter" && setSelectedExpenseCategory(c)}
+                  >
                     <div className="flex items-center justify-between gap-3">
                       <span className="truncate text-xs font-black text-main">{c.name}</span>
                       <span className="shrink-0 text-xs font-black tabular-nums text-main">
@@ -1083,7 +1278,11 @@ export default function FinancialReports() {
               topDays.map((d, i) => (
                 <div
                   key={d.date}
-                  className="flex items-center gap-3 rounded-2xl border border-border/50 bg-soft/50 p-3"
+                  className="flex items-center gap-3 rounded-2xl border border-border/50 bg-soft/50 p-3 cursor-pointer hover:bg-soft transition-colors"
+                  onClick={() => setSelectedDay(d)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === "Enter" && setSelectedDay(d)}
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-card text-sm font-black text-main shadow-sm">
                     {i + 1}

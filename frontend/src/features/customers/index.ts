@@ -9,6 +9,13 @@ export {
 export { customerId, getInitials, customerName, secondPhone } from "@/features/customers/utils/customer";
 export { useCustomersList } from "@/features/customers/hooks/useCustomersList";
 export { useCustomerDialogs } from "@/features/customers/hooks/useCustomerDialogs";
+export { useCustomerDetailPage } from "@/features/customers/hooks/useCustomerDetailPage";
+export { default as CustomerInlineEmptyState } from "@/features/customers/components/CustomerInlineEmptyState";
+export { default as CustomerOverviewTab } from "@/features/customers/components/CustomerOverviewTab";
+export { default as CustomerAppointmentsTab } from "@/features/customers/components/CustomerAppointmentsTab";
+export { default as CustomerInvoicesTab } from "@/features/customers/components/CustomerInvoicesTab";
+export { default as CustomerEditDialog } from "@/features/customers/components/CustomerEditDialog";
+export { default as BookingModal } from "@/features/customers/components/BookingModal";
 export { default as CustomerKpi } from "@/features/customers/components/CustomerKpi";
 export { default as CustomerMiniStat } from "@/features/customers/components/CustomerMiniStat";
 export { default as CustomerHeader } from "@/features/customers/components/CustomerHeader";
