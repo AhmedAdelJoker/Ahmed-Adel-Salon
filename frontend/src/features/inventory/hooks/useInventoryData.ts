@@ -3,8 +3,10 @@ import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { normalizeListResponse } from "@/services/apiAdapter";
 import { getAvailablePacks, getEstimatedUnitCost } from "@/features/inventory";
+import { exportService } from "@/services/exportService";
+import { baseURL } from "@/services/api";
+import { Droplets, Box } from "lucide-react";
 
- 
 export type InventoryProduct = Record<string, any>;
 
 export interface InventoryStats {
@@ -17,6 +19,12 @@ export interface InventoryStats {
   uniqueCats: number;
 }
 
+export interface CategoryTone {
+  Icon: typeof Droplets | typeof Box;
+  badge: string;
+  iconClass: string;
+}
+
 /**
  * Inventory listing data: fetch (debounced search), tab filtering,
  * derived stats and category list. Extracted from pages/cashier/Inventory.
@@ -27,6 +35,11 @@ export function useInventoryData() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("active");
+
+  const STATIC_BASE_URL = useMemo(
+    () => baseURL.replace("/api/v1", ""),
+    [],
+  );
 
   const fetchProducts = useCallback(async (query = "") => {
     try {
@@ -110,6 +123,45 @@ export function useInventoryData() {
     [productRows],
   );
 
+  const getCategoryTone = useCallback(
+    (product: Record<string, unknown>): CategoryTone => {
+      const normalized = String(product?.category || "").toLowerCase();
+      if (
+        normalized.includes("زيت") ||
+        normalized.includes("serum") ||
+        normalized.includes("سيروم")
+      ) {
+        return {
+          Icon: Droplets,
+          badge: "زيوت وسيروم",
+          iconClass: "bg-info-soft text-info",
+        };
+      }
+      return {
+        Icon: Box,
+        badge: "مستلزمات وتشغيل",
+        iconClass: "bg-primary-soft text-primary",
+      };
+    },
+    [],
+  );
+
+  const handleExport = useCallback(
+    async (type = "excel") => {
+      const filename = `inventory_${new Date().toISOString().split("T")[0]}`;
+      if (type === "excel") {
+        await exportService.downloadExcel("/exports/products/excel", filename, {
+          q: searchTerm,
+        });
+        return;
+      }
+      await exportService.downloadCsv("/exports/products/csv", filename, {
+        q: searchTerm,
+      });
+    },
+    [searchTerm],
+  );
+
   return {
     products: productRows,
     loading,
@@ -122,5 +174,8 @@ export function useInventoryData() {
     stats,
     uniqueCategories,
     setProducts,
+    STATIC_BASE_URL,
+    getCategoryTone,
+    handleExport,
   };
 }

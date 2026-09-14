@@ -1,10 +1,9 @@
-import React, { useRef } from "react";
+import React from "react";
 import {
   Activity,
   AlertTriangle,
   Box,
   Database,
-  Droplets,
   FileDown,
   History,
   Gift,
@@ -20,8 +19,6 @@ import {
   FileText,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { baseURL } from "@/services/api";
-import { exportService } from "@/services/exportService";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -57,31 +54,10 @@ import { Switch } from "@/components/ui/switch";
 import { formatNumber } from "@/lib/core/utils";
 import { AnimatePresence } from "framer-motion";
 
-const STATIC_BASE_URL = baseURL.replace("/api/v1", "");
 const NATIVE_SELECT_CLASS =
   "h-11 w-full rounded-xl bg-soft border border-border px-4 font-bold";
 const TEXTAREA_CLASS =
   "w-full min-h-[84px] rounded-xl border border-border bg-soft p-3 text-sm font-bold resize-none focus:border-slate-900 focus:ring-0 outline-none";
-
-function getCategoryTone(product: Record<string, unknown>) {
-  const normalized = String(product?.category || "").toLowerCase();
-  if (
-    normalized.includes("زيت") ||
-    normalized.includes("serum") ||
-    normalized.includes("سيروم")
-  ) {
-    return {
-      Icon: Droplets,
-      badge: "زيوت وسيروم",
-      iconClass: "bg-info-soft text-info",
-    };
-  }
-  return {
-    Icon: Box,
-    badge: "مستلزمات وتشغيل",
-    iconClass: "bg-primary-soft text-primary",
-  };
-}
 
 export default function Inventory() {
   const navigate = useNavigate();
@@ -99,6 +75,9 @@ export default function Inventory() {
     filteredProducts,
     stats,
     uniqueCategories,
+    STATIC_BASE_URL,
+    getCategoryTone,
+    handleExport,
   } = useInventoryData();
   const {
     saving,
@@ -127,6 +106,7 @@ export default function Inventory() {
     setNewSellPrice,
     selectedUnit,
     stockUnit,
+    fileInputRef,
     openCreate,
     openEdit,
     openStockModal,
@@ -137,21 +117,6 @@ export default function Inventory() {
     handleAddStock,
     handleUpdateSellPrice,
   } = useInventoryForm({ fetchProducts, isOwner });
-   
-  const fileInputRef = useRef<any>(null);
-
-  async function handleExport(type = "excel") {
-    const filename = `inventory_${new Date().toISOString().split("T")[0]}`;
-    if (type === "excel") {
-      await exportService.downloadExcel("/exports/products/excel", filename, {
-        q: searchTerm,
-      });
-      return;
-    }
-    await exportService.downloadCsv("/exports/products/csv", filename, {
-      q: searchTerm,
-    });
-  }
 
 
   if (loading && filteredProducts.length === 0) {

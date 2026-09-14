@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { validateImageSize } from "@/lib/media/upload";
@@ -64,6 +64,8 @@ export function useInventoryForm(options: {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [showPriceAlert, setShowPriceAlert] = useState(false);
   const [newSellPrice, setNewSellPrice] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedUnit = useMemo(
     () => getUnitMeta(formData.unit),
@@ -268,6 +270,7 @@ export function useInventoryForm(options: {
     setNewSellPrice,
     selectedUnit,
     stockUnit,
+    fileInputRef,
     openCreate,
     openEdit,
     openStockModal,
