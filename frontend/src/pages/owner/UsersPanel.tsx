@@ -1,44 +1,40 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React from "react";
 import {
-  Users,
+  ShieldCheck,
   Plus,
   Search,
-  Shield,
-  ShieldCheck,
+  LayoutGrid,
+  List,
   Edit3,
   Trash2,
   Lock,
   User as UserIcon,
-  LayoutGrid,
-  List,
-  CheckCircle2,
-  AlertTriangle,
-  Fingerprint,
-  Settings as SettingsIcon,
-  LayoutDashboard,
-  Receipt,
-  Scissors,
-  Package,
-  TrendingUp,
-  Wallet,
-  Clock,
-  History,
-  Zap,
-  Activity,
+  Shield,
   Check,
   X,
   RefreshCw,
+  Zap,
+  Activity,
+  CheckCircle2,
+  AlertTriangle,
+  Settings as SettingsIcon,
+  Clock,
+  History,
+  Package,
   Archive,
-  Globe,
-  Trophy,
-  FileBarChart2,
   UserCheck,
   UserCircle,
   Users2,
   Banknote,
   CalendarDays,
-  User,
-  Settings,
+  Receipt,
+  Scissors,
+  Globe,
+  Trophy,
+  FileBarChart2,
+  TrendingUp,
+  Wallet,
+  Fingerprint,
 } from "lucide-react";
 import api from "@/services/api";
 import { toast } from "react-hot-toast";
@@ -63,595 +59,37 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { AnimatePresence } from "framer-motion";
-
-const PERMISSION_PAGES = [
-  // نظام
-  {
-    id: "/owner",
-    label: "لوحة القيادة الرئيسية",
-    category: "نظام",
-    icon: LayoutDashboard,
-  },
-  {
-    id: "/owner/settings",
-    label: "إعدادات النظام المتكاملة",
-    category: "نظام",
-    icon: SettingsIcon,
-  },
-  {
-    id: "/owner/preferences",
-    label: "التفضيلات",
-    category: "نظام",
-    icon: SettingsIcon,
-  },
-  {
-    id: "/owner/users",
-    label: "إدارة المستخدمين",
-    category: "نظام",
-    icon: Users,
-  },
-  {
-    id: "/owner/permissions",
-    label: "صلاحيات الوصول",
-    category: "نظام",
-    icon: ShieldCheck,
-  },
-  {
-    id: "/owner/security-access",
-    label: "الأمان والوصول المشفر",
-    category: "نظام",
-    icon: Lock,
-  },
-  {
-    id: "/owner/alerts",
-    label: "مركز التنبيهات الذكية",
-    category: "نظام",
-    icon: Zap,
-  },
-  {
-    id: "/owner/connected-pages",
-    label: "الصفحات المتصلة",
-    category: "نظام",
-    icon: FileBarChart2,
-  },
-  {
-    id: "/activity-logs",
-    label: "سجلات الرقابة والنشاط",
-    category: "نظام",
-    icon: History,
-  },
-
-  // تشغيل
-  {
-    id: "/pos",
-    label: "نقطة البيع الذكية (POS)",
-    category: "تشغيل",
-    icon: Zap,
-  },
-  {
-    id: "/bookings",
-    label: "نظام الحجوزات والمواعيد",
-    category: "تشغيل",
-    icon: Clock,
-  },
-  {
-    id: "/reception-board",
-    label: "شاشة الاستقبال والمتابعة",
-    category: "تشغيل",
-    icon: List,
-  },
-  {
-    id: "/schedule",
-    label: "مخطط المواعيد",
-    category: "تشغيل",
-    icon: LayoutGrid,
-  },
-  {
-    id: "/customers",
-    label: "قاعدة بيانات العملاء",
-    category: "تشغيل",
-    icon: Users,
-  },
-  {
-    id: "/customers/:id",
-    label: "تفاصيل العميل",
-    category: "تشغيل",
-    icon: UserCheck,
-  },
-  {
-    id: "/owner/customers/archive",
-    label: "أرشيف العملاء",
-    category: "تشغيل",
-    icon: Archive,
-  },
-  {
-    id: "/inventory",
-    label: "إدارة المخزن والمستودع",
-    category: "تشغيل",
-    icon: Package,
-  },
-  {
-    id: "/inventory/archive",
-    label: "أرشيف المخزن",
-    category: "تشغيل",
-    icon: Archive,
-  },
-  {
-    id: "/inventory/bundles",
-    label: "باقات المنتجات",
-    category: "تشغيل",
-    icon: Package,
-  },
-
-  // مالية
-  {
-    id: "/invoices",
-    label: "الفواتير والمبيعات",
-    category: "مالية",
-    icon: Receipt,
-  },
-  {
-    id: "/invoices/archive",
-    label: "أرشيف الفواتير",
-    category: "مالية",
-    icon: History,
-  },
-  {
-    id: "/expenses",
-    label: "إدارة المصروفات التشغيلية",
-    category: "مالية",
-    icon: TrendingUp,
-  },
-  {
-    id: "/expenses/archive",
-    label: "أرشيف المصروفات",
-    category: "مالية",
-    icon: History,
-  },
-  {
-    id: "/owner/expenses/archive",
-    label: "أرشيف المصروفات (المالك)",
-    category: "مالية",
-    icon: History,
-  },
-  {
-    id: "/owner/cashbox",
-    label: "خزينة المحل والتدفق النقدي",
-    category: "مالية",
-    icon: Wallet,
-  },
-  {
-    id: "/owner/payroll",
-    label: "مسيرات الرواتب",
-    category: "مالية",
-    icon: Wallet,
-  },
-  {
-    id: "/owner/payroll/archive",
-    label: "أرشيف الرواتب",
-    category: "مالية",
-    icon: History,
-  },
-  {
-    id: "/owner/financial-rules",
-    label: "القواعد والسياسات المالية",
-    category: "مالية",
-    icon: ShieldCheck,
-  },
-  {
-    id: "/owner/adjustment-requests",
-    label: "طلبات تعديل الفواتير",
-    category: "مالية",
-    icon: AlertTriangle,
-  },
-  {
-    id: "/cashier/treasury",
-    label: "خزينة الكاشير",
-    category: "مالية",
-    icon: Wallet,
-  },
-
-  // إدارة و تقارير
-  {
-    id: "/owner/hr",
-    label: "إدارة الموارد البشرية",
-    category: "إدارة",
-    icon: Users,
-  },
-  {
-    id: "/owner/hr/archive",
-    label: "أرشيف الموظفين",
-    category: "إدارة",
-    icon: Archive,
-  },
-  {
-    id: "/attendance",
-    label: "الحضور والانضباط",
-    category: "إدارة",
-    icon: CheckCircle2,
-  },
-  {
-    id: "/approvals",
-    label: "مركز الاعتمادات والإشعارات",
-    category: "إدارة",
-    icon: ShieldCheck,
-  },
-  {
-    id: "/owner/services",
-    label: "إدارة الخدمات والقائمة",
-    category: "إدارة",
-    icon: Scissors,
-  },
-  {
-    id: "/owner/reports",
-    label: "التقارير التشغيلية",
-    category: "تقارير",
-    icon: TrendingUp,
-  },
-  {
-    id: "/owner/financial",
-    label: "تقارير الأداء المالي",
-    category: "تقارير",
-    icon: TrendingUp,
-  },
-  {
-    id: "/owner/employee-reports",
-    label: "تقارير أداء الموظفين",
-    category: "تقارير",
-    icon: Users,
-  },
-  {
-    id: "/owner/daily-summary",
-    label: "الملخص التشغيلي اليومي",
-    category: "تقارير",
-    icon: Activity,
-  },
-  {
-    id: "/owner/business-settings",
-    label: "الموقع العام وإعدادات النشاط",
-    category: "إدارة",
-    icon: Globe,
-  },
-  {
-    id: "/owner/website-settings",
-    label: "إعدادات الموقع",
-    category: "إدارة",
-    icon: Globe,
-  },
-  {
-    id: "/owner/working-hours",
-    label: "ساعات العمل",
-    category: "إدارة",
-    icon: Clock,
-  },
-  {
-    id: "/owner/loyalty-settings",
-    label: "نظام الولاء",
-    category: "إدارة",
-    icon: Trophy,
-  },
-
-  // لوحات خاصة
-  {
-    id: "/manager",
-    label: "لوحة تحكم المدير",
-    category: "لوحات",
-    icon: LayoutDashboard,
-  },
-  {
-    id: "/cashier",
-    label: "لوحة تحكم الكاشير",
-    category: "لوحات",
-    icon: LayoutDashboard,
-  },
-  {
-    id: "/barber",
-    label: "لوحة تحكم الحلاق",
-    category: "لوحات",
-    icon: LayoutDashboard,
-  },
-  {
-    id: "/barber/workstation",
-    label: "محطة العمل",
-    category: "لوحات",
-    icon: Clock,
-  },
-  {
-    id: "/barber/clients",
-    label: "عملائي",
-    category: "لوحات",
-    icon: Users2,
-  },
-  {
-    id: "/barber/earnings",
-    label: "أرباحي",
-    category: "لوحات",
-    icon: Banknote,
-  },
-  {
-    id: "/barber/availability",
-    label: "جدولي",
-    category: "لوحات",
-    icon: CalendarDays,
-  },
-  {
-    id: "/barber/profile",
-    label: "ملفي الشخصي",
-    category: "لوحات",
-    icon: UserCircle,
-  },
-  {
-    id: "/accountant",
-    label: "المركز المالي الإداري",
-    category: "لوحات",
-    icon: LayoutDashboard,
-  },
-
-  // شخصي
-  {
-    id: "/profile",
-    label: "الملف الشخصي",
-    category: "شخصي",
-    icon: User,
-  },
-  {
-    id: "/settings",
-    label: "الإعدادات الشخصية",
-    category: "شخصي",
-    icon: Settings,
-  },
-];
-
-const DEFAULT_ROLE_PERMISSIONS = {
-  OWNER: () => true,
-  ADMIN: () => true,
-  MANAGER: (id) =>
-    [
-      "/manager",
-      "/attendance",
-      "/approvals",
-      "/pos",
-      "/bookings",
-      "/reception-board",
-      "/schedule",
-      "/customers",
-      "/customers/:id",
-      "/owner/customers/archive",
-      "/inventory",
-      "/inventory/archive",
-      "/inventory/bundles",
-      "/invoices",
-      "/invoices/archive",
-      "/expenses",
-      "/activity-logs",
-      "/owner/security-access",
-      "/owner/hr",
-      "/owner/hr/archive",
-      "/owner/working-hours",
-      "/owner/loyalty-settings",
-      "/owner/reports",
-      "/owner/payroll",
-      "/owner/payroll/archive",
-      "/owner/adjustment-requests",
-      "/owner/expenses/archive",
-      "/expenses/archive",
-      "/profile",
-      "/settings",
-    ].some((p) => id.startsWith(p)),
-  CASHIER: (id) =>
-    [
-      "/cashier",
-      "/pos",
-      "/bookings",
-      "/reception-board",
-      "/schedule",
-      "/customers",
-      "/inventory",
-      "/inventory/archive",
-      "/inventory/bundles",
-      "/invoices",
-      "/invoices/archive",
-      "/expenses",
-      "/owner/cashbox",
-      "/expenses/archive",
-      "/profile",
-      "/settings",
-    ].some((p) => id.startsWith(p)),
-  ACCOUNTANT: (id) =>
-    [
-      "/accountant",
-      "/attendance",
-      "/inventory",
-      "/inventory/archive",
-      "/expenses",
-      "/expenses/archive",
-      "/owner/expenses/archive",
-      "/invoices/archive",
-      "/owner/customers/archive",
-      "/owner/financial",
-      "/owner/reports",
-      "/owner/daily-summary",
-      "/owner/employee-reports",
-      "/owner/payroll",
-      "/owner/payroll/archive",
-      "/owner/cashbox",
-      "/owner/adjustment-requests",
-      "/activity-logs",
-      "/profile",
-      "/settings",
-    ].some((p) => id.startsWith(p)),
-  BARBER: (id) =>
-    [
-      "/barber",
-      "/barber/workstation",
-      "/barber/clients",
-      "/barber/earnings",
-      "/barber/availability",
-      "/barber/profile",
-      "/barber/bookings",
-      "/bookings",
-      "/schedule",
-      "/reception-board",
-      "/profile",
-      "/settings",
-    ].some((p) => id.startsWith(p)),
-};
+import { useUsersData } from "@/features/users";
 
 export default function UsersPanel() {
-   
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState("grid");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isPermsOpen, setIsPermsOpen] = useState(false);
-   
-  const [editingUser, setEditingUser] = useState<any | null>(null);
-  const [isActionLoading, setIsActionLoading] = useState(false);
-   
-  const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
-
-  const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-    full_name: "",
-    email: "",
-    role: "CASHIER",
-    is_active: true,
-    permissions: {},
-  });
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/users");
-      setUsers(res.data || []);
-    } catch (_err) {
-      toast.error("فشل في مزامنة الهويات الرقمية");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const handleEdit = (user) => {
-    setEditingUser(user);
-    setFormData({
-      username: user.username,
-      password: "",
-      full_name: user.full_name || "",
-      email: user.email || "",
-      role: String(user.role).toUpperCase(),
-      is_active: user.is_active,
-      permissions: user.permissions || {},
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleOpenPerms = (user) => {
-    setEditingUser(user);
-    setFormData({
-      ...user,
-      role: String(user.role).toUpperCase(),
-      permissions: user.permissions || {},
-    });
-    setIsPermsOpen(true);
-  };
-
-  const handleSubmit = async () => {
-    if (!formData.username || (!editingUser && !formData.password)) {
-      toast.error("يرجى إدخال البيانات الأساسية للهوية");
-      return;
-    }
-
-    try {
-      setIsActionLoading(true);
-      const payload = {
-        ...formData,
-        email: formData.email?.trim() || null,
-        role: formData.role.toLowerCase(),
-      };
-      if (editingUser) {
-        await api.put(`/users/${editingUser.id}`, payload);
-        toast.success("تم تحديث بروتوكول الوصول بنجاح");
-      } else {
-        await api.post("/users", payload);
-        toast.success("تم إصدار هوية رقمية جديدة");
-      }
-      setIsModalOpen(false);
-      setIsPermsOpen(false);
-      fetchUsers();
-    } catch (_err) {
-       
-      const detail = (_err as any).response?.data?.detail;
-      const errorMessage = Array.isArray(detail) ? detail[0]?.msg : detail;
-      toast.error(
-        typeof errorMessage === "string"
-          ? errorMessage
-          : "فشل في حفظ التعديلات",
-      );
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!confirmDelete) return;
-    try {
-      setIsActionLoading(true);
-      await api.delete(`/users/${confirmDelete}`);
-      toast.success("تم سحب الصلاحيات وأرشفة الهوية");
-      fetchUsers();
-    } catch (_err) {
-      toast.error("فشل في حذف المستخدم");
-    } finally {
-      setIsActionLoading(false);
-      setConfirmDelete(null);
-    }
-  };
-
-  const togglePermission = (pageId) => {
-    setFormData((prev) => {
-      const perms = { ...prev.permissions };
-      if (perms[pageId] === true) perms[pageId] = false;
-      else if (perms[pageId] === false) delete perms[pageId];
-      else perms[pageId] = true;
-      return { ...prev, permissions: perms };
-    });
-  };
-
-  const filteredUsers = useMemo(
-    () =>
-      users.filter(
-        (u) =>
-          u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (u.full_name &&
-            u.full_name.toLowerCase().includes(searchTerm.toLowerCase())),
-      ),
-    [users, searchTerm],
-  );
-
-  const stats = useMemo(() => {
-    return {
-      total: users.length,
-      active: users.filter((u) => u.is_active).length,
-      admins: users.filter((u) =>
-        ["OWNER", "ADMIN"].includes(String(u.role).toUpperCase()),
-      ).length,
-      staff: users.filter(
-        (u) => !["OWNER", "ADMIN"].includes(String(u.role).toUpperCase()),
-      ).length,
-      percActive:
-        users.length > 0
-          ? Math.round(
-              (users.filter((u) => u.is_active).length / users.length) * 100,
-            )
-          : 0,
-    };
-  }, [users]);
+  const {
+    users,
+    loading,
+    viewMode,
+    setViewMode,
+    searchTerm,
+    setSearchTerm,
+    filteredUsers,
+    stats,
+    isModalOpen,
+    setIsModalOpen,
+    isPermsOpen,
+    setIsPermsOpen,
+    editingUser,
+    isActionLoading,
+    confirmDelete,
+    setConfirmDelete,
+    formData,
+    setFormData,
+    handleEdit,
+    handleOpenPerms,
+    handleSubmit,
+    handleDelete,
+    togglePermission,
+    resetForm,
+    getRolePermission,
+    PERMISSION_PAGES,
+  } = useUsersData();
 
   return (
     <div className="erp-page-container space-y-8 pb-16" dir="rtl">
@@ -673,16 +111,7 @@ export default function UsersPanel() {
         actions={
           <Button
             onClick={() => {
-              setEditingUser(null);
-              setFormData({
-                username: "",
-                password: "",
-                full_name: "",
-                email: "",
-                role: "CASHIER",
-                is_active: true,
-                permissions: {},
-              });
+              resetForm();
               setIsModalOpen(true);
             }}
             className="h-11 px-6 rounded-xl bg-primary text-white font-black shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all flex items-center gap-2"
@@ -697,7 +126,7 @@ export default function UsersPanel() {
         <StatCard
           label="إجمالي الهويات"
           value={stats.total}
-          icon={Users}
+          icon={Users2}
           variant="primary"
           trend={undefined}
           trendValue={undefined}
@@ -896,7 +325,7 @@ export default function UsersPanel() {
                   <th className="px-8 py-5 text-[10px] font-black text-muted uppercase tracking-widest border-b border-border/50">
                     الموظف
                   </th>
-                  <th className="px-8 py-5 text-[10px] font-black text-muted uppercase tracking-widest border-b border-border/50">
+                  <th className="px-8 py-5 text-[10px] font-black text-muted uppercase tracking-widest border-b border-border/50 text-center">
                     اسم المستخدم
                   </th>
                   <th className="px-8 py-5 text-[10px] font-black text-muted uppercase tracking-widest border-b border-border/50 text-center">
@@ -1201,7 +630,7 @@ export default function UsersPanel() {
                           const Icon = page.icon || Shield;
                           const role = formData.role?.toUpperCase();
                           const isDefaultAllowed =
-                            DEFAULT_ROLE_PERMISSIONS[role]?.(page.id) || false;
+                            getRolePermission(role, page.id);
 
                           return (
                             <button

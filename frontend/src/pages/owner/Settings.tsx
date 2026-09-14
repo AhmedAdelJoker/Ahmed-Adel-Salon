@@ -1,5 +1,6 @@
 import { usePreferences } from "@/context/PreferencesContext";
-import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Store,
@@ -110,6 +111,17 @@ const SETTINGS_TABS = [
 
 const Settings = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
+  const isOwnerLike = useMemo(() => {
+    const role = String(user?.role || "").toUpperCase();
+    return ["OWNER", "ADMIN"].includes(role);
+  }, [user?.role]);
+
+  const visibleTabs = useMemo(
+    () => (isOwnerLike ? SETTINGS_TABS : SETTINGS_TABS.filter((t) => t.id === "hours")),
+    [isOwnerLike],
+  );
+
   const {
     preferences,
     updatePreferences,
@@ -118,9 +130,11 @@ const Settings = () => {
   } = usePreferences();
 
   const requestedTab = searchParams.get("tab");
-  const activeTab = SETTINGS_TABS.some((tab) => tab.id === requestedTab)
-    ? requestedTab
-    : "shop";
+  const activeTab = visibleTabs.some((tab) => tab.id === requestedTab)
+    ? (requestedTab as string)
+    : isOwnerLike
+      ? "shop"
+      : "hours";
 
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -312,9 +326,13 @@ const Settings = () => {
   return (
     <div className="erp-page-container space-y-10 pb-24" dir="rtl">
       <PageHeader
-        title="إعدادات المنشأة"
-        subtitle="إدارة الهوية الرقمية، الكوادر، السياسات المالية، وتفضيلات النظام."
-        badge="لوحة التحكم الكاملة"
+        title={isOwnerLike ? "إعدادات المنشأة" : "ساعات العمل"}
+        subtitle={
+          isOwnerLike
+            ? "إدارة الهوية الرقمية، الكوادر، السياسات المالية، وتفضيلات النظام."
+            : "إدارة بروتوكول ساعات التشغيل — الوصول المحدود للمدير."
+        }
+        badge={isOwnerLike ? "لوحة التحكم الكاملة" : "وصول المدير"}
         icon={SettingsIcon}
         className={undefined}
         actions={
@@ -322,17 +340,23 @@ const Settings = () => {
             variant="primary"
             className="h-10 rounded-xl px-5 text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary border-none shadow-sm"
           >
-            <ShieldCheck size={16} className="ml-2" strokeWidth={2.5} /> صلاحيات
-            وصول المالك
+            <ShieldCheck size={16} className="ml-2" strokeWidth={2.5} />{" "}
+            {isOwnerLike ? "صلاحيات وصول المالك" : "صلاحيات المدير — ساعات العمل فقط"}
           </Badge>
         }
       />
+      {!isOwnerLike && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3 text-[11px] font-black text-amber-800">
+          <Clock size={16} className="shrink-0" />
+          أنت تدخل كمدير — يمكنك تعديل ساعات العمل فقط. باقي الإعدادات متاحة للمالك.
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-10">
         {/* Advanced Settings Navigation Sidebar */}
         <aside className="w-full lg:w-[320px] shrink-0">
           <div className="sticky top-24 space-y-2 flex lg:flex-col overflow-x-auto pb-4 lg:pb-0 no-scrollbar snap-x snap-mandatory bg-card/40 lg:bg-transparent p-2 rounded-2xl border border-border/40 lg:border-none lg:p-0">
-            {SETTINGS_TABS.map((tab) => {
+            {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (

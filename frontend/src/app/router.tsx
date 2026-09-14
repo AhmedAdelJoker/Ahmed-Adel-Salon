@@ -136,9 +136,6 @@ const BusinessSettingsPage = lazy(
 const OperationalReports = lazy(
   () => import("@/pages/owner/OperationalReports"),
 );
-const WorkingHoursPanel = lazy(
-  () => import("@/pages/owner/WorkingHoursPanel"),
-);
 const LoyaltySettingsPanel = lazy(
   () => import("@/pages/owner/LoyaltySettingsPanel"),
 );
@@ -421,7 +418,6 @@ export default function AppRouter() {
                   element={<FinancialRules />}
                 />
                 <Route path="/owner/alerts" element={<SmartAlerts />} />
-                <Route path="/owner/settings" element={<OwnerSettings />} />
                 <Route
                   path="/owner/connected-pages"
                   element={<ConnectedPages />}
@@ -455,6 +451,17 @@ export default function AppRouter() {
                 />
               </Route>
 
+              {/* Settings: OWNER full, MANAGER limited to hours tab (filtered inside component) */}
+              <Route
+                element={
+                  <RequireAuth
+                    allowedRoles={[...ROLES.OWNER, "MANAGER"]}
+                  />
+                }
+              >
+                <Route path="/owner/settings" element={<OwnerSettings />} />
+              </Route>
+
               {/* HR: Sidebar promises MANAGER — Route matches Sidebar */}
               <Route
                 element={
@@ -467,7 +474,7 @@ export default function AppRouter() {
                 <Route path="/owner/hr/archive" element={<EmployeeArchive />} />
                 <Route
                   path="/owner/working-hours"
-                  element={<WorkingHoursPanel />}
+                  element={<Navigate to="/owner/settings?tab=hours" replace />}
                 />
                 <Route
                   path="/owner/loyalty-settings"

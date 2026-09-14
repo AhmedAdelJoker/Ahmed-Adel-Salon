@@ -1,20 +1,31 @@
-import React, { useState, useEffect } from "react";
-
+import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
+  CalendarRange,
+  CheckCircle2,
   Clock,
-  Save,
   Copy,
-  Activity,
+  RotateCcw,
+  Save,
+  Sparkles,
+  Sun,
+  Moon,
+  Timer,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { motion } from "framer-motion";
 import { businessSettingsService } from "@/services/businessSettingsService";
 import type { DayConfig } from "@/types/attendance";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { PremiumCard, SkeletonCard } from "@/components/shared/PremiumUI";
+import { StatCard } from "@/components/shared/DisplayComponents";
+import { cn } from "@/lib/core/utils";
 
-const DAYS_AR = {
+const DAYS_AR: Record<string, string> = {
   saturday: "السبت",
   sunday: "الأحد",
   monday: "الاثنين",
@@ -32,48 +43,97 @@ const ORDER = [
   "wednesday",
   "thursday",
   "friday",
-];
+] as const;
 
-const DEFAULT_DAY_CONFIG = {
+type DayKey = (typeof ORDER)[number];
+
+const DEFAULT_DAY_CONFIG: DayConfig = {
   is_open: false,
   open_time: null,
   close_time: null,
 };
 
- 
-const normalizeDayConfig = (config: Record<string, any> = {}): DayConfig => {
-  const isOpen = Boolean(config?.is_open);
+const JS_DAY_TO_KEY: Record<number, DayKey> = {
+  0: "sunday",
+  1: "monday",
+  2: "tuesday",
+  3: "wednesday",
+  4: "thursday",
+  5: "friday",
+  6: "saturday",
+};
 
+function parseMins(v: string | null): number | null {
+  if (!v || typeof v !== "string") return null;
+  const [h, m] = v.split(":").map((x) => Number(x));
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return h * 60 + m;
+}
+
+function minsToLabel(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function durationLabel(open: string | null, close: string | null): string | null {
+  const o = parseMins(open);
+  const c = parseMins(close);
+  if (o === null || c === null) return null;
+  const diff = c - o;
+  if (diff <= 0) return null;
+  const hours = diff / 60;
+  if (Number.isInteger(hours)) return `${hours} ساعة`;
+  return `${hours.toFixed(1)} ساعة`;
+}
+
+function validateDay(c: DayConfig): string | null {
+  if (!c.is_open) return null;
+  if (!c.open_time || !c.close_time) return "حدد وقت الفتح والإغلاق";
+  const o = parseMins(c.open_time);
+  const cc = parseMins(c.close_time);
+  if (o === null || cc === null) return "صيغة الوقت غير صحيحة";
+  if (cc <= o) return "وقت الإغلاق يجب أن يكون بعد الفتح";
+  if (cc - o < 30) return "مدة الدوام قصيرة جداً (أقل من 30 دقيقة)";
+  return null;
+}
+
+const normalizeDayConfig = (config: Record<string, unknown> = {}): DayConfig => {
+  const isOpen = Boolean((config as Record<string, unknown>)?.is_open);
   return {
     is_open: isOpen,
-    open_time: isOpen ? config?.open_time || "10:00" : null,
-    close_time: isOpen ? config?.close_time || "22:00" : null,
+    open_time: isOpen ? (String((config as Record<string, unknown>)?.open_time || "10:00")) : null,
+    close_time: isOpen ? (String((config as Record<string, unknown>)?.close_time || "22:00")) : null,
   };
 };
 
- 
-const normalizeWorkingHours = (rawHours: Record<string, any> = {}): Record<string, DayConfig> =>
-  ORDER.reduce<Record<string, DayConfig>>((acc, day) => {
-    acc[day] = normalizeDayConfig(rawHours?.[day] || DEFAULT_DAY_CONFIG);
+const normalizeWorkingHours = (rawHours: Record<string, unknown> = {}): Record<DayKey, DayConfig> =>
+  ORDER.reduce<Record<DayKey, DayConfig>>((acc, day) => {
+    acc[day] = normalizeDayConfig((rawHours?.[day] as Record<string, unknown>) || DEFAULT_DAY_CONFIG);
     return acc;
-  }, {});
+  }, {} as Record<DayKey, DayConfig>);
 
 const WorkingHoursPanel = () => {
-  const [hours, setWorkingHours] = useState(() => normalizeWorkingHours());
+  const [hours, setHours] = useState<Record<DayKey, DayConfig>>(() => normalizeWorkingHours());
+  const [initialHours, setInitialHours] = useState<Record<DayKey, DayConfig>>(() => normalizeWorkingHours());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [applySource, setApplySource] = useState<DayKey>("saturday");
+
+  const todayKey: DayKey = useMemo(() => JS_DAY_TO_KEY[new Date().getDay()], []);
 
   useEffect(() => {
     const fetchHours = async () => {
       try {
         setLoading(true);
         const settings = await businessSettingsService.get();
-        setWorkingHours(
-          normalizeWorkingHours(
-            settings?.working_hours || settings?.workingHours || {},
-          ),
+        const normalized = normalizeWorkingHours(
+          (settings?.working_hours || settings?.workingHours || {}) as Record<string, unknown>,
         );
-      } catch (_err) {
+        setHours(normalized);
+        setInitialHours(normalized);
+      } catch {
         toast.error("فشل تحميل ساعات العمل");
       } finally {
         setLoading(false);
@@ -82,187 +142,546 @@ const WorkingHoursPanel = () => {
     fetchHours();
   }, []);
 
-  const handleToggle = (day: string) => {
-    setWorkingHours((prev) => {
-      const currentDay = normalizeDayConfig(prev?.[day]);
-      const isOpen = !currentDay.is_open;
+  const isDirty = useMemo(() => JSON.stringify(hours) !== JSON.stringify(initialHours), [hours, initialHours]);
 
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  const stats = useMemo(() => {
+    const openDays = ORDER.filter((d) => hours[d]?.is_open).length;
+    const closedDays = 7 - openDays;
+    let totalMins = 0;
+    ORDER.forEach((d) => {
+      const c = hours[d];
+      if (!c?.is_open) return;
+      const o = parseMins(c.open_time);
+      const cc = parseMins(c.close_time);
+      if (o !== null && cc !== null && cc > o) totalMins += cc - o;
+    });
+    const totalHours = Math.round((totalMins / 60) * 10) / 10;
+    const todayCfg = hours[todayKey];
+    const todayLabel = todayCfg?.is_open
+      ? `مفتوح ${todayCfg.open_time} – ${todayCfg.close_time}`
+      : "مغلق اليوم";
+    return { openDays, closedDays, totalHours, todayLabel, totalMins };
+  }, [hours, todayKey]);
+
+  const errors = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    ORDER.forEach((d) => {
+      map[d] = validateDay(hours[d] || DEFAULT_DAY_CONFIG);
+    });
+    return map as Record<DayKey, string | null>;
+  }, [hours]);
+
+  const hasErrors = useMemo(() => ORDER.some((d) => Boolean(errors[d])), [errors]);
+
+  const handleToggle = (day: DayKey) => {
+    setHours((prev) => {
+      const cur = normalizeDayConfig(prev[day] as unknown as Record<string, unknown>);
+      const isOpen = !cur.is_open;
       return {
         ...prev,
         [day]: {
-          ...currentDay,
           is_open: isOpen,
-          open_time: isOpen ? currentDay.open_time || "10:00" : null,
-          close_time: isOpen ? currentDay.close_time || "22:00" : null,
+          open_time: isOpen ? cur.open_time || "10:00" : null,
+          close_time: isOpen ? cur.close_time || "22:00" : null,
         },
       };
     });
   };
 
-  const handleChange = (day: string, field: string, value: string | null) => {
-    setWorkingHours((prev) => {
-      const currentDay = normalizeDayConfig(prev?.[day]);
-
-      return {
-        ...prev,
-        [day]: {
-          ...currentDay,
-          [field]: value,
-        },
-      };
-    });
+  const handleChange = (day: DayKey, field: "open_time" | "close_time", value: string) => {
+    setHours((prev) => ({
+      ...prev,
+      [day]: {
+        ...(prev[day] || DEFAULT_DAY_CONFIG),
+        [field]: value || null,
+      },
+    }));
   };
 
-  const applyToAll = () => {
-    const sat = hours?.saturday;
-    if (!sat) return;
-     
-    const newHours: Record<string, any> = {};
-    ORDER.forEach((day) => {
-      newHours[day] = { ...sat };
+  const handleResetDay = (day: DayKey) => {
+    setHours((prev) => ({ ...prev, [day]: { ...initialHours[day] } }));
+    toast.success(`تمت إعادة ${DAYS_AR[day]} للحالة المحفوظة`);
+  };
+
+  const handleCopyDayToAll = (source: DayKey) => {
+    const src = hours[source];
+    if (!src) return;
+    const next: Record<DayKey, DayConfig> = {} as Record<DayKey, DayConfig>;
+    ORDER.forEach((d) => {
+      next[d] = { ...src };
     });
-    setWorkingHours(newHours);
-    toast.success("تم تطبيق مواعيد السبت على جميع الأيام");
+    setHours(next);
+    toast.success(`تم نسخ مواعيد ${DAYS_AR[source]} إلى كل الأيام`);
+  };
+
+  const applyPresetAllOpen = () => {
+    const next: Record<DayKey, DayConfig> = {} as Record<DayKey, DayConfig>;
+    ORDER.forEach((d) => {
+      next[d] = { is_open: true, open_time: "10:00", close_time: "22:00" };
+    });
+    setHours(next);
+    toast.success("تم تطبيق 10:00 – 22:00 على كل الأيام");
+  };
+
+  const applyPresetFridayClosed = () => {
+    const next: Record<DayKey, DayConfig> = {} as Record<DayKey, DayConfig>;
+    ORDER.forEach((d) => {
+      if (d === "friday") next[d] = { is_open: false, open_time: null, close_time: null };
+      else next[d] = { is_open: true, open_time: "10:00", close_time: "22:00" };
+    });
+    setHours(next);
+    toast.success("تم تطبيق: الجمعة مغلق وباقي الأيام 10:00 – 22:00");
+  };
+
+  const applyPresetWeekendLight = () => {
+    const next: Record<DayKey, DayConfig> = {} as Record<DayKey, DayConfig>;
+    ORDER.forEach((d) => {
+      if (d === "friday") next[d] = { is_open: false, open_time: null, close_time: null };
+      else if (d === "saturday") next[d] = { is_open: true, open_time: "09:00", close_time: "18:00" };
+      else next[d] = { is_open: true, open_time: "10:00", close_time: "22:00" };
+    });
+    setHours(next);
+    toast.success("تم تطبيق نمط عطلة مخفف (السبت 09-18، الجمعة مغلق)");
+  };
+
+  const handleResetAll = () => {
+    setHours({ ...initialHours });
+    toast.success("تم التراجع عن التعديلات غير المحفوظة");
   };
 
   const handleSave = async () => {
+    if (hasErrors) {
+      const firstErrDay = ORDER.find((d) => errors[d]);
+      if (firstErrDay) toast.error(`${DAYS_AR[firstErrDay]}: ${errors[firstErrDay]}`);
+      return;
+    }
     setSaving(true);
     try {
       await businessSettingsService.update({ working_hours: hours });
+      setInitialHours({ ...hours });
       toast.success("تم حفظ ساعات العمل بنجاح");
-    } catch (_err) {
+    } catch {
       toast.error("فشل الحفظ");
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex min-h-[300px] items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-accent">
-          <Activity className="w-10 h-10 animate-pulse" />
-          <p className="text-muted font-bold text-sm">
-            جاري جلب جدول المواعيد...
-          </p>
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
         </div>
+        <SkeletonCard variant="content" height={320} />
       </div>
     );
+  }
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-black uppercase tracking-widest text-main flex items-center gap-2">
-            <Clock size={18} className="text-accent" /> تحديد ساعات العمل
-            الإستراتيجية
-          </h3>
-          <p className="text-[10px] font-bold text-muted mt-1 uppercase tracking-wider">
-            ضبط أوقات التشغيل والراحة لضمان كفاءة الحجوزات
-          </p>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300" dir="rtl">
+      {/* Header intro — compact because outer Settings already has PageHeader, but keep context when used standalone */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/10 flex items-center justify-center text-primary">
+              <Clock size={18} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-main flex items-center gap-2">
+                بروتوكول ساعات التشغيل
+                {isDirty && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[9px] font-black text-amber-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    تعديلات غير محفوظة
+                  </span>
+                )}
+              </h3>
+              <p className="text-[11px] font-bold text-muted mt-0.5">
+                تتحكم هذه المواعيد في الحجز العام، توفر المواعيد، وفتح الورديات. الجمعة مغلق افتراضياً.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetAll}
+              disabled={!isDirty || saving}
+              className="h-9 rounded-xl font-black text-[11px] gap-2"
+            >
+              <RotateCcw size={14} /> تراجع
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!isDirty || hasErrors || saving}
+              className="h-9 rounded-xl font-black text-[11px] gap-2 px-6 shadow-soft"
+            >
+              <Save size={14} /> {saving ? "جاري الحفظ..." : "حفظ المواعيد"}
+            </Button>
+          </div>
         </div>
-        <Button
-          variant="outline"
-          disabled={loading}
-          onClick={applyToAll}
-          className="h-10 rounded-xl font-black text-[10px] uppercase border-border bg-card hover:bg-soft"
-        >
-          <Copy size={14} className="ml-2" /> تطبيق السبت على الكل
-        </Button>
+
+        {hasErrors && (
+          <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[11px] font-black text-rose-700">
+            <AlertTriangle size={16} className="shrink-0" />
+            يوجد خطأ في أحد الأيام — راجع الحقول المميزة باللون الأحمر قبل الحفظ.
+          </div>
+        )}
       </div>
 
-      <Card className="rounded-[26px] border border-border bg-card shadow-soft overflow-hidden">
+      {/* KPI Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="أيام مفتوحة"
+          value={`${stats.openDays} / 7`}
+          icon={Sun}
+          variant="success"
+          hint={`${stats.totalHours} ساعة تشغيل أسبوعياً`}
+        />
+        <StatCard
+          label="أيام مغلقة"
+          value={`${stats.closedDays}`}
+          icon={Moon}
+          variant="secondary"
+          hint={stats.closedDays === 0 ? "يعمل طوال الأسبوع" : "أيام راحة مجدولة"}
+        />
+        <StatCard
+          label="إجمالي الساعات"
+          value={`${stats.totalHours} س`}
+          icon={Timer}
+          variant="primary"
+          hint={stats.totalHours >= 60 ? "أسبوع تشغيلي مكثف" : stats.totalHours >= 40 ? "دوام متوازن" : "دوام مخفف"}
+        />
+        <StatCard
+          label={`اليوم • ${DAYS_AR[todayKey]}`}
+          value={hours[todayKey]?.is_open ? `${hours[todayKey].open_time} – ${hours[todayKey].close_time}` : "مغلق"}
+          icon={CalendarRange}
+          variant={hours[todayKey]?.is_open ? "success" : "warning"}
+          hint={stats.todayLabel}
+        />
+      </div>
+
+      {/* Visual week strip */}
+      <PremiumCard noPadding hoverable={false} className="overflow-hidden border-border/60" animate={false}>
+        <div className="p-4 sm:p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-[11px] font-black uppercase tracking-widest text-muted flex items-center gap-2">
+              <Sparkles size={14} className="text-primary" /> معاينة الأسبوع
+            </h4>
+            <span className="text-[10px] font-bold text-muted hidden sm:inline">
+              العرض يتناسب مع مدة الدوام — الأعمدة الأطول تعني يوماً أطول
+            </span>
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {ORDER.map((day) => {
+              const cfg = hours[day];
+              const isToday = day === todayKey;
+              const durMins = cfg.is_open ? (parseMins(cfg.close_time) ?? 0) - (parseMins(cfg.open_time) ?? 0) : 0;
+              const pct = cfg.is_open ? Math.max(18, Math.min(100, (durMins / 720) * 100)) : 12;
+              const err = errors[day];
+              return (
+                <div
+                  key={day}
+                  className={cn(
+                    "relative flex flex-col items-center gap-2 rounded-2xl border p-2 sm:p-3 transition-all",
+                    isToday ? "border-primary/30 bg-primary/5 shadow-sm" : "border-border bg-card",
+                    !cfg.is_open && "bg-soft/40",
+                    err && "border-rose-200 bg-rose-50/60",
+                  )}
+                >
+                  {isToday && (
+                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-2 py-0.5 text-[8px] font-black text-white shadow">
+                      اليوم
+                    </span>
+                  )}
+                  <div className="text-[10px] font-black text-main mt-1">{DAYS_AR[day]}</div>
+                  <div className="w-full flex-1 flex items-end justify-center" style={{ minHeight: 56 }}>
+                    <div
+                      className={cn(
+                        "w-full rounded-xl flex items-center justify-center text-[9px] font-black transition-all",
+                        cfg.is_open ? "bg-primary text-white shadow-sm" : "bg-border text-muted border border-dashed",
+                        err && cfg.is_open && "bg-rose-500",
+                      )}
+                      style={{ height: `${pct}%`, minHeight: cfg.is_open ? 28 : 22 }}
+                      title={cfg.is_open ? `${cfg.open_time} – ${cfg.close_time}` : "مغلق"}
+                    >
+                      {cfg.is_open ? (
+                        <span className="hidden sm:inline tabular-nums">
+                          {cfg.open_time}–{cfg.close_time}
+                        </span>
+                      ) : (
+                        "مغلق"
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-[9px] font-bold tabular-nums text-muted h-3">
+                    {cfg.is_open ? durationLabel(cfg.open_time, cfg.close_time) || "—" : "—"}
+                  </div>
+                  {err && <div className="text-[8px] font-black text-rose-600 text-center leading-tight">{err}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </PremiumCard>
+
+      {/* Presets + apply-to-all */}
+      <Card className="rounded-2xl border-border/60 p-4 flex flex-col gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted ml-1">قوالب سريعة:</span>
+            <Button variant="outline" size="sm" onClick={applyPresetAllOpen} className="h-8 rounded-xl text-[11px] font-black">
+              كل الأيام 10–22
+            </Button>
+            <Button variant="outline" size="sm" onClick={applyPresetFridayClosed} className="h-8 rounded-xl text-[11px] font-black">
+              الجمعة مغلق
+            </Button>
+            <Button variant="outline" size="sm" onClick={applyPresetWeekendLight} className="h-8 rounded-xl text-[11px] font-black">
+              عطلة مخففة
+            </Button>
+          </div>
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <div className="flex items-center gap-2 flex-1 lg:flex-none bg-soft rounded-xl border border-border p-1">
+              <span className="text-[10px] font-black text-muted px-2 whitespace-nowrap">نسخ من</span>
+              <select
+                value={applySource}
+                onChange={(e) => setApplySource(e.target.value as DayKey)}
+                className="h-8 flex-1 rounded-lg border border-border bg-card px-2 text-[11px] font-black text-main outline-none focus:border-primary"
+              >
+                {ORDER.map((d) => (
+                  <option key={d} value={d}>
+                    {DAYS_AR[d]} {hours[d]?.is_open ? `(${hours[d].open_time}-${hours[d].close_time})` : "(مغلق)"}
+                  </option>
+                ))}
+              </select>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleCopyDayToAll(applySource)}
+                className="h-8 rounded-lg text-[11px] font-black gap-1 shrink-0"
+              >
+                <Copy size={13} /> تطبيق على الكل
+              </Button>
+            </div>
+          </div>
+        </div>
+        <p className="text-[10px] font-bold text-muted leading-relaxed">
+          القوالب تكتب فوق المواعيد الحالية فوراً — يمكنك التراجع قبل الحفظ. "تطبيق على الكل" ينسخ حالة يوم واحد (مفتوح/مغلق مع أوقاته) إلى باقي الأسبوع.
+        </p>
+      </Card>
+
+      {/* Days list */}
+      <Card className="rounded-[26px] border border-border bg-card shadow-soft overflow-hidden p-0">
         <div className="divide-y divide-border">
           {ORDER.map((day) => {
-            const config = (hours || {})[day] || {
-              is_open: false,
-              open_time: null,
-              close_time: null,
-            };
+            const cfg = hours[day] || DEFAULT_DAY_CONFIG;
+            const err = errors[day];
+            const isToday = day === todayKey;
+            const dur = cfg.is_open ? durationLabel(cfg.open_time, cfg.close_time) : null;
             return (
               <div
                 key={day}
-                className={`p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6 transition-colors ${config.is_open ? "bg-card" : "bg-soft/30"}`}
+                className={cn(
+                  "p-4 sm:p-5 flex flex-col gap-4 transition-colors",
+                  cfg.is_open ? "bg-card" : "bg-soft/20",
+                  isToday && "ring-1 ring-primary/15 ring-inset",
+                  err && "bg-rose-50/40",
+                )}
               >
-                <div className="flex items-center gap-6 min-w-[150px]">
-                  <div
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs shadow-sm border ${config.is_open ? "bg-accent text-white border-accent" : "bg-soft text-muted border-border opacity-50"}`}
-                  >
-                    {DAYS_AR[day].charAt(0)}
-                  </div>
-                  <div>
-                    <div className="text-sm font-black text-main">
-                      {DAYS_AR[day]}
-                    </div>
-                    <div className="text-[9px] font-bold text-muted uppercase tracking-widest mt-0.5">
-                      {config.is_open ? "يوم عمل تشغيلي" : "عطلة أسبوعية"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-1 items-center justify-end gap-10">
-                  {config.is_open && (
-                    <div className="flex items-center gap-4 animate-in fade-in zoom-in-95 duration-200">
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-black text-muted uppercase tracking-widest mr-1">
-                          الفتح
-                        </label>
-                        <Input
-                          type="time"
-                          className="h-10 rounded-lg bg-soft border-border font-black text-xs w-32"
-                          value={config.open_time ?? ""}
-                          onChange={(e) =>
-                            handleChange(day, "open_time", e.target.value)
-                          }
-                        />
-                      </div>
-                      <div className="text-muted mt-5 font-bold">إلى</div>
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-black text-muted uppercase tracking-widest mr-1">
-                          الإغلاق
-                        </label>
-                        <Input
-                          type="time"
-                          className="h-10 rounded-lg bg-soft border-border font-black text-xs w-32"
-                          value={config.close_time ?? ""}
-                          onChange={(e) =>
-                            handleChange(day, "close_time", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-3 pr-6 border-r border-border">
-                    <span
-                      className={`text-[10px] font-black uppercase ${config.is_open ? "text-accent" : "text-muted"}`}
+                {/* Mobile layout stacks, desktop is row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <div
+                      className={cn(
+                        "h-12 w-12 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 border shadow-sm transition-colors",
+                        cfg.is_open
+                          ? "bg-primary text-white border-primary"
+                          : "bg-soft text-muted border-border",
+                        isToday && cfg.is_open && "ring-2 ring-primary/20",
+                      )}
                     >
-                      {config.is_open ? "مفتوح" : "مغلق"}
-                    </span>
-                    <Switch
-                      checked={config.is_open}
-                      onCheckedChange={() => handleToggle(day)}
-                      className="data-[state=checked]:bg-accent"
-                    />
+                      {DAYS_AR[day].charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-black text-main">{DAYS_AR[day]}</span>
+                        {isToday && <Badge variant="primary" className="h-5 text-[9px] px-2">اليوم</Badge>}
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 h-5 rounded-full border px-2 text-[9px] font-black",
+                            cfg.is_open
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-soft text-muted border-border",
+                          )}
+                        >
+                          <span className={cn("h-1.5 w-1.5 rounded-full", cfg.is_open ? "bg-emerald-500" : "bg-muted")} />
+                          {cfg.is_open ? "مفتوح" : "مغلق"}
+                        </span>
+                        {dur && (
+                          <span className="inline-flex h-5 items-center rounded-full bg-primary/10 border border-primary/15 px-2 text-[9px] font-black text-primary tabular-nums">
+                            {dur}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] font-bold text-muted mt-1">
+                        {cfg.is_open ? `${cfg.open_time} – ${cfg.close_time}` : "عطلة أسبوعية — لا يُستقبل حجز"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-3">
+                    {cfg.is_open ? (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex items-center gap-2 sm:gap-3 bg-soft/50 rounded-2xl border border-border p-2 sm:p-3"
+                      >
+                        <div className="flex-1 sm:flex-none space-y-1">
+                          <label className="text-[9px] font-black text-muted uppercase tracking-widest mr-1">الفتح</label>
+                          <Input
+                            type="time"
+                            value={cfg.open_time ?? ""}
+                            onChange={(e) => handleChange(day, "open_time", e.target.value)}
+                            className={cn(
+                              "h-10 rounded-xl bg-card border-border font-black text-xs w-full sm:w-32 tabular-nums",
+                              err && "border-rose-300 focus-visible:ring-rose-200",
+                            )}
+                          />
+                        </div>
+                        <div className="text-muted font-black text-xs mt-5 hidden sm:block">—</div>
+                        <div className="flex-1 sm:flex-none space-y-1">
+                          <label className="text-[9px] font-black text-muted uppercase tracking-widest mr-1">الإغلاق</label>
+                          <Input
+                            type="time"
+                            value={cfg.close_time ?? ""}
+                            onChange={(e) => handleChange(day, "close_time", e.target.value)}
+                            className={cn(
+                              "h-10 rounded-xl bg-card border-border font-black text-xs w-full sm:w-32 tabular-nums",
+                              err && "border-rose-300 focus-visible:ring-rose-200",
+                            )}
+                          />
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <div className="hidden sm:flex h-10 items-center rounded-xl bg-soft border border-dashed border-border px-4 text-[11px] font-black text-muted">
+                        مغلق — لن تظهر مواعيد لهذا اليوم
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-2 sm:pr-4 sm:border-r border-border bg-card sm:bg-transparent rounded-xl sm:rounded-none border sm:border-0 p-2 sm:p-0">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopyDayToAll(day)}
+                          title={`نسخ ${DAYS_AR[day]} إلى كل الأيام`}
+                          className="h-8 w-8 p-0 rounded-xl border border-border bg-card hover:bg-soft"
+                        >
+                          <Copy size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleResetDay(day)}
+                          title="إعادة هذا اليوم للحالة المحفوظة"
+                          className="h-8 w-8 p-0 rounded-xl border border-border bg-card hover:bg-soft"
+                        >
+                          <RotateCcw size={14} />
+                        </Button>
+                      </div>
+                      <div className="h-6 w-px bg-border hidden sm:block" />
+                      <div className="flex items-center gap-2">
+                        <span className={cn("text-[11px] font-black", cfg.is_open ? "text-primary" : "text-muted")}>
+                          {cfg.is_open ? "مفتوح" : "مغلق"}
+                        </span>
+                        <Switch
+                          checked={cfg.is_open}
+                          onCheckedChange={() => handleToggle(day)}
+                          className="data-[state=checked]:bg-primary"
+                          aria-label={`تبديل ${DAYS_AR[day]}`}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
+                {err && (
+                  <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-black text-rose-700">
+                    <AlertTriangle size={14} className="shrink-0" />
+                    {err}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       </Card>
 
-      <div className="flex justify-end pt-4">
+      {/* Impact */}
+      <div
+        className={cn(
+          "rounded-2xl border p-4 flex gap-3 transition-colors",
+          isDirty
+            ? "border-amber-200 bg-amber-50/80 text-amber-900"
+            : "border-border bg-soft/30 text-muted",
+        )}
+      >
+        <div
+          className={cn(
+            "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border",
+            isDirty ? "bg-amber-500 text-white border-amber-500" : "bg-card text-muted border-border",
+          )}
+        >
+          {isDirty ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+        </div>
+        <div className="min-w-0">
+          <div className="text-[11px] font-black leading-none">
+            {isDirty ? "تعديلات غير محفوظة — سيتأثر الحجز والورديات" : "المواعيد متزامنة مع الخادم"}
+          </div>
+          <p className="text-[11px] font-bold leading-relaxed mt-1 opacity-80">
+            {isDirty
+              ? "بعد الحفظ: سيُحدّث الموقع العام، وتُفلتر المواعيد المتاحة، ويُمنع فتح وردية خارج الساعات المحددة. لم يتم الحفظ بعد."
+              : "أي تغيير هنا ينعكس فور حفظه على صفحة الحجز العامة وجدولة المواعيد ونظام الورديات."}
+          </p>
+        </div>
+      </div>
+
+      {/* Footer actions (sticky-like on mobile) */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:justify-end pt-2">
+        <Button
+          variant="outline"
+          onClick={handleResetAll}
+          disabled={!isDirty || saving}
+          className="h-11 rounded-xl font-black text-[11px] order-2 sm:order-1"
+        >
+          <RotateCcw size={14} className="ml-1" /> إلغاء التعديلات
+        </Button>
         <Button
           onClick={handleSave}
-          disabled={loading || saving}
-          variant="primary"
-          className="px-16 h-14 rounded-xl font-black text-[11px] uppercase tracking-[0.2em] shadow-soft hover:-translate-y-0.5 transition-all"
+          disabled={!isDirty || hasErrors || saving}
+          className="h-11 rounded-xl font-black text-[11px] px-10 shadow-soft order-1 sm:order-2"
         >
-          {saving ? "جاري الحفظ..." : "تأكيد بروتوكول التشغيل"}{" "}
-          <Save className="mr-2" size={16} />
+          <Save size={16} className="ml-2" />
+          {saving ? "جاري الحفظ..." : hasErrors ? "راجع الأخطاء أولاً" : "حفظ بروتوكول التشغيل"}
         </Button>
       </div>
+
+      <p className="text-center text-[10px] font-bold text-muted">
+        نصيحة: اجعل الجمعة مغلقاً لتطابق العطلة الرسمية، واستخدم القوالب لتطبيق نفس الدوام بسرعة.
+      </p>
     </div>
   );
 };

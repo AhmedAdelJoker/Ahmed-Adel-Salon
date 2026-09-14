@@ -188,13 +188,6 @@ const MENU_GROUPS = [
         roles: ["OWNER", "ADMIN", "MANAGER"],
       },
       {
-        key: "working-hours",
-        label: "ساعات العمل",
-        to: "/owner/working-hours",
-        icon: Clock,
-        roles: ["OWNER", "ADMIN", "MANAGER"],
-      },
-      {
         key: "attendance",
         label: "الحضور والانضباط",
         to: "/attendance",
