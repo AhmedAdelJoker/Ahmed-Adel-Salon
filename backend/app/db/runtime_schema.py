@@ -174,6 +174,24 @@ def ensure_runtime_schema() -> None:
             "recipient_name",
             "ALTER TABLE expenses ADD COLUMN recipient_name VARCHAR(255)",
         )
+        _ensure_column(
+            connection,
+            "expenses",
+            "reference_type",
+            "ALTER TABLE expenses ADD COLUMN reference_type VARCHAR(50)",
+        )
+        _ensure_column(
+            connection,
+            "expenses",
+            "reference_id",
+            "ALTER TABLE expenses ADD COLUMN reference_id INTEGER",
+        )
+        _ensure_column(
+            connection,
+            "expenses",
+            "internal_notes",
+            "ALTER TABLE expenses ADD COLUMN internal_notes VARCHAR(500)",
+        )
 
         _ensure_column(
             connection,

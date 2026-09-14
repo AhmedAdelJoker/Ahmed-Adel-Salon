@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.api.deps import require_cashier_manager_owner, require_owner_or_manager
@@ -14,6 +14,7 @@ from app.models.expense import Expense
 from app.schemas.expense import ExpenseCreate, ExpenseRead, ExpenseSummary, ExpenseArchiveResponse
 from app.utils.expense_labels import expense_label_ar
 from app.utils.media import process_image_content, get_upload_path
+from app.crud.core_business import create_cash_transaction
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 UPLOAD_DIR = get_upload_path("expenses")
@@ -36,7 +37,7 @@ def list_expenses(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    query = db.query(Expense)
+    query = db.query(Expense).options(joinedload(Expense.created_by_user))
 
     # Unified search (q or search)
     term = q or search
@@ -100,7 +101,7 @@ def get_expenses_archive(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    query = db.query(Expense)
+    query = db.query(Expense).options(joinedload(Expense.created_by_user))
 
     if start_date:
         try:
@@ -235,6 +236,11 @@ def create_expense(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
+    # recipient_name إجباري للإيجار/المشتريات
+    requiring = {"إيجار", "مشتريات"}
+    if payload.category in requiring and not (payload.recipient_name and str(payload.recipient_name).strip()):
+        raise HTTPException(status_code=400, detail="اسم المستفيد/المورد مطلوب لفئة الإيجار والمشتريات")
+    status_val = getattr(payload, "status", None) or ("pending_audit" if str(current_user.role).lower() == "cashier" else "approved")
     expense = Expense(
         title=payload.title or f"مصروف {payload.category}",
         amount=payload.amount,
@@ -244,12 +250,38 @@ def create_expense(
         payment_method=payload.payment_method or "cash",
         expense_date=payload.expense_date or datetime.now(),
         invoice_image_url=getattr(payload, "invoice_image_url", None),
-        status=getattr(payload, "status", None) or ("pending_audit" if str(current_user.role).lower() == "cashier" else "approved"),
+        reference_type=getattr(payload, "reference_type", None),
+        reference_id=getattr(payload, "reference_id", None),
+        internal_notes=getattr(payload, "internal_notes", None),
+        status=status_val,
         created_by_user_id=current_user.id,
     )
     db.add(expense)
     db.commit()
     db.refresh(expense)
+    # reload with creator for response
+    expense = db.query(Expense).options(joinedload(Expense.created_by_user)).filter(Expense.id == expense.id).first()
+
+    # ديناميكي: أي مصروف معتمد يسجل حركة خزنة تلقائياً (كاش/غير كاش)
+    if status_val == "approved" and expense.amount and float(expense.amount) > 0:
+        try:
+            pm = str(expense.payment_method or "cash").strip().lower()
+            create_cash_transaction(
+                db,
+                direction="out",
+                amount=float(expense.amount),
+                transaction_type="expense_payment",
+                payment_method=pm or "cash",
+                notes=f"مصروف: {expense.title} - {expense.category}",
+                user_id=current_user.id,
+                reference_type="expense",
+                reference_id=expense.id,
+                reference_no=f"EXP-{expense.id}",
+                commit=True,
+            )
+        except Exception as _e:
+            print(f"[Cashbox] expense auto-withdraw failed for expense {expense.id}: {_e}")
+
     return expense
 
 
@@ -263,9 +295,34 @@ def approve_expense(
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
     
+    was_pending = expense.status == "pending_audit"
     expense.status = "approved"
     db.commit()
     db.refresh(expense)
+
+    # إذا كان معلق سابقاً، الآن يسمع في الخزنة
+    if was_pending and expense.amount and float(expense.amount) > 0:
+        try:
+            from app.crud.core_business import find_existing_cash_transaction
+            existing = find_existing_cash_transaction(db, reference_type="expense", reference_id=expense.id, transaction_type="expense_payment")
+            if not existing:
+                pm = str(expense.payment_method or "cash").strip().lower()
+                create_cash_transaction(
+                    db,
+                    direction="out",
+                    amount=float(expense.amount),
+                    transaction_type="expense_payment",
+                    payment_method=pm or "cash",
+                    notes=f"مصروف معتمد: {expense.title} - {expense.category}",
+                    user_id=current_user.id,
+                    reference_type="expense",
+                    reference_id=expense.id,
+                    reference_no=f"EXP-{expense.id}",
+                    commit=True,
+                )
+        except Exception as _e:
+            print(f"[Cashbox] approve auto-withdraw failed for expense {expense.id}: {_e}")
+
     return expense
 
 
@@ -309,6 +366,11 @@ def update_expense(
     if str(current_user.role or "").strip().lower() not in ("owner", "admin"):
         raise HTTPException(status_code=403, detail="التعديل متاح للمالك فقط")
 
+    # recipient_name إجباري للإيجار/المشتريات عند التعديل
+    requiring = {"إيجار", "مشتريات"}
+    if payload.category in requiring and not (payload.recipient_name and str(payload.recipient_name).strip()):
+        raise HTTPException(status_code=400, detail="اسم المستفيد/المورد مطلوب لفئة الإيجار والمشتريات")
+
     expense.title = payload.title or expense.title
     expense.amount = payload.amount
     expense.category = payload.category
@@ -316,6 +378,9 @@ def update_expense(
     expense.recipient_name = payload.recipient_name
     expense.payment_method = payload.payment_method or expense.payment_method
     expense.invoice_image_url = getattr(payload, "invoice_image_url", None) or expense.invoice_image_url
+    expense.reference_type = getattr(payload, "reference_type", None)
+    expense.reference_id = getattr(payload, "reference_id", None)
+    expense.internal_notes = getattr(payload, "internal_notes", None)
     if payload.expense_date:
         expense.expense_date = payload.expense_date
     if getattr(payload, "status", None):
@@ -323,6 +388,10 @@ def update_expense(
 
     db.commit()
     db.refresh(expense)
+    # ensure created_by is loaded for response
+    db.refresh(expense)
+    # reload with joinedload for creator
+    expense = db.query(Expense).options(joinedload(Expense.created_by_user)).filter(Expense.id == expense_id).first()
     return expense
 
 

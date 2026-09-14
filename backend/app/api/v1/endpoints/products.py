@@ -166,26 +166,45 @@ def add_product_stock(
     # Auto-unarchive when adding stock
     product.is_archived = False
 
+    pending_expense = None
     if payload.create_expense:
-        # Total cost is already provided or calculated based on new/existing cost_price
         total_cost = Decimal(str(payload.purchase_price or product.cost_price or 0)) * Decimal(str(payload.amount))
-        
         expense_note = payload.note or f"توريد مخزون للمنتج {product.name} ({payload.amount} عبوة)"
         if price_changed:
             expense_note += f" - [تغير في سعر الشراء إلى {product.cost_price}]"
-        
         if payload.invoice_image_url:
             expense_note = f"{expense_note}\nمرفق: {payload.invoice_image_url}"
-        
-        db.add(
-            Expense(
-                amount=float(total_cost),
-                category="مشتريات مخزون",
-                description=expense_note,
-                recipient_name=product.company_name or product.name,
-                created_by_user_id=current_user.id
-            )
+        pending_expense = Expense(
+            amount=float(total_cost),
+            category="مشتريات مخزون",
+            description=expense_note,
+            recipient_name=product.company_name or product.name,
+            payment_method="cash",
+            status="approved",
+            created_by_user_id=current_user.id,
         )
+        db.add(pending_expense)
+        db.flush()
+
+    # إذا كان مشتريات، سجل حركة خزنة (كاش افتراضياً) — ديناميكي
+    if pending_expense is not None and pending_expense.amount and float(pending_expense.amount) > 0:
+        try:
+            from app.crud.core_business import create_cash_transaction
+            create_cash_transaction(
+                db,
+                direction="out",
+                amount=float(pending_expense.amount),
+                transaction_type="expense_payment",
+                payment_method="cash",
+                notes=f"مشتريات مخزون: {product.name} ({payload.amount} عبوة)",
+                user_id=current_user.id,
+                reference_type="expense",
+                reference_id=pending_expense.id,
+                reference_no=f"EXP-{pending_expense.id}",
+                commit=False,
+            )
+        except Exception as _e:
+            print(f"[Cashbox] purchase auto-withdraw failed: {_e}")
 
     db.commit()
     db.refresh(product)

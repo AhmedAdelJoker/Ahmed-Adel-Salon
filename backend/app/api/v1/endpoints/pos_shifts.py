@@ -71,6 +71,29 @@ def open_shift(
     db.add(shift)
     db.commit()
     db.refresh(shift)
+
+    # خزنة الكاشير تسمع في الخزنة المركزية — رصيد افتتاحي كاش
+    try:
+        from app.crud.core_business import create_cash_transaction
+        oc = float(shift.opening_cash or 0)
+        if oc > 0:
+            create_cash_transaction(
+                db,
+                direction="in",
+                amount=oc,
+                transaction_type="opening_balance",
+                payment_method="cash",
+                notes=f"رصيد افتتاحي وردية #{shift.id} - {current_user.full_name or current_user.username}",
+                user_id=current_user.id,
+                reference_type="pos_shift",
+                reference_id=shift.id,
+                reference_no=f"SHIFT-{shift.id}",
+                commit=True,
+            )
+    except Exception as _e:
+        print(f"[Cashbox] opening_balance failed for shift {shift.id}: {_e}")
+
+    db.refresh(shift)
     return shift
 
 @router.post("/{shift_id}/close")

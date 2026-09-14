@@ -35,11 +35,23 @@ class ShopSettingsOut(ShopSettingsBase):
     model_config = {"from_attributes": True}
 
 
+class UserBrief(BaseModel):
+    id: int
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    profile_image_url: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class CashTransactionCreate(BaseModel):
     direction: str
     amount: float
     payment_method: Optional[str] = "cash"
     notes: Optional[str] = None
+    reference_no: Optional[str] = None
+    recipient_name: Optional[str] = None
 
 
 class CashTransactionOut(BaseModel):
@@ -57,6 +69,13 @@ class CashTransactionOut(BaseModel):
     is_voided: int
     transaction_date: Optional[datetime] = None
     created_at: Optional[datetime] = None
+    # المنشئ — عالمي متوسط: الاسم والدور
+    user_id: Optional[int] = None
+    created_by_user_id: Optional[int] = None
+    created_by_user: Optional[UserBrief] = None
+    user: Optional[UserBrief] = None
+    # تفاصيل أكثر عند الإنشاء (المستفيد/المرجع)
+    recipient_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -85,6 +104,36 @@ class DashboardCoreSummary(BaseModel):
     today_sales: float
     today_expenses: float
     today_net: float
+    # --- خزنة الكاش vs غير الكاش (تفصيل احترافي) ---
+    cash_in: float = 0
+    cash_out: float = 0
+    cash_balance_detail: float = 0
+    non_cash_in: float = 0
+    non_cash_out: float = 0
+    non_cash_balance: float = 0
+    cash_today_sales: float = 0
+    cash_today_expenses: float = 0
+    cash_today_net: float = 0
+    non_cash_today_sales: float = 0
+    non_cash_today_expenses: float = 0
+    non_cash_today_net: float = 0
+    # رصيد ورديات الكاشير المفتوحة (drawer)
+    drawer_balance: float = 0
+    drawer_open_shifts: int = 0
+    by_payment_method: dict = {}
+    # المدة (يوم/أسبوع/شهر/سنة/مخصص) — حساب شخصي + تقرير حركة
+    period_label: str = "الكل"
+    period_start: Optional[str] = None
+    period_end: Optional[str] = None
+    period_in: float = 0
+    period_out: float = 0
+    period_net: float = 0
+    period_cash_in: float = 0
+    period_cash_out: float = 0
+    period_cash_net: float = 0
+    period_non_cash_in: float = 0
+    period_non_cash_out: float = 0
+    period_non_cash_net: float = 0
 
 
 

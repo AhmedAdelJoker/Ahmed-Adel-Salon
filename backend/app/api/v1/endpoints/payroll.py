@@ -310,6 +310,28 @@ def pay_payroll(
         db.add(new_expense)
         db.flush()
         
+        # ديناميكي: حركة خزنة لسحب الراتب (كاش/غير كاش حسب طريقة الدفع)
+        try:
+            from app.crud.core_business import create_cash_transaction
+            pm = str(new_expense.payment_method or "cash").strip().lower()
+            if new_expense.amount and float(new_expense.amount) > 0:
+                create_cash_transaction(
+                    db,
+                    direction="out",
+                    amount=float(new_expense.amount),
+                    transaction_type="payroll_payment",
+                    payment_method=pm or "cash",
+                    notes=f"صرف راتب: {record.employee_name_snapshot} {record.period_month}/{record.period_year}",
+                    user_id=current_user.id,
+                    reference_type="payroll",
+                    reference_id=record.id,
+                    reference_no=f"PAY-{record.id}",
+                    employee_id=record.employee_id,
+                    commit=False,
+                )
+        except Exception as _e:
+            print(f"[Cashbox] payroll auto-withdraw failed: {_e}")
+        
         record.expense_id = new_expense.id
         
         # Mark advances as deducted

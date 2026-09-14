@@ -200,32 +200,29 @@ def create_manual_invoice(
     # 7. Deduct stock for the invoice
     deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=current_user.id)
 
-    # 7b. Auto-create cashbox transaction for cash payments (إيداع نقدي في الخزنة)
+    # 7b. Auto-create cashbox transactions — كل طرق الدفع تسمع في الخزنة المركزية (كاش + غير كاش)
     try:
         pm = str(payload.payment_method or "").strip().lower()
-        cash_amount = Decimal("0")
+        svc_label = service_name if 'service_name' in locals() else 'خدمات'
+        def _inv_pm_label(m: str) -> str:
+            return {"cash": "نقدي", "card": "شبكة", "bank_transfer": "تحويل", "wallet": "محفظة"}.get(m, m)
         if pm == "cash":
-            cash_amount = final_amount
+            create_cash_transaction(db, direction="in", amount=float(final_amount), transaction_type="invoice_payment", payment_method="cash", notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({_inv_pm_label('cash')})", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
+        elif pm == "card":
+            create_cash_transaction(db, direction="in", amount=float(final_amount), transaction_type="invoice_payment", payment_method="card", notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({_inv_pm_label('card')})", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
+        elif pm == "bank_transfer":
+            create_cash_transaction(db, direction="in", amount=float(final_amount), transaction_type="invoice_payment", payment_method="bank_transfer", notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({_inv_pm_label('bank_transfer')})", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
+        elif pm == "wallet":
+            create_cash_transaction(db, direction="in", amount=float(final_amount), transaction_type="invoice_payment", payment_method="wallet", notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({_inv_pm_label('wallet')})", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
         elif pm == "split" and payload.split_payments:
             for sp in payload.split_payments:
-                if str(sp.payment_method or "").strip().lower() == "cash":
-                    cash_amount += Decimal(str(sp.amount))
-        if cash_amount > 0:
-            create_cash_transaction(
-                db,
-                direction="in",
-                amount=float(cash_amount),
-                transaction_type="invoice_payment",
-                payment_method="cash",
-                notes=f"تحصيل فاتورة {invoice.invoice_no} - {service_name if 'service_name' in locals() else 'خدمات'}",
-                user_id=current_user.id,
-                reference_type="invoice",
-                reference_id=invoice.id,
-                reference_no=invoice.invoice_no,
-                customer_id=customer_id,
-                employee_id=main_barber_id,
-                commit=False,
-            )
+                sp_pm = str(sp.payment_method or "").strip().lower() or "cash"
+                sp_amt = Decimal(str(sp.amount or 0))
+                if sp_amt > 0:
+                    create_cash_transaction(db, direction="in", amount=float(sp_amt), transaction_type="invoice_payment", payment_method=sp_pm, notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({_inv_pm_label(sp_pm)} - تقسيط)", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
+        elif final_amount and float(final_amount) > 0:
+            # fallback: أي طريقة دفع غير معروفة
+            create_cash_transaction(db, direction="in", amount=float(final_amount), transaction_type="invoice_payment", payment_method=pm or "cash", notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({pm})", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
     except Exception as _cash_err:
         print(f"[Cashbox] auto-deposit failed for invoice {invoice.invoice_no}: {_cash_err}")
 
@@ -763,17 +760,18 @@ def finalize_draft(
     
     deduct_stock_for_invoice(db, invoice_id=draft.id, created_by_user_id=getattr(current_user, "id", None))
 
-    # Auto-deposit cash for draft finalize if cash
+    # Auto-deposit for draft finalize — كل طرق الدفع تسمع في الخزنة المركزية
     try:
-        pm_draft = str(draft.payment_method or "").strip().lower()
-        if pm_draft == "cash" and draft.total_amount and float(draft.total_amount) > 0:
+        pm_draft = str(draft.payment_method or "").strip().lower() or "cash"
+        if draft.total_amount and float(draft.total_amount) > 0:
+            pm_label = {"cash": "نقدي", "card": "شبكة", "bank_transfer": "تحويل", "wallet": "محفظة"}.get(pm_draft, pm_draft)
             create_cash_transaction(
                 db,
                 direction="in",
                 amount=float(draft.total_amount),
                 transaction_type="invoice_payment",
-                payment_method="cash",
-                notes=f"تحصيل فاتورة {draft.invoice_no}",
+                payment_method=pm_draft,
+                notes=f"تحصيل فاتورة {draft.invoice_no} ({pm_label})",
                 user_id=getattr(current_user, "id", None),
                 reference_type="invoice",
                 reference_id=draft.id,
