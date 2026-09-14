@@ -1,6 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
-
-import { toast } from "react-hot-toast";
+import React from "react";
 import {
   Activity,
   AlertTriangle,
@@ -21,17 +19,12 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-
-import api from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import {
-  PageHeader,
-  StatCard,
-} from "@/components/shared/PremiumUI";
+import { PageHeader, StatCard } from "@/components/shared/PremiumUI";
 import InlineNotice from "@/components/shared/InlineNotice";
 import { TableEmptyState } from "@/components/shared/TableEmptyState";
 import { cn } from "@/lib/core/utils";
@@ -43,346 +36,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-const DEFAULT_SECURITY_SETTINGS = {
-  enforceStrongPasswords: true,
-  requireShiftForSales: true,
-  lockClosedShiftEdits: true,
-  enableActivityLogs: true,
-  restrictExportsToManagers: true,
-  requireDiscountApproval: true,
-  sessionTimeoutMinutes: 60,
-  maxFailedLoginAttempts: 5,
-};
-
-const SECURITY_SETTINGS_STORAGE_KEY = "security.access.settings";
-
-const DEFAULT_SECURITY_SYNC_STATUS = {
-  settingsSource: "local",
-  sessionsAvailable: true,
-  usersAvailable: true,
-  logsAvailable: true,
-  lastMessage: "",
-};
-
-const roleLabels = {
-  owner: "مالك النظام",
-  admin: "مدير النظام",
-  manager: "مدير",
-  cashier: "كاشير",
-  barber: "خبير",
-  user: "مستخدم",
-};
-
-const riskKeywords =
-  /delete|cancel|refund|discount|permission|login|failed|export|import|invoice|shift/i;
-
-function asArray(response) {
-  const data = response?.data ?? response;
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.items)) return data.items;
-  if (Array.isArray(data?.data)) return data.data;
-  return [];
-}
-
-function formatDate(value) {
-  if (!value) return "---";
-  try {
-    return new Date(value).toLocaleString("ar-EG", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch (err) {
-    return String(value);
-  }
-}
-
-function getUserName(user) {
-  return (
-    user?.full_name ||
-    user?.fullName ||
-    user?.display_name ||
-    user?.username ||
-    user?.email ||
-    "مستخدم غير محدد"
-  );
-}
-
-function getRole(user) {
-  return user?.role || user?.role_name || user?.roleName || "user";
-}
-
-function getId(item) {
-  return (
-    item?.id ||
-    item?.user_id ||
-    item?.userId ||
-    item?.employee_id ||
-    item?.employeeId
-  );
-}
-
-function sanitizeSecuritySettings(input = {}) {
-  const merged = {
-    ...DEFAULT_SECURITY_SETTINGS,
-    ...(input && typeof input === "object" ? input : {}),
-  };
-
-  return {
-    ...merged,
-    sessionTimeoutMinutes: Math.max(
-      5,
-      Number(
-        merged.sessionTimeoutMinutes ??
-          DEFAULT_SECURITY_SETTINGS.sessionTimeoutMinutes,
-      ) || DEFAULT_SECURITY_SETTINGS.sessionTimeoutMinutes,
-    ),
-    maxFailedLoginAttempts: Math.max(
-      1,
-      Number(
-        merged.maxFailedLoginAttempts ??
-          DEFAULT_SECURITY_SETTINGS.maxFailedLoginAttempts,
-      ) || DEFAULT_SECURITY_SETTINGS.maxFailedLoginAttempts,
-    ),
-  };
-}
-
-function readStoredSecuritySettings() {
-  try {
-    const raw = localStorage.getItem(SECURITY_SETTINGS_STORAGE_KEY);
-    return raw
-      ? sanitizeSecuritySettings(JSON.parse(raw))
-      : sanitizeSecuritySettings(DEFAULT_SECURITY_SETTINGS);
-  } catch (err) {
-    return sanitizeSecuritySettings(DEFAULT_SECURITY_SETTINGS);
-  }
-}
-
-async function captureRequest(request) {
-  try {
-    const response = await request;
-    return { ok: true, response };
-  } catch (error) {
-    return { ok: false, error };
-  }
-}
+import {
+  useSecurityAccess,
+  riskKeywords,
+  formatDate,
+  getUserName,
+  getRole,
+  getId,
+  ROLE_LABELS,
+} from "@/features/security";
 
 export default function SecurityAccess() {
-  const [usersLoading, setUsersLoading] = useState(true);
-  const [logsLoading, setLogsLoading] = useState(true);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
-  const [settingsLoading, setSettingsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  
-  const [users, setUsers] = useState<any[]>([]);
-  
-  const [logs, setLogs] = useState<any[]>([]);
-  
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("overview");
-  const [settings, setSettings] = useState(() => readStoredSecuritySettings());
-  const [syncStatus, setSyncStatus] = useState(DEFAULT_SECURITY_SYNC_STATUS);
-
-  // تعريف قائمة التبويبات المفقودة ليعمل الـ map البرمجي بسلاسة
-  const tabs = [
-    { id: "overview", label: "نظرة عامة", icon: Shield },
-    { id: "users", label: "المستخدمين والأدوار", icon: Users },
-    { id: "policies", label: "سياسات الوصول", icon: Lock },
-    { id: "activity", label: "سجل العمليات الحساسة", icon: Activity },
-  ];
-
-  // دالة تحديث الحقول الفردية للسياسات
-  const updateSetting = (key, value) => {
-    setSettings((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  // دالة تصدير تقرير الأمان
-  const exportSecurityReport = () => {
-    toast.success("جاري تصدير تقرير الأمان بصيغة CSV تلقائياً...");
-    try {
-      const headers = ["ID", "Action", "Description", "Entity Type", "Date"];
-      const rows = logs.map((log) => [
-        log.id || "",
-        log.action || "",
-        log.description || "",
-        log.entity_type || "",
-        log.created_at || "",
-      ]);
-      const csvContent =
-        "data:text/csv;charset=utf-8,\uFEFF" +
-        [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `security_report_${Date.now()}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (_err) {
-      toast.error("فشل استخراج ملف التقرير.");
-    }
-  };
-
-  // دالة حفظ السياسات وإرسالها للسيرفر وحفظ نسخة احتياطية في localStorage
-  const saveSettings = async () => {
-    setSaving(true);
-    try {
-      localStorage.setItem(
-        SECURITY_SETTINGS_STORAGE_KEY,
-        JSON.stringify(settings),
-      );
-
-      const res = await captureRequest(api.put("/security/settings", settings));
-      if (res.ok) {
-        toast.success("تم حفظ وتطبيق سياسات الأمان بنجاح على الخادم.");
-      } else {
-        toast.success("تم الحفظ محلياً بنجاح (الخادم قيد التحديث).");
-      }
-    } catch (_error) {
-      toast.error("حدث خطأ أثناء محاولة حفظ الإعدادات.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // حساب الـ Metrics الحية لتفادي أخطاء حقول الإحصائيات
-  const metrics = useMemo(() => {
-    const activeU = users.filter((u) => u.is_active !== false).length;
-    const inactiveU = users.filter((u) => u.is_active === false).length;
-    const sensitiveL = logs.filter((log) =>
-      riskKeywords.test(`${log?.action || ""} ${log?.description || ""}`),
-    ).length;
-
-    return {
-      activeUsers: activeU,
-      inactiveUsers: inactiveU,
-      activeSessions: sessions.length || 0,
-      sensitiveLogs: sensitiveL,
-    };
-  }, [users, logs, sessions]);
-
-  // تصفية المستخدمين بناءً على مربع البحث
-  const filteredUsers = useMemo(() => {
-    if (!searchTerm) return users;
-    const term = searchTerm.toLowerCase();
-    return users.filter((u) => {
-      const name = getUserName(u).toLowerCase();
-      const email = (u?.email || "").toLowerCase();
-      const role = getRole(u).toLowerCase();
-      return name.includes(term) || email.includes(term) || role.includes(term);
-    });
-  }, [users, searchTerm]);
-
-  async function loadSecurityData({ background = false } = {}) {
-    if (background) setRefreshing(true);
-
-    const fetchUsers = async () => {
-      try {
-        setUsersLoading(true);
-        const res = await captureRequest(
-          api.get("/users", { params: { limit: 1000 } }),
-        );
-        setUsers(res.ok ? asArray(res.response) : []);
-        return res;
-      } finally {
-        setUsersLoading(false);
-      }
-    };
-
-    const fetchLogs = async () => {
-      try {
-        setLogsLoading(true);
-        const res = await captureRequest(
-          api.get("/activity-logs", { params: { page: 1, page_size: 30 } }),
-        );
-        setLogs(res.ok ? asArray(res.response) : []);
-        return res;
-      } finally {
-        setLogsLoading(false);
-      }
-    };
-
-    const fetchSessions = async () => {
-      try {
-        setSessionsLoading(true);
-        const res = await captureRequest(api.get("/auth/sessions"));
-        setSessions(res.ok ? asArray(res.response) : []);
-        return res;
-      } finally {
-        setSessionsLoading(false);
-      }
-    };
-
-    const fetchSettings = async () => {
-      try {
-        setSettingsLoading(true);
-        const res = await captureRequest(api.get("/security/settings"));
-        const serverSettings = res.ok ? res.response?.data : null;
-        if (serverSettings && typeof serverSettings === "object") {
-          setSettings(sanitizeSecuritySettings(serverSettings));
-        }
-        return res;
-      } finally {
-        setSettingsLoading(false);
-      }
-    };
-
-    try {
-      const [usersRes, logsRes, sessionsRes, settingsRes] = await Promise.all([
-        fetchUsers(),
-        fetchLogs(),
-        fetchSessions(),
-        fetchSettings(),
-      ]);
-
-      let lastMessage = "";
-      if (!settingsRes.ok) {
-         
-        const statusCode = (settingsRes.error as any)?.response?.status;
-        lastMessage =
-          statusCode === 404
-            ? "سياسات الأمان تُعرض من النسخة المحلية مؤقتًا حتى يجهز endpoint أو يعاد تحميل الخادم."
-            : "تعذر الوصول إلى خادم سياسات الأمان، لذلك يتم استخدام آخر نسخة محلية محفوظة.";
-      } else if (!sessionsRes.ok) {
-        lastMessage =
-           
-          (sessionsRes.error as any)?.response?.status === 404
-            ? "معلومات الجلسات غير متاحة حاليًا من الخادم، لذلك يظهر الملخص بدون تفاصيل الجلسات."
-            : "تعذر تحميل الجلسات الحالية من الخادم، وقد تكون أرقام الجلسات تقريبية.";
-      } else if (!usersRes.ok || !logsRes.ok) {
-        lastMessage =
-          "تم تحميل مركز الأمان جزئيًا، لكن بعض بيانات المستخدمين أو السجلات لم تصل من الخادم.";
-      }
-
-      setSyncStatus({
-        settingsSource: settingsRes.ok ? "server" : "local",
-        sessionsAvailable: sessionsRes.ok,
-        usersAvailable: usersRes.ok,
-        logsAvailable: logsRes.ok,
-        lastMessage,
-      });
-    } catch (_error) {
-      console.error("Security data load error:", _error);
-      toast.error("تعذر تحميل بيانات الأمان والوصول");
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
-  useEffect(() => {
-    loadSecurityData();
-  }, []);
-
-  const loading =
-    usersLoading && logsLoading && sessionsLoading && settingsLoading;
+  const {
+    loading,
+    refreshing,
+    metrics,
+    syncStatus,
+    tabs,
+    activeTab,
+    setActiveTab,
+    settings,
+    updateSetting,
+    exportSecurityReport,
+    saveSettings,
+    filteredUsers,
+    loadSecurityData,
+    logs,
+    sessions,
+    searchTerm,
+    setSearchTerm,
+  } = useSecurityAccess();
 
   return (
     <div className="erp-page space-y-8 pb-12" dir="rtl">
@@ -486,7 +169,7 @@ export default function SecurityAccess() {
       <Card className="rounded-3xl border border-black/5 bg-white p-2 shadow-sm dark:border-white/10 dark:bg-[#171717]">
         <div className="flex gap-2 overflow-x-auto p-1">
           {tabs.map((tab) => {
-            const Icon = tab.icon;
+            const Icon = tab.icon === "Shield" ? Shield : tab.icon === "Users" ? Users : tab.icon === "Lock" ? Lock : Activity;
             return (
               <button
                 key={tab.id}
@@ -512,7 +195,7 @@ export default function SecurityAccess() {
       ) : null}
 
       {activeTab === "users" ? (
-        <UsersPanel
+        <UsersPanelTab
           users={filteredUsers}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
@@ -660,7 +343,7 @@ function StatusRow({ icon: Icon, title, enabled, note }: StatusRowProps) {
   );
 }
 
-function UsersPanel({ users, searchTerm, setSearchTerm }) {
+function UsersPanelTab({ users, searchTerm, setSearchTerm }) {
   return (
     <Card className="overflow-hidden rounded-3xl border border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-[#171717]">
       <div className="flex flex-col gap-4 border-b border-black/5 p-5 dark:border-white/10 md:flex-row md:items-center md:justify-between">
@@ -712,7 +395,7 @@ function UsersPanel({ users, searchTerm, setSearchTerm }) {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="rounded-xl px-3 py-1">
-                      {roleLabels[role] || role}
+                      {ROLE_LABELS[role] || role}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -752,42 +435,12 @@ function UsersPanel({ users, searchTerm, setSearchTerm }) {
 
 function PoliciesPanel({ settings, updateSetting }) {
   const booleanPolicies = [
-    {
-      key: "enforceStrongPasswords",
-      title: "فرض كلمات مرور قوية",
-      description: "منع كلمات المرور الضعيفة عند إنشاء أو تعديل الحسابات.",
-      icon: KeyRound,
-    },
-    {
-      key: "requireShiftForSales",
-      title: "منع البيع بدون وردية",
-      description: "لا يسمح للكاشير بإصدار فاتورة قبل فتح وردية.",
-      icon: Lock,
-    },
-    {
-      key: "lockClosedShiftEdits",
-      title: "قفل تعديلات الورديات المغلقة",
-      description: "حماية العمليات المالية بعد إغلاق الوردية.",
-      icon: FileLock2,
-    },
-    {
-      key: "enableActivityLogs",
-      title: "تسجيل العمليات الحساسة",
-      description: "تسجيل الدخول، الحذف، الخصومات، التصدير، وتعديل الصلاحيات.",
-      icon: Activity,
-    },
-    {
-      key: "restrictExportsToManagers",
-      title: "تقييد التصدير للإدارة",
-      description: "السماح للمالك والمدير فقط بتصدير البيانات الحساسة.",
-      icon: Download,
-    },
-    {
-      key: "requireDiscountApproval",
-      title: "اعتماد الخصومات الكبيرة",
-      description: "إلزام موافقة المدير عند تجاوز حد الخصم المسموح.",
-      icon: ShieldAlert,
-    },
+    { key: "enforceStrongPasswords", title: "فرض كلمات مرور قوية", description: "منع كلمات المرور الضعيفة عند إنشاء أو تعديل الحسابات.", icon: KeyRound },
+    { key: "requireShiftForSales", title: "منع البيع بدون وردية", description: "لا يسمح للكاشير بإصدار فاتورة قبل فتح وردية.", icon: Lock },
+    { key: "lockClosedShiftEdits", title: "قفل تعديلات الورديات المغلقة", description: "حماية العمليات المالية بعد إغلاق الوردية.", icon: FileLock2 },
+    { key: "enableActivityLogs", title: "تسجيل العمليات الحساسة", description: "تسجيل الدخول، الحذف، الخصومات، التصدير، وتعديل الصلاحيات.", icon: Activity },
+    { key: "restrictExportsToManagers", title: "تقييد التصدير للإدارة", description: "السماح للمالك والمدير فقط بتصدير البيانات الحساسة.", icon: Download },
+    { key: "requireDiscountApproval", title: "اعتماد الخصومات الكبيرة", description: "إلزام موافقة المدير عند تجاوز حد الخصم المسموح.", icon: ShieldAlert },
   ];
 
   return (
@@ -843,10 +496,7 @@ function PoliciesPanel({ settings, updateSetting }) {
               min="5"
               value={settings.sessionTimeoutMinutes || ""}
               onChange={(event) =>
-                updateSetting(
-                  "sessionTimeoutMinutes",
-                  Number(event.target.value || 0),
-                )
+                updateSetting("sessionTimeoutMinutes", Number(event.target.value || 0))
               }
               className="h-11"
             />
@@ -860,10 +510,7 @@ function PoliciesPanel({ settings, updateSetting }) {
               min="1"
               value={settings.maxFailedLoginAttempts || ""}
               onChange={(event) =>
-                updateSetting(
-                  "maxFailedLoginAttempts",
-                  Number(event.target.value || 0),
-                )
+                updateSetting("maxFailedLoginAttempts", Number(event.target.value || 0))
               }
               className="h-11"
             />
