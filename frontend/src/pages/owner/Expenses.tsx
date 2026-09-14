@@ -1,5 +1,4 @@
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Wallet,
@@ -33,7 +32,6 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,10 +49,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import {
-  PageHeader,
-  PremiumCard,
-} from "@/components/shared/PremiumUI";
+import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";
 import {
   StatCard as StatCardDisplay,
   CurrencyStatCard,
@@ -63,12 +58,7 @@ import {
   DateText,
 } from "@/components/shared/DisplayComponents";
 import { cn, formatCurrency } from "@/lib/core/utils";
-import type {
-  ExpenseFormData,
-  ExpenseRecord,
-  ExpenseSummary,
-} from "@/types/expenses";
-import api, { staticURL } from "@/services/api";
+import { staticURL } from "@/services/api";
 import {
   PieChart,
   Pie,
@@ -86,42 +76,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AnimatePresence } from "framer-motion";
 import { BarChart3, FileSpreadsheet } from "lucide-react";
+import { useExpensesData, CATEGORIES, PAYMENT_METHODS, CATEGORY_COLORS } from "@/features/expenses";
 
-const CATEGORIES = [
-  "رواتب",
-  "إيجار",
-  "مشتريات",
-  "كهرباء",
-  "مياه",
-  "إنترنت",
-  "صيانة",
-  "تسويق",
-  "ضيافة",
-  "سلف",
-  "أخرى",
-];
-const PAYMENT_METHODS = [
-  { value: "cash", label: "نقدي" },
-  { value: "card", label: "بطاقة" },
-  { value: "bank_transfer", label: "تحويل بنكي" },
-  { value: "wallet", label: "محفظة" },
-];
-
-const CATEGORY_COLORS = {
-  رواتب: "#6366f1",
-  إيجار: "#f59e0b",
-  مشتريات: "#10b981",
-  كهرباء: "#3b82f6",
-  مياه: "#06b6d4",
-  إنترنت: "#8b5cf6",
-  صيانة: "#ef4444",
-  تسويق: "#ec4899",
-  ضيافة: "#f97316",
-  سلف: "#14b8a6",
-  أخرى: "#6b7280",
-};
-
-const CATEGORY_ICONS = {
+const CATEGORY_ICONS: Record<string, typeof Users> = {
   رواتب: Users,
   إيجار: Building2,
   مشتريات: Package,
@@ -135,7 +92,6 @@ const CATEGORY_ICONS = {
   أخرى: FileText,
 };
 
-// خريطة الترابط مع النظام
 const SYSTEM_LINKS = [
   { label: "المخزون", icon: Package, desc: "مشتريات المخزون تُنشئ مصروف تلقائي", color: "bg-emerald-500", href: "/inventory" },
   { label: "الرواتب", icon: Users, desc: "صرف الرواتب يُنشئ مصروف رواتب", color: "bg-indigo-500", href: "/owner/payroll" },
@@ -147,249 +103,52 @@ const ExpensesPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isOwner = ["OWNER", "ADMIN"].includes(String(user?.role || "").toUpperCase());
-  const invoiceInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
-  const [summary, setSummary] = useState<ExpenseSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const pageSize = 20;
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentId, setCurrentId] = useState<number | string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [deleteId, setDeleteId] = useState<number | string | null>(null);
-  const [uploading, setUploading] = useState(false);
-
-  const [viewItem, setViewItem] = useState<ExpenseRecord | null>(null);
-  const [isViewOpen, setIsViewOpen] = useState(false);
-
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [paymentFilter, setPaymentFilter] = useState("all");
-
-  const [formData, setFormData] = useState<ExpenseFormData>({
-    title: "",
-    description: "",
-    amount: "",
-    category: "أخرى",
-    payment_method: "cash",
-    expense_date: new Date().toISOString().split("T")[0],
-    status: "recorded",
-    invoice_image_url: "",
-  });
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-      setCurrentPage(1);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const skip = (currentPage - 1) * pageSize;
-      const params: Record<string, unknown> = { limit: pageSize, skip, q: debouncedSearch };
-      if (categoryFilter !== "all") params.category = categoryFilter;
-      if (paymentFilter !== "all") params.payment_method = paymentFilter;
-      if (dateFrom) params.date_from = dateFrom;
-      if (dateTo) params.date_to = dateTo;
-
-      const [listRes, summaryRes] = await Promise.all([
-        api.get("/expenses", { params }),
-        api.get("/expenses/summary"),
-      ]);
-      const data = listRes.data;
-      const items = Array.isArray(data) ? data : data.items || data.data || [];
-      setExpenses(items);
-      // When backend returns list, we estimate total; when paginated, use length for now
-      // Archive endpoint gives exact total, but main list is filtered via params now
-      setTotalCount(Array.isArray(data) ? (items.length < pageSize && currentPage === 1 ? items.length : items.length + (currentPage-1)*pageSize) : data.total || items.length);
-      // Correct totalCount via length if not paginated header: fallback to items length + maybe more
-      // For better UX, if items.length === pageSize, assume there may be more
-      if (Array.isArray(data) && items.length === pageSize) {
-        // Try to get real total from summary if available, otherwise keep estimate
-        setTotalCount(prev => Math.max(prev, items.length + 1));
-      }
-      setSummary(summaryRes.data || null);
-    } catch (_err) {
-      toast.error("فشل تحميل البيانات");
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, debouncedSearch, categoryFilter, dateFrom, dateTo, paymentFilter, pageSize]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const handleSubmit = async () => {
-    if (!formData.title?.trim() || !formData.amount || !formData.category) {
-      toast.error("يرجى إكمال البيانات الأساسية");
-      return;
-    }
-    if (!isOwner && isEditing) return toast.error("التعديل متاح للمالك فقط");
-
-    try {
-      setIsSubmitting(true);
-      const payload = {
-        ...formData,
-        amount: Math.abs(Number(formData.amount)),
-        expense_date: formData.expense_date ? new Date(formData.expense_date).toISOString() : new Date().toISOString(),
-      };
-      if (isEditing) {
-        await api.put(`/expenses/${currentId}`, payload);
-        toast.success("تم التحديث");
-      } else {
-        await api.post("/expenses", payload);
-        toast.success("تم التسجيل");
-      }
-      setIsModalOpen(false);
-      resetForm();
-      fetchData();
-    } catch (_err) {
-      const apiErr = _err as { response?: { data?: { detail?: unknown } }; message?: string };
-      const msg = apiErr?.response?.data?.detail;
-      toast.error(typeof msg === "string" ? msg : "فشل الحفظ");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      await api.delete(`/expenses/${deleteId}`);
-      toast.success("تم الحذف");
-      setDeleteId(null);
-      fetchData();
-    } catch (_err) {
-      const apiErr = _err as { response?: { data?: { detail?: unknown } }; message?: string };
-      const msg = apiErr?.response?.data?.detail || "حذف السجلات المالية غير مسموح به لضمان نزاهة البيانات";
-      toast.error(String(msg));
-    }
-  };
-
-  const handleEdit = (exp) => {
-    setViewItem(null);
-    setFormData({
-      title: exp.title || "",
-      description: exp.description || "",
-      amount: exp.amount?.toString() || "",
-      category: exp.category || "أخرى",
-      payment_method: exp.payment_method || "cash",
-      expense_date: exp.expense_date ? new Date(exp.expense_date).toISOString().split("T")[0] : "",
-      status: exp.status || "recorded",
-      invoice_image_url: exp.invoice_image_url || "",
-    });
-    setCurrentId(exp.id);
-    setIsEditing(true);
-    setIsModalOpen(true);
-  };
-
-  const handleView = (exp) => {
-    setViewItem(exp);
-    setIsViewOpen(true);
-  };
-
-  const handleApprove = async (id) => {
-    try {
-      await api.post(`/expenses/${id}/approve`);
-      toast.success("تم اعتماد المصروف");
-      fetchData();
-    } catch (err) {
-      toast.error("فشل الاعتماد");
-    }
-  };
-
-  const handleInvoiceUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setUploading(true);
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await api.post("/expenses/upload-invoice", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setFormData((p) => ({ ...p, invoice_image_url: res.data?.url || "" }));
-      toast.success("تم رفع الصورة");
-    } catch (err) {
-      toast.error("فشل الرفع");
-    } finally {
-      setUploading(false);
-      if (invoiceInputRef.current) invoiceInputRef.current.value = "";
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      title: "",
-      description: "",
-      amount: "",
-      category: "أخرى",
-      payment_method: "cash",
-      expense_date: new Date().toISOString().split("T")[0],
-      status: "recorded",
-      invoice_image_url: "",
-    });
-    setIsEditing(false);
-    setCurrentId(null);
-  };
-
-  const exportToCSV = useCallback(() => {
-    if (!expenses.length) return toast.error("لا توجد بيانات للتصدير");
-    const headers = ["العنوان", "التصنيف", "المبلغ", "طريقة الدفع", "التاريخ", "الوصف"];
-    const rows = expenses.map((exp) => [
-      exp.title,
-      exp.category,
-      exp.amount,
-      PAYMENT_METHODS.find((m) => m.value === exp.payment_method)?.label || exp.payment_method,
-      new Date(String(exp.expense_date || "")).toLocaleDateString("ar-EG"),
-      exp.description || "",
-    ]);
-    const csvContent = [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
-    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `expenses-${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-    toast.success("تم تصدير البيانات بنجاح");
-  }, [expenses]);
-
-  const totalPages = Math.ceil(totalCount / pageSize);
-  const expenseRows = Array.isArray(expenses) ? expenses : [];
-
-  const categoryData = useMemo(() => {
-    if (!expenses.length) return [];
-    const grouped: Record<string, number> = {};
-    expenses.forEach((exp) => {
-      const key = String(exp.category || "أخرى");
-      grouped[key] = (grouped[key] || 0) + Number(exp.amount || 0);
-    });
-    return Object.entries(grouped).map(([name, value]) => ({ name, value, color: CATEGORY_COLORS[name] || "#6b7280" }));
-  }, [expenses]);
-
-  const paymentData = useMemo(() => {
-    if (!expenses.length) return [];
-    const grouped: Record<string, number> = {};
-    expenses.forEach((exp) => {
-      const method = PAYMENT_METHODS.find((m) => m.value === exp.payment_method)?.label || exp.payment_method || "غير محدد";
-      grouped[method] = (grouped[method] || 0) + Number(exp.amount || 0);
-    });
-    return Object.entries(grouped).map(([name, value]) => ({ name, value }));
-  }, [expenses]);
-
-  const totalAmount = expenseRows.reduce((s, e) => s + Number(e.amount || 0), 0);
-  const hasActiveFilters = categoryFilter !== "all" || paymentFilter !== "all" || !!dateFrom || !!dateTo || !!debouncedSearch;
+  const {
+    loading,
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    expenseRows,
+    categoryData,
+    paymentData,
+    totalAmount,
+    hasActiveFilters,
+    totalCount,
+    summary,
+    isModalOpen,
+    setIsModalOpen,
+    isEditing,
+    isSubmitting,
+    deleteId,
+    setDeleteId,
+    uploading,
+    viewItem,
+    isViewOpen,
+    setIsViewOpen,
+    searchTerm,
+    setSearchTerm,
+    categoryFilter,
+    setCategoryFilter,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    paymentFilter,
+    setPaymentFilter,
+    formData,
+    setFormData,
+    invoiceInputRef,
+    fetchData,
+    handleSubmit,
+    handleDelete,
+    handleEdit,
+    handleView,
+    handleApprove,
+    handleInvoiceUpload,
+    resetForm,
+    exportToCSV,
+  } = useExpensesData(isOwner);
 
   return (
     <div className="erp-page space-y-6 pb-10" dir="rtl">
@@ -413,7 +172,6 @@ const ExpensesPage = () => {
         }
       />
 
-      {/* System Relations */}
       <PremiumCard noPadding className="overflow-hidden border-dashed bg-gradient-to-br from-card via-card to-soft/30">
         <div className="p-4 sm:p-5 flex flex-col gap-4">
           <div className="flex items-center gap-3">
@@ -444,35 +202,13 @@ const ExpensesPage = () => {
         </div>
       </PremiumCard>
 
-      {/* Stats - fixed heights, no overlap, truncation enforced */}
       <div data-stats-grid="true">
-        <CurrencyStatCard
-          label="اليوم"
-          value={Number(summary?.today_total ?? 0)}
-          icon={Clock}
-          variant="danger"
-        />
-        <CurrencyStatCard
-          label="هذا الشهر"
-          value={Number(summary?.month_total ?? summary?.total_amount ?? 0)}
-          icon={Calendar}
-          variant="primary"
-        />
-        <CurrencyStatCard
-          label="هذا العام"
-          value={Number(summary?.year_total ?? 0)}
-          icon={TrendingUp}
-          variant="success"
-        />
-        <StatCardDisplay
-          label="أعلى فئة"
-          value={String(summary?.top_category || "—")}
-          icon={Tag}
-          variant="warning"
-        />
+        <CurrencyStatCard label="اليوم" value={Number(summary?.today_total ?? 0)} icon={Clock} variant="danger" />
+        <CurrencyStatCard label="هذا الشهر" value={Number(summary?.month_total ?? summary?.total_amount ?? 0)} icon={Calendar} variant="primary" />
+        <CurrencyStatCard label="هذا العام" value={Number(summary?.year_total ?? 0)} icon={TrendingUp} variant="success" />
+        <StatCardDisplay label="أعلى فئة" value={String(summary?.top_category || "—")} icon={Tag} variant="warning" />
       </div>
 
-      {/* Summary Bar */}
       {summary && (
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
           <span className="text-muted">العدد الكلي:</span>
@@ -484,23 +220,11 @@ const ExpensesPage = () => {
         </div>
       )}
 
-      {/* Charts - responsive with no-overlap, fixed-height wrappers */}
-      {expenses.length > 0 && (
+      {expenseRows.length > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 min-w-0">
-          <ChartCard
-            className="xl:col-span-3"
-            title="توزيع الفئات"
-            subtitle="نسب المصاريف حسب كل فئة"
-            badge={
-              <Badge variant="outline" className="rounded-full text-[10px] font-black whitespace-nowrap">
-                {categoryData.length} فئات
-              </Badge>
-            }
-            data={categoryData}
-            height={300}
-            emptyTitle="لا توجد فئات بعد"
-            emptyHint="سجّل مصاريف متعددة لرؤية التوزيع"
-          >
+          <ChartCard className="xl:col-span-3" title="توزيع الفئات" subtitle="نسب المصاريف حسب كل فئة"
+            badge={<Badge variant="outline" className="rounded-full text-[10px] font-black whitespace-nowrap">{categoryData.length} فئات</Badge>}
+            data={categoryData} height={300} emptyTitle="لا توجد فئات بعد" emptyHint="سجّل مصاريف متعددة لرؤية التوزيع">
             <ResponsiveContainer width="100%" height={300}>
               <PieChart margin={{ top: 0, right: 0, bottom: 12, left: 0 }}>
                 <Pie data={categoryData} cx="50%" cy="44%" innerRadius={52} outerRadius={78} paddingAngle={3} dataKey="value" stroke="none">
@@ -512,20 +236,13 @@ const ExpensesPage = () => {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard
-            className="xl:col-span-2"
-            title="طرق الدفع"
-            subtitle="قيمة المصاريف لكل وسيلة دفع"
-            data={paymentData}
-            height={300}
-            emptyTitle="لا توجد بيانات دفع"
-            emptyHint="سجّل مصاريف بوسائل دفع مختلفة"
-          >
+          <ChartCard className="xl:col-span-2" title="طرق الدفع" subtitle="قيمة المصاريف لكل وسيلة دفع"
+            data={paymentData} height={300} emptyTitle="لا توجد بيانات دفع" emptyHint="سجّل مصاريف بوسائل دفع مختلفة">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={paymentData} margin={{ top: 8, right: 8, left: -8, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 700 }} interval={0} angle={-15} textAnchor="end" height={36} tickMargin={8} />
-                <YAxis tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={36} />
+                <YAxis tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} width={36} />
                 <Tooltip formatter={(value) => formatCurrency(value)} cursor={{ fill: "rgba(0,0,0,0.04)" }} contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", fontWeight: 700, fontSize: 11 }} />
                 <Bar dataKey="value" fill="#0f172a" radius={[8, 8, 0, 0]} barSize={28} maxBarSize={42} />
               </BarChart>
@@ -534,7 +251,6 @@ const ExpensesPage = () => {
         </div>
       )}
 
-      {/* Filters - Premium & Responsive */}
       <PremiumCard noPadding className="overflow-hidden">
         <div className="p-4 sm:p-5 space-y-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
@@ -580,7 +296,6 @@ const ExpensesPage = () => {
         </div>
       </PremiumCard>
 
-      {/* Expense List */}
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
@@ -621,13 +336,7 @@ const ExpensesPage = () => {
               const isPending = exp.status === "pending_audit";
               const isCancelled = exp.status === "cancelled" || exp.status === "rejected";
               return (
-                <motion.div
-                  key={exp.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ delay: i * 0.02 }}
-                >
+                <motion.div key={exp.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: i * 0.02 }}>
                   <PremiumCard className="group p-4 sm:p-5 hover:shadow-premium transition-all">
                     <div className="flex items-start gap-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/50 shadow-sm" style={{ backgroundColor: `${catColor}12`, color: catColor }}>
@@ -663,8 +372,8 @@ const ExpensesPage = () => {
                           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl bg-soft border border-border hover:bg-slate-900 hover:text-white" onClick={() => handleEdit(exp)} title={isOwner ? "تعديل" : "عرض"}>
                             {isOwner ? <FileText size={14} /> : <Eye size={14} />}
                           </Button>
-                          {isPending && isOwner && (
-                            <Button size="sm" className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] px-3" onClick={() => handleApprove(exp.id)}>
+                          {isPending && isOwner && exp.id && (
+                            <Button size="sm" className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] px-3" onClick={() => exp.id != null && handleApprove(exp.id)}>
                               <CheckCircle2 size={12} className="ml-1" /> اعتماد
                             </Button>
                           )}
@@ -688,7 +397,6 @@ const ExpensesPage = () => {
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <PremiumCard className="p-3 flex items-center justify-between">
           <p className="text-xs font-black text-muted">صفحة <span className="text-main">{currentPage}</span> من {totalPages}</p>
@@ -704,7 +412,6 @@ const ExpensesPage = () => {
         </PremiumCard>
       )}
 
-      {/* View Details Modal - Read Only */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
         <DialogContent dir="rtl" className="max-w-lg rounded-[2rem] border-0 p-0 overflow-hidden bg-card shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)]">
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white relative overflow-hidden">
@@ -731,12 +438,12 @@ const ExpensesPage = () => {
                 <div className="rounded-2xl bg-soft border border-border p-4 min-w-0">
                   <div className="text-[9px] font-black text-muted uppercase tracking-widest mb-1">المبلغ</div>
                   <div className="text-lg font-black text-slate-900 truncate"><CurrencyText value={viewItem.amount} /></div>
-                  <div className="text-[11px] font-bold text-muted truncate">{PAYMENT_METHODS.find(m=>m.value===viewItem.payment_method)?.label}</div>
+                  <div className="text-[11px] font-bold text-muted truncate">{PAYMENT_METHODS.find((m) => m.value === viewItem.payment_method)?.label}</div>
                 </div>
                 <div className="rounded-2xl bg-soft border border-border p-4">
                   <div className="text-[9px] font-black text-muted uppercase tracking-widest mb-1">التصنيف</div>
                   <div className="text-sm font-black text-main flex items-center gap-2">
-                    <span className="h-7 w-7 rounded-lg flex items-center justify-center text-white text-xs" style={{backgroundColor: CATEGORY_COLORS[viewItem.category ?? ""] || "#6b7280"}}>{viewItem.category?.[0]}</span>
+                    <span className="h-7 w-7 rounded-lg flex items-center justify-center text-white text-xs" style={{ backgroundColor: CATEGORY_COLORS[viewItem.category ?? ""] || "#6b7280" }}>{viewItem.category?.[0]}</span>
                     {viewItem.category}
                   </div>
                 </div>
@@ -748,7 +455,7 @@ const ExpensesPage = () => {
                 </div>
                 <div className="rounded-xl bg-card border border-border p-3">
                   <div className="text-[9px] font-black text-muted uppercase">طريقة الدفع</div>
-                  <div className="font-black text-main mt-1">{PAYMENT_METHODS.find(m=>m.value===viewItem.payment_method)?.label || viewItem.payment_method}</div>
+                  <div className="font-black text-main mt-1">{PAYMENT_METHODS.find((m) => m.value === viewItem.payment_method)?.label || viewItem.payment_method}</div>
                 </div>
               </div>
               {viewItem.description && (
@@ -780,7 +487,6 @@ const ExpensesPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add/Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsModalOpen(open); }}>
         <DialogContent className="max-w-lg rounded-[1.75rem] p-0 overflow-hidden border-border bg-card shadow-premium" dir="rtl" aria-describedby="expense-dialog-desc">
           <DialogHeader className="p-6 pb-4 border-b border-border/40 bg-gradient-to-br from-slate-50 to-white">
