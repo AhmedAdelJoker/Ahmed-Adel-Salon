@@ -102,17 +102,10 @@ export function useOperationalReports() {
   }, [transactions, searchQuery]);
 
   return {
-    activeTab, setActiveTab,
-    loading,
-    lastUpdated,
-    startDate, setStartDate,
-    endDate, setEndDate,
+    activeTab, setActiveTab, loading, lastUpdated,
+    startDate, setStartDate, endDate, setEndDate,
     searchQuery, setSearchQuery,
-    financialMetrics,
-    operationalMetrics,
-    aiInsights,
-    filteredHistory,
-    transactions,
-    fetchData,
+    financialMetrics, operationalMetrics, aiInsights, filteredHistory,
+    transactions, fetchData,
   };
 }
