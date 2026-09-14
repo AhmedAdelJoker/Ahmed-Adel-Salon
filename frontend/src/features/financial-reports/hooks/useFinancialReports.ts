@@ -13,7 +13,7 @@ import {
   pctGrowth,
 } from "@/lib/money/financialAnalytics";
 import type { FinancialsState, RawRow, TrendPoint, ExpenseSlice } from "@/types/reports";
-import { aiService } from "@/services/aiService";
+import { aiService } from "@/lib/aiService";
 import { exportService } from "@/services/exportService";
 import { businessSettingsService } from "@/services/businessSettingsService";
 import { useAuth } from "@/context/AuthContext";

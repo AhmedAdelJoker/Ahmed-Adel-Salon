@@ -5,7 +5,7 @@ import {
   getReadyBookingsForPos,
   bookingToPosDraft,
   markBookingPaid,
-} from "@/services/bookingPosBridgeService";
+} from "@/features/bookings/services/bookingPosBridgeService";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";

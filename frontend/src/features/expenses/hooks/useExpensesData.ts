@@ -31,6 +31,7 @@ export function useExpensesData(isOwner: boolean) {
     title: "", description: "", amount: "", category: "أخرى",
     payment_method: "cash", expense_date: new Date().toISOString().split("T")[0],
     status: "recorded", invoice_image_url: "",
+    recipient_name: "", reference_type: "", reference_id: "", internal_notes: "",
   });
 
   useEffect(() => {
@@ -68,17 +69,26 @@ export function useExpensesData(isOwner: boolean) {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const resetForm = useCallback(() => {
-    setFormData({ title: "", description: "", amount: "", category: "أخرى", payment_method: "cash", expense_date: new Date().toISOString().split("T")[0], status: "recorded", invoice_image_url: "" });
+    setFormData({ title: "", description: "", amount: "", category: "أخرى", payment_method: "cash", expense_date: new Date().toISOString().split("T")[0], status: "recorded", invoice_image_url: "", recipient_name: "", reference_type: "", reference_id: "", internal_notes: "" });
     setIsEditing(false);
     setCurrentId(null);
   }, []);
 
   const handleSubmit = useCallback(async () => {
     if (!formData.title?.trim() || !formData.amount || !formData.category) { toast.error("يرجى إكمال البيانات الأساسية"); return; }
+    if (["إيجار", "مشتريات"].includes(formData.category) && !formData.recipient_name?.trim()) { toast.error("اسم المستفيد/المورد مطلوب لفئة الإيجار والمشتريات"); return; }
     if (!isOwner && isEditing) return toast.error("التعديل متاح للمالك فقط");
     try {
       setIsSubmitting(true);
-      const payload = { ...formData, amount: Math.abs(Number(formData.amount)), expense_date: formData.expense_date ? new Date(formData.expense_date).toISOString() : new Date().toISOString() };
+      const payload: Record<string, unknown> = {
+        ...formData,
+        amount: Math.abs(Number(formData.amount)),
+        expense_date: formData.expense_date ? new Date(formData.expense_date).toISOString() : new Date().toISOString(),
+        recipient_name: formData.recipient_name?.trim() || null,
+        reference_type: formData.reference_type || null,
+        reference_id: formData.reference_id ? Number(formData.reference_id) : null,
+        internal_notes: formData.internal_notes?.trim() || null,
+      };
       if (isEditing) { await api.put(`/expenses/${currentId}`, payload); toast.success("تم التحديث"); }
       else { await api.post("/expenses", payload); toast.success("تم التسجيل"); }
       setIsModalOpen(false); resetForm(); fetchData();
@@ -97,7 +107,20 @@ export function useExpensesData(isOwner: boolean) {
 
   const handleEdit = useCallback((exp: ExpenseRecord) => {
     setViewItem(null);
-    setFormData({ title: exp.title || "", description: exp.description || "", amount: exp.amount?.toString() || "", category: exp.category || "أخرى", payment_method: exp.payment_method || "cash", expense_date: exp.expense_date ? new Date(exp.expense_date).toISOString().split("T")[0] : "", status: exp.status || "recorded", invoice_image_url: exp.invoice_image_url || "" });
+    setFormData({
+      title: exp.title || "",
+      description: exp.description || "",
+      amount: exp.amount?.toString() || "",
+      category: exp.category || "أخرى",
+      payment_method: exp.payment_method || "cash",
+      expense_date: exp.expense_date ? new Date(String(exp.expense_date)).toISOString().split("T")[0] : "",
+      status: exp.status || "recorded",
+      invoice_image_url: (exp.invoice_image_url as string) || "",
+      recipient_name: (exp.recipient_name as string) || "",
+      reference_type: (exp.reference_type as string) || "",
+      reference_id: exp.reference_id != null ? String(exp.reference_id) : "",
+      internal_notes: (exp.internal_notes as string) || "",
+    });
     setCurrentId(exp.id != null ? exp.id : null);
     setIsEditing(true); setIsModalOpen(true);
   }, []);

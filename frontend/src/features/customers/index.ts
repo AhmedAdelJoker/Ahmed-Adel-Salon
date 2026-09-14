@@ -28,3 +28,4 @@ export { default as CustomerPagination } from "@/features/customers/components/C
 export { default as CustomerDetailsDialog } from "@/features/customers/components/CustomerDetailsDialog";
 export { default as CustomerFormDialog } from "@/features/customers/components/CustomerFormDialog";
 export { default as CustomerDeleteDialog } from "@/features/customers/components/CustomerDeleteDialog";
+export { importService } from "@/features/customers/services/importService";

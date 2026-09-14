@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Archive, FileText, Clock, Eye, Trash2, Plus, Activity } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
-import employeeDocumentService from "@/services/employeeDocumentService";
+import employeeDocumentService from "@/features/hr/services/employeeDocumentService";
 
 export default function DocumentsTab({
   editingEmp,

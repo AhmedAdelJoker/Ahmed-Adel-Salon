@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import type { DocumentRecord } from "@/types/employee";
-import employeeDocumentService from "@/services/employeeDocumentService";
+import employeeDocumentService from "@/features/hr/services/employeeDocumentService";
 
 export function useEmployeeDocuments() {
   const [employeeDocs, setEmployeeDocs] = useState<DocumentRecord[]>([]);

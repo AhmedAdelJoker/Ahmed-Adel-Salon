@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { exportToPDF } from "@/lib/export/utils";
-import { aiService } from "@/services/aiService";
+import { aiService } from "@/lib/aiService";
 import AIInsights from "@/components/AIInsights";
 import {
   BarChart,

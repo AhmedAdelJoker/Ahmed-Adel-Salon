@@ -3,7 +3,7 @@ import { toast } from "react-hot-toast";
 import { reportService } from "@/services/reportService";
 import api from "@/services/api";
 import { adaptList } from "@/services/apiAdapter";
-import { aiService } from "@/services/aiService";
+import { aiService } from "@/lib/aiService";
 
 const fmtDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

@@ -4,8 +4,8 @@
 import { useCallback, useState } from "react";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
-import serviceCategoryService from "@/services/serviceCategoryService";
-import offerService from "@/services/offerService";
+import serviceCategoryService from "@/features/catalog/services/serviceCategoryService";
+import offerService from "@/features/catalog/services/offerService";
 import type {
   CategoryFormData,
   CategoryRecord,

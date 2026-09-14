@@ -20,7 +20,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 
-import { scheduleService } from "@/services/scheduleService";
+import { scheduleService } from "@/features/bookings/services/scheduleService";
 import { businessSettingsService } from "@/services/businessSettingsService";
 import { useSocket } from "@/context/SocketContext";
 import { Button } from "@/components/ui/button";

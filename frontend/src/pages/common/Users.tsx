@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { userService } from "@/services/userService";
+import { userService } from "@/features/users/services/userService";
 import { barberService } from "@/services/barberService";
 import { cn } from "@/lib/core/utils";
 import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";

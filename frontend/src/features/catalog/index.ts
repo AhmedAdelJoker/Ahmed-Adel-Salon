@@ -27,3 +27,5 @@ export { default as OffersPanel } from "@/features/catalog/components/OffersPane
 export { default as ServiceFormModal } from "@/features/catalog/components/ServiceFormModal";
 export { default as CategoryFormModal } from "@/features/catalog/components/CategoryFormModal";
 export { default as OfferFormModal } from "@/features/catalog/components/OfferFormModal";
+export { default as offerService } from "@/features/catalog/services/offerService";
+export { default as serviceCategoryService } from "@/features/catalog/services/serviceCategoryService";

@@ -2,7 +2,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import payrollService from "@/services/payrollService";
-import salaryAdvanceService from "@/services/salaryAdvanceService";
+import salaryAdvanceService from "@/features/payroll/services/salaryAdvanceService";
 import { adaptList, adaptObject } from "@/services/apiAdapter";
 import api from "@/services/api";
 import toast from "react-hot-toast";
