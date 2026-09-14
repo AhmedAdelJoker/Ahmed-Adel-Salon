@@ -18,5 +18,6 @@ export {
   sendWhatsAppMessage,
 } from "@/features/bookings/utils/board";
 export { useBookingsBoard } from "@/features/bookings/hooks/useBookingsBoard";
+export { useBookingsData } from "@/features/bookings/hooks/useBookingsData";
 export { getReadyBookingsForPos, bookingToPosDraft, markBookingPaid } from "@/features/bookings/services/bookingPosBridgeService";
 export { scheduleService } from "@/features/bookings/services/scheduleService";
