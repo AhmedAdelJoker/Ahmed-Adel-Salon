@@ -132,4 +132,25 @@ export default [
       ],
     },
   },
+  // Feature boundary: features should import through barrel exports
+  {
+    files: ["src/features/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        {
+          patterns: [
+            {
+              group: ["../*"],
+              message: "Use the @/ alias instead of relative parent imports.",
+            },
+            {
+              group: ["@/features/*/components/*", "@/features/*/services/*"],
+              message: "Feature internal modules are private. Import through the feature barrel (@/features/<name>) instead.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];
