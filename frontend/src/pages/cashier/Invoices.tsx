@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-hot-toast";
 import {
   FileText,
   Filter,
@@ -20,11 +20,9 @@ import {
   Columns,
   X,
 } from "lucide-react";
-import { toast } from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useSalon } from "@/context/SalonContext";
 import { printThermalReceipt } from "@/lib/print/receipt";
-import api from "@/services/api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -57,7 +55,7 @@ import {
 } from "@/components/ui/table";
 import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";
 import { Badge } from "@/components/ui/badge";
-import { useInvoicesData } from "@/features/invoices/hooks/useInvoicesData";
+import { useInvoicesData } from "@/features/invoices";
 import { paymentLabels, statusLabels, formatCurrency, formatDate, invoiceId, invoiceNo, invoiceCustomer, invoicePayment, invoiceStatus, invoiceTotal, invoiceCreatedAt, rowsFromInvoice, itemName, itemQty, itemTotal, invoiceBarber, isInvoiceEditable } from "@/features/invoices";
 import { Input } from "@/components/ui/input";
 
@@ -99,98 +97,18 @@ export default function Invoices() {
     filteredInvoices,
     summary,
     exportToCSV,
+    adjustmentDialog,
+    setAdjustmentDialog,
+    adjustmentSubmitting,
+    busyPdfId,
+    selectedInvoice,
+    setSelectedInvoice,
+    averageInvoice,
+    totalPages,
+    pendingAdjustments,
+    openInvoicePdf,
+    submitAdjustmentRequest,
   } = useInvoicesData();
-   
-
-   
-  const [adjustmentDialog, setAdjustmentDialog] = useState<any>({
-    open: false,
-    invoice: null,
-    type: "discount",
-    reason: "",
-    new_value: "",
-    notes: "",
-    manager_pin: "",
-  });
-  const [adjustmentSubmitting, setAdjustmentSubmitting] = useState(false);
-  const [busyPdfId, setBusyPdfId] = useState<number | string | null>(null);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-
-  const averageInvoice = summary.count ? summary.total / summary.count : 0;
-  const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize));
-  const pendingAdjustments = adjustments.filter(
-    (request) =>
-      String(request.status || request.request_status || "").toLowerCase() ===
-      "pending",
-  ).length;
-
-  async function openInvoicePdf(invoice) {
-    const id = invoiceId(invoice);
-    if (!id) return toast.error("لا يمكن تحديد رقم الفاتورة");
-    try {
-      setBusyPdfId(id);
-      const response = await api.get(`/invoices/${id}/pdf`, {
-        params: { inline: true },
-        responseType: "blob",
-      });
-      const file = new Blob([response.data], {
-        type: (response?.headers?.["content-type"] as string | undefined) || "application/pdf",
-      });
-      const fileUrl = URL.createObjectURL(file);
-      window.open(fileUrl, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(fileUrl), 60000);
-    } catch (err) {
-      toast.error("تعذر فتح ملف PDF");
-    } finally {
-      setBusyPdfId(null);
-    }
-  }
-
-  async function submitAdjustmentRequest() {
-    if (!adjustmentDialog.reason) return toast.error("يرجى ذكر سبب التعديل");
-
-    if (!isInvoiceEditable(adjustmentDialog.invoice)) {
-      toast.error(
-        "عفواً، انتهت الفترة المسموح بها لتعديل الفاتورة (ساعة واحدة)",
-      );
-      setAdjustmentDialog((p) => ({ ...p, open: false }));
-      return;
-    }
-
-    try {
-      setAdjustmentSubmitting(true);
-      const id = invoiceId(adjustmentDialog.invoice);
-      const payload = {
-        request_type: adjustmentDialog.type,
-        reason: adjustmentDialog.reason,
-        notes: adjustmentDialog.notes,
-        manager_pin: adjustmentDialog.manager_pin || null,
-        old_values: {
-          total_amount: invoiceTotal(adjustmentDialog.invoice),
-          payment_method: invoicePayment(adjustmentDialog.invoice),
-        },
-        requested_values:
-          adjustmentDialog.type === "void"
-            ? { status: "cancelled" }
-            : {
-                new_value: adjustmentDialog.new_value,
-              },
-      };
-      await api.post(`/invoices/${id}/adjustment-requests`, payload);
-      toast.success("تم إرسال طلب التعديل بنجاح");
-      setAdjustmentDialog({
-        ...adjustmentDialog,
-        open: false,
-        manager_pin: "",
-      });
-      fetchInvoices();
-    } catch (err) {
-      toast.error("فشل إرسال الطلب");
-    } finally {
-      setAdjustmentSubmitting(false);
-    }
-  }
-
 
   return (
     <div className="min-h-screen pb-12" dir="rtl">

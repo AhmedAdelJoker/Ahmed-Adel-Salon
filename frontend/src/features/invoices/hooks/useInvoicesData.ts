@@ -6,7 +6,8 @@ import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { adaptList } from "@/services/apiAdapter";
 import { getApiErrorMessage } from "@/lib/core/utils";
-import { invoiceCustomer, invoiceNo } from "@/features/invoices/utils/invoice";
+import { invoiceCustomer, invoiceNo, invoiceId, invoiceTotal, invoicePayment, invoiceStatus, isInvoiceEditable } from "@/features/invoices/utils/invoice";
+import { printThermalReceipt } from "@/lib/print/receipt";
 
 export function useInvoicesData() {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -36,6 +37,19 @@ export function useInvoicesData() {
     amount: true,
     actions: true,
   });
+
+  const [adjustmentDialog, setAdjustmentDialog] = useState<any>({
+    open: false,
+    invoice: null,
+    type: "discount",
+    reason: "",
+    new_value: "",
+    notes: "",
+    manager_pin: "",
+  });
+  const [adjustmentSubmitting, setAdjustmentSubmitting] = useState(false);
+  const [busyPdfId, setBusyPdfId] = useState<number | string | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
 
   const toggleColumn = useCallback((key) => {
     setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -179,6 +193,13 @@ export function useInvoicesData() {
     return { total, count: filteredInvoices.length, paid, pending: filteredInvoices.length - paid };
   }, [filteredInvoices]);
 
+  const averageInvoice = summary.count ? summary.total / summary.count : 0;
+  const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize));
+  const pendingAdjustments = adjustments.filter(
+    (request) =>
+      String(request.status || request.request_status || "").toLowerCase() === "pending",
+  ).length;
+
   const exportToCSV = useCallback(() => {
     const rows = filteredInvoices.map((inv) => ({
       No: invoiceNo(inv),
@@ -197,6 +218,73 @@ export function useInvoicesData() {
     a.click();
     URL.revokeObjectURL(url);
   }, [filteredInvoices]);
+
+  const openInvoicePdf = useCallback(async (invoice: any, settings?: any) => {
+    const id = invoiceId(invoice);
+    if (!id) return toast.error("لا يمكن تحديد رقم الفاتورة");
+    try {
+      setBusyPdfId(id);
+      const response = await api.get(`/invoices/${id}/pdf`, {
+        params: { inline: true },
+        responseType: "blob",
+      });
+      const file = new Blob([response.data], {
+        type: (response?.headers?.["content-type"] as string | undefined) || "application/pdf",
+      });
+      const fileUrl = URL.createObjectURL(file);
+      window.open(fileUrl, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(fileUrl), 60000);
+    } catch (err) {
+      toast.error("تعذر فتح ملف PDF");
+    } finally {
+      setBusyPdfId(null);
+    }
+  }, []);
+
+  const submitAdjustmentRequest = useCallback(async () => {
+    if (!adjustmentDialog.reason) return toast.error("يرجى ذكر سبب التعديل");
+
+    if (!isInvoiceEditable(adjustmentDialog.invoice)) {
+      toast.error(
+        "عفواً، انتهت الفترة المسموح بها لتعديل الفاتورة (ساعة واحدة)",
+      );
+      setAdjustmentDialog((p) => ({ ...p, open: false }));
+      return;
+    }
+
+    try {
+      setAdjustmentSubmitting(true);
+      const id = invoiceId(adjustmentDialog.invoice);
+      const payload = {
+        request_type: adjustmentDialog.type,
+        reason: adjustmentDialog.reason,
+        notes: adjustmentDialog.notes,
+        manager_pin: adjustmentDialog.manager_pin || null,
+        old_values: {
+          total_amount: invoiceTotal(adjustmentDialog.invoice),
+          payment_method: invoicePayment(adjustmentDialog.invoice),
+        },
+        requested_values:
+          adjustmentDialog.type === "void"
+            ? { status: "cancelled" }
+            : {
+                new_value: adjustmentDialog.new_value,
+              },
+      };
+      await api.post(`/invoices/${id}/adjustment-requests`, payload);
+      toast.success("تم إرسال طلب التعديل بنجاح");
+      setAdjustmentDialog({
+        ...adjustmentDialog,
+        open: false,
+        manager_pin: "",
+      });
+      fetchInvoices();
+    } catch (err) {
+      toast.error("فشل إرسال الطلب");
+    } finally {
+      setAdjustmentSubmitting(false);
+    }
+  }, [adjustmentDialog, fetchInvoices]);
 
   return {
     invoices,
@@ -230,5 +318,16 @@ export function useInvoicesData() {
     filteredInvoices,
     summary,
     exportToCSV,
+    adjustmentDialog,
+    setAdjustmentDialog,
+    adjustmentSubmitting,
+    busyPdfId,
+    selectedInvoice,
+    setSelectedInvoice,
+    averageInvoice,
+    totalPages,
+    pendingAdjustments,
+    openInvoicePdf,
+    submitAdjustmentRequest,
   };
 }
