@@ -433,7 +433,26 @@ const ExpensesPage = () => {
             </div>
           </div>
           {viewItem ? (
-            <div className="p-6 space-y-5 max-h-[65vh] overflow-y-auto">
+            <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+              {/* Creator */}
+              <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xs shrink-0">
+                  {String(((viewItem.created_by as Record<string, unknown>)?.full_name as string) || ((viewItem.created_by_user as Record<string, unknown>)?.full_name as string) || viewItem.recipient_name || "؟")[0]}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-black text-main truncate">
+                    {String(((viewItem.created_by as Record<string, unknown>)?.full_name as string) || ((viewItem.created_by_user as Record<string, unknown>)?.full_name as string) || ((viewItem.created_by as Record<string, unknown>)?.username as string) || "غير معروف")}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge className={cn("h-5 rounded-full px-2 text-[9px] font-black border-0", String(((viewItem.created_by as Record<string, unknown>)?.role || (viewItem.created_by_user as Record<string, unknown>)?.role || "")).toUpperCase() === "OWNER" ? "bg-blue-600 text-white" : String(((viewItem.created_by as Record<string, unknown>)?.role || "")).toUpperCase() === "MANAGER" ? "bg-violet-600 text-white" : "bg-sky-600 text-white")}>
+                      {String(((viewItem.created_by as Record<string, unknown>)?.role || (viewItem.created_by_user as Record<string, unknown>)?.role || "موظف") ) }
+                    </Badge>
+                    <span className="text-[11px] font-bold text-muted flex items-center gap-1"><Clock size={10} /><DateText value={viewItem.created_at as string} /></span>
+                  </div>
+                </div>
+                <div className="text-[10px] font-black text-muted">المنشئ</div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-soft border border-border p-4 min-w-0">
                   <div className="text-[9px] font-black text-muted uppercase tracking-widest mb-1">المبلغ</div>
@@ -443,37 +462,73 @@ const ExpensesPage = () => {
                 <div className="rounded-2xl bg-soft border border-border p-4">
                   <div className="text-[9px] font-black text-muted uppercase tracking-widest mb-1">التصنيف</div>
                   <div className="text-sm font-black text-main flex items-center gap-2">
-                    <span className="h-7 w-7 rounded-lg flex items-center justify-center text-white text-xs" style={{ backgroundColor: CATEGORY_COLORS[viewItem.category ?? ""] || "#6b7280" }}>{viewItem.category?.[0]}</span>
-                    {viewItem.category}
+                    <span className="h-7 w-7 rounded-lg flex items-center justify-center text-white text-xs" style={{ backgroundColor: CATEGORY_COLORS[viewItem.category ?? ""] || "#6b7280" }}>{String(viewItem.category || "?")[0]}</span>
+                    {String(viewItem.category || "—")}
                   </div>
+                  {viewItem.recipient_name ? <div className="text-[11px] font-bold text-muted mt-1 truncate">المستفيد: {String(viewItem.recipient_name)}</div> : null}
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-xl bg-card border border-border p-3 min-w-0">
                   <div className="text-[9px] font-black text-muted uppercase">التاريخ</div>
-                  <div className="font-black text-main mt-1 flex items-center gap-1.5"><Calendar size={12} /><DateText value={viewItem.expense_date} /></div>
+                  <div className="font-black text-main mt-1 flex items-center gap-1.5"><Calendar size={12} /><DateText value={viewItem.expense_date as string} /></div>
                 </div>
                 <div className="rounded-xl bg-card border border-border p-3">
                   <div className="text-[9px] font-black text-muted uppercase">طريقة الدفع</div>
-                  <div className="font-black text-main mt-1">{PAYMENT_METHODS.find((m) => m.value === viewItem.payment_method)?.label || viewItem.payment_method}</div>
+                  <div className="font-black text-main mt-1">{PAYMENT_METHODS.find((m) => m.value === viewItem.payment_method)?.label || String(viewItem.payment_method || "—")}</div>
                 </div>
               </div>
-              {viewItem.description && (
-                <div className="space-y-2">
-                  <div className="text-[10px] font-black text-muted uppercase tracking-widest">الوصف</div>
-                  <div className="rounded-2xl border border-border bg-soft/50 p-4">
-                    <p className="text-sm font-bold leading-relaxed text-main whitespace-pre-wrap">{viewItem.description}</p>
+
+              {/* Reference + Cashbox linkage */}
+              {(viewItem.reference_type || viewItem.reference_id) && (
+                <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-2">
+                  <div className="text-[10px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-2"><ArrowUpRight size={12} /> مرتبط بـ</div>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-indigo-600 text-white rounded-full text-[10px] font-black">{String(viewItem.reference_type)}</Badge>
+                    <span className="font-black text-sm">#{String(viewItem.reference_id)}</span>
+                    <button onClick={() => {
+                      const t = String(viewItem.reference_type);
+                      const id = String(viewItem.reference_id);
+                      if (t === "payroll") navigate(`/owner/payroll?employeeId=${id}`);
+                      else if (t === "invoice") navigate(`/invoices`);
+                      else if (t === "product") navigate(`/inventory`);
+                      else if (t === "booking") navigate(`/bookings`);
+                    }} className="mr-auto text-xs font-black text-indigo-600 hover:underline">فتح المرجع</button>
                   </div>
                 </div>
               )}
-              {viewItem.invoice_image_url && (
+              <div className="rounded-xl border border-border bg-soft/30 p-3 flex items-center gap-2">
+                <Wallet size={14} className="text-muted" />
+                <span className="text-xs font-bold text-muted">حركة الخزنة:</span>
+                <span className="font-black text-xs">EXP-{String(viewItem.id)}</span>
+                <button onClick={() => navigate("/owner/cashbox")} className="mr-auto text-xs font-black text-primary hover:underline">عرض في الخزنة</button>
+              </div>
+
+              {viewItem.description ? (
+                <div className="space-y-2">
+                  <div className="text-[10px] font-black text-muted uppercase tracking-widest">الوصف العام</div>
+                  <div className="rounded-2xl border border-border bg-soft/50 p-4">
+                    <p className="text-sm font-bold leading-relaxed text-main whitespace-pre-wrap">{String(viewItem.description)}</p>
+                  </div>
+                </div>
+              ) : null}
+              {viewItem.internal_notes ? (
+                <div className="space-y-2">
+                  <div className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-1"><ShieldCheck size={12} /> ملاحظات داخلية (للمالك)</div>
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-bold leading-relaxed text-amber-900 whitespace-pre-wrap">{String(viewItem.internal_notes)}</p>
+                  </div>
+                </div>
+              ) : null}
+              {viewItem.invoice_image_url ? (
                 <div className="space-y-2">
                   <div className="text-[10px] font-black text-muted uppercase tracking-widest">صورة الفاتورة</div>
-                  <a href={viewItem.invoice_image_url.startsWith("http") ? viewItem.invoice_image_url : `${staticURL}${viewItem.invoice_image_url}`} target="_blank" rel="noreferrer" className="block rounded-2xl overflow-hidden border border-border hover:opacity-90 transition-opacity">
-                    <img src={viewItem.invoice_image_url.startsWith("http") ? viewItem.invoice_image_url : `${staticURL}${viewItem.invoice_image_url}`} alt="فاتورة" className="w-full max-h-64 object-contain bg-soft" />
+                  <a href={String(viewItem.invoice_image_url).startsWith("http") ? String(viewItem.invoice_image_url) : `${staticURL}${String(viewItem.invoice_image_url)}`} target="_blank" rel="noreferrer" className="block rounded-2xl overflow-hidden border border-border hover:opacity-90 transition-opacity">
+                    <img src={String(viewItem.invoice_image_url).startsWith("http") ? String(viewItem.invoice_image_url) : `${staticURL}${String(viewItem.invoice_image_url)}`} alt="فاتورة" className="w-full max-h-64 object-contain bg-soft" />
                   </a>
                 </div>
-              )}
+              ) : null}
               <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 flex gap-3">
                 <div className="h-8 w-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0"><Eye size={14} /></div>
                 <p className="text-[11px] font-bold leading-relaxed text-amber-800">هذا العرض للقراءة فقط. للتعديل استخدم زر <b>تعديل</b> وصلاحية المالك مطلوبة.</p>
@@ -497,44 +552,99 @@ const ExpensesPage = () => {
             <DialogDescription id="expense-dialog-desc" className="sr-only">نموذج إضافة أو تعديل بيانات المصروف</DialogDescription>
             {!isOwner && isEditing && <Badge className="mt-2 bg-amber-500 text-white rounded-full w-fit">قراءة فقط - المالك فقط يمكنه التعديل</Badge>}
           </DialogHeader>
-          <div className="p-6 space-y-4 max-h-[62vh] overflow-y-auto">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest">العنوان *</label>
-              <Input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} disabled={isEditing && !isOwner} className="h-11 rounded-xl bg-soft border-border font-bold" placeholder="مثال: فاتورة الكهرباء..." />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest">التصنيف *</label>
-                <Select disabled={isEditing && !isOwner} value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
-                  <SelectTrigger className="h-11 rounded-xl bg-soft border-border font-black"><SelectValue /></SelectTrigger>
-                  <SelectContent className="rounded-xl">{CATEGORIES.map((c) => <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>)}</SelectContent>
-                </Select>
+          <div className="p-6 space-y-5 max-h-[62vh] overflow-y-auto">
+            {/* Section 1: Basic */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">1</div>
+                <span className="text-[11px] font-black uppercase tracking-widest text-muted">البيانات الأساسية</span>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest">المبلغ *</label>
-                <div className="relative">
-                  <Input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} disabled={isEditing && !isOwner} className="h-11 rounded-xl bg-soft border-border font-black pr-4 pl-12" placeholder="0.00" />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">ج.م</span>
+                <label className="text-[10px] font-black text-muted uppercase tracking-widest">العنوان *</label>
+                <Input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} disabled={isEditing && !isOwner} className="h-11 rounded-xl bg-soft border-border font-bold" placeholder="مثال: فاتورة الكهرباء..." />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">التصنيف *</label>
+                  <Select disabled={isEditing && !isOwner} value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
+                    <SelectTrigger className="h-11 rounded-xl bg-soft border-border font-black"><SelectValue /></SelectTrigger>
+                    <SelectContent className="rounded-xl">{CATEGORIES.map((c) => <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">المبلغ *</label>
+                  <div className="relative">
+                    <Input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} disabled={isEditing && !isOwner} className="h-11 rounded-xl bg-soft border-border font-black pr-4 pl-12" placeholder="0.00" />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">ج.م</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest">طريقة الدفع</label>
-                <Select disabled={isEditing && !isOwner} value={formData.payment_method} onValueChange={(v) => setFormData({ ...formData, payment_method: v })}>
-                  <SelectTrigger className="h-11 rounded-xl bg-soft border-border font-black"><SelectValue /></SelectTrigger>
-                  <SelectContent className="rounded-xl">{PAYMENT_METHODS.map((m) => <SelectItem key={m.value} value={m.value} className="font-bold">{m.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest">التاريخ</label>
-                <Input type="date" value={formData.expense_date} onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })} disabled={isEditing && !isOwner} className="h-11 rounded-xl bg-soft border-border font-bold" />
+                <label className="text-[10px] font-black text-muted uppercase tracking-widest">
+                  المستفيد / المورد {["إيجار", "مشتريات"].includes(formData.category) && <span className="text-rose-500">*</span>}
+                </label>
+                <Input value={formData.recipient_name} onChange={(e) => setFormData({ ...formData, recipient_name: e.target.value })} disabled={isEditing && !isOwner} className={cn("h-11 rounded-xl bg-soft border-border font-bold", ["إيجار", "مشتريات"].includes(formData.category) && !formData.recipient_name?.trim() && "border-rose-300 focus:border-rose-500")} placeholder={["إيجار", "مشتريات"].includes(formData.category) ? "مطلوب — اسم المالك أو المورد" : "اختياري — اسم الشخص أو الجهة"} />
+                {["إيجار", "مشتريات"].includes(formData.category) && !formData.recipient_name?.trim() && <p className="text-[10px] font-bold text-rose-600">مطلوب لفئة الإيجار/المشتريات</p>}
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest">الوصف</label>
-              <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} disabled={isEditing && !isOwner} className="w-full min-h-[84px] rounded-xl border border-border bg-soft p-3 text-sm font-bold resize-none focus:border-slate-900 focus:ring-0 outline-none" placeholder="تفاصيل إضافية..." />
+
+            {/* Section 2: Payment */}
+            <div className="space-y-3 pt-3 border-t border-border/40">
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded-lg bg-sky-600 text-white flex items-center justify-center text-[10px] font-black">2</div>
+                <span className="text-[11px] font-black uppercase tracking-widest text-muted">الدفع والوصف</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">طريقة الدفع</label>
+                  <Select disabled={isEditing && !isOwner} value={formData.payment_method} onValueChange={(v) => setFormData({ ...formData, payment_method: v })}>
+                    <SelectTrigger className="h-11 rounded-xl bg-soft border-border font-black"><SelectValue /></SelectTrigger>
+                    <SelectContent className="rounded-xl">{PAYMENT_METHODS.map((m) => <SelectItem key={m.value} value={m.value} className="font-bold">{m.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">التاريخ</label>
+                  <Input type="date" value={formData.expense_date} onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })} disabled={isEditing && !isOwner} className="h-11 rounded-xl bg-soft border-border font-bold" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-muted uppercase tracking-widest">الوصف العام</label>
+                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} disabled={isEditing && !isOwner} className="w-full min-h-[72px] rounded-xl border border-border bg-soft p-3 text-sm font-bold resize-none focus:border-slate-900 focus:ring-0 outline-none" placeholder="تفاصيل تظهر في الكشف..." />
+              </div>
             </div>
+
+            {/* Section 3: Linking + Internal */}
+            <div className="space-y-3 pt-3 border-t border-border/40">
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded-lg bg-amber-500 text-white flex items-center justify-center text-[10px] font-black">3</div>
+                <span className="text-[11px] font-black uppercase tracking-widest text-muted">الربط والملاحظات الداخلية</span>
+                <Badge variant="outline" className="mr-auto rounded-full text-[9px] font-black">اختياري</Badge>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">نوع المرجع</label>
+                  <Select disabled={isEditing && !isOwner} value={formData.reference_type || "none"} onValueChange={(v) => setFormData({ ...formData, reference_type: v === "none" ? "" : v, reference_id: v === "none" ? "" : formData.reference_id })}>
+                    <SelectTrigger className="h-11 rounded-xl bg-soft border-border font-black"><SelectValue /></SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="none">بدون ربط</SelectItem>
+                      <SelectItem value="payroll">راتب</SelectItem>
+                      <SelectItem value="invoice">فاتورة</SelectItem>
+                      <SelectItem value="product">منتج/مخزون</SelectItem>
+                      <SelectItem value="booking">حجز</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">رقم المرجع</label>
+                  <Input value={formData.reference_id} onChange={(e) => setFormData({ ...formData, reference_id: e.target.value })} disabled={isEditing && !isOwner || !formData.reference_type} className="h-11 rounded-xl bg-soft border-border font-bold" placeholder={!formData.reference_type ? "اختر النوع أولاً" : "مثال: 123"} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-muted uppercase tracking-widest">ملاحظات داخلية (لا تظهر في الكشف العام)</label>
+                <textarea value={formData.internal_notes} onChange={(e) => setFormData({ ...formData, internal_notes: e.target.value })} disabled={isEditing && !isOwner} className="w-full min-h-[64px] rounded-xl border border-amber-200 bg-amber-50/50 p-3 text-sm font-bold resize-none focus:border-amber-300 outline-none" placeholder="ملاحظة للمالك فقط..." />
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-muted uppercase tracking-widest">صورة الفاتورة</label>
               <input type="file" ref={invoiceInputRef} onChange={handleInvoiceUpload} className="hidden" accept="image/*" />

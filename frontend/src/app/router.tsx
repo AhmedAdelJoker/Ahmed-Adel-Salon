@@ -27,6 +27,7 @@ import { Scissors } from "lucide-react";
 
 const PAGE_TITLES = Object.freeze({
   "/owner": "التقارير الإحصائية",
+  "/owner/cashbox": "خزينة المحل",
   "/owner/employee-reports": "تقارير الموظفين",
   "/owner/hr": "إدارة الموارد البشرية",
   "/owner/hr/archive": "أرشيف الموظفين",

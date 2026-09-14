@@ -37,7 +37,7 @@ const ShiftSidebar = () => {
     readyAppointments,
     isShopOpen,
   } = usePOS();
-  const { drawerBalance } = useSalon();
+  const { drawerBalance, valutBalance, vaultCashBalance, refreshBalance } = useSalon();
 
   const [openingCash, setOpeningCash] = useState("0");
   const [isOpeningShift, setIsOpeningShift] = useState(false);
@@ -68,8 +68,9 @@ const ShiftSidebar = () => {
     try {
       setIsOpeningShift(true);
       await posShiftService.open({ openingCash });
-      await fetchShift(); // Fully reload shift data from server
-      toast.success("تم فتح الوردية بنجاح");
+      await fetchShift();
+      await refreshBalance();
+      toast.success("تم فتح الوردية بنجاح — تم التحديث في الخزنة المركزية");
     } catch (error) {
        
       const apiErr = error as { response?: { data?: { detail?: unknown } } };
@@ -87,9 +88,10 @@ const ShiftSidebar = () => {
 
        
       const closedData = (response as any)?.data || response;
-      await fetchShift(); // Should set it to null or update status
+      await fetchShift();
+      await refreshBalance();
       setShowCloseShift(false);
-      toast.success("تم إنهاء الوردية بنجاح");
+      toast.success("تم إنهاء الوردية بنجاح — الخزنة محدثة");
 
       // Print enriched report
       printShiftReport(closedData);
@@ -407,12 +409,20 @@ const ShiftSidebar = () => {
             iconBg: "bg-sky-500 text-white",
           },
           {
-            label: "رصيد الخزينة الإجمالي",
-            value: formatCurrency(drawerBalance),
+            label: "رصيد الخزنة (مرتبط)",
+            value: formatCurrency(vaultCashBalance || drawerBalance),
             icon: Wallet,
             bgClass: "bg-emerald-500/5",
             textClass: "text-emerald-600 dark:text-emerald-400",
             iconBg: "bg-emerald-500 text-white",
+          },
+          {
+            label: "الخزنة • الإجمالي",
+            value: formatCurrency(valutBalance || drawerBalance),
+            icon: Wallet,
+            bgClass: "bg-slate-500/5",
+            textClass: "text-slate-800 dark:text-slate-200",
+            iconBg: "bg-slate-900 text-white",
           },
         ].map((tile, i) => (
           <Card

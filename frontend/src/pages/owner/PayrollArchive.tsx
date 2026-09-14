@@ -4,6 +4,7 @@ import payrollService from "@/services/payrollService";
 import { adaptApiResponse } from "@/services/apiAdapter";
 import toast from "react-hot-toast";
 import exportService from "@/services/exportService";
+import { useAuth } from "@/context/AuthContext";
 import {
   Archive,
   ArrowRight,
@@ -17,7 +18,9 @@ import {
   TrendingUp,
   Users,
   Wallet,
+  Trash2,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -95,11 +98,15 @@ type ArchiveFilters = {
 };
 
 const PayrollArchive = () => {
+  const { user } = useAuth();
+  const isOwner = useMemo(() => ["OWNER", "ADMIN"].includes(String(user?.role || "").toUpperCase()), [user?.role]);
   const [items, setItems] = useState<unknown[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<Record<string, unknown> | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [filters, setFilters] = useState<ArchiveFilters>({
     start_year: new Date().getFullYear(),
     end_year: "all",
@@ -162,8 +169,33 @@ const PayrollArchive = () => {
 
   const handlePrint = () => window.print();
 
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      setDeleting(true);
+      await payrollService.remove(deleteId);
+      toast.success("تم حذف السجل من الأرشيف — بقي المصروف المالي محفوظاً");
+      setDeleteId(null);
+      fetchArchive(filters);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      if (msg && String(msg).includes("Cannot delete paid")) toast.error("لا يمكن حذف راتب مدفوع — استخدم الإلغاء بدلاً منه");
+      else toast.error("فشل حذف السجل");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="erp-page-container space-y-6 pb-10" dir="rtl">
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+        title="حذف السجل من الأرشيف؟"
+        description="سيتم حذف سجل الراتب من الأرشيف فقط — لن يتم حذف المصروف المالي المرتبط وسيبقى في سجلات الخزنة والمصروفات."
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
       <PageHeader
         title="أرشيف الرواتب"
         subtitle="السجل التاريخي لمدفوعات الموظفين — بحث زمني شامل مع تصدير"
@@ -331,6 +363,11 @@ const PayrollArchive = () => {
                         <div className="flex items-center justify-center gap-1">
                           <Button variant="outline" size="sm" onClick={() => { setDetailItem(item); setDetailOpen(true); }} className="h-8 rounded-xl text-[11px] font-black">تفاصيل</Button>
                           <Button variant="ghost" size="sm" onClick={() => exportService.downloadPdf(`/exports/payroll/${String(item.id)}/pdf`, `payslip_${String(item.employee_name_snapshot)}_${String(item.period_month)}_${String(item.period_year)}`)} className="h-8 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 text-[11px] font-black">PDF</Button>
+                          {isOwner && (
+                            <Button variant="ghost" size="sm" onClick={() => setDeleteId(String(item.id))} disabled={String(item.status) === "paid"} title={String(item.status) === "paid" ? "لا يمكن حذف راتب مدفوع" : "حذف من الأرشيف فقط — يبقى المصروف"} className="h-8 w-8 p-0 rounded-xl border border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-40">
+                              <Trash2 size={14} />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -357,6 +394,11 @@ const PayrollArchive = () => {
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => { setDetailItem(item); setDetailOpen(true); }} className="flex-1 h-9 rounded-xl text-xs font-black">تفاصيل</Button>
                     <Button variant="ghost" onClick={() => exportService.downloadPdf(`/exports/payroll/${String(item.id)}/pdf`, `payslip_${String(item.employee_name_snapshot)}`)} className="flex-1 h-9 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 text-xs font-black">PDF</Button>
+                    {isOwner && (
+                      <Button variant="ghost" onClick={() => setDeleteId(String(item.id))} disabled={String(item.status) === "paid"} className="h-9 w-9 p-0 rounded-xl border border-rose-100 bg-rose-50 text-rose-600 disabled:opacity-40 shrink-0">
+                        <Trash2 size={14} />
+                      </Button>
+                    )}
                   </div>
                 </PremiumCard>
               ))}

@@ -245,7 +245,7 @@ const MENU_GROUPS = [
         key: "cashbox",
         label: "خزينة المحل",
         to: "/owner/cashbox",
-        icon: TrendingUp,
+        icon: Wallet,
         roles: ["OWNER", "ADMIN", "CASHIER", "ACCOUNTANT"],
       },
       {
@@ -254,20 +254,6 @@ const MENU_GROUPS = [
         to: "/owner/payroll",
         icon: Wallet,
         roles: ["OWNER", "ADMIN", "ACCOUNTANT", "MANAGER"],
-      },
-      {
-        key: "payroll-archive",
-        label: "أرشيف الرواتب",
-        to: "/owner/payroll/archive",
-        icon: History,
-        roles: ["OWNER", "ADMIN", "ACCOUNTANT", "MANAGER"],
-      },
-      {
-        key: "expenses-archive",
-        label: "أرشيف المصروفات",
-        to: "/expenses/archive",
-        icon: History,
-        roles: ["OWNER", "ADMIN", "ACCOUNTANT", "MANAGER", "CASHIER"],
       },
       {
         key: "loyalty",
@@ -321,7 +307,7 @@ const MENU_GROUPS = [
         label: "إعدادات المحل",
         to: "/owner/settings",
         icon: Settings,
-        roles: ["OWNER", "ADMIN"],
+        roles: ["OWNER", "ADMIN", "MANAGER"],
       },
       {
         key: "website-settings",

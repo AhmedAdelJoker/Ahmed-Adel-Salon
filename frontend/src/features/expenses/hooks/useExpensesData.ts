@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import type { ExpenseFormData, ExpenseRecord, ExpenseSummary } from "@/types/expenses";
-import { PAYMENT_METHODS, CATEGORY_COLORS } from "../constants";
+import { PAYMENT_METHODS, CATEGORY_COLORS } from "@/features/expenses/constants";
 
 const PAGE_SIZE = 20;
 

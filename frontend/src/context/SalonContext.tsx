@@ -8,11 +8,7 @@ import {
 } from "react";
 import { useAuth, type AuthUser } from "@/context/AuthContext";
 import { SocketContext } from "@/context/SocketContext";
-
-// ✅ QR SYSTEM
 import { generatePublicQR } from "@/lib/media/qr";
-
-// ✅ Services
 import { customerService } from "@/services/customerService";
 import { serviceService } from "@/services/serviceService";
 import { barberService } from "@/services/barberService";
@@ -22,8 +18,8 @@ import { reportService } from "@/services/reportService";
 import { dashboardService } from "@/services/dashboardService";
 import { businessSettingsService } from "@/services/businessSettingsService";
 import { posShiftService } from "@/services/posShiftService";
+import cashboxService from "@/services/cashboxService";
 
- 
 export type SalonRecord = Record<string, any>;
 
 export interface SalonContextValue {
@@ -44,6 +40,9 @@ export interface SalonContextValue {
   checkedOut: SalonRecord[];
   qrImage: string;
   drawerBalance: number;
+  valutBalance: number;
+  vaultCashBalance: number;
+  vaultDigitalBalance: number;
   refreshBalance: () => Promise<void>;
   refreshSalonData: () => Promise<void>;
   loadAll: () => Promise<void>;
@@ -79,27 +78,21 @@ export function SalonProvider({ children }: { children: ReactNode }) {
   const [dashboardWidgets, setDashboardWidgets] =
     useState<SalonRecord | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // ✅ QR IMAGE (GLOBAL)
   const [qrImage, setQrImage] = useState("");
-
-  // ✅ Drawer Balance
   const [drawerBalance, setDrawerBalance] = useState(0);
+  const [valutBalance, setValutBalance] = useState(0);
+  const [vaultCashBalance, setVaultCashBalance] = useState(0);
+  const [vaultDigitalBalance, setVaultDigitalBalance] = useState(0);
 
-  // ✅ Load all data
   async function loadAll() {
     if (!isAuthenticated) return;
-
     setLoading(true);
-
     try {
-      // Phase 1: Critical data for UI structure and basic operation
       const [settingsRes, servicesRes, barbersRes] = await Promise.allSettled([
         businessSettingsService.get?.(),
         serviceService.list?.(),
         barberService.list?.(),
       ]);
-
       if (settingsRes.status === "fulfilled") {
         const s = (settingsRes.value || {}) as SalonRecord;
         setSettings(s);
@@ -109,17 +102,11 @@ export function SalonProvider({ children }: { children: ReactNode }) {
           "default-salon";
         generatePublicQR(slug).then((img) => setQrImage(img ?? ""));
       }
-
       if (servicesRes.status === "fulfilled")
         setServices(toArray(servicesRes.value));
-
       if (barbersRes.status === "fulfilled")
         setBarbers(toArray(barbersRes.value));
-
-      // Set loading to false early once critical data is here
       setLoading(false);
-
-      // Phase 2: Deferred/Background data
       const [customersRes, sessionsRes, invoicesRes, reportsRes] =
         await Promise.allSettled([
           customerService.list?.(),
@@ -127,31 +114,36 @@ export function SalonProvider({ children }: { children: ReactNode }) {
           invoiceService.list?.(),
           reportService.overview?.(),
         ]);
-
       if (customersRes.status === "fulfilled")
         setCustomers(toArray(customersRes.value));
-
       if (sessionsRes.status === "fulfilled")
         setSessions(toArray(sessionsRes.value));
-
       if (invoicesRes.status === "fulfilled")
         setInvoices(toArray(invoicesRes.value));
-
       if (reportsRes.status === "fulfilled")
         setReportOverview(reportsRes.value || null);
-
       try {
         const widgets = await dashboardService.widgets?.();
         setDashboardWidgets(widgets || null);
       } catch (err) {
         console.error("Dashboard widgets error:", err);
       }
-
-      // Load balance
       try {
-        const b = await posShiftService.getBalance();
-        setDrawerBalance(b);
-      } catch (_e) {}
+        const summary = await cashboxService.getSummary();
+        const cashBal = Number(summary?.cash_balance_detail ?? summary?.cash_balance ?? 0);
+        const digitalBal = Number(summary?.non_cash_balance ?? 0);
+        const totalBal = Number(summary?.cash_balance ?? cashBal + digitalBal);
+        setVaultCashBalance(cashBal);
+        setVaultDigitalBalance(digitalBal);
+        setValutBalance(totalBal);
+        setDrawerBalance(cashBal);
+      } catch (_e) {
+        try {
+          const b = await posShiftService.getBalance();
+          setDrawerBalance(Number(b ?? 0));
+          setValutBalance(Number(b ?? 0));
+        } catch {}
+      }
     } catch (err) {
       console.error("SalonProvider loadAll error:", err);
     } finally {
@@ -159,10 +151,8 @@ export function SalonProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // ✅ Load data
   useEffect(() => {
     if (!socket) return;
-
     if (isAuthenticated) {
       loadAll();
     } else {
@@ -175,20 +165,20 @@ export function SalonProvider({ children }: { children: ReactNode }) {
       setReportOverview(null);
       setDashboardWidgets(null);
       setDrawerBalance(0);
+      setValutBalance(0);
+      setVaultCashBalance(0);
+      setVaultDigitalBalance(0);
     }
   }, [isAuthenticated, socket]);
 
-  // ✅ Session groups
   const waiting = useMemo(
     () => sessions.filter((s) => s.status === "waiting"),
     [sessions],
   );
-
   const inProgress = useMemo(
     () => sessions.filter((s) => s.status === "in_progress"),
     [sessions],
   );
-
   const completedUnpaid = useMemo(
     () =>
       sessions.filter(
@@ -196,7 +186,6 @@ export function SalonProvider({ children }: { children: ReactNode }) {
       ),
     [sessions],
   );
-
   const checkedOut = useMemo(
     () =>
       sessions.filter((s) => s.status === "checked_out" || s.status === "paid"),
@@ -205,10 +194,22 @@ export function SalonProvider({ children }: { children: ReactNode }) {
 
   const refreshBalance = async (): Promise<void> => {
     try {
-      const b = await posShiftService.getBalance();
-      setDrawerBalance(Number(b ?? 0));
+      const summary = await cashboxService.getSummary();
+      const cashBal = Number(summary?.cash_balance_detail ?? summary?.cash_balance ?? 0);
+      const digitalBal = Number(summary?.non_cash_balance ?? 0);
+      const totalBal = Number(summary?.cash_balance ?? cashBal + digitalBal);
+      setVaultCashBalance(cashBal);
+      setVaultDigitalBalance(digitalBal);
+      setValutBalance(totalBal);
+      setDrawerBalance(cashBal);
     } catch (e) {
-      console.error("refreshBalance error:", e);
+      try {
+        const b = await posShiftService.getBalance();
+        setDrawerBalance(Number(b ?? 0));
+        setValutBalance(Number(b ?? 0));
+      } catch (inner) {
+        console.error("refreshBalance error:", e, inner);
+      }
     }
   };
 
@@ -225,7 +226,6 @@ export function SalonProvider({ children }: { children: ReactNode }) {
     return created;
   };
 
-  // ✅ Context Value
   const value = useMemo<SalonContextValue>(
     () => ({
       isAuthenticated,
@@ -245,6 +245,9 @@ export function SalonProvider({ children }: { children: ReactNode }) {
       checkedOut,
       qrImage,
       drawerBalance,
+      valutBalance,
+      vaultCashBalance,
+      vaultDigitalBalance,
       refreshBalance,
       refreshSalonData: loadAll,
       loadAll,
@@ -268,6 +271,9 @@ export function SalonProvider({ children }: { children: ReactNode }) {
       checkedOut,
       qrImage,
       drawerBalance,
+      valutBalance,
+      vaultCashBalance,
+      vaultDigitalBalance,
       addClient,
     ],
   );
@@ -277,7 +283,6 @@ export function SalonProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ✅ Hook
 export function useSalon(): SalonContextValue {
   const context = useContext(SalonContext);
   if (!context) {

@@ -47,7 +47,7 @@ export default function Header({
   const navigate = useNavigate();
   const { user, logout, loading } = useAuth();
   const { preferences, toggleTheme } = usePreferences();
-  const { drawerBalance } = useSalon();
+  const { valutBalance, vaultCashBalance } = useSalon();
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -151,16 +151,23 @@ export default function Header({
           </div>
 
           {(role === "OWNER" || role === "CASHIER" || role === "ADMIN") && (
-            <div className="flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-accent/5 border border-accent/20 shadow-sm group hover:bg-accent/10 transition-all cursor-help">
+            <div
+              onClick={() => navigate("/owner/cashbox")}
+              title="الخزنة المركزية — مرتبط بالخزنة (نقدي + رقمي)"
+              className="flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-accent/5 border border-accent/20 shadow-sm group hover:bg-accent/10 transition-all cursor-pointer"
+            >
               <div className="h-8 w-8 flex items-center justify-center rounded-xl bg-accent/10 text-accent border border-accent/20">
                 <Wallet size={16} />
               </div>
               <div className="flex flex-col leading-none">
                 <span className="text-[9px] font-black text-accent/60 uppercase tracking-widest mb-1.5">
-                  Vault Balance
+                  الخزنة • Vault
                 </span>
                 <span className="text-[14px] font-black text-main tabular-nums drop-shadow-sm">
-                  {formatCurrency(drawerBalance)}
+                  {formatCurrency(valutBalance)}
+                </span>
+                <span className="text-[9px] font-bold text-muted hidden xl:block">
+                  نقدي {formatCurrency(vaultCashBalance)}
                 </span>
               </div>
             </div>
