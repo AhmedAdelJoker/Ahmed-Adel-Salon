@@ -1,31 +1,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
+  AlertTriangle,
   Banknote,
+  BarChart3,
+  BellRing,
   Calculator,
   Calendar,
+  CalendarRange,
   CreditCard,
   Download,
+  FileDown,
   FileSpreadsheet,
+  FileText,
   History,
   Info,
   LayoutGrid,
   MousePointer2,
   PieChart as PieChartIcon,
+  Play,
+  Printer,
   Receipt,
   RefreshCw,
   Sparkles,
   Target,
+  Trash2,
   TrendingDown,
   TrendingUp,
   Wallet,
   X,
+  Zap,
 } from "lucide-react";
 import {
   Area,
-  AreaChart,
+  Bar,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -34,10 +46,19 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "react-hot-toast";
-import api from "@/services/api";
+import api, { staticURL } from "@/services/api";
 import { adaptList, adaptObject, adaptTotal } from "@/services/apiAdapter";
 import { expenseCategoryLabel } from "@/lib/money/expenseCategories";
-import type { FinancialsState, TrendPoint, ExpenseSlice } from "@/types/reports";
+import {
+  detectAnomalies,
+  downloadCsvFile,
+  lastNMonthKeys,
+  type MonthlyBucket,
+  monthKeyOf,
+  monthLabelAr,
+  pctGrowth,
+} from "@/lib/money/financialAnalytics";
+import type { FinancialsState, RawRow, TrendPoint, ExpenseSlice } from "@/types/reports";
 import {
   Card,
   CardContent,
@@ -47,8 +68,11 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { aiService } from "@/services/aiService";
 import { exportService } from "@/services/exportService";
+import { businessSettingsService } from "@/services/businessSettingsService";
+import { useAuth } from "@/context/AuthContext";
 import AIInsights from "@/components/AIInsights";
 import { cn, formatCurrency, formatDateTime } from "@/lib/core/utils";
 import { PageHeader, SkeletonCard } from "@/components/shared/PremiumUI";
@@ -169,19 +193,11 @@ function prevRangeOf(from: string, to: string): { from: string; to: string } | n
   return { from: toISODate(prevStart), to: toISODate(prevEnd) };
 }
 
-/** % change vs baseline, or null when there is no baseline to compare against. */
-function pctGrowth(curr: number, prev: number): number | null {
-  if (!Number.isFinite(curr) || !Number.isFinite(prev) || prev <= 0) return null;
-  return ((curr - prev) / prev) * 100;
-}
-
 /** Signed number for the trend chip (the chip appends the % sign itself). */
 function formatSignedPct(v: number): string {
   const sign = v > 0 ? "+" : v < 0 ? "-" : "+";
   return `${sign}${Math.abs(v).toFixed(1)}`;
 }
-
-type RawRow = Record<string, any>;
 
 function filterValidInvoices(rows: RawRow[], from: string, to: string): RawRow[] {
   return rows.filter((inv) => {
@@ -286,6 +302,7 @@ const EMPTY_FINANCIALS: FinancialsState = {
   payments: [],
   expenseCategories: [],
   dailyTrends: [],
+  prevDailyTrends: [],
   invoiceCount: 0,
   expenseCount: 0,
   avgTicket: 0,
@@ -295,6 +312,8 @@ const EMPTY_FINANCIALS: FinancialsState = {
   prevRange: null,
   totalInvoices: 0,
   truncated: false,
+  invoiceRows: [],
+  expenseRows: [],
 };
 
 export default function FinancialReports() {
@@ -309,6 +328,115 @@ export default function FinancialReports() {
   const [exporting, setExporting] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [financials, setFinancials] = useState<FinancialsState>(EMPTY_FINANCIALS);
+  const [monthly, setMonthly] = useState<MonthlyBucket[]>([]);
+  const [monthlyLoading, setMonthlyLoading] = useState(false);
+  const [monthlyLoaded, setMonthlyLoaded] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [monthlyTarget, setMonthlyTarget] = useState(500000);
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [targetDraft, setTargetDraft] = useState("500000");
+  const [savingTarget, setSavingTarget] = useState(false);
+
+  interface ReportSchedule {
+    id: number;
+    name: string;
+    frequency: string;
+    channel: string;
+    target_phone?: string | null;
+    is_active: boolean;
+    last_run_at?: string | null;
+    next_run_at?: string | null;
+    last_status?: string;
+    last_summary?: string | null;
+    last_pdf_url?: string | null;
+  }
+
+  const [schedules, setSchedules] = useState<ReportSchedule[]>([]);
+  const [schedLoading, setSchedLoading] = useState(false);
+  const [schedBusyId, setSchedBusyId] = useState<number | string | null>(null);
+  const [schedFreq, setSchedFreq] = useState("daily");
+  const [schedChannel, setSchedChannel] = useState("notification");
+  const [schedPhone, setSchedPhone] = useState("");
+
+  const fetchSchedules = useCallback(async () => {
+    setSchedLoading(true);
+    try {
+      const res = await api.get("/report-schedules");
+      const items = adaptList<ReportSchedule>(res);
+      setSchedules(items);
+    } catch (error) {
+      toast.error("فشل تحميل التقارير المجدولة");
+    } finally {
+      setSchedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (hasLoaded) fetchSchedules();
+  }, [hasLoaded, fetchSchedules]);
+
+  const handleCreateSchedule = async () => {
+    if (schedBusyId) return;
+    setSchedBusyId("new");
+    try {
+      await api.post("/report-schedules", {
+        frequency: schedFreq,
+        channel: schedChannel,
+        target_phone: schedPhone.trim() || null,
+      });
+      setSchedPhone("");
+      toast.success("تم إنشاء الجدولة");
+      await fetchSchedules();
+    } catch (error) {
+      toast.error("فشل إنشاء الجدولة");
+    } finally {
+      setSchedBusyId(null);
+    }
+  };
+
+  const handleToggleSchedule = async (s: ReportSchedule) => {
+    setSchedBusyId(s.id);
+    try {
+      await api.put(`/report-schedules/${s.id}`, { is_active: !s.is_active });
+      await fetchSchedules();
+    } catch (error) {
+      toast.error("فشل تحديث الجدولة");
+    } finally {
+      setSchedBusyId(null);
+    }
+  };
+
+  const handleDeleteSchedule = async (s: ReportSchedule) => {
+    setSchedBusyId(s.id);
+    try {
+      await api.delete(`/report-schedules/${s.id}`);
+      toast.success("تم حذف الجدولة");
+      await fetchSchedules();
+    } catch (error) {
+      toast.error("فشل حذف الجدولة");
+    } finally {
+      setSchedBusyId(null);
+    }
+  };
+
+  const handleRunScheduleNow = async (s: ReportSchedule) => {
+    setSchedBusyId(s.id);
+    try {
+      const res = await api.post(`/report-schedules/${s.id}/run-now`);
+      const status = res?.data?.status;
+      if (status === "ok") toast.success("تم إرسال التقرير");
+      else toast.error(res?.data?.errors?.join("؛ ") || "تعذر إرسال التقرير");
+      await fetchSchedules();
+    } catch (error) {
+      toast.error("فشل تشغيل الجدولة");
+    } finally {
+      setSchedBusyId(null);
+    }
+  };
+
+  const { user, currentUser } = useAuth();
+  const activeRole = String((currentUser || user)?.role || "").toLowerCase();
+  const canEditTarget = ["owner", "admin", "manager", "accountant"].includes(activeRole);
 
   const hasLoadedRef = useRef(false);
 
@@ -318,7 +446,7 @@ export default function FinancialReports() {
     setLoadError(null);
     try {
       const prev = prevRangeOf(fromDate, toDate);
-      const [invPage, expSumRes, expenseRows, prevInvPage, prevExpSumRes] = await Promise.all([
+      const [invPage, expSumRes, expenseRows, prevInvPage, prevExpSumRes, prevExpRows, settingsRes] = await Promise.all([
         fetchAllInvoices(fromDate, toDate),
         api.get("/expenses/summary", { params: { from_date: fromDate, to_date: toDate } }),
         fetchAllExpenses(fromDate, toDate),
@@ -326,7 +454,19 @@ export default function FinancialReports() {
         prev
           ? api.get("/expenses/summary", { params: { from_date: prev.from, to_date: prev.to } })
           : Promise.resolve(null),
+        prev ? fetchAllExpenses(prev.from, prev.to) : Promise.resolve([]),
+        businessSettingsService.get().catch(() => null),
       ]);
+
+      const settingsTarget = safeNum(
+        (settingsRes as Record<string, unknown> | null)?.monthlyRevenueTarget ??
+          (settingsRes as Record<string, unknown> | null)?.monthly_revenue_target ??
+          500000,
+      );
+      if (settingsTarget > 0) {
+        setMonthlyTarget(settingsTarget);
+        setTargetDraft(String(Math.round(settingsTarget)));
+      }
 
       const invoices = filterValidInvoices(invPage.rows, fromDate, toDate);
       const prevInvoices = prev ? filterValidInvoices(prevInvPage.rows, prev.from, prev.to) : [];
@@ -377,6 +517,50 @@ export default function FinancialReports() {
         const exp = expByDay.get(d) || 0;
         return { name: shortLabel(d), date: d, label: shortLabel(d), rev, exp, net: rev - exp };
       });
+
+      // Previous period daily trends for chart overlay
+      let prevDailyTrends: TrendPoint[] = [];
+      if (prev) {
+        const prevDays = eachDayISO(prev.from, prev.to);
+        const prevRevByDay = new Map<string, number>();
+        const prevExpByDay = new Map<string, number>();
+        prevInvoices.forEach((inv) => {
+          const d = dayKeyOf(inv.created_at);
+          if (!d) return;
+          prevRevByDay.set(d, (prevRevByDay.get(d) || 0) + safeNum(inv.total_amount));
+        });
+        prevExpRows.forEach((e) => {
+          const d = dayKeyOf(e.expense_date ?? e.created_at);
+          if (!d) return;
+          prevExpByDay.set(d, (prevExpByDay.get(d) || 0) + safeNum(e.amount));
+        });
+        prevDailyTrends = prevDays.map((d) => {
+          const rev = prevRevByDay.get(d) || 0;
+          const exp = prevExpByDay.get(d) || 0;
+          return { name: shortLabel(d), date: d, label: shortLabel(d), rev, exp, net: rev - exp };
+        });
+
+        // Bucket if too many points (same logic as current)
+        if (prevDailyTrends.length > 45) {
+          const buckets: TrendPoint[] = [];
+          for (let i = 0; i < prevDailyTrends.length; i += 7) {
+            const chunk = prevDailyTrends.slice(i, i + 7);
+            const rev = chunk.reduce((s, p) => s + p.rev, 0);
+            const exp = chunk.reduce((s, p) => s + p.exp, 0);
+            const first = chunk[0];
+            const last = chunk[chunk.length - 1];
+            buckets.push({
+              name: `${first.label}-${last.label}`,
+              date: first.date,
+              label: `${first.label}-${last.label}`,
+              rev,
+              exp,
+              net: rev - exp,
+            });
+          }
+          prevDailyTrends = buckets;
+        }
+      }
 
       if (dailyTrends.length > 45) {
         const buckets: TrendPoint[] = [];
@@ -439,8 +623,11 @@ export default function FinancialReports() {
         bestDay,
         growth,
         prevRange: prev,
+        prevDailyTrends,
         totalInvoices: invPage.total,
         truncated: invPage.truncated,
+        invoiceRows: invoices,
+        expenseRows: expenseRows,
       });
       setLastUpdated(new Date());
     } catch (error) {
@@ -460,6 +647,56 @@ export default function FinancialReports() {
     }, hasLoadedRef.current ? 400 : 0);
     return () => clearTimeout(t);
   }, [fetchFinancials]);
+
+  /** Six-month revenue/expense comparison, fetched on demand (single range query, bucketed client-side). */
+  const fetchSixMonths = useCallback(async () => {
+    if (monthlyLoading) return;
+    setMonthlyLoading(true);
+    try {
+      const keys = lastNMonthKeys(6);
+      const from = `${keys[0]}-01`;
+      const now = new Date();
+      const to = toISODate(now);
+      const [invPage, expRows] = await Promise.all([
+        fetchAllInvoices(from, to),
+        fetchAllExpenses(from, to),
+      ]);
+      const invoices = filterValidInvoices(invPage.rows, from, to);
+      const byKey = new Map<string, MonthlyBucket>();
+      keys.forEach((k) => byKey.set(k, { key: k, label: monthLabelAr(k), rev: 0, exp: 0, net: 0 }));
+      invoices.forEach((inv) => {
+        const k = monthKeyOf(dayKeyOf(inv.created_at));
+        const b = byKey.get(k);
+        if (b) b.rev += safeNum(inv.total_amount);
+      });
+      expRows.forEach((e) => {
+        const k = monthKeyOf(dayKeyOf(e.expense_date ?? e.created_at));
+        const b = byKey.get(k);
+        if (b) b.exp += safeNum(e.amount);
+      });
+      const buckets = keys.map((k) => {
+        const b = byKey.get(k)!;
+        return { ...b, net: b.rev - b.exp };
+      });
+      setMonthly(buckets);
+      setMonthlyLoaded(true);
+    } catch (error) {
+      toast.error("فشل تحميل مقارنة الشهور");
+    } finally {
+      setMonthlyLoading(false);
+    }
+  }, [monthlyLoading]);
+
+  /** Auto-refresh every 60s while enabled (polling fallback — WS covers notifications only). */
+  useEffect(() => {
+    if (!autoRefresh || !hasLoaded) return undefined;
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible" && !document.hidden) {
+        fetchFinancials();
+      }
+    }, 60000);
+    return () => clearInterval(id);
+  }, [autoRefresh, hasLoaded, fetchFinancials]);
 
   const applyPreset = (id: PresetId) => {
     const r = presetRange(id);
@@ -492,29 +729,105 @@ export default function FinancialReports() {
   );
   const maxDayNet = topDays[0]?.net || 1;
 
-  // Previous period daily trends for chart overlay
-  const prevDailyTrends = useMemo(() => {
-    if (!financials.prevRange) return null;
-    // Note: We already fetched prevInvoices in fetchFinancials, but we don't store the daily breakdown.
-    // For now, we'll compute it by re-aggregating from the fetched prevInvoices.
-    // Since we don't have prevInvoices in state, we return null and the chart won't show overlay.
-    // This would need the previous period daily data to be fetched and stored.
-    return null;
-  }, [financials.prevRange]);
-
-  // Monthly target (EGP) - can be configured or fetched from backend
-  const MONTHLY_REVENUE_TARGET = 500000; // 500k EGP default
+  // Monthly revenue target (EGP) — loaded from backend business settings
   const monthStart = useMemo(
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10),
     [],
   );
   const isCurrentMonth = fromDate <= monthStart && toDate >= monthStart;
   const currentMonthRevenue = isCurrentMonth ? financials.revenue : 0;
-  const targetProgress = Math.min(100, (currentMonthRevenue / MONTHLY_REVENUE_TARGET) * 100);
+  const targetProgress =
+    monthlyTarget > 0 ? Math.min(100, (currentMonthRevenue / monthlyTarget) * 100) : 0;
+
+  const handleSaveTarget = async () => {
+    const value = Math.round(Number(targetDraft));
+    if (!Number.isFinite(value) || value <= 0) {
+      toast.error("أدخل هدفاً شهرياً صحيحاً أكبر من صفر");
+      return;
+    }
+    setSavingTarget(true);
+    try {
+      const updated = await businessSettingsService.update({ monthlyRevenueTarget: value });
+      const next = safeNum(
+        (updated as Record<string, unknown>)?.monthlyRevenueTarget ??
+          (updated as Record<string, unknown>)?.monthly_revenue_target ??
+          value,
+      );
+      setMonthlyTarget(next > 0 ? next : value);
+      setTargetDraft(String(value));
+      setEditingTarget(false);
+      toast.success("تم حفظ الهدف الشهري");
+    } catch (error) {
+      toast.error("فشل حفظ الهدف الشهري");
+    } finally {
+      setSavingTarget(false);
+    }
+  };
 
   // Drill-down state
   const [selectedDay, setSelectedDay] = useState<TrendPoint | null>(null);
   const [selectedExpenseCategory, setSelectedExpenseCategory] = useState<ExpenseSlice | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<{ name: string; value: number } | null>(null);
+
+  // Drill-down detail: filter invoices/expenses for the selected day
+  const dayInvoices = useMemo(() => {
+    if (!selectedDay) return [];
+    return financials.invoiceRows.filter((inv) => {
+      const d = dayKeyOf(inv.created_at);
+      return d === selectedDay.date;
+    });
+  }, [selectedDay, financials.invoiceRows]);
+
+  const dayExpenses = useMemo(() => {
+    if (!selectedDay) return [];
+    return financials.expenseRows.filter((e) => {
+      const d = dayKeyOf(e.expense_date ?? e.created_at);
+      return d === selectedDay.date;
+    });
+  }, [selectedDay, financials.expenseRows]);
+
+  // Anomaly detection over the visible daily series
+  const anomalies = useMemo(
+    () => (hasData ? detectAnomalies(financials.dailyTrends) : []),
+    [hasData, financials.dailyTrends],
+  );
+  const anomalyDates = useMemo(() => new Set(anomalies.map((a) => a.date)), [anomalies]);
+
+  // Payment-method drill-down: invoices paid with the selected method
+  const paymentInvoices = useMemo(() => {
+    if (!selectedPayment) return [];
+    return financials.invoiceRows.filter(
+      (inv) => String(inv.payment_method || "cash") === selectedPayment.name,
+    );
+  }, [selectedPayment, financials.invoiceRows]);
+
+  // Category movements: expense rows composing the selected category (canonical Arabic label match)
+  const categoryMovements = useMemo(() => {
+    if (!selectedExpenseCategory) return [];
+    return financials.expenseRows
+      .filter((e) => expenseCategoryLabel(String(e.category ?? "عام")) === selectedExpenseCategory.name)
+      .sort((a, b) => String(b.expense_date ?? b.created_at ?? "").localeCompare(String(a.expense_date ?? a.created_at ?? "")));
+  }, [selectedExpenseCategory, financials.expenseRows]);
+
+  // 30-day cash-flow projection from recent daily averages
+  const forecast = useMemo(() => {
+    const trends = financials.dailyTrends;
+    if (!hasData || trends.length === 0) return null;
+    const window = trends.slice(-14);
+    const n = window.length || 1;
+    const avgRev = window.reduce((s, t) => s + t.rev, 0) / n;
+    const avgExp = window.reduce((s, t) => s + t.exp, 0) / n;
+    const projRev = avgRev * 30;
+    const projExp = avgExp * 30;
+    const projNet = projRev - projExp;
+    const cumulative: Array<{ name: string; net: number }> = [];
+    let acc = 0;
+    for (let i = 1; i <= 30; i += 1) {
+      acc += avgRev - avgExp;
+      if (i % 3 === 0 || i === 30) cumulative.push({ name: `يوم ${i}`, net: Math.round(acc) });
+    }
+    return { avgRev, avgExp, projRev, projExp, projNet, basisDays: n, cumulative };
+  }, [hasData, financials.dailyTrends]);
 
   const aiInsights = useMemo(() => {
     const base = aiService.generateInsights([
@@ -574,6 +887,11 @@ export default function FinancialReports() {
         `أكبر بند مصروفات: ${topExpense.name} بقيمة ${formatCurrency(topExpense.value)} (${share.toFixed(0)}% من المصروفات) — ابدأ التفاوض والترشيد من هنا.`,
       );
     }
+    if (anomalies.length > 0) {
+      extra.push(
+        `رُصد ${anomalies.length} شذوذ إحصائي في الفترة — أبرزها: ${anomalies[0].message}.`,
+      );
+    }
     const merged = [...extra, ...base.insights].filter(Boolean).slice(0, 5);
     return { ...base, insights: merged.length ? merged : base.insights };
   }, [
@@ -592,6 +910,7 @@ export default function FinancialReports() {
     hasData,
     topPayment,
     topExpense,
+    anomalies,
   ]);
 
   const handleExport = async (endpoint: string, baseName: string, type: "pdf" | "excel") => {
@@ -613,6 +932,79 @@ export default function FinancialReports() {
     } finally {
       setExporting(null);
     }
+  };
+
+  /** Client-side export of the selected day (invoices + expenses) as Excel-ready CSV. */
+  const handleExportDay = () => {
+    if (!selectedDay) return;
+    const rows: Array<Array<string | number>> = [];
+    dayInvoices.forEach((inv) => {
+      rows.push([
+        selectedDay.date,
+        "فاتورة",
+        String(inv.id ?? ""),
+        String(inv.client_name || inv.client_name_ar || "عميل"),
+        paymentLabel(String(inv.payment_method ?? "")),
+        safeNum(inv.total_amount),
+      ]);
+    });
+    dayExpenses.forEach((e) => {
+      rows.push([
+        selectedDay.date,
+        "مصروف",
+        String(e.id ?? ""),
+        String(e.title || e.description || "مصروف"),
+        expenseCategoryLabel(String(e.category ?? "عام")),
+        -Math.abs(safeNum(e.amount)),
+      ]);
+    });
+    if (!rows.length) {
+      toast.error("لا توجد حركات لهذا اليوم للتصدير");
+      return;
+    }
+    downloadCsvFile(`day_detail_${selectedDay.date}`, ["التاريخ", "النوع", "الرقم", "البيان", "التصنيف", "المبلغ"], rows);
+    toast.success("تم تصدير تفاصيل اليوم بنجاح");
+  };
+
+  /** Client-side export of the selected expense category movements as CSV. */
+  const handleExportCategory = () => {
+    if (!selectedExpenseCategory || !categoryMovements.length) {
+      toast.error("لا توجد حركات لهذا البند للتصدير");
+      return;
+    }
+    const rows = categoryMovements.map((e) => [
+      dayKeyOf(e.expense_date ?? e.created_at),
+      String(e.title || e.description || "مصروف"),
+      expenseCategoryLabel(String(e.category ?? "عام")),
+      safeNum(e.amount),
+    ]);
+    downloadCsvFile(`category_${selectedExpenseCategory.name}`, ["التاريخ", "البيان", "الفئة", "المبلغ"], rows);
+    toast.success("تم تصدير حركات البند بنجاح");
+  };
+
+  /** Client-side export of the selected payment method invoices as CSV. */
+  const handleExportPayment = () => {
+    if (!selectedPayment || !paymentInvoices.length) {
+      toast.error("لا توجد فواتير لهذه الوسيلة للتصدير");
+      return;
+    }
+    const rows = paymentInvoices.map((inv) => [
+      dayKeyOf(inv.created_at),
+      String(inv.id ?? ""),
+      String(inv.client_name || inv.client_name_ar || "عميل"),
+      paymentLabel(String(inv.payment_method ?? "")),
+      safeNum(inv.total_amount),
+    ]);
+    downloadCsvFile(
+      `payment_${selectedPayment.name}_${fromDate}_${toDate}`,
+      ["التاريخ", "رقم الفاتورة", "العميل", "وسيلة الدفع", "المبلغ"],
+      rows,
+    );
+    toast.success("تم تصدير فواتير الوسيلة بنجاح");
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   if (loading && !hasLoaded) {
@@ -706,7 +1098,7 @@ export default function FinancialReports() {
         badge="الرقابة المالية"
         icon={Banknote}
         actions={
-          <div className="flex w-full flex-col gap-3 xl:w-auto">
+          <div className="flex w-full flex-col gap-3 print:hidden xl:w-auto">
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label="نطاقات زمنية سريعة">
               {PRESETS.map((p) => (
                 <button
@@ -766,6 +1158,18 @@ export default function FinancialReports() {
               >
                 <RefreshCw size={15} /> تحديث
               </Button>
+              <Button
+                onClick={handlePrint}
+                variant="outline"
+                className="h-11 gap-2 px-5 text-xs font-black print:hidden"
+                title="طباعة التقرير أو حفظه PDF"
+              >
+                <Printer size={15} /> طباعة / PDF
+              </Button>
+              <label className="flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-[11px] font-black text-muted print:hidden">
+                <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} aria-label="تحديث تلقائي" />
+                تحديث تلقائي
+              </label>
             </div>
           </div>
         }
@@ -857,15 +1261,53 @@ export default function FinancialReports() {
                   <p className="text-[10px] font-black uppercase tracking-widest text-muted">
                     الهدف الشهري للإيرادات
                   </p>
-                  <p className="text-xl font-black text-main tabular-nums">
-                    {formatCurrency(MONTHLY_REVENUE_TARGET)}
-                  </p>
+                  {editingTarget ? (
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        value={targetDraft}
+                        onChange={(e) => setTargetDraft(e.target.value)}
+                        className="h-9 w-36 rounded-xl border border-border bg-card px-3 text-sm font-black tabular-nums text-main outline-none focus:border-primary"
+                        aria-label="الهدف الشهري"
+                      />
+                      <Button size="sm" onClick={handleSaveTarget} loading={savingTarget} className="h-9 text-[11px] font-black">
+                        حفظ
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingTarget(false);
+                          setTargetDraft(String(Math.round(monthlyTarget)));
+                        }}
+                        className="h-9 text-[11px] font-black"
+                      >
+                        إلغاء
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p className="text-xl font-black text-main tabular-nums">
+                        {formatCurrency(monthlyTarget)}
+                      </p>
+                      {canEditTarget && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingTarget(true)}
+                          className="rounded-lg border border-border bg-card px-2 py-1 text-[10px] font-black text-muted hover:text-primary print:hidden"
+                        >
+                          تعديل
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex-1 sm:w-72">
                 <div className="flex items-center justify-between gap-3 mb-2">
                   <span className="text-sm font-black text-main">
-                    {formatCurrency(currentMonthRevenue)} / {formatCurrency(MONTHLY_REVENUE_TARGET)}
+                    {formatCurrency(currentMonthRevenue)} / {formatCurrency(monthlyTarget)}
                   </span>
                   <span className="text-sm font-black text-primary">{targetProgress.toFixed(1)}%</span>
                 </div>
@@ -878,7 +1320,7 @@ export default function FinancialReports() {
                 <p className="mt-1 text-[10px] font-bold text-muted">
                   {targetProgress >= 100
                     ? "🎉 تم تحقيق الهدف! تجاوز بنسبة " + (targetProgress - 100).toFixed(1) + "%"
-                    : "متبقي " + formatCurrency(MONTHLY_REVENUE_TARGET - currentMonthRevenue) + " للوصول للهدف"}
+                    : "متبقي " + formatCurrency(Math.max(0, monthlyTarget - currentMonthRevenue)) + " للوصول للهدف"}
                 </p>
               </div>
               <div className="flex items-center gap-2 text-[10px] font-black text-muted">
@@ -922,8 +1364,65 @@ export default function FinancialReports() {
         </CardContent>
         </Card>
 
+      {/* Anomaly Alerts */}
+      {anomalies.length > 0 && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardHeader className="border-b border-border/60">
+            <div className="flex items-center gap-2">
+              <div className="rounded-xl bg-amber-500/15 p-2 text-amber-600">
+                <AlertTriangle size={18} />
+              </div>
+              <div>
+                <CardTitle>تنبيهات الشذوذ الإحصائي</CardTitle>
+                <CardDescription>
+                  أيام خارج النمط المعتاد (انحراف ±2σ أو قفزة 3 أضعاف الوسيط) — راجعها قبل اعتماد التقرير
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2 p-4 sm:p-6">
+            {anomalies.slice(0, 4).map((a) => (
+              <div
+                key={`${a.date}-${a.kind}`}
+                className="flex items-start gap-3 rounded-xl border border-amber-500/25 bg-card p-3"
+              >
+                <AlertTriangle
+                  size={16}
+                  className={cn("mt-0.5 shrink-0", a.severity === "high" ? "text-rose-600" : "text-amber-600")}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-black text-main">{a.message}</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="text-[9px]">
+                      {a.kind === "rev_spike" ? "قفزة إيرادات" : a.kind === "exp_spike" ? "قفزة مصروفات" : "هبوط الصافي"}
+                    </Badge>
+                    {a.severity === "high" && (
+                      <Badge className="bg-rose-600 text-[9px] text-white">حرج</Badge>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const t = financials.dailyTrends.find((d) => d.date === a.date);
+                        if (t) {
+                          setSelectedExpenseCategory(null);
+                          setSelectedPayment(null);
+                          setSelectedDay(t);
+                        }
+                      }}
+                      className="text-[10px] font-black text-primary hover:underline"
+                    >
+                      فحص اليوم ←
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Drill-down Detail Panel */}
-      {(selectedDay || selectedExpenseCategory) && (
+      {(selectedDay || selectedExpenseCategory || selectedPayment) && (
         <Card className="overflow-hidden border-primary/30 bg-primary/5 animate-in slide-in-from-bottom-4">
           <CardHeader className="flex items-center justify-between border-b border-border/60">
             <div className="flex items-center gap-3">
@@ -934,12 +1433,16 @@ export default function FinancialReports() {
                 <CardTitle className="text-lg">
                   {selectedDay
                     ? `تفاصيل ${selectedDay.date} — ${shortLabel(selectedDay.date)}`
-                    : `تفاصيل البند: ${selectedExpenseCategory?.name}`}
+                    : selectedExpenseCategory
+                      ? `تفاصيل البند: ${selectedExpenseCategory.name}`
+                      : `تحصيلات: ${selectedPayment ? paymentLabel(selectedPayment.name) : ""}`}
                 </CardTitle>
                 <CardDescription className="text-[10px]">
                   {selectedDay
                     ? "تفاصيل الإيرادات والمصروفات والفواتير لهذا اليوم"
-                    : "تحليل مفصل لهذا البند من المصروفات"}
+                    : selectedExpenseCategory
+                      ? "تحليل مفصل لهذا البند من المصروفات"
+                      : "الفواتير المحصلة بهذه الوسيلة خلال الفترة"}
                 </CardDescription>
               </div>
             </div>
@@ -950,6 +1453,7 @@ export default function FinancialReports() {
               onClick={() => {
                 setSelectedDay(null);
                 setSelectedExpenseCategory(null);
+                setSelectedPayment(null);
               }}
               aria-label="إغلاق التفاصيل"
             >
@@ -958,48 +1462,143 @@ export default function FinancialReports() {
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
             {selectedDay ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">
-                    إيرادات اليوم
-                  </p>
-                  <p className="text-2xl font-black text-emerald-600 tabular-nums">
-                    {formatCurrency(selectedDay.rev)}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-600 mb-1">
-                    مصروفات اليوم
-                  </p>
-                  <p className="text-2xl font-black text-rose-600 tabular-nums">
-                    {formatCurrency(selectedDay.exp)}
-                  </p>
-                </div>
-                <div
-                  className={cn(
-                    "rounded-2xl p-4 text-center",
-                    selectedDay.net >= 0
-                      ? "border-emerald-500/20 bg-emerald-500/5"
-                      : "border-rose-500/20 bg-rose-500/5",
-                  )}
-                >
-                  <p className="text-[10px] font-black uppercase tracking-widest mb-1">
-                    {selectedDay.net >= 0 ? "صافي ربح" : "صافي خسارة"}
-                  </p>
-                  <p
+              <div className="space-y-5">
+                {/* Summary cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">
+                      إيرادات اليوم
+                    </p>
+                    <p className="text-2xl font-black text-emerald-600 tabular-nums">
+                      {formatCurrency(selectedDay.rev)}
+                    </p>
+                    <p className="mt-1 text-[11px] font-bold text-muted">{dayInvoices.length} فاتورة</p>
+                  </div>
+                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-center">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-rose-600 mb-1">
+                      مصروفات اليوم
+                    </p>
+                    <p className="text-2xl font-black text-rose-600 tabular-nums">
+                      {formatCurrency(selectedDay.exp)}
+                    </p>
+                    <p className="mt-1 text-[11px] font-bold text-muted">{dayExpenses.length} مصروف</p>
+                  </div>
+                  <div
                     className={cn(
-                      "text-2xl font-black tabular-nums",
-                      selectedDay.net >= 0 ? "text-emerald-600" : "text-rose-600",
+                      "rounded-2xl p-4 text-center",
+                      selectedDay.net >= 0
+                        ? "border-emerald-500/20 bg-emerald-500/5"
+                        : "border-rose-500/20 bg-rose-500/5",
                     )}
                   >
-                    {formatCurrency(selectedDay.net)}
-                  </p>
+                    <p className="text-[10px] font-black uppercase tracking-widest mb-1">
+                      {selectedDay.net >= 0 ? "صافي ربح" : "صافي خسارة"}
+                    </p>
+                    <p
+                      className={cn(
+                        "text-2xl font-black tabular-nums",
+                        selectedDay.net >= 0 ? "text-emerald-600" : "text-rose-600",
+                      )}
+                    >
+                      {formatCurrency(selectedDay.net)}
+                    </p>
+                  </div>
                 </div>
+
+                {/* Invoices list */}
+                <div className="flex flex-wrap items-center gap-2 print:hidden">
+                  <Button
+                    onClick={handleExportDay}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-[11px] font-black"
+                    disabled={dayInvoices.length === 0 && dayExpenses.length === 0}
+                  >
+                    <FileDown size={14} /> تصدير اليوم Excel
+                  </Button>
+                  <Button
+                    onClick={handlePrint}
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2 text-[11px] font-black"
+                  >
+                    <Printer size={14} /> طباعة التفاصيل
+                  </Button>
+                </div>
+                {dayInvoices.length > 0 && (
+                  <div>
+                    <h4 className="mb-2 text-sm font-black text-main flex items-center gap-2">
+                      <FileText size={14} className="text-emerald-600" />
+                      فواتير اليوم ({dayInvoices.length})
+                    </h4>
+                    <div className="max-h-[220px] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-card p-2">
+                      {dayInvoices.map((inv, idx) => (
+                        <div
+                          key={inv.id ?? idx}
+                          className="flex items-center justify-between rounded-lg border border-border/40 bg-background px-3 py-2 text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[10px] text-muted">
+                              #{inv.id ?? idx + 1}
+                            </span>
+                            <span className="font-bold text-main">
+                              {inv.client_name || inv.client_name_ar || "عميل"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] text-muted">
+                              {paymentLabel(inv.payment_method)}
+                            </span>
+                            <span className="font-black text-emerald-600 tabular-nums">
+                              {formatCurrency(inv.total_amount)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Expenses list */}
+                {dayExpenses.length > 0 && (
+                  <div>
+                    <h4 className="mb-2 text-sm font-black text-main flex items-center gap-2">
+                      <Receipt size={14} className="text-rose-600" />
+                      مصروفات اليوم ({dayExpenses.length})
+                    </h4>
+                    <div className="max-h-[220px] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-card p-2">
+                      {dayExpenses.map((exp, idx) => (
+                        <div
+                          key={exp.id ?? idx}
+                          className="flex items-center justify-between rounded-lg border border-border/40 bg-background px-3 py-2 text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted">
+                              {expenseCategoryLabel(exp.category ?? "عام")}
+                            </span>
+                            <span className="font-bold text-main truncate max-w-[160px]">
+                              {exp.title || exp.description || "مصروف"}
+                            </span>
+                          </div>
+                          <span className="font-black text-rose-600 tabular-nums">
+                            {formatCurrency(exp.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {dayInvoices.length === 0 && dayExpenses.length === 0 && (
+                  <p className="text-center text-xs font-bold text-muted py-4">
+                    لا توجد فواتير أو مصروفات مسجلة لهذا اليوم
+                  </p>
+                )}
               </div>
-            ) : (
-              selectedExpenseCategory && (
-                <div className="space-y-3">
-                  <div className="rounded-2xl border border-border/60 bg-card p-4">
+            ) : selectedExpenseCategory ? (
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-border/60 bg-card p-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-black text-main">{selectedExpenseCategory.name}</span>
                       <span className="text-lg font-black tabular-nums text-main">
@@ -1024,11 +1623,119 @@ export default function FinancialReports() {
                     </div>
                   </div>
                   <p className="text-[11px] font-bold text-muted">
-                    عدد الحركات: {selectedExpenseCategory.count ?? "—"}
+                    عدد الحركات: {selectedExpenseCategory.count ?? categoryMovements.length}
                   </p>
+                  {categoryMovements.length > 0 && (
+                    <div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <h4 className="text-sm font-black text-main flex items-center gap-2">
+                          <Receipt size={14} className="text-rose-600" />
+                          الحركات المكونة للبند ({categoryMovements.length})
+                        </h4>
+                        <Button
+                          onClick={handleExportCategory}
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 text-[11px] font-black print:hidden"
+                        >
+                          <FileDown size={14} /> تصدير Excel
+                        </Button>
+                      </div>
+                      <div className="max-h-[240px] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-card p-2">
+                        {categoryMovements.map((e, idx) => (
+                          <div
+                            key={e.id ?? idx}
+                            className="flex items-center justify-between rounded-lg border border-border/40 bg-background px-3 py-2 text-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[10px] tabular-nums text-muted">
+                                {dayKeyOf(e.expense_date ?? e.created_at)}
+                              </span>
+                              <span className="font-bold text-main truncate max-w-[200px]">
+                                {e.title || e.description || "مصروف"}
+                              </span>
+                            </div>
+                            <span className="font-black text-rose-600 tabular-nums">
+                              {formatCurrency(e.amount)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )
-            )}
+              ) : selectedPayment ? (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-border/60 bg-card p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-black text-main">
+                        {paymentLabel(selectedPayment.name)}
+                      </span>
+                      <span className="text-lg font-black tabular-nums text-main">
+                        {formatCurrency(selectedPayment.value)}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs font-bold text-muted">
+                      <span>نسبة من إجمالي الإيرادات</span>
+                      <span>
+                        {financials.revenue > 0
+                          ? ((selectedPayment.value / financials.revenue) * 100).toFixed(1) + "%"
+                          : "—"}
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-soft">
+                      <div
+                        className="h-full rounded-full bg-emerald-500"
+                        style={{
+                          width: `${financials.revenue > 0 ? Math.min(100, (selectedPayment.value / financials.revenue) * 100) : 0}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <h4 className="text-sm font-black text-main flex items-center gap-2">
+                      <FileText size={14} className="text-emerald-600" />
+                      فواتير {paymentLabel(selectedPayment.name)} ({paymentInvoices.length})
+                    </h4>
+                    <Button
+                      onClick={handleExportPayment}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-[11px] font-black print:hidden"
+                      disabled={paymentInvoices.length === 0}
+                    >
+                      <FileDown size={14} /> تصدير Excel
+                    </Button>
+                  </div>
+                  {paymentInvoices.length > 0 ? (
+                    <div className="max-h-[240px] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-card p-2">
+                      {paymentInvoices.map((inv, idx) => (
+                        <div
+                          key={inv.id ?? idx}
+                          className="flex items-center justify-between rounded-lg border border-border/40 bg-background px-3 py-2 text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[10px] tabular-nums text-muted">
+                              {dayKeyOf(inv.created_at)}
+                            </span>
+                            <span className="font-bold text-main truncate max-w-[200px]">
+                              {inv.client_name || inv.client_name_ar || "عميل"}
+                            </span>
+                          </div>
+                          <span className="font-black text-emerald-600 tabular-nums">
+                            {formatCurrency(inv.total_amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-xs font-bold text-muted py-4">
+                      لا توجد فواتير مسجلة بهذه الوسيلة
+                    </p>
+                  )}
+                </div>
+              ) : null
+            }
           </CardContent>
         </Card>
       )}
@@ -1048,13 +1755,23 @@ export default function FinancialReports() {
                 الفواتير والمصروفات
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline" className="gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" /> الإيرادات
               </Badge>
               <Badge variant="outline" className="gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-rose-500" /> المصروفات
               </Badge>
+              {financials.prevDailyTrends.length > 0 && (
+                <>
+                  <Badge variant="outline" className="gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 opacity-60" style={{ borderBottom: "2px dashed" }} /> الفترة السابقة (إيراد)
+                  </Badge>
+                  <Badge variant="outline" className="gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-rose-500 opacity-60" style={{ borderBottom: "2px dashed" }} /> الفترة السابقة (مصروف)
+                  </Badge>
+                </>
+              )}
             </div>
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
@@ -1069,7 +1786,7 @@ export default function FinancialReports() {
             ) : (
               <div className="h-[300px] w-full sm:h-[340px]" dir="ltr">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
+                  <ComposedChart
                     data={financials.dailyTrends}
                     margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
                   >
@@ -1080,6 +1797,14 @@ export default function FinancialReports() {
                       </linearGradient>
                       <linearGradient id="finExp" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.28} />
+                        <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="finRevPrev" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.12} />
+                        <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="finExpPrev" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.12} />
                         <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
                       </linearGradient>
                     </defs>
@@ -1100,6 +1825,36 @@ export default function FinancialReports() {
                       tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
                     />
                     <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
+                    {/* Previous period - Revenue (dashed line) */}
+                    {financials.prevDailyTrends.length > 0 && (
+                      <>
+                        <Line
+                          type="monotone"
+                          data={financials.prevDailyTrends}
+                          dataKey="rev"
+                          name="إيرادات الفترة السابقة"
+                          stroke="#10B981"
+                          strokeWidth={1.5}
+                          strokeDasharray="6 4"
+                          strokeOpacity={0.6}
+                          dot={false}
+                          activeDot={{ r: 4, strokeWidth: 2, stroke: "#10B981", fill: "#fff", strokeOpacity: 0.6 }}
+                        />
+                        {/* Previous period - Expenses (dashed line) */}
+                        <Line
+                          type="monotone"
+                          data={financials.prevDailyTrends}
+                          dataKey="exp"
+                          name="مصروفات الفترة السابقة"
+                          stroke="#F43F5E"
+                          strokeWidth={1.5}
+                          strokeDasharray="6 4"
+                          strokeOpacity={0.6}
+                          dot={false}
+                          activeDot={{ r: 4, strokeWidth: 2, stroke: "#F43F5E", fill: "#fff", strokeOpacity: 0.6 }}
+                        />
+                      </>
+                    )}
                     {/* Current period - Revenue */}
                     <Area
                       type="monotone"
@@ -1122,7 +1877,7 @@ export default function FinancialReports() {
                       dot={false}
                       activeDot={{ r: 5, strokeWidth: 2, stroke: "#F43F5E", fill: "#fff" }}
                     />
-                  </AreaChart>
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -1137,7 +1892,7 @@ export default function FinancialReports() {
               </div>
               <CardTitle>طرق التحصيل</CardTitle>
             </div>
-            <CardDescription>توزيع المبيعات حسب وسيلة الدفع</CardDescription>
+            <CardDescription>توزيع المبيعات حسب وسيلة الدفع — اضغط أي وسيلة لعرض فواتيرها</CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
             {!paymentsWithPct.length ? (
@@ -1161,7 +1916,17 @@ export default function FinancialReports() {
                         strokeWidth={0}
                       >
                         {paymentsWithPct.map((p) => (
-                          <Cell key={p.name} fill={p.color} />
+                          <Cell
+                            key={p.name}
+                            fill={p.color}
+                            onClick={() => {
+                              setSelectedDay(null);
+                              setSelectedExpenseCategory(null);
+                              setSelectedPayment({ name: p.name, value: p.value });
+                            }}
+                            style={{ cursor: "pointer", outline: "none" }}
+                            opacity={selectedPayment && selectedPayment.name !== p.name ? 0.45 : 1}
+                          />
                         ))}
                       </Pie>
                       <ReTooltip content={<FinanceTooltip />} />
@@ -1180,7 +1945,30 @@ export default function FinancialReports() {
                   {paymentsWithPct.map((p) => (
                     <div
                       key={p.name}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-soft/60 p-3"
+                      className={cn(
+                        "flex items-center justify-between gap-3 rounded-xl border p-3 cursor-pointer transition-colors",
+                        selectedPayment?.name === p.name
+                          ? "border-primary bg-primary/5"
+                          : "border-border/50 bg-soft/60 hover:bg-soft",
+                      )}
+                      onClick={() => {
+                        setSelectedDay(null);
+                        setSelectedExpenseCategory(null);
+                        setSelectedPayment(
+                          selectedPayment?.name === p.name ? null : { name: p.name, value: p.value },
+                        );
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          setSelectedDay(null);
+                          setSelectedExpenseCategory(null);
+                          setSelectedPayment(
+                            selectedPayment?.name === p.name ? null : { name: p.name, value: p.value },
+                          );
+                        }
+                      }}
                     >
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
@@ -1228,10 +2016,20 @@ export default function FinancialReports() {
                   <div
                     key={`${c.name}-${i}`}
                     className="space-y-1.5 cursor-pointer hover:bg-soft/50 rounded-xl p-2 transition-colors"
-                    onClick={() => setSelectedExpenseCategory(c)}
+                    onClick={() => {
+                      setSelectedDay(null);
+                      setSelectedPayment(null);
+                      setSelectedExpenseCategory(c);
+                    }}
                     role="button"
                     tabIndex={0}
-                    onKeyDown={(e) => e.key === "Enter" && setSelectedExpenseCategory(c)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setSelectedDay(null);
+                        setSelectedPayment(null);
+                        setSelectedExpenseCategory(c);
+                      }
+                    }}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="truncate text-xs font-black text-main">{c.name}</span>
@@ -1279,17 +2077,34 @@ export default function FinancialReports() {
                 <div
                   key={d.date}
                   className="flex items-center gap-3 rounded-2xl border border-border/50 bg-soft/50 p-3 cursor-pointer hover:bg-soft transition-colors"
-                  onClick={() => setSelectedDay(d)}
+                  onClick={() => {
+                    setSelectedExpenseCategory(null);
+                    setSelectedPayment(null);
+                    setSelectedDay(d);
+                  }}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && setSelectedDay(d)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setSelectedExpenseCategory(null);
+                      setSelectedPayment(null);
+                      setSelectedDay(d);
+                    }
+                  }}
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-card text-sm font-black text-main shadow-sm">
                     {i + 1}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-black tabular-nums text-main">{d.date}</span>
+                      <span className="flex items-center gap-1.5 text-xs font-black tabular-nums text-main">
+                        {d.date}
+                        {anomalyDates.has(d.date) && (
+                          <span title="يوم شاذ إحصائياً">
+                            <AlertTriangle size={12} className="text-amber-600" />
+                          </span>
+                        )}
+                      </span>
                       <span
                         className={cn(
                           "shrink-0 text-xs font-black tabular-nums",
@@ -1319,6 +2134,327 @@ export default function FinancialReports() {
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-border/60">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="rounded-xl bg-indigo-500/10 p-2 text-indigo-600">
+                  <CalendarRange size={18} />
+                </div>
+                <div>
+                  <CardTitle>مقارنة آخر 6 شهور</CardTitle>
+                  <CardDescription>الإيرادات مقابل المصروفات شهرياً من البيانات الحقيقية</CardDescription>
+                </div>
+              </div>
+              {!monthlyLoaded && (
+                <Button
+                  onClick={fetchSixMonths}
+                  loading={monthlyLoading}
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-2 text-[11px] font-black"
+                >
+                  <BarChart3 size={14} /> تحميل المقارنة
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6">
+            {!monthlyLoaded ? (
+              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <CalendarRange size={26} className="text-muted" />
+                <p className="text-sm font-black text-main">المقارنة الشهرية جاهزة عند الطلب</p>
+                <p className="text-xs font-bold text-muted">اضغط تحميل لجلب 6 شهور وتجميعها شهرياً.</p>
+              </div>
+            ) : (
+              <div className="h-[260px] w-full" dir="ltr">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={monthly} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="var(--border)" opacity={0.5} />
+                    <XAxis
+                      dataKey="label"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                      dy={8}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      width={56}
+                      tickFormatter={compactTick}
+                      tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                    />
+                    <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
+                    <Bar dataKey="rev" name="الإيرادات" fill="#10B981" radius={[6, 6, 0, 0]} maxBarSize={28} />
+                    <Bar dataKey="exp" name="المصروفات" fill="#F43F5E" radius={[6, 6, 0, 0]} maxBarSize={28} />
+                    <Line
+                      type="monotone"
+                      dataKey="net"
+                      name="الصافي"
+                      stroke="#6366F1"
+                      strokeWidth={2.5}
+                      dot={{ r: 3, fill: "#6366F1" }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-border/60">
+            <div className="flex items-center gap-2">
+              <div className="rounded-xl bg-violet-500/10 p-2 text-violet-600">
+                <Zap size={18} />
+              </div>
+              <div>
+                <CardTitle>إسقاط التدفق النقدي — 30 يوم</CardTitle>
+                <CardDescription>
+                  {forecast
+                    ? `بناءً على متوسط آخر ${forecast.basisDays} يوم من الفترة الحالية`
+                    : "توقع تلقائي من الترند الحالي"}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 p-4 sm:p-6">
+            {!forecast ? (
+              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <Zap size={26} className="text-muted" />
+                <p className="text-sm font-black text-main">لا توجد بيانات كافية للإسقاط</p>
+                <p className="text-xs font-bold text-muted">اختر نطاقاً زمنياً فيه حركات مالية.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">إيراد متوقع</p>
+                    <p className="mt-1 text-sm font-black tabular-nums text-emerald-600">
+                      {formatCurrency(forecast.projRev)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-3">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-rose-600">مصروف متوقع</p>
+                    <p className="mt-1 text-sm font-black tabular-nums text-rose-600">
+                      {formatCurrency(forecast.projExp)}
+                    </p>
+                  </div>
+                  <div
+                    className={cn(
+                      "rounded-2xl border p-3",
+                      forecast.projNet >= 0
+                        ? "border-emerald-500/20 bg-emerald-500/5"
+                        : "border-rose-500/20 bg-rose-500/5",
+                    )}
+                  >
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted">صافي متوقع</p>
+                    <p
+                      className={cn(
+                        "mt-1 text-sm font-black tabular-nums",
+                        forecast.projNet >= 0 ? "text-emerald-600" : "text-rose-600",
+                      )}
+                    >
+                      {formatCurrency(forecast.projNet)}
+                    </p>
+                  </div>
+                </div>
+                <div className="h-[150px] w-full" dir="ltr">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={forecast.cumulative} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="finForecast" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.28} />
+                          <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="var(--border)" opacity={0.5} />
+                      <XAxis
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                        dy={8}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        width={56}
+                        tickFormatter={compactTick}
+                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                      />
+                      <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
+                      <Area
+                        type="monotone"
+                        dataKey="net"
+                        name="الصافي التراكمي المتوقع"
+                        stroke="#8B5CF6"
+                        strokeWidth={2.5}
+                        strokeDasharray="6 4"
+                        fill="url(#finForecast)"
+                        dot={false}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="text-[10px] font-bold text-muted">
+                  متوسط يومي: إيراد {formatCurrency(forecast.avgRev)} • مصروف {formatCurrency(forecast.avgExp)} — الإسقاط خطي ويفترض استمرار نفس الوتيرة.
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {canEditTarget && (
+        <Card className="overflow-hidden print:hidden">
+          <CardHeader className="border-b border-border/60">
+            <div className="flex items-center gap-2">
+              <div className="rounded-xl bg-teal-500/10 p-2 text-teal-600">
+                <BellRing size={18} />
+              </div>
+              <div>
+                <CardTitle>التقارير المالية المجدولة</CardTitle>
+                <CardDescription>
+                  إرسال تلقائي لملخص الإيرادات والمصروفات والصافي — إشعار داخل النظام و/أو واتساب
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 p-4 sm:p-6">
+            <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-dashed border-border bg-soft/60 p-3">
+              <label className="flex flex-col gap-1 text-[11px] font-black text-muted">
+                التكرار
+                <select
+                  value={schedFreq}
+                  onChange={(e) => setSchedFreq(e.target.value)}
+                  className="h-10 rounded-xl border border-border bg-card px-3 text-xs font-black text-main outline-none"
+                >
+                  <option value="daily">يومي</option>
+                  <option value="weekly">أسبوعي</option>
+                  <option value="monthly">شهري</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] font-black text-muted">
+                القناة
+                <select
+                  value={schedChannel}
+                  onChange={(e) => setSchedChannel(e.target.value)}
+                  className="h-10 rounded-xl border border-border bg-card px-3 text-xs font-black text-main outline-none"
+                >
+                  <option value="notification">إشعار داخلي</option>
+                  <option value="whatsapp">واتساب</option>
+                  <option value="both">الاثنان معاً</option>
+                </select>
+              </label>
+              {(schedChannel === "whatsapp" || schedChannel === "both") && (
+                <label className="flex flex-col gap-1 text-[11px] font-black text-muted">
+                  رقم الواتساب (اختياري — وإلا رقم المحل)
+                  <input
+                    value={schedPhone}
+                    onChange={(e) => setSchedPhone(e.target.value)}
+                    placeholder="01xxxxxxxxx"
+                    dir="ltr"
+                    className="h-10 w-40 rounded-xl border border-border bg-card px-3 text-xs font-black tabular-nums text-main outline-none"
+                  />
+                </label>
+              )}
+              <Button
+                onClick={handleCreateSchedule}
+                loading={schedBusyId === "new"}
+                disabled={schedBusyId !== null}
+                className="h-10 gap-2 text-xs font-black"
+              >
+                <BellRing size={15} /> إنشاء جدولة
+              </Button>
+            </div>
+
+            {schedLoading ? (
+              <p className="py-6 text-center text-xs font-bold text-muted">جاري تحميل الجداول...</p>
+            ) : schedules.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <BellRing size={24} className="text-muted" />
+                <p className="text-sm font-black text-main">لا توجد جداول بعد</p>
+                <p className="text-xs font-bold text-muted">أنشئ أول جدولة ليصلك الملخص المالي تلقائياً.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {schedules.map((s) => (
+                  <div
+                    key={s.id}
+                    className={cn(
+                      "flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between",
+                      s.is_active ? "border-border/60 bg-card" : "border-border/40 bg-soft/40 opacity-70",
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-black text-main">
+                        {s.name} • {s.frequency === "daily" ? "يومي" : s.frequency === "weekly" ? "أسبوعي" : "شهري"} •{" "}
+                        {s.channel === "notification" ? "إشعار داخلي" : s.channel === "whatsapp" ? "واتساب" : "إشعار + واتساب"}
+                      </p>
+                      <p className="mt-1 text-[10px] font-bold tabular-nums text-muted">
+                        {s.last_run_at
+                          ? `آخر تشغيل: ${s.last_run_at.slice(0, 16).replace("T", " ")} (${s.last_status === "ok" ? "ناجح" : "فشل"})`
+                          : "لم يُشغَّل بعد"}
+                        {s.next_run_at ? ` • التالي: ${s.next_run_at.slice(0, 16).replace("T", " ")}` : ""}
+                      </p>
+                      {s.last_summary && (
+                        <p className="mt-1 line-clamp-2 text-[10px] font-bold leading-relaxed text-muted">
+                          {s.last_summary}
+                        </p>
+                      )}
+                      {s.last_pdf_url && (
+                        <a
+                          href={`${staticURL}${s.last_pdf_url}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-border bg-soft/60 px-2.5 py-1 text-[10px] font-black text-primary hover:underline"
+                        >
+                          <FileDown size={12} /> تحميل آخر PDF
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <label className="flex items-center gap-2 text-[10px] font-black text-muted">
+                        <Switch
+                          checked={s.is_active}
+                          onCheckedChange={() => handleToggleSchedule(s)}
+                          aria-label="تفعيل الجدولة"
+                        />
+                        {s.is_active ? "مفعّلة" : "متوقفة"}
+                      </label>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRunScheduleNow(s)}
+                        loading={schedBusyId === s.id}
+                        disabled={schedBusyId !== null}
+                        className="gap-1.5 text-[11px] font-black"
+                        title="تشغيل فوري"
+                      >
+                        <Play size={13} /> الآن
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDeleteSchedule(s)}
+                        disabled={schedBusyId !== null}
+                        className="gap-1.5 text-[11px] font-black text-rose-600"
+                        aria-label="حذف الجدولة"
+                      >
+                        <Trash2 size={13} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="relative overflow-hidden bg-slate-950 text-white">
         <div className="relative z-10 space-y-6 p-6 sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1345,7 +2481,7 @@ export default function FinancialReports() {
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-purple-500/10 blur-[100px]" />
       </Card>
 
-      <div className="space-y-5">
+      <div className="space-y-5 print:hidden">
         <div className="flex items-center gap-3">
           <div className="rounded-2xl bg-primary p-2.5 text-white shadow-lg shadow-primary/20">
             <LayoutGrid size={20} />
@@ -1415,6 +2551,11 @@ export default function FinancialReports() {
         {refreshing && (
           <span className="text-[10px] font-black uppercase tracking-widest text-primary">
             جاري التحديث...
+          </span>
+        )}
+        {autoRefresh && (
+          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
+            التحديث التلقائي مفعّل (كل 60 ثانية)
           </span>
         )}
       </div>

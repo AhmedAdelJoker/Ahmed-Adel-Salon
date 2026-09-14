@@ -50,6 +50,7 @@ from app.models.employee_time_off import EmployeeTimeOff  # noqa
 from app.models.employee_presence_log import EmployeePresenceLog  # noqa
 from app.models.leave_request import LeaveRequest  # noqa
 from app.models.notification import Notification  # noqa
+from app.models.report_schedule import ReportSchedule  # noqa
 
 # Supporting / approval models
 from app.models.discount_approval_request import DiscountApprovalRequest  # noqa

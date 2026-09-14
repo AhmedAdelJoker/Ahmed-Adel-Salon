@@ -43,6 +43,33 @@ def scheduled_shift_closure():
     finally:
         db.close()
 
+
+def scheduled_report_delivery():
+    """Task to deliver due periodic financial reports."""
+    db = SessionLocal()
+    try:
+        from app.services.scheduled_reports import run_due_schedules
+        results = run_due_schedules(db)
+        if results:
+            print(f"[Scheduler] Delivered {len(results)} scheduled report(s).")
+    except Exception as e:
+        print(f"[Scheduler] Error during scheduled-report-delivery: {e}")
+    finally:
+        db.close()
+
+
+def cleanup_scheduled_reports():
+    """Task to delete old scheduled-report PDFs, keeping the most recent N."""
+    from app.services.scheduled_reports import cleanup_old_pdfs
+    try:
+        import os
+        keep_n = int(os.environ.get("SCHEDULED_PDF_KEEP", "20"))
+        result = cleanup_old_pdfs(keep_n)
+        if result["deleted"]:
+            print(f"[Scheduler] Cleaned up {result['deleted']} old PDF(s). {result['remaining']} remaining.")
+    except Exception as e:
+        print(f"[Scheduler] Error during PDF cleanup: {e}")
+
 scheduler = BackgroundScheduler()
 scheduler.add_job(
     scheduled_shift_closure,
@@ -52,6 +79,26 @@ scheduler.add_job(
     coalesce=True,
     misfire_grace_time=300,
     id="auto_close_shifts",
+    replace_existing=True,
+)
+scheduler.add_job(
+    scheduled_report_delivery,
+    "interval",
+    minutes=30,
+    max_instances=1,
+    coalesce=True,
+    misfire_grace_time=600,
+    id="scheduled_report_delivery",
+    replace_existing=True,
+)
+scheduler.add_job(
+    cleanup_scheduled_reports,
+    "interval",
+    hours=24,
+    max_instances=1,
+    coalesce=True,
+    misfire_grace_time=60,
+    id="cleanup_scheduled_pdfs",
     replace_existing=True,
 )
 scheduler.start()

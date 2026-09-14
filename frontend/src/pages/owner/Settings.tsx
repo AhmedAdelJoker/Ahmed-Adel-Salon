@@ -88,6 +88,11 @@ const normalizeShopSettings = (data: Record<string, any> = {}, fallback: Record<
     data.allowBankCard ??
     fallback.allow_bank_card ??
     true,
+  monthly_revenue_target:
+    data.monthly_revenue_target ??
+    data.monthlyRevenueTarget ??
+    fallback.monthly_revenue_target ??
+    500000,
 });
 
 const SETTINGS_TABS = [
@@ -144,6 +149,7 @@ const Settings = () => {
     allow_vodafone_cash: true,
     allow_instapay: true,
     allow_bank_card: true,
+    monthly_revenue_target: 500000,
   });
 
   const getLogoPreviewUrl = () => {
@@ -272,6 +278,7 @@ const Settings = () => {
         allowVodafoneCash: shopSettings.allow_vodafone_cash,
         allowInstapay: shopSettings.allow_instapay,
         allowBankCard: shopSettings.allow_bank_card,
+        monthlyRevenueTarget: safePositive(shopSettings.monthly_revenue_target) || 500000,
       };
 
       const res = await api.put("/business-settings", payload);
@@ -620,6 +627,26 @@ const Settings = () => {
                             }
                             className="h-16 rounded-[1.25rem] bg-soft border-border/60 font-bold px-7 focus:bg-card focus:ring-4 focus:ring-primary/5 transition-all"
                           />
+                        </div>
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black text-muted uppercase tracking-widest mr-1">
+                            الهدف الشهري للإيرادات (ج.م)
+                          </label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={shopSettings.monthly_revenue_target}
+                            onChange={(e) =>
+                              setShopSettings({
+                                ...shopSettings,
+                                monthly_revenue_target: Number(e.target.value) || 0,
+                              })
+                            }
+                            className="h-16 rounded-[1.25rem] bg-soft border-border/60 text-lg font-black px-7 tabular-nums focus:bg-card focus:ring-4 focus:ring-primary/5 transition-all"
+                          />
+                          <p className="text-[10px] font-bold text-muted">
+                            يظهر في بطاقة الهدف بصفحة التحليلات المالية.
+                          </p>
                         </div>
                       </div>
                     </div>

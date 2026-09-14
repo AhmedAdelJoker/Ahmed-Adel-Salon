@@ -91,6 +91,7 @@ class BusinessSettingsUpdate(BaseModel):
     social_tiktok: Optional[str] = None
     social_youtube: Optional[str] = None
     loyalty_settings: Optional[dict[str, Any]] = None
+    monthly_revenue_target: Optional[float] = Field(default=None, ge=0)
 
     # Snapshot
     public_site_snapshot: Optional[dict[str, Any]] = None
@@ -173,6 +174,7 @@ class BusinessSettingsRead(BaseModel):
     social_tiktok: Optional[str] = None
     social_youtube: Optional[str] = None
     loyalty_settings: Optional[dict[str, Any]] = None
+    monthly_revenue_target: float = 500000
 
     # Snapshot
     public_site_snapshot: Optional[dict[str, Any]] = None

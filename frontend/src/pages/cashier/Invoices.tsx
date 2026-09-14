@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FileText,
@@ -25,7 +25,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useSalon } from "@/context/SalonContext";
 import { printThermalReceipt } from "@/lib/print/receipt";
 import api from "@/services/api";
-import { adaptList } from "@/services/apiAdapter";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -47,7 +46,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn, getApiErrorMessage, formatCurrency as formatCurrencyShared } from "@/lib/core/utils";
+import { cn } from "@/lib/core/utils";
 import {
   Table,
   TableBody,
@@ -58,7 +57,8 @@ import {
 } from "@/components/ui/table";
 import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";
 import { Badge } from "@/components/ui/badge";
-import { paymentLabels, statusLabels, asNumber, formatCurrency, formatDate, invoiceId, invoiceNo, invoiceCustomer, invoicePayment, invoiceStatus, invoiceTotal, invoiceCreatedAt, rowsFromInvoice, itemName, itemQty, itemTotal, invoiceBarber, isInvoiceEditable } from "@/features/invoices";
+import { useInvoicesData } from "@/features/invoices/hooks/useInvoicesData";
+import { paymentLabels, statusLabels, formatCurrency, formatDate, invoiceId, invoiceNo, invoiceCustomer, invoicePayment, invoiceStatus, invoiceTotal, invoiceCreatedAt, rowsFromInvoice, itemName, itemQty, itemTotal, invoiceBarber, isInvoiceEditable } from "@/features/invoices";
 import { Input } from "@/components/ui/input";
 
 
@@ -67,42 +67,40 @@ export default function Invoices() {
   const { user } = useAuth();
 
   const navigate = useNavigate();
+  const {
+    invoices,
+    adjustments,
+    invoicesLoading,
+    adjustmentsLoading,
+    loading,
+    query,
+    setQuery,
+    paymentFilter,
+    setPaymentFilter,
+    statusFilter,
+    setStatusFilter,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+    currentPage,
+    setCurrentPage,
+    timePreset,
+    setTimePreset,
+    sortConfig,
+    showColumnPicker,
+    setShowColumnPicker,
+    pageSize,
+    totalCount,
+    visibleColumns,
+    toggleColumn,
+    handleSort,
+    fetchInvoices,
+    filteredInvoices,
+    summary,
+    exportToCSV,
+  } = useInvoicesData();
    
-  const [invoices, setInvoices] = useState<any[]>([]);
-   
-  const [adjustments, setAdjustments] = useState<any[]>([]);
-  const [invoicesLoading, setInvoicesLoading] = useState(true);
-  const [adjustmentsLoading, setAdjustmentsLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [paymentFilter, setPaymentFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-   
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-   
-  const [busyPdfId, setBusyPdfId] = useState<any>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [timePreset, setTimePreset] = useState("month");
-   
-  const [sortConfig, setSortConfig] = useState<any>({
-    key: "created_at",
-    direction: "desc",
-  });
-  const [showColumnPicker, setShowColumnPicker] = useState(false);
-  const pageSize = 20;
-  const [totalCount, setTotalCount] = useState(0);
-
-   
-  const [visibleColumns, setVisibleColumns] = useState<any>({
-    invoiceNo: true,
-    customer: true,
-    date: true,
-    payment: true,
-    status: true,
-    amount: true,
-    actions: true,
-  });
 
    
   const [adjustmentDialog, setAdjustmentDialog] = useState<any>({
@@ -115,177 +113,8 @@ export default function Invoices() {
     manager_pin: "",
   });
   const [adjustmentSubmitting, setAdjustmentSubmitting] = useState(false);
-
-  const toggleColumn = useCallback((key) => {
-    setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
-
-  const handleSort = useCallback((key) => {
-    setSortConfig((prev) => ({
-      key,
-      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
-    }));
-    setCurrentPage(1);
-  }, []);
-
-  async function fetchInvoices() {
-    const fetchInvoiceData = async () => {
-      try {
-        setInvoicesLoading(true);
-        const params: Record<string, unknown> = {
-          skip: (currentPage - 1) * pageSize,
-          limit: pageSize,
-        };
-        if (fromDate) params.from_date = fromDate;
-        if (toDate) params.to_date = toDate;
-        if (paymentFilter !== "all") params.payment_method = paymentFilter;
-        if (statusFilter !== "all") params.status = statusFilter;
-
-        const res = await api.get("/invoices", { params });
-        const raw = res.data || {};
-        const items = Array.isArray(raw) ? raw : raw.items || adaptList(res);
-        const total = typeof raw.total === "number" ? raw.total : items.length;
-        setInvoices(items);
-        setTotalCount(total);
-      } catch (error) {
-        const apiErr = error as { response?: { data?: unknown } };
-        console.error("Invoices load error:", apiErr?.response?.data || error);
-        toast.error(getApiErrorMessage(apiErr, "فشل تحميل أرشيف الفواتير"));
-        setInvoices([]);
-      } finally {
-        setInvoicesLoading(false);
-      }
-    };
-
-    const fetchAdjustments = async () => {
-      try {
-        setAdjustmentsLoading(true);
-        const res = await api.get("/invoice-adjustment-requests");
-        setAdjustments(adaptList(res));
-      } catch (error) {
-        console.error("Adjustments load error:", error);
-        setAdjustments([]);
-      } finally {
-        setAdjustmentsLoading(false);
-      }
-    };
-
-    return Promise.all([fetchInvoiceData(), fetchAdjustments()]);
-  }
-
-  useEffect(() => {
-    const fmtLocal = (d) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-    const urlMonth = new URLSearchParams(window.location.search).get("month");
-    if (urlMonth) {
-      const [y, m] = urlMonth.split("-").map(Number);
-      if (y && m) {
-        const first = new Date(y, m - 1, 1);
-        const last = new Date(y, m, 0);
-        setFromDate(fmtLocal(first));
-        setToDate(fmtLocal(last));
-        return;
-      }
-    }
-
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    let from = "";
-    let to = "";
-    switch (timePreset) {
-      case "today":
-        from = fmtLocal(today);
-        to = from;
-        break;
-      case "week": {
-        const start = new Date(today);
-        start.setDate(start.getDate() - start.getDay());
-        from = fmtLocal(start);
-        to = fmtLocal(today);
-        break;
-      }
-      case "month":
-        from = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 1));
-        to = fmtLocal(today);
-        break;
-      case "last_month": {
-        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const end = new Date(now.getFullYear(), now.getMonth(), 0);
-        from = fmtLocal(start);
-        to = fmtLocal(end);
-        break;
-      }
-      default:
-        break;
-    }
-    if (timePreset !== "custom") {
-      setFromDate(from);
-      setToDate(to);
-    }
-  }, [timePreset]);
-
-  useEffect(() => {
-    fetchInvoices();
-     
-  }, [fromDate, toDate, paymentFilter, statusFilter, currentPage]);
-
-  const loading = invoicesLoading || adjustmentsLoading;
-
-  const filteredInvoices = useMemo(() => {
-    const text = query.trim().toLowerCase();
-    const filtered = invoices.filter((invoice) => {
-      if (!text) return true;
-      return [invoiceNo(invoice), invoiceCustomer(invoice)]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(text);
-    });
-
-    const { key, direction } = sortConfig;
-    const getValue = (invoice) => {
-      switch (key) {
-        case "invoiceNo":
-          return invoiceNo(invoice);
-        case "customer":
-          return invoiceCustomer(invoice);
-        case "date":
-          return new Date(invoiceCreatedAt(invoice) || 0).getTime();
-        case "payment":
-          return invoicePayment(invoice);
-        case "status":
-          return invoiceStatus(invoice);
-        case "amount":
-          return invoiceTotal(invoice);
-        case "created_at":
-        default:
-          return new Date(invoiceCreatedAt(invoice) || 0).getTime();
-      }
-    };
-
-    filtered.sort((a, b) => {
-      const valA = getValue(a);
-      const valB = getValue(b);
-      if (valA < valB) return direction === "asc" ? -1 : 1;
-      if (valA > valB) return direction === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    return filtered;
-  }, [invoices, query, sortConfig]);
-
-  const summary = useMemo(() => {
-    return filteredInvoices.reduce(
-      (acc, invoice) => {
-        acc.count += 1;
-        acc.total += invoiceTotal(invoice);
-        if (invoiceStatus(invoice) === "paid") acc.paid += 1;
-        return acc;
-      },
-      { count: 0, total: 0, paid: 0 },
-    );
-  }, [filteredInvoices]);
+  const [busyPdfId, setBusyPdfId] = useState<number | string | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
 
   const averageInvoice = summary.count ? summary.total / summary.count : 0;
   const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize));
@@ -362,44 +191,6 @@ export default function Invoices() {
     }
   }
 
-  const exportToCSV = useCallback(() => {
-    if (!filteredInvoices.length) return toast.error("لا توجد بيانات للتصدير");
-
-    const headers = [
-      { key: "invoiceNo", label: "رقم الفاتورة" },
-      { key: "customer", label: "العميل" },
-      { key: "barber", label: "الخبير" },
-      { key: "date", label: "التاريخ" },
-      { key: "payment", label: "وسيلة الدفع" },
-      { key: "status", label: "الحالة" },
-      { key: "amount", label: "القيمة" },
-    ];
-
-    const rows = filteredInvoices.map((inv) => ({
-      invoiceNo: `#${invoiceNo(inv)}`,
-      customer: invoiceCustomer(inv),
-      barber: invoiceBarber(inv),
-      date: formatDate(invoiceCreatedAt(inv)),
-      payment: paymentLabels[invoicePayment(inv)] || invoicePayment(inv),
-      status: statusLabels[invoiceStatus(inv)] || invoiceStatus(inv),
-      amount: formatCurrency(invoiceTotal(inv)),
-    }));
-
-    const csvContent = [
-      headers.map((h) => h.label).join(","),
-      ...rows.map((r) => headers.map((h) => `"${r[h.key]}"`).join(",")),
-    ].join("\n");
-
-    const blob = new Blob(["\uFEFF" + csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `invoices-${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-    toast.success("تم تصدير البيانات بنجاح");
-  }, [filteredInvoices]);
 
   return (
     <div className="min-h-screen pb-12" dir="rtl">

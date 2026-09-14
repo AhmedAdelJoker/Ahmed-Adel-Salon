@@ -83,6 +83,9 @@ class BusinessSettings(Base):
     
     # Loyalty System Configuration
     loyalty_settings = Column(JSON, nullable=True) # {enabled: bool, tiers: [], points_per_egp: float, etc}
+
+    # Monthly revenue target (EGP) shown on the owner financial dashboard
+    monthly_revenue_target = Column(Numeric(12, 2), nullable=False, default=500000)
     
     public_site_snapshot = Column(JSON, nullable=True)
     public_site_published_at = Column(DateTime(timezone=True), nullable=True)

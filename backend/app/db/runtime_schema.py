@@ -175,6 +175,19 @@ def ensure_runtime_schema() -> None:
             "ALTER TABLE expenses ADD COLUMN recipient_name VARCHAR(255)",
         )
 
+        _ensure_column(
+            connection,
+            "business_settings",
+            "monthly_revenue_target",
+            "ALTER TABLE business_settings ADD COLUMN monthly_revenue_target NUMERIC(12, 2) DEFAULT 500000",
+        )
+        _ensure_column(
+            connection,
+            "report_schedules",
+            "last_pdf_url",
+            "ALTER TABLE report_schedules ADD COLUMN last_pdf_url VARCHAR(500)",
+        )
+
         _ensure_index(connection, "ix_invoices_created_at", "CREATE INDEX ix_invoices_created_at ON invoices (created_at)")
         _ensure_index(connection, "ix_invoices_barber_created", "CREATE INDEX ix_invoices_barber_created ON invoices (barber_id, created_at)")
         _ensure_index(connection, "ix_expenses_expense_date", "CREATE INDEX ix_expenses_expense_date ON expenses (expense_date)")

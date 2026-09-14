@@ -41,6 +41,7 @@ from app.api.v1.endpoints.admin import router as admin_router
 from app.api.v1.endpoints.public_seo import router as public_seo_router
 from app.api.v1.endpoints.reminders import router as reminders_router
 from app.api.v1.endpoints.exports import router as exports_router
+from app.api.v1.endpoints.report_schedules import router as report_schedules_router
 from app.api.v1.endpoints.imports import router as imports_router
 from app.api.v1.endpoints.security_settings import router as security_settings_router
 from app.api.v1.endpoints.financial_rules import router as financial_rules_router
@@ -105,6 +106,7 @@ api_router.include_router(admin_router)
 api_router.include_router(public_seo_router)
 api_router.include_router(reminders_router)
 api_router.include_router(exports_router)
+api_router.include_router(report_schedules_router)
 api_router.include_router(imports_router)
 api_router.include_router(security_settings_router)
 api_router.include_router(financial_rules_router)

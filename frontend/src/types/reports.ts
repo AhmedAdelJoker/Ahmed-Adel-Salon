@@ -1,6 +1,9 @@
 /**
  * Financial reports domain types (moved from pages/owner/FinancialReports.tsx).
  */
+
+/** Generic row type for API responses that may contain any fields. */
+export type RawRow = Record<string, any>;
 export interface PaymentSlice {
   name: string;
   value: number;
@@ -44,6 +47,7 @@ export interface FinancialsState {
   payments: PaymentSlice[];
   expenseCategories: ExpenseSlice[];
   dailyTrends: TrendPoint[];
+  prevDailyTrends: TrendPoint[];
   invoiceCount: number;
   expenseCount: number;
   avgTicket: number;
@@ -55,4 +59,8 @@ export interface FinancialsState {
   totalInvoices: number;
   /** True when rows were capped for performance. */
   truncated: boolean;
+  /** Full invoice rows for drill-down (last fetch). */
+  invoiceRows: RawRow[];
+  /** Full expense rows for drill-down (last fetch). */
+  expenseRows: RawRow[];
 }
