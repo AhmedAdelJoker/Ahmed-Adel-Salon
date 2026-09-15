@@ -12,7 +12,7 @@ import {
 } from "@/features/loyalty/utils/loyaltyHelpers";
 
 export type LoyaltyTierField = "name" | "min_visits" | "discount_percent";
-export type LoyaltyRuleField = "points_per_egp" | "redemption_rate";
+export type LoyaltyRuleField = "points_per_egp" | "redemption_rate" | "points_expiry_months";
 
 export function useLoyaltySettings() {
   const [settings, setSettings] = useState<LoyaltySettings>(DEFAULT_LOYALTY_SETTINGS);

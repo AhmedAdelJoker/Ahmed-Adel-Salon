@@ -418,6 +418,10 @@ export default function AppRouter() {
                   path="/owner/financial-rules"
                   element={<FinancialRules />}
                 />
+                <Route
+                  path="/owner/loyalty-settings"
+                  element={<LoyaltySettingsPanel />}
+                />
                 <Route path="/owner/alerts" element={<SmartAlerts />} />
                 <Route
                   path="/owner/connected-pages"
@@ -476,10 +480,6 @@ export default function AppRouter() {
                 <Route
                   path="/owner/working-hours"
                   element={<Navigate to="/owner/settings?tab=hours" replace />}
-                />
-                <Route
-                  path="/owner/loyalty-settings"
-                  element={<LoyaltySettingsPanel />}
                 />
               </Route>
 

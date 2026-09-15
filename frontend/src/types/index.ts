@@ -15,3 +15,4 @@ export * from "@/types/cashbox";
 export * from "@/types/website";
 export * from "@/types/attendance";
 export * from "@/types/reports";
+export * from "@/types/loyalty";

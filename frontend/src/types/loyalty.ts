@@ -13,6 +13,8 @@ export interface LoyaltySettings {
   enabled: boolean;
   points_per_egp: number;
   redemption_rate: number;
+  /** 0 = لا تنتهي الصلاحية أبداً */
+  points_expiry_months: number;
   tiers: LoyaltyTier[];
 }
 

@@ -26,7 +26,6 @@ import {
   Banknote,
   CalendarDays,
   UserCircle,
-  Trophy,
   Globe,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -254,13 +253,6 @@ const MENU_GROUPS = [
         to: "/owner/payroll",
         icon: Wallet,
         roles: ["OWNER", "ADMIN", "ACCOUNTANT", "MANAGER"],
-      },
-      {
-        key: "loyalty",
-        label: "نظام الولاء",
-        to: "/owner/loyalty-settings",
-        icon: Trophy,
-        roles: ["OWNER", "ADMIN", "MANAGER"],
       },
       {
         key: "reports",

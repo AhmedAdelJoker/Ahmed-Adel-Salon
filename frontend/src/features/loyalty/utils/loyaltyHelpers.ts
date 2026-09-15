@@ -7,6 +7,7 @@ export const LOYALTY_LIMITS = {
   pointsPerEgpMax: 1,
   redemptionMin: 0.1,
   redemptionMax: 2,
+  expiryMonthsMax: 60,
 } as const;
 
 /** أمثلة المعاينة الحية داخل PreviewCard */
@@ -16,6 +17,7 @@ export const DEFAULT_LOYALTY_SETTINGS: LoyaltySettings = {
   enabled: false,
   points_per_egp: 0.1, // 10 جنيه = 1 نقطة
   redemption_rate: 0.5, // 1 نقطة = 0.5 جنيه
+  points_expiry_months: 0, // 0 = بدون انتهاء
   tiers: [
     { name: "برونزي", min_visits: 0, discount_percent: 0, color: "bg-orange-600" },
     { name: "فضي", min_visits: 6, discount_percent: 5, color: "bg-slate-400" },
@@ -42,6 +44,10 @@ export function normalizeLoyaltySettings(raw: unknown): LoyaltySettings {
       record.redemption_rate ?? record.redemptionRate,
       DEFAULT_LOYALTY_SETTINGS.redemption_rate,
     ),
+    points_expiry_months: Math.max(
+      0,
+      Math.floor(toNumber(record.points_expiry_months ?? record.pointsExpiryMonths, 0)),
+    ),
     tiers: rawTiers
       .filter((t) => t && typeof t === "object")
       .map((t) => ({
@@ -60,6 +66,7 @@ export function toLoyaltyPayload(settings: LoyaltySettings): LoyaltySavePayload 
       enabled: settings.enabled,
       points_per_egp: toNumber(settings.points_per_egp, DEFAULT_LOYALTY_SETTINGS.points_per_egp),
       redemption_rate: toNumber(settings.redemption_rate, DEFAULT_LOYALTY_SETTINGS.redemption_rate),
+      points_expiry_months: Math.max(0, Math.floor(toNumber(settings.points_expiry_months, 0))),
       tiers: settings.tiers.map((tier) => ({
         name: String(tier.name ?? "").trim(),
         min_visits: Math.max(0, Math.floor(toNumber(tier.min_visits, 0))),
@@ -102,6 +109,10 @@ export function validateLoyaltySettings(settings: LoyaltySettings): string | nul
   }
   if (!isInRange(settings.redemption_rate, LOYALTY_LIMITS.redemptionMin, LOYALTY_LIMITS.redemptionMax)) {
     return `قيمة الاستبدال بين ${LOYALTY_LIMITS.redemptionMin} و ${LOYALTY_LIMITS.redemptionMax} جنيه لكل نقطة`;
+  }
+  const expiryMonths = Math.floor(Number(settings.points_expiry_months));
+  if (!Number.isFinite(expiryMonths) || expiryMonths < 0 || expiryMonths > LOYALTY_LIMITS.expiryMonthsMax) {
+    return `صلاحية النقاط بين 0 و ${LOYALTY_LIMITS.expiryMonthsMax} شهراً (0 = بدون انتهاء)`;
   }
   return null;
 }
