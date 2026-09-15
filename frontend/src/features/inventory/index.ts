@@ -19,6 +19,16 @@ export {
 } from "@/features/inventory/components/Skeletons";
 export { StockWizard } from "@/features/inventory/components/StockWizard";
 export { FilterPanel } from "@/features/inventory/components/FilterPanel";
+export { FormField } from "@/features/inventory/components/FormField";
+export type { FormFieldProps } from "@/features/inventory/components/FormField";
+export { ProductFormModal } from "@/features/inventory/components/ProductFormModal";
+export type { ProductFormModalProps } from "@/features/inventory/components/ProductFormModal";
+export { StockSupplyModal } from "@/features/inventory/components/StockSupplyModal";
+export type { StockSupplyModalProps } from "@/features/inventory/components/StockSupplyModal";
+export { HistoryModal } from "@/features/inventory/components/HistoryModal";
+export type { HistoryModalProps } from "@/features/inventory/components/HistoryModal";
+export { ProductDetailsModal } from "@/features/inventory/components/ProductDetailsModal";
+export type { ProductDetailsModalProps } from "@/features/inventory/components/ProductDetailsModal";
 export {
   default as designTokens,
   inventoryTokens,
