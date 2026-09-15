@@ -11,11 +11,9 @@ import {
   Download,
   FileDown,
   FileSpreadsheet,
-  FileText,
   History,
   Info,
   LayoutGrid,
-  MousePointer2,
   PieChart as PieChartIcon,
   Play,
   Printer,
@@ -27,7 +25,6 @@ import {
   TrendingDown,
   TrendingUp,
   Wallet,
-  X,
   Zap,
 } from "lucide-react";
 import {
@@ -45,7 +42,6 @@ import {
   YAxis,
 } from "recharts";
 import { staticURL } from "@/services/api";
-import { expenseCategoryLabel } from "@/lib/money/expenseCategories";
 import {
   Card,
   CardContent,
@@ -63,105 +59,17 @@ import {
   CurrencyStatCard,
   StatCard as StatCardDisplay,
 } from "@/components/shared/DisplayComponents";
-import { useFinancialReports, formatSignedPct } from "@/features/financial-reports";
-
-const CHART_COLORS = [
-  "#6366F1",
-  "#10B981",
-  "#F59E0B",
-  "#EF4444",
-  "#8B5CF6",
-  "#06B6D4",
-  "#EC4899",
-  "#84CC16",
-];
-
-const PAYMENT_LABELS: Record<string, string> = {
-  cash: "نقدي",
-  credit_card: "بطاقة ائتمان",
-  card: "بطاقة",
-  visa: "فيزا",
-  mastercard: "ماستركارد",
-  wallet: "محفظة إلكترونية",
-  instapay: "انستاباي",
-  bank_transfer: "تحويل بنكي",
-  vodafone_cash: "فودافون كاش",
-  orange_money: "أورانج موني",
-};
-
-const PRESETS: Array<{ id: "today" | "week" | "month" | "quarter"; label: string }> = [
-  { id: "today", label: "اليوم" },
-  { id: "week", label: "7 أيام" },
-  { id: "month", label: "الشهر" },
-  { id: "quarter", label: "90 يوم" },
-];
-
-function shortLabel(iso: string): string {
-  const parts = iso.split("-");
-  if (parts.length !== 3) return iso;
-  return `${parts[2]}/${parts[1]}`;
-}
-
-function paymentLabel(key: string): string {
-  if (!key) return "غير محدد";
-  const k = String(key).trim().toLowerCase();
-  return PAYMENT_LABELS[k] ?? String(key);
-}
-
-function dayKeyOf(v: unknown): string {
-  if (!v) return "";
-  const s = String(v);
-  return s.length >= 10 ? s.slice(0, 10) : "";
-}
-
-interface TooltipEntry {
-  name?: string;
-  value?: number | string;
-  color?: string;
-  payload?: { name?: string; fill?: string };
-}
-
-function FinanceTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: TooltipEntry[];
-  label?: string;
-}) {
-  if (!active || !payload || payload.length === 0) return null;
-  const title = label || payload[0]?.name || payload[0]?.payload?.name || "تفاصيل";
-  return (
-    <div className="min-w-[180px] rounded-2xl border border-border bg-card/95 p-4 shadow-premium backdrop-blur-md">
-      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-muted">{title}</p>
-      <div className="space-y-1.5">
-        {payload.map((entry, index) => (
-          <div key={index} className="flex items-center justify-between gap-6">
-            <div className="flex min-w-0 items-center gap-2">
-              <div
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: entry.color || entry.payload?.fill || "#6366F1" }}
-              />
-              <span className="truncate text-xs font-bold text-muted">{entry.name}</span>
-            </div>
-            <span className="shrink-0 text-sm font-black tabular-nums text-main">
-              {formatCurrency(entry.value)}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function compactTick(v: number): string {
-  const n = Number(v);
-  const num = Number.isFinite(n) ? n : 0;
-  if (Math.abs(num) >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-  if (Math.abs(num) >= 1000) return `${(num / 1000).toFixed(num % 1000 === 0 ? 0 : 1)}k`;
-  return String(Math.round(num));
-}
+import {
+  AnomalyAlerts,
+  CHART_COLORS,
+  DrilldownPanel,
+  FinanceTooltip,
+  MonthlyTargetProgress,
+  PRESETS,
+  compactTick,
+  formatSignedPct,
+  useFinancialReports,
+} from "@/features/financial-reports";
 
 export default function FinancialReports() {
   const {
@@ -239,6 +147,15 @@ export default function FinancialReports() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleInspectAnomalyDay = (date: string) => {
+    const t = financials.dailyTrends.find((d) => d.date === date);
+    if (t) {
+      setSelectedExpenseCategory(null);
+      setSelectedPayment(null);
+      setSelectedDay(t);
+    }
   };
 
   if (loading && !hasLoaded) {
@@ -484,86 +401,24 @@ export default function FinancialReports() {
 
       {/* Monthly Revenue Target Progress */}
       {isCurrentMonth && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Target size={22} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-muted">
-                    الهدف الشهري للإيرادات
-                  </p>
-                  {editingTarget ? (
-                    <div className="mt-1 flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={1}
-                        value={targetDraft}
-                        onChange={(e) => setTargetDraft(e.target.value)}
-                        className="h-9 w-36 rounded-xl border border-border bg-card px-3 text-sm font-black tabular-nums text-main outline-none focus:border-primary"
-                        aria-label="الهدف الشهري"
-                      />
-                      <Button size="sm" onClick={handleSaveTarget} loading={savingTarget} className="h-9 text-[11px] font-black">
-                        حفظ
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingTarget(false);
-                          setTargetDraft(String(Math.round(monthlyTarget)));
-                        }}
-                        className="h-9 text-[11px] font-black"
-                      >
-                        إلغاء
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <p className="text-xl font-black text-main tabular-nums">
-                        {formatCurrency(monthlyTarget)}
-                      </p>
-                      {canEditTarget && (
-                        <button
-                          type="button"
-                          onClick={() => setEditingTarget(true)}
-                          className="rounded-lg border border-border bg-card px-2 py-1 text-[10px] font-black text-muted hover:text-primary print:hidden"
-                        >
-                          تعديل
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex-1 sm:w-72">
-                <div className="flex items-center justify-between gap-3 mb-2">
-                  <span className="text-sm font-black text-main">
-                    {formatCurrency(currentMonthRevenue)} / {formatCurrency(monthlyTarget)}
-                  </span>
-                  <span className="text-sm font-black text-primary">{targetProgress.toFixed(1)}%</span>
-                </div>
-                <div className="h-3 overflow-hidden rounded-full bg-border">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-500"
-                    style={{ width: `${targetProgress}%` }}
-                  />
-                </div>
-                <p className="mt-1 text-[10px] font-bold text-muted">
-                  {targetProgress >= 100
-                    ? "🎉 تم تحقيق الهدف! تجاوز بنسبة " + (targetProgress - 100).toFixed(1) + "%"
-                    : "متبقي " + formatCurrency(Math.max(0, monthlyTarget - currentMonthRevenue)) + " للوصول للهدف"}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-black text-muted">
-                <Calendar size={12} />
-                <span>منذ {monthStart.slice(5).replace("-", "/")} حتى {toDate.slice(5).replace("-", "/")}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <MonthlyTargetProgress
+          monthlyTarget={monthlyTarget}
+          currentMonthRevenue={currentMonthRevenue}
+          targetProgress={targetProgress}
+          monthStart={monthStart}
+          toDate={toDate}
+          editingTarget={editingTarget}
+          targetDraft={targetDraft}
+          savingTarget={savingTarget}
+          canEditTarget={canEditTarget}
+          onTargetDraftChange={setTargetDraft}
+          onEditTarget={() => setEditingTarget(true)}
+          onCancelEditTarget={() => {
+            setEditingTarget(false);
+            setTargetDraft(String(Math.round(monthlyTarget)));
+          }}
+          onSaveTarget={handleSaveTarget}
+        />
       )}
 
       <Card>
@@ -599,380 +454,28 @@ export default function FinancialReports() {
         </Card>
 
       {/* Anomaly Alerts */}
-      {anomalies.length > 0 && (
-        <Card className="border-amber-500/40 bg-amber-500/5">
-          <CardHeader className="border-b border-border/60">
-            <div className="flex items-center gap-2">
-              <div className="rounded-xl bg-amber-500/15 p-2 text-amber-600">
-                <AlertTriangle size={18} />
-              </div>
-              <div>
-                <CardTitle>تنبيهات الشذوذ الإحصائي</CardTitle>
-                <CardDescription>
-                  أيام خارج النمط المعتاد (انحراف ±2σ أو قفزة 3 أضعاف الوسيط) — راجعها قبل اعتماد التقرير
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2 p-4 sm:p-6">
-            {anomalies.slice(0, 4).map((a) => (
-              <div
-                key={`${a.date}-${a.kind}`}
-                className="flex items-start gap-3 rounded-xl border border-amber-500/25 bg-card p-3"
-              >
-                <AlertTriangle
-                  size={16}
-                  className={cn("mt-0.5 shrink-0", a.severity === "high" ? "text-rose-600" : "text-amber-600")}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-black text-main">{a.message}</p>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className="text-[9px]">
-                      {a.kind === "rev_spike" ? "قفزة إيرادات" : a.kind === "exp_spike" ? "قفزة مصروفات" : "هبوط الصافي"}
-                    </Badge>
-                    {a.severity === "high" && (
-                      <Badge className="bg-rose-600 text-[9px] text-white">حرج</Badge>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const t = financials.dailyTrends.find((d) => d.date === a.date);
-                        if (t) {
-                          setSelectedExpenseCategory(null);
-                          setSelectedPayment(null);
-                          setSelectedDay(t);
-                        }
-                      }}
-                      className="text-[10px] font-black text-primary hover:underline"
-                    >
-                      فحص اليوم ←
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      <AnomalyAlerts anomalies={anomalies} onInspectDay={handleInspectAnomalyDay} />
 
       {/* Drill-down Detail Panel */}
-      {(selectedDay || selectedExpenseCategory || selectedPayment) && (
-        <Card className="overflow-hidden border-primary/30 bg-primary/5 animate-in slide-in-from-bottom-4">
-          <CardHeader className="flex items-center justify-between border-b border-border/60">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-primary/10 p-2 text-primary">
-                <MousePointer2 size={18} />
-              </div>
-              <div>
-                <CardTitle className="text-lg">
-                  {selectedDay
-                    ? `تفاصيل ${selectedDay.date} — ${shortLabel(selectedDay.date)}`
-                    : selectedExpenseCategory
-                      ? `تفاصيل البند: ${selectedExpenseCategory.name}`
-                      : `تحصيلات: ${selectedPayment ? paymentLabel(selectedPayment.name) : ""}`}
-                </CardTitle>
-                <CardDescription className="text-[10px]">
-                  {selectedDay
-                    ? "تفاصيل الإيرادات والمصروفات والفواتير لهذا اليوم"
-                    : selectedExpenseCategory
-                      ? "تحليل مفصل لهذا البند من المصروفات"
-                      : "الفواتير المحصلة بهذه الوسيلة خلال الفترة"}
-                </CardDescription>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => {
-                setSelectedDay(null);
-                setSelectedExpenseCategory(null);
-                setSelectedPayment(null);
-              }}
-              aria-label="إغلاق التفاصيل"
-            >
-              <X size={18} />
-            </Button>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6">
-            {selectedDay ? (
-              <div className="space-y-5">
-                {/* Summary cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">
-                      إيرادات اليوم
-                    </p>
-                    <p className="text-2xl font-black text-emerald-600 tabular-nums">
-                      {formatCurrency(selectedDay.rev)}
-                    </p>
-                    <p className="mt-1 text-[11px] font-bold text-muted">{dayInvoices.length} فاتورة</p>
-                  </div>
-                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-center">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-rose-600 mb-1">
-                      مصروفات اليوم
-                    </p>
-                    <p className="text-2xl font-black text-rose-600 tabular-nums">
-                      {formatCurrency(selectedDay.exp)}
-                    </p>
-                    <p className="mt-1 text-[11px] font-bold text-muted">{dayExpenses.length} مصروف</p>
-                  </div>
-                  <div
-                    className={cn(
-                      "rounded-2xl p-4 text-center",
-                      selectedDay.net >= 0
-                        ? "border-emerald-500/20 bg-emerald-500/5"
-                        : "border-rose-500/20 bg-rose-500/5",
-                    )}
-                  >
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-1">
-                      {selectedDay.net >= 0 ? "صافي ربح" : "صافي خسارة"}
-                    </p>
-                    <p
-                      className={cn(
-                        "text-2xl font-black tabular-nums",
-                        selectedDay.net >= 0 ? "text-emerald-600" : "text-rose-600",
-                      )}
-                    >
-                      {formatCurrency(selectedDay.net)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Invoices list */}
-                <div className="flex flex-wrap items-center gap-2 print:hidden">
-                  <Button
-                    onClick={handleExportDay}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 text-[11px] font-black"
-                    disabled={dayInvoices.length === 0 && dayExpenses.length === 0}
-                  >
-                    <FileDown size={14} /> تصدير اليوم Excel
-                  </Button>
-                  <Button
-                    onClick={handlePrint}
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2 text-[11px] font-black"
-                  >
-                    <Printer size={14} /> طباعة التفاصيل
-                  </Button>
-                </div>
-                {dayInvoices.length > 0 && (
-                  <div>
-                    <h4 className="mb-2 text-sm font-black text-main flex items-center gap-2">
-                      <FileText size={14} className="text-emerald-600" />
-                      فواتير اليوم ({dayInvoices.length})
-                    </h4>
-                    <div className="max-h-[220px] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-card p-2">
-                      {dayInvoices.map((inv, idx) => (
-                        <div
-                          key={inv.id ?? idx}
-                          className="flex items-center justify-between rounded-lg border border-border/40 bg-background px-3 py-2 text-xs"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[10px] text-muted">
-                              #{inv.id ?? idx + 1}
-                            </span>
-                            <span className="font-bold text-main">
-                              {inv.client_name || inv.client_name_ar || "عميل"}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-[10px] text-muted">
-                              {paymentLabel(inv.payment_method)}
-                            </span>
-                            <span className="font-black text-emerald-600 tabular-nums">
-                              {formatCurrency(inv.total_amount)}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Expenses list */}
-                {dayExpenses.length > 0 && (
-                  <div>
-                    <h4 className="mb-2 text-sm font-black text-main flex items-center gap-2">
-                      <Receipt size={14} className="text-rose-600" />
-                      مصروفات اليوم ({dayExpenses.length})
-                    </h4>
-                    <div className="max-h-[220px] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-card p-2">
-                      {dayExpenses.map((exp, idx) => (
-                        <div
-                          key={exp.id ?? idx}
-                          className="flex items-center justify-between rounded-lg border border-border/40 bg-background px-3 py-2 text-xs"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-muted">
-                              {expenseCategoryLabel(exp.category ?? "عام")}
-                            </span>
-                            <span className="font-bold text-main truncate max-w-[160px]">
-                              {exp.title || exp.description || "مصروف"}
-                            </span>
-                          </div>
-                          <span className="font-black text-rose-600 tabular-nums">
-                            {formatCurrency(exp.amount)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Empty state */}
-                {dayInvoices.length === 0 && dayExpenses.length === 0 && (
-                  <p className="text-center text-xs font-bold text-muted py-4">
-                    لا توجد فواتير أو مصروفات مسجلة لهذا اليوم
-                  </p>
-                )}
-              </div>
-            ) : selectedExpenseCategory ? (
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-border/60 bg-card p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-black text-main">{selectedExpenseCategory.name}</span>
-                      <span className="text-lg font-black tabular-nums text-main">
-                        {formatCurrency(selectedExpenseCategory.value)}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between text-xs font-bold text-muted">
-                      <span>نسبة من إجمالي المصروفات</span>
-                      <span>
-                        {financials.expenses > 0
-                          ? ((selectedExpenseCategory.value / financials.expenses) * 100).toFixed(1) + "%"
-                          : "—"}
-                      </span>
-                    </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-soft">
-                      <div
-                        className="h-full rounded-full bg-primary"
-                        style={{
-                          width: `${financials.expenses > 0 ? Math.min(100, (selectedExpenseCategory.value / financials.expenses) * 100) : 0}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <p className="text-[11px] font-bold text-muted">
-                    عدد الحركات: {selectedExpenseCategory.count ?? categoryMovements.length}
-                  </p>
-                  {categoryMovements.length > 0 && (
-                    <div>
-                      <div className="mb-2 flex items-center justify-between">
-                        <h4 className="text-sm font-black text-main flex items-center gap-2">
-                          <Receipt size={14} className="text-rose-600" />
-                          الحركات المكونة للبند ({categoryMovements.length})
-                        </h4>
-                        <Button
-                          onClick={handleExportCategory}
-                          variant="outline"
-                          size="sm"
-                          className="gap-2 text-[11px] font-black print:hidden"
-                        >
-                          <FileDown size={14} /> تصدير Excel
-                        </Button>
-                      </div>
-                      <div className="max-h-[240px] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-card p-2">
-                        {categoryMovements.map((e, idx) => (
-                          <div
-                            key={e.id ?? idx}
-                            className="flex items-center justify-between rounded-lg border border-border/40 bg-background px-3 py-2 text-xs"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-[10px] tabular-nums text-muted">
-                                {dayKeyOf(e.expense_date ?? e.created_at)}
-                              </span>
-                              <span className="font-bold text-main truncate max-w-[200px]">
-                                {e.title || e.description || "مصروف"}
-                              </span>
-                            </div>
-                            <span className="font-black text-rose-600 tabular-nums">
-                              {formatCurrency(e.amount)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : selectedPayment ? (
-                <div className="space-y-3">
-                  <div className="rounded-2xl border border-border/60 bg-card p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-black text-main">
-                        {paymentLabel(selectedPayment.name)}
-                      </span>
-                      <span className="text-lg font-black tabular-nums text-main">
-                        {formatCurrency(selectedPayment.value)}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between text-xs font-bold text-muted">
-                      <span>نسبة من إجمالي الإيرادات</span>
-                      <span>
-                        {financials.revenue > 0
-                          ? ((selectedPayment.value / financials.revenue) * 100).toFixed(1) + "%"
-                          : "—"}
-                      </span>
-                    </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-soft">
-                      <div
-                        className="h-full rounded-full bg-emerald-500"
-                        style={{
-                          width: `${financials.revenue > 0 ? Math.min(100, (selectedPayment.value / financials.revenue) * 100) : 0}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <h4 className="text-sm font-black text-main flex items-center gap-2">
-                      <FileText size={14} className="text-emerald-600" />
-                      فواتير {paymentLabel(selectedPayment.name)} ({paymentInvoices.length})
-                    </h4>
-                    <Button
-                      onClick={handleExportPayment}
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 text-[11px] font-black print:hidden"
-                      disabled={paymentInvoices.length === 0}
-                    >
-                      <FileDown size={14} /> تصدير Excel
-                    </Button>
-                  </div>
-                  {paymentInvoices.length > 0 ? (
-                    <div className="max-h-[240px] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-card p-2">
-                      {paymentInvoices.map((inv, idx) => (
-                        <div
-                          key={inv.id ?? idx}
-                          className="flex items-center justify-between rounded-lg border border-border/40 bg-background px-3 py-2 text-xs"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[10px] tabular-nums text-muted">
-                              {dayKeyOf(inv.created_at)}
-                            </span>
-                            <span className="font-bold text-main truncate max-w-[200px]">
-                              {inv.client_name || inv.client_name_ar || "عميل"}
-                            </span>
-                          </div>
-                          <span className="font-black text-emerald-600 tabular-nums">
-                            {formatCurrency(inv.total_amount)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center text-xs font-bold text-muted py-4">
-                      لا توجد فواتير مسجلة بهذه الوسيلة
-                    </p>
-                  )}
-                </div>
-              ) : null
-            }
-          </CardContent>
-        </Card>
-      )}
+      <DrilldownPanel
+        selectedDay={selectedDay}
+        selectedExpenseCategory={selectedExpenseCategory}
+        selectedPayment={selectedPayment}
+        dayInvoices={dayInvoices}
+        dayExpenses={dayExpenses}
+        financials={financials}
+        categoryMovements={categoryMovements}
+        paymentInvoices={paymentInvoices}
+        onClose={() => {
+          setSelectedDay(null);
+          setSelectedExpenseCategory(null);
+          setSelectedPayment(null);
+        }}
+        onExportDay={handleExportDay}
+        onExportCategory={handleExportCategory}
+        onExportPayment={handleExportPayment}
+        onPrint={handlePrint}
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="overflow-hidden lg:col-span-2">
