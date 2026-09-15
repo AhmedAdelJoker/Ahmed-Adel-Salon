@@ -1,114 +1,21 @@
-import {
-  Users,
-  CalendarDays,
-  Receipt,
-  Boxes,
-  Zap,
-  PlusCircle,
-  Clock,
-  TrendingUp,
-  Wallet,
-  ArrowRight,
-  Coins,
-  UserCheck,
-  Search,
-  Eye,
-  Printer,
-  ShieldCheck,
-  X,
-  RefreshCw,
-} from "lucide-react";
+import { Boxes, RefreshCw, Wallet, Zap } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { formatCurrency, cn } from "@/lib/core/utils";
 import {
   PageHeader,
   PremiumCard,
-  StatCard,
   ContentPanel,
 } from "@/components/shared/PremiumUI";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { useCashierDashboard } from "@/features/cashier-dashboard";
-
-const highlightText = (text, query) => {
-  if (!query || !text) return text;
-  const regex = new RegExp(`(${query})`, "gi");
-  const parts = String(text).split(regex);
-  return parts.map((part, i) =>
-    regex.test(part) ? (
-      <mark
-        key={i}
-        className="bg-primary/20 text-primary font-black rounded-sm px-0.5"
-      >
-        {part}
-      </mark>
-    ) : (
-      part
-    ),
-  );
-};
-
-const quickActions = [
-  {
-    title: "نقطة البيع",
-    desc: "فتح واجهة الكاشير",
-    icon: Zap,
-    link: "/pos",
-    variant: "primary",
-  },
-  {
-    title: "حجز جديد",
-    desc: "تسجيل موعد",
-    icon: PlusCircle,
-    link: "/bookings",
-    variant: "info",
-  },
-  {
-    title: "العملاء",
-    desc: "إدارة البيانات",
-    icon: Users,
-    link: "/customers",
-    variant: "success",
-  },
-  {
-    title: "المخزن",
-    desc: "متابعة المنتجات",
-    icon: Boxes,
-    link: "/inventory",
-    variant: "warning",
-  },
-  {
-    title: "المصروفات",
-    desc: "تسجيل نثريات",
-    icon: Coins,
-    link: "/expenses",
-    variant: "danger",
-  },
-];
+import {
+  useCashierDashboard,
+  DashboardStats,
+  TodayInvoicesList,
+  ViewInvoiceModal,
+  AdjustmentRequestModal,
+  quickActions,
+} from "@/features/cashier-dashboard";
 
 export default function CashierDashboard() {
   const {
@@ -198,67 +105,7 @@ export default function CashierDashboard() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <StatCard
-          label="مبيعات اليوم"
-          value={formatCurrency(summary?.today_sales || 0)}
-          icon={TrendingUp}
-          variant="success"
-          delay={0}
-         trend={undefined} trendValue={undefined} />
-        <StatCard
-          label="مصاريف اليوم"
-          value={formatCurrency(summary?.today_expenses || 0)}
-          icon={Coins}
-          variant="danger"
-          delay={0.05}
-         trend={undefined} trendValue={undefined} />
-        <StatCard
-          label="الموظفون الحاضرون"
-          value={summary?.present_employees_count || 0}
-          icon={UserCheck}
-          variant="primary"
-          delay={0.1}
-         trend={undefined} trendValue={undefined} />
-        <StatCard
-          label="بانتظار الخدمة"
-          value={summary?.waiting_customers || 0}
-          icon={Clock}
-          variant="warning"
-          delay={0.15}
-         trend={undefined} trendValue={undefined} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="الحجوزات"
-          value={summary?.today_appointments || 0}
-          icon={CalendarDays}
-          variant="info"
-          delay={0}
-         trend={undefined} trendValue={undefined} />
-        <StatCard
-          label="الفواتير"
-          value={summary?.invoices_count || 0}
-          icon={Receipt}
-          variant="secondary"
-          delay={0.05}
-         trend={undefined} trendValue={undefined} />
-        <StatCard
-          label="إلغاءات اليوم"
-          value={summary?.todayCancellationsCount || 0}
-          icon={X}
-          variant="danger"
-          delay={0.1}
-         trend={undefined} trendValue={undefined} />
-        <StatCard
-          label="معدل الإلغاء"
-          value={`${summary?.cancellationRate || 0}%`}
-          icon={TrendingUp}
-          variant="warning"
-          delay={0.15}
-         trend={undefined} trendValue={undefined} />
-      </div>
+      <DashboardStats summary={summary} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
@@ -299,132 +146,15 @@ export default function CashierDashboard() {
             ))}
           </div>
 
-          <ContentPanel className={undefined}
-            title="إدارة مبيعات اليوم"
-            subtitle="متابعة وتعديل فواتير اليوم بشكل سريع"
-            actions={
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted/60"
-                    size={14}
-                  />
-                  <Input
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="بحث برقم الفاتورة أو العميل..."
-                    className="pr-9 h-9 text-[11px] font-bold"
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate("/invoices")}
-                  className="text-[10px] font-black uppercase"
-                >
-                  الأرشيف <ArrowRight size={14} className="mr-2 rotate-180" />
-                </Button>
-              </div>
-            }
-          >
-            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-              <Table>
-                <TableHeader className="sticky top-0 bg-card z-10">
-                  <TableRow>
-                    <TableHead className="h-10 text-[10px] font-black uppercase">
-                      رقم الفاتورة
-                    </TableHead>
-                    <TableHead className="h-10 text-[10px] font-black uppercase">
-                      العميل
-                    </TableHead>
-                    <TableHead className="h-10 text-[10px] font-black uppercase">
-                      القيمة
-                    </TableHead>
-                    <TableHead className="h-10 text-[10px] font-black uppercase text-center">
-                      الدفع
-                    </TableHead>
-                    <TableHead className="h-10 text-[10px] font-black uppercase text-center">
-                      إجراءات
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTodayInvoices.length > 0 ? (
-                    filteredTodayInvoices.map((inv) => (
-                      <TableRow
-                        key={inv.id}
-                        className="hover:bg-soft/50 transition-colors group"
-                      >
-                        <TableCell className="py-3 font-black text-main tabular-nums text-xs">
-                          #{highlightText(inv.invoice_no || inv.id, searchTerm)}
-                        </TableCell>
-                        <TableCell className="py-3 text-xs font-bold text-muted">
-                          {highlightText(
-                            inv.customer_name || "عميل عام",
-                            searchTerm,
-                          )}
-                        </TableCell>
-                        <TableCell className="py-3 text-xs font-black text-primary tabular-nums">
-                          {formatCurrency(inv.total_amount)}
-                        </TableCell>
-                        <TableCell className="py-3 text-center">
-                          <Badge
-                            variant="secondary"
-                            className="text-[8px] h-4 px-1.5 uppercase font-black"
-                          >
-                            {inv.payment_method === "cash" ? "نقدي" : "شبكة"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <div className="flex justify-center gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 hover:text-primary"
-                              onClick={() => handleViewInvoice(inv)}
-                            >
-                              <Eye size={14} />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 hover:text-primary"
-                              onClick={() => handlePrintInvoice(inv)}
-                            >
-                              <Printer size={14} />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 hover:text-warning"
-                              onClick={() => handleRequestAdjustment(inv)}
-                            >
-                              <ShieldCheck size={14} />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={5}
-                        className="py-12 text-center opacity-50"
-                      >
-                        <Receipt
-                          size={32}
-                          className="mx-auto text-muted mb-2"
-                        />
-                        <p className="text-[10px] font-black uppercase tracking-widest">
-                          لا توجد فواتير مطابقة
-                        </p>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </ContentPanel>
+          <TodayInvoicesList
+            invoices={filteredTodayInvoices}
+            searchTerm={searchTerm}
+            onSearchChange={(v) => setSearchTerm(v)}
+            onArchive={() => navigate("/invoices")}
+            onView={handleViewInvoice}
+            onPrint={handlePrintInvoice}
+            onRequestAdjustment={handleRequestAdjustment}
+          />
         </div>
 
         <div className="space-y-6">
@@ -485,7 +215,7 @@ export default function CashierDashboard() {
                 </p>
                 <Link to="/inventory">
                   <Button
-                     
+
                     variant={("link" as any)}
                     className="p-0 h-auto text-[11px] font-black text-warning-strong underline mt-2"
                   >
@@ -505,203 +235,20 @@ export default function CashierDashboard() {
         </div>
       </div>
 
-      {/* View Invoice Modal */}
-      <Dialog
-        open={viewInvoice.open}
-        onOpenChange={(open) => setViewInvoice({ open, data: null })}
-      >
-        <DialogContent className="max-w-2xl" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black">
-              تفاصيل الفاتورة #{viewInvoice.data?.invoice_no || "---"}
-            </DialogTitle>
-          </DialogHeader>
-          {viewInvoice.data && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-xl bg-soft p-4 border border-border">
-                  <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1">
-                    العميل
-                  </p>
-                  <p className="font-black text-main">
-                    {viewInvoice.data.customer_name || "عميل عام"}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-soft p-4 border border-border">
-                  <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1">
-                    وسيلة الدفع
-                  </p>
-                  <p className="font-black text-main">
-                    {viewInvoice.data.payment_method === "cash"
-                      ? "نقدي"
-                      : "شبكة"}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-soft p-4 border border-border">
-                  <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1">
-                    الإجمالي
-                  </p>
-                  <p className="text-xl font-black text-primary tabular-nums">
-                    {formatCurrency(viewInvoice.data.total_amount)}
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">
-                  البنود
-                </h4>
-                <div className="rounded-2xl border border-border overflow-hidden">
-                  <Table>
-                    <TableHeader className="bg-soft/30">
-                      <TableRow>
-                        <TableHead className="text-[10px]">البند</TableHead>
-                        <TableHead className="text-[10px] text-center">
-                          الكمية
-                        </TableHead>
-                        <TableHead className="text-[10px] text-left">
-                          السعر
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {viewInvoice.data.items?.map((item, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="text-xs font-bold text-main">
-                            {item.service_name}
-                          </TableCell>
-                          <TableCell className="text-center text-xs font-black tabular-nums">
-                            {item.quantity}
-                          </TableCell>
-                          <TableCell className="text-left text-xs font-black text-main tabular-nums">
-                            {formatCurrency(item.total_price)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setViewInvoice({ open: false, data: null })}
-              className="h-11 rounded-xl px-6"
-            >
-              إغلاق
-            </Button>
-            <Button
-              onClick={() => handlePrintInvoice(viewInvoice.data)}
-              className="h-11 rounded-xl px-6 premium-button"
-            >
-              <Printer size={16} className="ml-2" /> طباعة إيصال
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ViewInvoiceModal
+        viewInvoice={viewInvoice}
+        setViewInvoice={setViewInvoice}
+        onPrint={handlePrintInvoice}
+      />
 
-      {/* Adjustment Request Modal */}
-      <Dialog
-        open={adjInvoice.open}
-        onOpenChange={(open) => setAdjInvoice({ open, data: null })}
-      >
-        <DialogContent className="max-w-md" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black">
-              طلب تعديل مالي
-            </DialogTitle>
-            <DialogDescription className="text-[11px] font-bold text-muted">
-              سيتم إرسال هذا الطلب للمراجعة والاعتماد من قبل الإدارة.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5 p-1">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                نوع التعديل
-              </label>
-              <Select
-                value={adjForm.type}
-                onValueChange={(v) => setAdjForm((p) => ({ ...p, type: v }))}
-              >
-                <SelectTrigger className="font-black h-11 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="discount" className="font-bold">
-                    تعديل الخصم
-                  </SelectItem>
-                  <SelectItem value="payment_method" className="font-bold">
-                    تغيير طريقة الدفع
-                  </SelectItem>
-                  <SelectItem value="void" className="font-bold">
-                    إلغاء الفاتورة بالكامل
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                سبب التعديل
-              </label>
-              <textarea
-                className="w-full h-24 rounded-xl bg-soft p-4 text-sm font-bold border border-border focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-muted/40"
-                placeholder="يرجى كتابة تفاصيل السبب..."
-                value={adjForm.reason}
-                onChange={(e) =>
-                  setAdjForm((p) => ({ ...p, reason: e.target.value }))
-                }
-              />
-            </div>
-            {adjForm.type !== "void" && (
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                  القيمة الجديدة
-                </label>
-                <Input
-                  value={adjForm.newValue}
-                  onChange={(e) =>
-                    setAdjForm((p) => ({ ...p, newValue: e.target.value }))
-                  }
-                  placeholder="أدخل المبلغ الجديد..."
-                  className="text-center font-black h-11"
-                />
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                كود المدير (اعتماد فوري)
-              </label>
-              <Input
-                type="password"
-                value={adjForm.managerPin}
-                onChange={(e) =>
-                  setAdjForm((p) => ({ ...p, managerPin: e.target.value }))
-                }
-                className="text-center tracking-[1em] font-black h-11"
-                placeholder="••••"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2 pt-6">
-            <Button
-              variant="ghost"
-              onClick={() => setAdjInvoice({ open: false, data: null })}
-              className="h-11 rounded-xl"
-            >
-              تراجع
-            </Button>
-            <Button
-              variant="warning"
-              loading={submittingAdj}
-              onClick={submitAdjustment}
-              className="h-11 rounded-xl px-8 font-black"
-            >
-              تأكيد وإرسال الطلب
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AdjustmentRequestModal
+        adjInvoice={adjInvoice}
+        setAdjInvoice={setAdjInvoice}
+        adjForm={adjForm}
+        setAdjForm={setAdjForm}
+        submittingAdj={submittingAdj}
+        onSubmit={submitAdjustment}
+      />
     </div>
   );
 }
