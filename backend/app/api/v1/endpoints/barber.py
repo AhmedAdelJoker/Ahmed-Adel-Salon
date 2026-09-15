@@ -14,6 +14,7 @@ from app.models.employee_time_off import EmployeeTimeOff
 from app.models.appointment import Appointment
 from app.models.appointment_service import AppointmentService
 from app.models.customer import Customer
+from app.services.loyalty_service import sweep_expired_points
 from pydantic import BaseModel
 
 
@@ -375,6 +376,8 @@ def get_barber_clients(
     ).distinct().all()
     ids = [c[0] for c in customer_ids]
     customers = db.query(Customer).filter(Customer.customer_id.in_(ids)).all() if ids else []
+    if sweep_expired_points(db, customers):
+        db.commit()
     return [
         {
             "id": c.customer_id,
@@ -437,6 +440,7 @@ def update_barber_client(
     customer.phone = payload.phone or customer.phone
     customer.email = payload.email if payload.email is not None else customer.email
     customer.notes = payload.notes if payload.notes is not None else customer.notes
+    sweep_expired_points(db, [customer])
     db.commit()
     db.refresh(customer)
     return {

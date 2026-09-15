@@ -205,6 +205,12 @@ def ensure_runtime_schema() -> None:
             "last_pdf_url",
             "ALTER TABLE report_schedules ADD COLUMN last_pdf_url VARCHAR(500)",
         )
+        _ensure_column(
+            connection,
+            "customers",
+            "loyalty_points_earned_at",
+            "ALTER TABLE customers ADD COLUMN loyalty_points_earned_at TIMESTAMP",
+        )
 
         _ensure_index(connection, "ix_invoices_created_at", "CREATE INDEX ix_invoices_created_at ON invoices (created_at)")
         _ensure_index(connection, "ix_invoices_barber_created", "CREATE INDEX ix_invoices_barber_created ON invoices (barber_id, created_at)")

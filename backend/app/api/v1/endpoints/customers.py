@@ -24,6 +24,7 @@ from app.schemas.customer import (
     CustomerUpdate,
     CustomerArchiveRead,
 )
+from app.services.loyalty_service import sweep_expired_points
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
 
@@ -35,7 +36,7 @@ def list_customers(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    return (
+    customers = (
         db.query(Customer)
         .filter(Customer.is_deleted == False)
         .order_by(Customer.customer_id.desc())
@@ -43,6 +44,9 @@ def list_customers(
         .limit(limit)
         .all()
     )
+    if sweep_expired_points(db, customers):
+        db.commit()
+    return customers
 
 
 @router.get("/search", response_model=list[CustomerRead])
@@ -57,6 +61,8 @@ def search_customers_by_phone(
         .filter(Customer.is_deleted == False)
         .all()
     )
+    if sweep_expired_points(db, customers):
+        db.commit()
     return customers
 
 
@@ -88,6 +94,8 @@ def get_customer(
     customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="العميل غير موجود")
+    if sweep_expired_points(db, [customer]):
+        db.commit()
     return customer
 
 
