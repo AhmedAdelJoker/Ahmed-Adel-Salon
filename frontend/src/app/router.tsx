@@ -163,8 +163,8 @@ const CashierDashboard = lazy(
 const Customers = lazy(() => import("@/pages/cashier/Customers"));
 const CustomerDetail = lazy(() => import("@/pages/cashier/CustomerDetail"));
 const Invoices = lazy(() => import("@/pages/cashier/Invoices"));
-const InvoiceArchivePage = lazy(
-  () => import("@/pages/cashier/InvoiceArchivePage"),
+const InvoiceArchive = lazy(
+  () => import("@/pages/cashier/InvoiceArchive"),
 );
 const SuppliesArchive = lazy(
   () => import("@/pages/cashier/SuppliesArchive"),
@@ -604,7 +604,7 @@ export default function AppRouter() {
                 />
                 <Route
                   path="/invoices/archive"
-                  element={<InvoiceArchivePage />}
+                  element={<InvoiceArchive />}
                 />
                 <Route
                   path="/invoice-archive"
