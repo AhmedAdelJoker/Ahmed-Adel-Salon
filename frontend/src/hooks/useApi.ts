@@ -15,6 +15,7 @@ import type { PaginatedParams, PaginatedResult } from "@/types/common";
 const queryKeys = {
   employees: ["employees"],
   employeesArchive: ["employees", "archive"],
+  employeePerformance: ["reports", "employee-performance"],
   products: ["products"],
   invoices: ["invoices"],
   services: ["services"],
@@ -58,6 +59,16 @@ function fetchCustomers(params?: PaginatedParams): Promise<PaginatedResult<AnyRe
 
 function fetchExpenses(params?: PaginatedParams): Promise<unknown> {
   return api.get("/expenses", { params }).then((r) => r.data);
+}
+
+function fetchEmployeePerformance(params: {
+  from_date: string;
+  to_date: string;
+  page?: number;
+  page_size?: number;
+  search?: string;
+}): Promise<any> {
+  return api.get("/reports/employee-performance", { params }).then((r) => r.data);
 }
 
 type QueryOpts<T> = Omit<UseQueryOptions<T>, "queryKey" | "queryFn">;
@@ -151,6 +162,25 @@ export function useExpenses<T = unknown>(
     queryKey: [...queryKeys.expenses, params],
     queryFn: () => fetchExpenses(params) as Promise<T>,
     staleTime: 30_000,
+    ...options,
+  });
+}
+
+export function useEmployeePerformance(
+  params: {
+    from_date: string;
+    to_date: string;
+    page?: number;
+    page_size?: number;
+    search?: string;
+  },
+  options: QueryOpts<any> = {},
+) {
+  return useQuery({
+    queryKey: [...queryKeys.employeePerformance, params],
+    queryFn: () => fetchEmployeePerformance(params),
+    staleTime: 30_000,
+    placeholderData: (previousData) => previousData, // keepPreviousData equivalent
     ...options,
   });
 }
