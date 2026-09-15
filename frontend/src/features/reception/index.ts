@@ -13,3 +13,6 @@ export { default as ReceptionHeader } from "@/features/reception/components/Rece
 export { default as ReceptionKpis } from "@/features/reception/components/ReceptionKpis";
 export { default as ReceptionToolbar } from "@/features/reception/components/ReceptionToolbar";
 export { default as DonePanel } from "@/features/reception/components/DonePanel";
+export { default as ReceptionKanbanBoard } from "@/features/reception/components/ReceptionKanbanBoard";
+export { default as FastClientDialog } from "@/features/reception/components/FastClientDialog";
+export { default as ReceptionActionDialogs } from "@/features/reception/components/ReceptionActionDialogs";
