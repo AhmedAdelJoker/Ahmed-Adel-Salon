@@ -72,7 +72,7 @@ export default function MobileNav() {
             : "grid-cols-5";
 
   return (
-    <nav className="fixed inset-x-4 bottom-4 z-50 lg:hidden">
+    <nav aria-label="التنقل السريع" className="fixed inset-x-4 bottom-4 z-50 lg:hidden">
       <div className="mx-auto max-w-lg rounded-2xl border border-border bg-card/90 px-2 py-2 shadow-premium backdrop-blur-xl">
         <div className={`grid gap-1 ${gridCols}`}>
           {resolvedLinks.map((link) => {
@@ -81,6 +81,7 @@ export default function MobileNav() {
               <NavLink
                 key={link.label + link.to}
                 to={link.to}
+                aria-label={link.label}
                 className={({ isActive }) =>
                   cn(
                     "flex flex-col items-center justify-center gap-1 rounded-xl py-2 transition-all",

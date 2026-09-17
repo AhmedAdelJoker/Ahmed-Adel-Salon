@@ -92,7 +92,8 @@ export default function Header({
       <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-6">
         <button
           onClick={onOpenSidebar}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 border border-border/50 text-muted hover:text-accent hover:border-accent/40 lg:hidden transition-all"
+          aria-label="فتح القائمة الجانبية"
+          className="focus-ring flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 border border-border/50 text-muted hover:text-accent hover:border-accent/40 lg:hidden transition-all"
         >
           <Menu size={20} />
         </button>
@@ -120,7 +121,8 @@ export default function Header({
         {/* Search Command Button */}
         <button
           onClick={openCommandPalette}
-          className="hidden lg:flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/5 border border-border/40 text-muted/60 hover:text-main hover:border-accent/50 hover:bg-accent/5 transition-all group shadow-sm"
+          aria-label="فتح البحث الذكي"
+          className="focus-ring hidden lg:flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/5 border border-border/40 text-muted/60 hover:text-main hover:border-accent/50 hover:bg-accent/5 transition-all group shadow-sm"
         >
           <Search
             size={14}
@@ -179,7 +181,8 @@ export default function Header({
         <div className="flex min-w-0 items-center gap-2 sm:gap-4">
           <button
             onClick={toggleTheme}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 border border-border/40 text-muted hover:text-accent hover:border-accent/30 hover:bg-accent/5 transition-all"
+            aria-label={isDark ? "التبديل إلى الوضع الفاتح" : "التبديل إلى الوضع الداكن"}
+            className="focus-ring flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 border border-border/40 text-muted hover:text-accent hover:border-accent/30 hover:bg-accent/5 transition-all"
           >
             {isDark ? (
               <Sun size={18} strokeWidth={2.5} />
@@ -190,7 +193,10 @@ export default function Header({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex min-w-0 items-center gap-2 rounded-2xl border border-transparent p-1.5 transition-all hover:border-border/40 hover:bg-white/5 sm:gap-4 sm:pl-4 group">
+              <button
+                aria-label="قائمة المستخدم"
+                aria-haspopup="menu"
+                className="flex min-w-0 items-center gap-2 rounded-2xl border border-transparent p-1.5 transition-all hover:border-border/40 hover:bg-white/5 sm:gap-4 sm:pl-4 group">
                 <div className="relative">
                   <div className="absolute inset-0 rounded-xl bg-accent/20 blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="relative h-10 w-10 overflow-hidden rounded-xl bg-gradient-to-br from-bg-card to-bg-soft text-accent font-black border border-accent/30 shadow-md">
@@ -198,6 +204,8 @@ export default function Header({
                       <img
                         src={getAvatarUrl() ?? ""}
                         alt={displayName}
+                        loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                       />
                     ) : (

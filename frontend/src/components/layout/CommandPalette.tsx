@@ -131,6 +131,7 @@ export default function CommandPalette() {
             <Search size={18} className="text-primary" />
             <input
               autoFocus
+              aria-label="البحث السريع عن صفحة أو مهمة"
               placeholder="ابحث عن صفحة أو مهمة..."
               className="flex-1 bg-transparent text-right text-sm font-bold text-main outline-none placeholder:text-muted/60"
               value={query}
