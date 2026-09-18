@@ -1,7 +1,8 @@
 from datetime import timedelta, datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm, HTTPAuthorizationCredentials, HTTPBearer
+import pyotp
 import jwt
 from jwt.exceptions import ExpiredSignatureError, PyJWTError as JWTError
 from pydantic import BaseModel
@@ -226,6 +227,106 @@ def logout(
     return {"message": "تم تسجيل الخروج بنجاح"}
 
 
+class TwoFactorCode(BaseModel):
+    code: str
+
+
+class TwoFactorDisable(BaseModel):
+    password: str
+
+
+@router.post("/2fa/setup")
+def setup_two_factor(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Generate a TOTP secret (inactive until verified via /2fa/enable)."""
+    if getattr(current_user, "totp_enabled", False):
+        raise HTTPException(status_code=400, detail="المصادقة الثنائية مفعّلة بالفعل")
+    secret = pyotp.random_base32()
+    current_user.totp_secret = secret
+    current_user.totp_enabled = False
+    db.add(current_user)
+    db.commit()
+    audit_log(
+        db, request, current_user,
+        action="2fa_setup",
+        entity_type="auth",
+        description={"username": current_user.username},
+    )
+    return {
+        "secret": secret,
+        "otpauth_url": pyotp.totp.TOTP(secret).provisioning_uri(
+            name=current_user.username, issuer_name="SalonPro"
+        ),
+    }
+
+
+@router.post("/2fa/enable")
+def enable_two_factor(
+    payload: TwoFactorCode,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Verify a TOTP code against the pending secret and activate 2FA."""
+    if getattr(current_user, "totp_enabled", False):
+        raise HTTPException(status_code=400, detail="المصادقة الثنائية مفعّلة بالفعل")
+    if not current_user.totp_secret:
+        raise HTTPException(status_code=400, detail="ابدأ الإعداد أولاً عبر /2fa/setup")
+    try:
+        ok = bool(
+            pyotp.TOTP(current_user.totp_secret).verify(payload.code.strip(), valid_window=1)
+        )
+    except Exception:
+        ok = False
+    if not ok:
+        raise HTTPException(status_code=400, detail="رمز التحقق غير صحيح")
+    current_user.totp_enabled = True
+    db.add(current_user)
+    db.commit()
+    audit_log(
+        db, request, current_user,
+        action="2fa_enabled",
+        entity_type="auth",
+        description={"username": current_user.username},
+    )
+    return {"message": "تم تفعيل المصادقة الثنائية بنجاح"}
+
+
+@router.post("/2fa/disable")
+def disable_two_factor(
+    payload: TwoFactorDisable,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Disable 2FA after confirming the account password (recovery path)."""
+    if not verify_password(payload.password, current_user.hashed_password):
+        audit_log(
+            db, request, current_user,
+            action="2fa_disable_failed",
+            entity_type="auth",
+            description={"username": current_user.username, "reason": "wrong_password"},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="كلمة المرور غير صحيحة",
+        )
+    current_user.totp_secret = None
+    current_user.totp_enabled = False
+    db.add(current_user)
+    db.commit()
+    audit_log(
+        db, request, current_user,
+        action="2fa_disabled",
+        entity_type="auth",
+        description={"username": current_user.username},
+    )
+    return {"message": "تم إيقاف المصادقة الثنائية"}
+
+
 @router.get("/sessions")
 def get_active_sessions(
     request: Request,
@@ -271,6 +372,7 @@ def login(
     request: Request,
     db: Session = Depends(get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
+    totp_code: str | None = Form(None),
 ):
     # Phase 3: account lockout by username + IP.
     # The check is per-identifier so a single user can't lock out everyone.
@@ -331,6 +433,43 @@ def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="المستخدم غير نشط",
         )
+
+    # Phase 3 (2FA/TOTP): users with totp_enabled must present a valid code.
+    # Machine-readable signal via X-2FA-Required header (detail stays a string).
+    if getattr(user, "totp_enabled", False):
+        if not totp_code:
+            audit_log(
+                db, request, user,
+                action="login_failed",
+                entity_type="auth",
+                description={"username": form_data.username, "reason": "totp_missing"},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="رمز التحقق مطلوب",
+                headers={"X-2FA-Required": "totp"},
+            )
+        try:
+            totp_ok = bool(
+                user.totp_secret
+                and pyotp.TOTP(user.totp_secret).verify(totp_code.strip(), valid_window=1)
+            )
+        except Exception:
+            totp_ok = False
+        if not totp_ok:
+            for identifier in (user_identifier, ip_identifier):
+                lockout.record_failure(identifier)
+            audit_log(
+                db, request, user,
+                action="login_failed",
+                entity_type="auth",
+                description={"username": form_data.username, "reason": "totp_invalid"},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="رمز التحقق غير صحيح",
+                headers={"X-2FA-Required": "totp"},
+            )
 
     # Success: reset failure counters
     for identifier in (user_identifier, ip_identifier):

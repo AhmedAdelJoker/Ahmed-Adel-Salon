@@ -22,6 +22,16 @@ class User(Base):
 
     is_active = Column(Boolean, nullable=False, default=True)
 
+    # Bumped on password change — every JWT carries the version it was
+    # issued with (``ver`` claim); older versions are rejected. This gives
+    # "logout everywhere" without tracking every issued token.
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
+
+    # TOTP two-factor auth (Phase 3). ``totp_secret`` is set at setup time but
+    # only enforced once ``totp_enabled`` flips on after code verification.
+    totp_secret = Column(String(64), nullable=True)
+    totp_enabled = Column(Boolean, nullable=False, default=False, server_default="0")
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     barber = relationship("Employee", foreign_keys=[barber_id])

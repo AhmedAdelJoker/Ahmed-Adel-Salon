@@ -15,6 +15,7 @@ reportlab>=4.2.0
 arabic-reshaper==3.0.0
 python-bidi==0.6.7
 slowapi>=0.1.9
+pyotp==2.10.0
 pandas>=2.0.0
 openpyxl>=3.1.0
 Pillow==12.3.0
