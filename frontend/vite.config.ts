@@ -10,7 +10,18 @@ const chunkGroups = [
   },
   {
     name: "ui-vendor",
-    packages: ["axios", "lucide-react", "react-hot-toast"],
+    // NOTE: clsx / tailwind-merge / class-variance-authority are imported by
+    // lib/core/utils.ts which every route uses. They MUST live here — if
+    // left ungrouped, the bundler merges them into reports-vendor and every
+    // page (including /login) downloads recharts (~84KiB wasted, LCP +0.4s).
+    packages: [
+      "axios",
+      "lucide-react",
+      "react-hot-toast",
+      "clsx",
+      "tailwind-merge",
+      "class-variance-authority",
+    ],
   },
   {
     name: "i18n-vendor",
