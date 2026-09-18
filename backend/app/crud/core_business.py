@@ -1,4 +1,3 @@
-from fastapi.middleware.cors import CORSMiddleware
 import json
 import uuid
 from datetime import datetime
@@ -213,13 +212,21 @@ def create_audit_log(
     return row
 
 
-def list_audit_logs(db: Session, limit: int = 50):
-    return (
+def list_audit_logs(db: Session, limit: int = 50, offset: int = 0):
+    """Phase 2: bounded pagination + count for X-Total-Count header."""
+    total = (
         db.query(AuditLog)
         .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        .count()
+    )
+    rows = (
+        db.query(AuditLog)
+        .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        .offset(offset)
         .limit(limit)
         .all()
     )
+    return rows, total
 
 
 def _sum_filtered(db: Session, direction: str, payment_filter: str | None, date_str: str | None = None, start: str | None = None, end: str | None = None):

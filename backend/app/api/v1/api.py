@@ -1,5 +1,3 @@
-from datetime import datetime
-from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.endpoints import booking_pos_bridge
 from app.api.v1.endpoints import invoice_adjustment_requests
 from fastapi import APIRouter
