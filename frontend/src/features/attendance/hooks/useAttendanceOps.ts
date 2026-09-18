@@ -121,7 +121,7 @@ export function useAttendanceOps(opts: {
   );
 
   const handleExportPDF = useCallback(() => {
-    exportAttendancePDF({
+    void exportAttendancePDF({
       activeViewMode,
       todayRecords,
       processedData,

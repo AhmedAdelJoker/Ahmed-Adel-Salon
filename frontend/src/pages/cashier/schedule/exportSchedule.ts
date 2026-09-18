@@ -1,9 +1,10 @@
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import { formatTime12h } from "@/lib/core/utils";
 import { getStatusConfig } from "@/pages/cashier/schedule/scheduleUtils";
 
-export function exportSchedulePDF({ appointments, selectedDate }: any) {
+export async function exportSchedulePDF({ appointments, selectedDate }: any): Promise<void> {
+  // Lazy-load the heavy PDF libs only when the user actually exports (~430KB saved).
+  const { jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
   const dateLabel = new Date(selectedDate + "T00:00:00").toLocaleDateString(

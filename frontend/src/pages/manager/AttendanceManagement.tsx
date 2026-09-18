@@ -6,8 +6,6 @@ import type {
   AttendanceSettingsForm,
   LeaveRecord,
 } from "@/types/attendance";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 
 
 import { useNavigate } from "react-router-dom";
@@ -149,7 +147,10 @@ const AttendanceManagement = () => {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
+    // Lazy-load the heavy PDF libs only when the user actually exports (~430KB saved).
+    const { jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
     const doc = new jsPDF();
     doc.setFont("helvetica", "bold");
     doc.text("Barber Luxe OS - Attendance Report", 14, 20);

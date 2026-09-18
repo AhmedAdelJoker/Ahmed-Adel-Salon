@@ -1,5 +1,3 @@
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import { toast } from "react-hot-toast";
 import {
   analyzeProductivity,
@@ -204,13 +202,16 @@ export function buildCalendarDays(
   return days;
 }
 
-export function exportAttendancePDF(opts: {
+export async function exportAttendancePDF(opts: {
   activeViewMode: AttendanceViewMode;
   todayRecords: AttendanceRecord[];
   processedData: AttendanceRecord[];
   archiveRecords: AttendanceRecord[];
-}): void {
+}): Promise<void> {
   const { activeViewMode, todayRecords, processedData, archiveRecords } = opts;
+  // Lazy-load the heavy PDF libs only when the user actually exports (~430KB saved).
+  const { jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
   const doc = new jsPDF();
   doc.setFont("helvetica", "bold");
   doc.text("Barber Luxe OS - Attendance Report", 14, 20);

@@ -413,7 +413,7 @@ export function useSchedule() {
     (format: any) => {
       try {
         if (format === "pdf") {
-          exportSchedulePDF({ appointments: dayAppointments, selectedDate });
+          void exportSchedulePDF({ appointments: dayAppointments, selectedDate });
         } else {
           exportScheduleCSV({ appointments: dayAppointments, selectedDate });
         }

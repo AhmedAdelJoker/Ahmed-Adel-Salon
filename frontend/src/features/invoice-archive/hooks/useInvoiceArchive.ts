@@ -1,7 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { toast } from "react-hot-toast";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import api from "@/services/api";
 import { formatCurrency } from "@/lib/core/utils";
 
@@ -218,6 +216,9 @@ export function useInvoiceArchive() {
     if (!months.length) return toast.error("لا توجد بيانات للتصدير");
     try {
       toast.loading("جاري إنشاء التقرير...", { id: "pdf" });
+      // Lazy-load the heavy PDF libs only when the user actually exports (~430KB saved).
+      const { jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
       const doc = new jsPDF({
         orientation: "landscape",
         unit: "pt",
