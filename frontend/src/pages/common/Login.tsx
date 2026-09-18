@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { motion } from "framer-motion";
 import { Lock, ShieldCheck, User } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, TotpRequiredError } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,6 +37,8 @@ function InfoChip({ icon, title, label }) {
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [totp, setTotp] = useState("");
+  const [totpRequired, setTotpRequired] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login: loginUser, user } = useAuth();
   const navigate = useNavigate();
@@ -52,11 +54,16 @@ export default function Login() {
 
     setIsSubmitting(true);
     try {
-      await loginUser(username.trim(), password);
+      await loginUser(username.trim(), password, totpRequired ? totp.trim() : undefined);
       toast.success("تمت المصادقة الرقمية بنجاح");
       navigate("/", { replace: true });
     } catch (err) {
-      toast.error("بيانات الاعتماد غير صالحة");
+      if (err instanceof TotpRequiredError || (err as { code?: string })?.code === "TOTP_REQUIRED") {
+        setTotpRequired(true);
+        toast.error("هذا الحساب محمي بالمصادقة الثنائية — أدخل رمز التحقق");
+      } else {
+        toast.error("بيانات الاعتماد غير صالحة");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -65,7 +72,6 @@ export default function Login() {
   return (
     <main
       className="relative min-h-screen overflow-hidden bg-bg-main text-main selection:bg-accent selection:text-bg-main"
-      dir="rtl"
     >
       {/* Premium Background Elements */}
       <div className="absolute inset-0 bg-gradient-to-br from-bg-main via-bg-soft to-bg-main" />
@@ -250,6 +256,31 @@ export default function Login() {
                       />
                     </div>
                   </div>
+
+                  {totpRequired && (
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-black text-muted uppercase tracking-widest mr-2">
+                        رمز التحقق (6 أرقام)
+                      </span>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 right-5 flex items-center text-muted group-focus-within:text-accent transition-colors">
+                          <ShieldCheck size={18} strokeWidth={2.5} />
+                        </div>
+                        <Input
+                          value={totp || ""}
+                          onChange={(event) =>
+                            setTotp(event.target.value.replace(/\D/g, "").slice(0, 6))
+                          }
+                          className="h-14 pr-14 bg-bg-main/50 border-border/40 focus:border-accent/40 rounded-2xl text-[14px] font-bold text-center tracking-[0.5em]"
+                          placeholder="••••••"
+                          autoComplete="one-time-code"
+                          inputMode="numeric"
+                          dir="ltr"
+                          required={totpRequired}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <Button
                     type="submit"

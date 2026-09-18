@@ -34,7 +34,7 @@ export interface AuthContextValue {
   currentUser: AuthUser | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (username: string, password: string) => Promise<AuthUser>;
+  login: (username: string, password: string, totpCode?: string) => Promise<AuthUser>;
   logout: (options?: LogoutOptions) => void;
   refreshUser: () => Promise<AuthUser | null>;
   fetchUserProfile: () => Promise<AuthUser | null>;
@@ -42,10 +42,20 @@ export interface AuthContextValue {
 
 interface AxiosLikeError {
   response?: {
+    status?: number;
+    headers?: Record<string, string | undefined>;
     data?: {
       detail?: unknown;
     };
   };
+}
+
+export class TotpRequiredError extends Error {
+  code = "TOTP_REQUIRED" as const;
+  constructor() {
+    super("TOTP_REQUIRED");
+    this.name = "TotpRequiredError";
+  }
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -69,6 +79,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const logout = useCallback(({ silent = false, redirect = true }: LogoutOptions = {}) => {
+    // Phase 3: revoke server-side tokens (best-effort) so a stolen token
+    // cannot be reused after logout. Local cleanup always runs.
+    try {
+      const token = localStorage.getItem("token");
+      const refreshToken = localStorage.getItem("refresh_token");
+      if (token) {
+        void api
+          .post(
+            "/auth/logout",
+            { refresh_token: refreshToken ?? undefined },
+            { headers: { Authorization: `Bearer ${token}` } },
+          )
+          .catch(() => undefined);
+      }
+    } catch {
+      /* storage/network unavailable — still clear local state below */
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
@@ -136,11 +163,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [fetchUserProfile]);
 
   const login = useCallback(
-    async (username: string, password: string): Promise<AuthUser> => {
+    async (username: string, password: string, totpCode?: string): Promise<AuthUser> => {
       try {
         const formData = new URLSearchParams();
         formData.append("username", username);
         formData.append("password", password);
+        if (totpCode) {
+          formData.append("totp_code", totpCode);
+        }
 
         const response = await api.post("/auth/login", formData, {
           headers: {
@@ -174,6 +204,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return userData;
       } catch (err) {
         console.error("Login error details:", (err as AxiosLikeError).response?.data);
+        // 2FA gate: surface a typed error (no generic toast) so the
+        // login form can reveal the one-time-code field instead.
+        const resp = (err as AxiosLikeError).response;
+        if (resp?.status === 401 && resp?.headers?.["x-2fa-required"] === "totp") {
+          throw new TotpRequiredError();
+        }
         let errorMsg = "فشل تسجيل الدخول";
         const detail = (err as AxiosLikeError).response?.data?.detail;
 
