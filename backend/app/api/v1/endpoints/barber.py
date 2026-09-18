@@ -1,6 +1,6 @@
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from datetime import date, datetime, timedelta
 from typing import Any, List, Optional
@@ -51,7 +51,8 @@ def _resolve_barber_id(current_user) -> Optional[int]:
     return current_user.barber_id or current_user.employee_id
 
 
-def _get_barber(db: Session, current_user) -> Employee:
+def _get_barber(db: Session, current_user) -> int:
+    """Resolve the current user's employee id (kept db arg for call-site compat)."""
     barber_id = _resolve_barber_id(current_user)
     if not barber_id:
         raise HTTPException(status_code=404, detail="Barber profile not found")
@@ -127,17 +128,23 @@ def get_barber_queue(
 
     today = date.today()
 
-    waiting = db.query(Appointment).filter(
+    waiting = db.query(Appointment).options(
+        joinedload(Appointment.customer),
+        joinedload(Appointment.services),
+    ).filter(
         Appointment.barber_id == barber_id,
         Appointment.status.in_(["waiting", "in-service", "pending"]),
         Appointment.appointment_date == today
-    ).all()
+    ).order_by(Appointment.appointment_time.asc()).limit(200).all()
 
-    completed = db.query(Appointment).filter(
+    completed = db.query(Appointment).options(
+        joinedload(Appointment.customer),
+        joinedload(Appointment.services),
+    ).filter(
         Appointment.barber_id == barber_id,
         Appointment.status.in_(["completed", "ready_for_payment"]),
         Appointment.appointment_date == today
-    ).all()
+    ).order_by(Appointment.appointment_time.asc()).limit(200).all()
     
     return {
         "waiting": waiting,
@@ -204,22 +211,46 @@ def get_barber_calendar(
         else:
             end_date = date(today.year, today.month + 1, 1) - timedelta(days=1)
 
-    appointments = db.query(Appointment).filter(
+    appointments = db.query(Appointment).options(
+        joinedload(Appointment.customer),
+        joinedload(Appointment.services),
+    ).filter(
         Appointment.barber_id == barber_id,
         Appointment.appointment_date >= start_date,
         Appointment.appointment_date <= end_date,
-    ).all()
+    ).order_by(Appointment.appointment_date.asc()).limit(1000).all()
+
+    def _customer_name(apt) -> str:
+        return (
+            getattr(apt, "customer_name", None)
+            or (apt.customer.first_name + " " + (apt.customer.last_name or "")).strip() if getattr(apt, "customer", None) else None
+            or (apt.customer.name if getattr(getattr(apt, "customer", None), "name", None) else None)
+            or "عميل نقدي"
+        )
+
+    def _service_name(apt) -> str:
+        direct = getattr(apt, "service_name", None)
+        if direct:
+            return direct
+        services = getattr(apt, "services", None) or []
+        names = [getattr(s, "service_name_snapshot", "") for s in services if getattr(s, "service_name_snapshot", "")]
+        if names:
+            return ", ".join(names)
+        single = getattr(apt, "service", None)
+        if single is not None and getattr(single, "name", None):
+            return single.name
+        return "خدمة"
 
     return {
         "appointments": [
             {
                 "id": apt.id,
-                "customer_name": apt.customer_name or (apt.customer.name if apt.customer else "عميل نقدي"),
-                "service_name": apt.service_name or (apt.service.name if apt.service else "خدمة"),
+                "customer_name": _customer_name(apt),
+                "service_name": _service_name(apt),
                 "appointment_date": str(apt.appointment_date),
-                "start_time": apt.start_time or "09:00",
+                "start_time": getattr(apt, "start_time", None) or (apt.appointment_time.strftime("%H:%M") if getattr(apt, "appointment_time", None) else "09:00"),
                 "status": apt.status,
-                "total_amount": float(apt.total_amount or 0),
+                "total_amount": float(getattr(apt, "total_amount", None) or getattr(apt, "total_estimated_price", None) or 0),
                 "notes": apt.notes or "",
             }
             for apt in appointments
@@ -294,10 +325,13 @@ def get_barber_schedule(
     else:
         target_date = date.today()
 
-    appointments = db.query(Appointment).filter(
+    appointments = db.query(Appointment).options(
+        joinedload(Appointment.customer),
+        joinedload(Appointment.services),
+    ).filter(
         Appointment.barber_id == barber_id,
         Appointment.appointment_date == target_date,
-    ).order_by(Appointment.appointment_time.asc()).all()
+    ).order_by(Appointment.appointment_time.asc()).limit(200).all()
 
     # Get working hours
     from app.models.business_settings import BusinessSettings
@@ -312,9 +346,9 @@ def get_barber_schedule(
         "appointments": [
             {
                 "id": apt.id,
-                "customer_name": apt.customer.name if apt.customer else "عميل نقدي",
+                "customer_name": (f"{apt.customer.first_name} {(apt.customer.last_name or '')}".strip() if apt.customer else "عميل نقدي"),
                 "customer_phone": apt.customer.phone if apt.customer else "",
-                "service_name": ", ".join(s.service_name_snapshot for s in apt.services) or "خدمة",
+                "service_name": ", ".join(s.service_name_snapshot for s in (apt.services or []) if getattr(s, "service_name_snapshot", None)) or "خدمة",
                 "start_time": apt.appointment_time.strftime("%H:%M") if apt.appointment_time else "09:00",
                 "end_time": "",
                 "status": apt.status,
@@ -340,7 +374,10 @@ def get_appointment_by_id(
     if not barber_id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    appointment = db.query(Appointment).filter(
+    appointment = db.query(Appointment).options(
+        joinedload(Appointment.customer),
+        joinedload(Appointment.services),
+    ).filter(
         Appointment.id == appointment_id,
         Appointment.barber_id == barber_id
     ).first()
@@ -350,9 +387,9 @@ def get_appointment_by_id(
 
     return {
         "id": appointment.id,
-        "customer_name": appointment.customer.name if appointment.customer else "عميل نقدي",
+        "customer_name": (f"{appointment.customer.first_name} {(appointment.customer.last_name or '')}".strip() if appointment.customer else "عميل نقدي"),
         "customer_phone": appointment.customer.phone if appointment.customer else "",
-        "service_name": ", ".join(s.service_name_snapshot for s in appointment.services) or "خدمة",
+        "service_name": ", ".join(s.service_name_snapshot for s in (appointment.services or []) if getattr(s, "service_name_snapshot", None)) or "خدمة",
         "appointment_date": str(appointment.appointment_date),
         "start_time": appointment.appointment_time.strftime("%H:%M") if appointment.appointment_time else "",
         "end_time": "",
@@ -658,8 +695,10 @@ def get_barber_commissions(
     db: Session = Depends(deps.get_db),
     current_user: Any = Depends(deps.get_current_active_user),
     period: str = "week",
+    limit: int = Query(200, ge=1, le=500),
 ) -> Any:
     """Commission list for the barber over a period."""
+    from app.models.invoice_item import InvoiceItem
     barber_id = _get_barber(db, current_user)
     barber = db.query(Employee).filter(Employee.id == barber_id).first()
     commission_rate = float(barber.commission_rate or 15) / 100 if barber else 0.15
@@ -674,26 +713,34 @@ def get_barber_commissions(
     else:
         start = today - timedelta(days=6)
 
-    invoices = db.query(Invoice).filter(
+    invoices = db.query(Invoice).options(
+        joinedload(Invoice.items),
+        joinedload(Invoice.customer),
+    ).filter(
         Invoice.barber_id == barber_id,
         func.date(Invoice.created_at) >= start,
         Invoice.is_draft == False,
-    ).order_by(Invoice.created_at.desc()).all()
+    ).order_by(Invoice.created_at.desc()).limit(limit).all()
 
     items = []
     for inv in invoices:
         item_names = []
-        for it in inv.items:
-            name = getattr(it, "service_name", None) or getattr(it, "product_name", None)
+        for it in (inv.items or []):
+            name = getattr(it, "service_name", None)
             if name:
                 item_names.append(name)
+        customer = getattr(inv, "customer", None)
+        customer_name = (
+            f"{customer.first_name} {(customer.last_name or '')}".strip()
+            if customer is not None else "عميل نقدي"
+        )
         items.append({
             "id": inv.id,
             "invoice_no": inv.invoice_no or f"#{inv.id}",
             "date": str(inv.created_at.date()) if inv.created_at else str(today),
             "amount": float(inv.subtotal_amount or 0),
             "commission": round(float(inv.subtotal_amount or 0) * commission_rate, 2),
-            "customer_name": inv.customer.name if inv.customer else "عميل نقدي",
+            "customer_name": customer_name,
             "service_name": ", ".join(item_names[:2]) or "خدمة",
             "paid": bool(inv.is_closed),
         })

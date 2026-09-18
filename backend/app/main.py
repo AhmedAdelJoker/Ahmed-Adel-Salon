@@ -1,4 +1,6 @@
 from contextlib import asynccontextmanager
+import logging
+import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -13,12 +15,14 @@ from app.core.config import settings
 from app.db.runtime_schema import ensure_runtime_schema
 from app.db.seed import seed_data
 
+logger = logging.getLogger("app.main")
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     ensure_runtime_schema()
     seed_data()
-    print("Server started. Background scheduler for POS shifts is active.")
+    logger.info("Server started. Background scheduler for POS shifts is active.")
     yield
     try:
         scheduler.shutdown(wait=False)
@@ -26,7 +30,15 @@ async def lifespan(_app: FastAPI):
         pass
 
 
-app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+_is_prod = (os.getenv("ENVIRONMENT") or settings.ENVIRONMENT) == "production"
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    lifespan=lifespan,
+    # Phase 3: never expose interactive docs / OpenAPI schema in production.
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
+)
 
 
 # --- Background Tasks ---
@@ -37,9 +49,9 @@ def scheduled_shift_closure():
         from app.services.pos_shift_service import auto_close_expired_shifts
         closed_count = auto_close_expired_shifts(db)
         if closed_count > 0:
-            print(f"[Scheduler] Automatically closed {closed_count} POS shift(s).")
-    except Exception as e:
-        print(f"[Scheduler] Error during auto-shift-closure: {e}")
+            logger.info("[Scheduler] Automatically closed %d POS shift(s).", closed_count)
+    except Exception:
+        logger.exception("[Scheduler] Error during auto-shift-closure")
     finally:
         db.close()
 
@@ -51,9 +63,9 @@ def scheduled_report_delivery():
         from app.services.scheduled_reports import run_due_schedules
         results = run_due_schedules(db)
         if results:
-            print(f"[Scheduler] Delivered {len(results)} scheduled report(s).")
-    except Exception as e:
-        print(f"[Scheduler] Error during scheduled-report-delivery: {e}")
+            logger.info("[Scheduler] Delivered %d scheduled report(s).", len(results))
+    except Exception:
+        logger.exception("[Scheduler] Error during scheduled-report-delivery")
     finally:
         db.close()
 
@@ -66,9 +78,12 @@ def cleanup_scheduled_reports():
         keep_n = int(os.environ.get("SCHEDULED_PDF_KEEP", "20"))
         result = cleanup_old_pdfs(keep_n)
         if result["deleted"]:
-            print(f"[Scheduler] Cleaned up {result['deleted']} old PDF(s). {result['remaining']} remaining.")
-    except Exception as e:
-        print(f"[Scheduler] Error during PDF cleanup: {e}")
+            logger.info(
+                "[Scheduler] Cleaned up %d old PDF(s). %d remaining.",
+                result["deleted"], result["remaining"],
+            )
+    except Exception:
+        logger.exception("[Scheduler] Error during PDF cleanup")
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(
@@ -151,21 +166,23 @@ try:
                                 except Exception:
                                     pass
 except Exception as _e:
-    print(f"[uploads] legacy migration warning: {_e}")
+    logger.warning("[uploads] legacy migration warning: %s", _e)
 
 app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 
+# Use configured allowed hosts, fallback to localhost for dev
+_allowed_hosts = settings.ALLOWED_HOSTS if isinstance(settings.ALLOWED_HOSTS, list) else [settings.ALLOWED_HOSTS]
+if not _allowed_hosts:
+    _allowed_hosts = ["localhost", "127.0.0.1"]
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["*"], # Relaxed for development to avoid port-matching issues
+    allowed_hosts=_allowed_hosts,
 )
 
 
-# CORS Middleware
+# CORS Middleware — local dev origins only (5173 per project rules; no :3000)
 origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
@@ -182,9 +199,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["Content-Disposition", "X-Export-Empty", "X-Export-Filename"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"],
+    expose_headers=["Content-Disposition", "X-Export-Empty", "X-Export-Filename", "X-Total-Count"],
 )
 
 
@@ -193,11 +210,14 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     import traceback
-    print(f"[UNHANDLED] {request.method} {request.url.path}: {exc}")
-    traceback.print_exc()
+    import logging
+
+    logger = logging.getLogger("app.unhandled")
+    logger.error(f"[UNHANDLED] {request.method} {request.url.path}: {exc}", exc_info=True)
+    # Don't leak internal error details to client
     response = JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "error": str(exc)},
+        content={"detail": "حدث خطأ داخلي، حاول مرة أخرى"},
     )
     origin = request.headers.get("origin")
     if origin and origin in origins:
@@ -214,9 +234,27 @@ async def add_security_headers(request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    # Strict-Transport-Security: tell browsers to upgrade to HTTPS for 1 year,
+    # including subdomains. Safe to send even over HTTP because browsers ignore
+    # it on plain HTTP. Activates the moment the app is served behind HTTPS.
+    response.headers.setdefault(
+        "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+    )
+    # Content-Security-Policy: defense-in-depth against XSS.
+    # - default-src 'self': only same-origin by default
+    # - img-src 'self' data: blob: https:: allow image previews from local blobs and HTTPS sources
+    # - script-src 'self': no inline scripts (SPA bundle is served same-origin)
+    # - style-src 'self' 'unsafe-inline': inline styles for component libraries
+    # - connect-src 'self' ws: wss: http://localhost:5173: API + dev HMR
+    # - frame-ancestors 'none': equivalent to X-Frame-Options: DENY
+    response.headers.setdefault("Content-Security-Policy", settings.CSP_POLICY)
+    # Cross-Origin policies: isolate the app from other origins' resources
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
 
     if request.url.path.startswith("/api/v1/auth"):
         response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
 
     return response
 
