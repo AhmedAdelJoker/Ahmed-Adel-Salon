@@ -12,3 +12,18 @@ export type { ScheduleHeaderActionsProps } from "@/features/schedule/components/
 export { ScheduleLoadingSkeleton } from "@/features/schedule/components/ScheduleLoadingSkeleton";
 export { ScheduleDragPreview } from "@/features/schedule/components/ScheduleDragPreview";
 export type { ScheduleDragPreviewProps } from "@/features/schedule/components/ScheduleDragPreview";
+export { BarberColumn } from "@/features/schedule/components/DayBoard/BarberColumn";
+export type { BarberColumnProps } from "@/features/schedule/components/DayBoard/BarberColumn";
+export { SlotDropZone } from "@/features/schedule/components/DayBoard/SlotDropZone";
+export type { SlotDropZoneProps } from "@/features/schedule/components/DayBoard/SlotDropZone";
+export {
+  TIME_COL_WIDTH,
+  BARBER_COL_MIN,
+  dirIsRtl,
+  MAX_LANES,
+} from "@/features/schedule/components/DayBoard/constants";
+export {
+  hourLineClass,
+  computeLanes,
+  slotTo24,
+} from "@/features/schedule/components/DayBoard/utils";
