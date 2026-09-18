@@ -12,7 +12,7 @@ test('admin login reaches the app', async ({ page }) => {
   await expect(username).toBeVisible({ timeout: 15000 });
 
   await username.fill('admin');
-  await password.fill('admin123');
+  await password.fill('TestAdmin123');
   await page.locator('button[type="submit"]').click();
 
   await page.waitForURL((url) => !url.pathname.includes('login'), {

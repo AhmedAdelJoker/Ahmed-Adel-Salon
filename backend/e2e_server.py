@@ -16,7 +16,13 @@ if os.path.exists(db_path):
 os.environ["DATABASE_URL"] = "sqlite:///" + db_path.replace("\\", "/")
 # NOTE: set explicitly — must not depend on CWD/.env discovery.
 os.environ["FIRST_SUPERUSER"] = "admin"
-os.environ["FIRST_SUPERUSER_PASSWORD"] = "admin123"
+# NOTE: must satisfy validate_superuser_password (admin123 is rejected).
+os.environ["FIRST_SUPERUSER_PASSWORD"] = "TestAdmin123"
+# E2E preview runs on :5174 (dev :5173 stays for humans) — allow both origins.
+os.environ["BACKEND_CORS_ORIGINS"] = (
+    "http://127.0.0.1:5174,http://localhost:5174,"
+    "http://127.0.0.1:5173,http://localhost:5173"
+)
 
 import uvicorn
 
