@@ -1,7 +1,7 @@
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_cashier_manager_owner, get_current_active_shift
@@ -84,13 +84,45 @@ def _ensure_queue_customer(db: Session, payload: WalkInQueueCreate) -> Customer:
 
 @router.get("")
 def list_queue(
+    response: Response = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    skip: int = Query(0, ge=0),
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=500),
+    sort: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner)
+    current_user: User = Depends(require_cashier_manager_owner),
 ):
-    # Only show queue items for active/current shifts to keep focus
-    rows = db.query(WalkInQueue).filter(
+    # Phase 2: was returning ALL queue items unbounded
+    query = db.query(WalkInQueue).filter(
         WalkInQueue.status.in_(["waiting", "called", "in_service"])
-    ).order_by(WalkInQueue.id.asc()).all()
+    )
+
+    if sort:
+        sort_field = sort.lstrip("-")
+        desc = sort.startswith("-")
+        column = getattr(WalkInQueue, sort_field, None)
+        if column is not None:
+            query = query.order_by(column.desc() if desc else column.asc())
+    else:
+        query = query.order_by(WalkInQueue.id.asc())
+
+    eff_offset = offset
+    eff_limit = limit
+    if page is not None and page_size is not None:
+        eff_offset = (page - 1) * page_size
+        eff_limit = page_size
+    elif skip > 0:
+        eff_offset = skip
+
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Page-Size"] = str(eff_limit)
+        if page is not None:
+            response.headers["X-Page"] = str(page)
+    rows = query.offset(eff_offset).limit(eff_limit).all()
     return [_serialize_queue_item(db, r) for r in rows]
 
 

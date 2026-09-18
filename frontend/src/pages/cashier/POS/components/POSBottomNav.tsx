@@ -46,7 +46,6 @@ const POSBottomNav = ({
         exit={{ y: "100%", opacity: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
         className="fixed inset-x-0 bottom-0 z-50 lg:hidden mobile-bottom-safe"
-        dir="rtl"
         role="tablist"
         aria-label="تنقل نقطة البيع"
       >

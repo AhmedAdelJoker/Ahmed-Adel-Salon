@@ -30,7 +30,7 @@ export default function CategoryFormModal({
 }) {
   return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="bg-card border-border" dir="rtl">
+        <DialogContent className="bg-card border-border">
           <DialogHeader className="text-right">
             <DialogTitle className="text-xl font-black text-main">
               {editing ? "تعديل التصنيف" : "إضافة تصنيف جديد"}

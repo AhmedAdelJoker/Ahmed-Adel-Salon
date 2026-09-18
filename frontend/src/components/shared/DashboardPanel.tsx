@@ -8,7 +8,6 @@ export default function DashboardPanel({
   return (
     <section
       className={`card rounded-3xl border border-border bg-card shadow-soft overflow-hidden ${className}`}
-      dir="rtl"
     >
       {(title || subtitle || action) && (
         <header className="flex flex-col gap-4 border-b border-border bg-soft/50 p-5 sm:flex-row sm:items-center sm:justify-between">

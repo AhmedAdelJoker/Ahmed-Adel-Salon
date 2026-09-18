@@ -11,6 +11,7 @@ from app.models.user import User
 from app.models.business_settings import BusinessSettings
 from app.schemas.business_settings import BusinessSettingsRead, BusinessSettingsUpdate
 from app.utils.media import process_image_content, get_upload_path
+from app.core.upload_security import validate_image
 
 router = APIRouter(prefix="/business-settings", tags=["Business Settings"])
 
@@ -85,7 +86,8 @@ async def upload_business_logo(
 ):
     """رفع لوجو المحل وتحديث الإعدادات."""
     row = _get_or_create_business_settings(db)
-    content = await file.read()
+    # Phase 3: validate MIME/size/filename before processing
+    content = await validate_image(file, max_size=5 * 1024 * 1024)
     filename = process_image_content(content, file.filename, UPLOADS_DIR)
     row.logo_url = f"/uploads/business/{filename}"
     db.add(row)
@@ -101,7 +103,8 @@ async def upload_business_media(
     current_user: User = Depends(require_owner_or_manager),
 ):
     """رفع صورة للصفحة العامة (غلاف أو معرض)."""
-    content = await file.read()
+    # Phase 3: validate MIME/size/filename before processing
+    content = await validate_image(file, max_size=10 * 1024 * 1024)
     filename = process_image_content(content, file.filename, UPLOADS_DIR)
     # رابط نسبي — الفرونت-إند يضيف STATIC_URL أمامه
     url = f"/uploads/business/{filename}"

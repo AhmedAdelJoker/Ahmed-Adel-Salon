@@ -12,33 +12,36 @@ import {
   ShieldCheck,
   Download,
   X,
-  CheckSquare,
-  Square,
+  Check,
   ChevronRight,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import CustomerDetailsDialog from "@/features/customers/components/CustomerDetailsDialog";
 import { exportService } from "@/services/exportService";
-import { cn } from "@/lib/core/utils";
+import { cn, formatDateTime } from "@/lib/core/utils";
 import api from "@/services/api";
 import { normalizeListResponse } from "@/services/apiAdapter";
 import { toast } from "react-hot-toast";
-import { PremiumCard } from "@/components/shared/PremiumUI";
+import { PageHeader, SkeletonCard } from "@/components/shared/PremiumUI";
+import { StatCard } from "@/components/shared/DisplayComponents";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 
 const CustomerArchive = () => {
   const navigate = useNavigate();
-   
+
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-   
+
   const [confirmTarget, setConfirmTarget] = useState<any | null>(null);
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [selectAll, setSelectAll] = useState(false);
+  const [detailsTarget, setDetailsTarget] = useState<any | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
 
   const fetchArchive = async () => {
     try {
@@ -83,7 +86,7 @@ const CustomerArchive = () => {
       setConfirmAction(null);
       fetchArchive();
     } catch (error) {
-       
+
       const msg = (error as any)?.response?.data?.detail || "فشل الحذف النهائي";
       toast.error(msg, { duration: 5000 });
     } finally {
@@ -95,15 +98,27 @@ const CustomerArchive = () => {
     if (selectedIds.size === 0) return;
     try {
       setIsActionLoading(true);
-      await api.post("/customers/archive/bulk-restore", {
+      const res = await api.post("/customers/archive/bulk-restore", {
         customer_ids: Array.from(selectedIds),
       });
-      toast.success(`تم استعادة ${selectedIds.size} عميل بنجاح`);
+      // 207 Multi-Status: some restored, some blocked (related records)
+      if (res.status === 207 && res.data) {
+        const { restored, blocked, detail } = res.data;
+        toast.success(
+          `تم استعادة ${restored?.length ?? selectedIds.size} عميل. تعذّر استعادة ${
+            blocked?.length ?? 0
+          } عميل.`,
+          { duration: 5000 },
+        );
+        if (detail) console.warn("Bulk restore partial:", detail);
+      } else {
+        toast.success(`تم استعادة ${selectedIds.size} عميل بنجاح`);
+      }
       setSelectedIds(new Set());
-      setSelectAll(false);
       fetchArchive();
     } catch (err) {
-      toast.error("فشل الاستعادة الجماعية");
+      const msg = (err as any)?.response?.data?.detail || "فشل الاستعادة الجماعية";
+      toast.error(msg, { duration: 5000 });
     } finally {
       setIsActionLoading(false);
     }
@@ -130,10 +145,9 @@ const CustomerArchive = () => {
         toast.success(`تم حذف ${selectedIds.size} عميل نهائياً`);
       }
       setSelectedIds(new Set());
-      setSelectAll(false);
       fetchArchive();
     } catch (error) {
-       
+
       const msg = (error as any)?.response?.data?.detail || "فشل الحذف النهائي الجماعي";
       toast.error(msg, { duration: 5000 });
     } finally {
@@ -142,7 +156,9 @@ const CustomerArchive = () => {
   };
 
   const handleExport = async () => {
+    if (isExporting) return;
     try {
+      setIsExporting(true);
       const filename = `customers_archive_${new Date().toISOString().split("T")[0]}`;
       await exportService.downloadExcel(
         "/exports/customers/excel",
@@ -152,32 +168,31 @@ const CustomerArchive = () => {
       toast.success("تم تصدير الأرشيف بنجاح");
     } catch (err) {
       toast.error("فشل تصدير الأرشيف");
+    } finally {
+      setIsExporting(false);
     }
   };
 
-  const openConfirm = (customer, action) => {
+  const openConfirm = (customer: any, action: string) => {
     setConfirmTarget(customer);
     setConfirmAction(action);
   };
 
-  const toggleSelect = (customerId) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(customerId)) {
-      newSelected.delete(customerId);
-    } else {
-      newSelected.add(customerId);
-    }
-    setSelectedIds(newSelected);
+  const closeSingleConfirm = () => {
+    setConfirmTarget(null);
+    setConfirmAction(null);
   };
 
-  const toggleSelectAll = () => {
-    if (selectAll) {
-      setSelectedIds(new Set());
-      setSelectAll(false);
-    } else {
-      setSelectedIds(new Set(filteredCustomers.map((c) => c.customer_id)));
-      setSelectAll(true);
-    }
+  const toggleSelect = (customerId: string | number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(customerId)) {
+        next.delete(customerId);
+      } else {
+        next.add(customerId);
+      }
+      return next;
+    });
   };
 
   const filteredCustomers = useMemo(() => {
@@ -193,329 +208,369 @@ const CustomerArchive = () => {
     );
   }, [customers, searchTerm]);
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "---";
-    try {
-      return new Date(dateStr).toLocaleDateString("ar-EG", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch (err) {
-      return "---";
-    }
+  // Derived selection state — always in sync with the visible list.
+  const allVisibleSelected =
+    filteredCustomers.length > 0 &&
+    filteredCustomers.every((c) => selectedIds.has(c.customer_id));
+
+  const toggleSelectVisible = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        filteredCustomers.forEach((c) => next.delete(c.customer_id));
+      } else {
+        filteredCustomers.forEach((c) => next.add(c.customer_id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    // Selections belong to the previous filter — reset to avoid acting on hidden rows.
+    setSelectedIds(new Set());
   };
 
   return (
-    <div className="min-h-screen pb-12" dir="rtl">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
-        <ConfirmDialog
-          open={!!confirmTarget && confirmAction === "restore"}
-          onOpenChange={(open) =>
-            !open && setConfirmTarget(null) && setConfirmAction(null)
-          }
-          title="استعادة العميل؟"
-          description="هل أنت متأكد من رغبتك في استعادة هذا العميل للعمل؟ سيتم إرجاعه للقائمة النشطة مع جميع بياناته."
-          onConfirm={handleRestore}
-          loading={isActionLoading}
-          confirmText="استعادة"
-        />
+    <div className="erp-page-container space-y-6 pb-16">
+      <ConfirmDialog
+        open={!!confirmTarget && confirmAction === "restore"}
+        onOpenChange={(open) => {
+          if (!open) closeSingleConfirm();
+        }}
+        title="استعادة العميل؟"
+        description="هل أنت متأكد من رغبتك في استعادة هذا العميل للعمل؟ سيتم إرجاعه للقائمة النشطة مع جميع بياناته."
+        onConfirm={handleRestore}
+        loading={isActionLoading}
+        confirmText="استعادة"
+      />
 
-        <ConfirmDialog
-          open={!!confirmTarget && confirmAction === "permanent_delete"}
-          onOpenChange={(open) =>
-            !open && setConfirmTarget(null) && setConfirmAction(null)
-          }
-          title="حذف نهائي لا يمكن التراجع عنه"
-          description={`سيتم حذف العميل ${confirmTarget?.first_name || ""} ${confirmTarget?.last_name || ""} وجميع بياناته نهائياً. قد يفشل الحذف إذا كان للعميل فواتير مرتبطة.`}
-          onConfirm={handlePermanentDelete}
-          loading={isActionLoading}
-          confirmText="حذف نهائي"
-          variant="danger"
-        />
+      <ConfirmDialog
+        open={!!confirmTarget && confirmAction === "permanent_delete"}
+        onOpenChange={(open) => {
+          if (!open) closeSingleConfirm();
+        }}
+        title="حذف نهائي لا يمكن التراجع عنه"
+        description={`سيتم حذف العميل ${confirmTarget?.first_name || ""} ${confirmTarget?.last_name || ""} وجميع بياناته نهائياً. قد يفشل الحذف إذا كان للعميل فواتير مرتبطة.`}
+        onConfirm={handlePermanentDelete}
+        loading={isActionLoading}
+        confirmText="حذف نهائي"
+        variant="danger"
+      />
 
-        <ConfirmDialog
-          open={confirmAction === "bulk_restore"}
-          onOpenChange={(open) => !open && setConfirmAction(null)}
-          title="استعادة جماعية؟"
-          description={`هل أنت متأكد من استعادة ${selectedIds.size} عميل محدد؟`}
-          onConfirm={handleBulkRestore}
-          loading={isActionLoading}
-          confirmText="استعادة الجميع"
-        />
+      <ConfirmDialog
+        open={confirmAction === "bulk_restore"}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null);
+        }}
+        title="استعادة جماعية؟"
+        description={`هل أنت متأكد من استعادة ${selectedIds.size} عميل محدد؟`}
+        onConfirm={handleBulkRestore}
+        loading={isActionLoading}
+        confirmText="استعادة الجميع"
+      />
 
-        <ConfirmDialog
-          open={confirmAction === "bulk_permanent_delete"}
-          onOpenChange={(open) => !open && setConfirmAction(null)}
-          title="حذف نهائي جماعي"
-          description={`سيتم حذف ${selectedIds.size} عميل وجميع بياناتهم نهائياً.`}
-          onConfirm={handleBulkPermanentDelete}
-          loading={isActionLoading}
-          confirmText="حذف الجميع"
-          variant="danger"
-        />
+      <ConfirmDialog
+        open={confirmAction === "bulk_permanent_delete"}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null);
+        }}
+        title="حذف نهائي جماعي"
+        description={`سيتم حذف ${selectedIds.size} عميل وجميع بياناتهم نهائياً.`}
+        onConfirm={handleBulkPermanentDelete}
+        loading={isActionLoading}
+        confirmText="حذف الجميع"
+        variant="danger"
+      />
 
-        {/* Header */}
-        <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-soft sm:rounded-2xl sm:p-5">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/customers")}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card transition-colors hover:bg-soft sm:h-10 sm:w-10"
-            >
-              <ChevronRight size={16} className="text-muted" />
-            </button>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 sm:h-11 sm:w-11">
-              <Archive size={18} className="text-purple-500 sm:hidden" />
-              <Archive size={20} className="hidden text-purple-500 sm:block" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-base font-black text-main sm:text-lg lg:text-xl">
-                أرشيف العملاء
-              </h1>
-              <p className="hidden text-[10px] font-bold text-muted sm:block">
-                سجل العملاء المحذوفين — يمكن استعادتهم أو حذفهم نهائياً
-              </p>
-            </div>
-            <Badge className="hidden shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-black sm:inline-flex">
-              {filteredCustomers.length} عميل
+      <CustomerDetailsDialog
+        open={!!detailsTarget}
+        onOpenChange={(open) => {
+          if (!open) setDetailsTarget(null);
+        }}
+        customer={detailsTarget}
+        loading={isActionLoading}
+        onClose={() => setDetailsTarget(null)}
+        archived
+        onRestore={() => {
+          if (!detailsTarget) return;
+          openConfirm(detailsTarget, "restore");
+          setDetailsTarget(null);
+        }}
+      />
+
+      <PageHeader
+        title="أرشيف العملاء"
+        subtitle="سجل العملاء المحذوفين — يمكن استعادتهم أو حذفهم نهائياً."
+        badge="الأرشيف"
+        icon={Archive}
+        actions={
+          <>
+            <Badge className="shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-black tabular-nums">
+              {customers.length} عميل
             </Badge>
-          </div>
-        </div>
-
-        {/* Search & Actions */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted/60"
-              size={14}
-            />
-            <Input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="بحث بالاسم أو الجوال أو الإيميل..."
-              className="h-10 w-full pr-9 text-sm sm:h-11"
-            />
-          </div>
-          <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              onClick={handleExport}
-              disabled={loading}
-              className="h-10 rounded-xl px-3 text-xs"
+              size="icon"
+              onClick={() => navigate("/customers")}
+              title="العودة لقائمة العملاء"
+              aria-label="العودة لقائمة العملاء"
+              className="h-12 w-12 rounded-2xl border-border/60 bg-soft text-muted shadow-sm hover:border-primary hover:bg-primary/10 hover:text-primary"
             >
-              <Download size={14} className="ml-1.5" />
-              <span className="hidden sm:inline">تصدير</span>
+              <ChevronRight size={24} />
             </Button>
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        {/* Select All / Bulk Actions */}
-        {filteredCustomers.length > 0 && (
-          <div className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 shadow-soft">
-            <button
-              type="button"
-              onClick={toggleSelectAll}
-              className="flex cursor-pointer items-center gap-2 text-xs font-bold text-muted"
+      <div data-stats-grid="true">
+        <StatCard
+          label="إجمالي الأرشيف"
+          value={customers.length}
+          icon={Archive}
+          variant="primary"
+          hint="عميل محذوف"
+        />
+        <StatCard
+          label="المحدد حالياً"
+          value={selectedIds.size}
+          icon={Check}
+          variant="warning"
+          hint="لإجراء جماعي"
+        />
+        <StatCard
+          label="نتائج البحث"
+          value={filteredCustomers.length}
+          icon={Search}
+          variant="secondary"
+          hint={searchTerm.trim() ? `عن "${searchTerm.trim()}"` : "كل السجلات"}
+        />
+      </div>
+
+      {/* Search & Actions */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted/60"
+            size={16}
+          />
+          <Input
+            value={searchTerm}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="بحث بالاسم أو الجوال أو الإيميل..."
+            aria-label="بحث في أرشيف العملاء"
+            className="h-11 w-full rounded-xl pr-9 text-sm font-bold shadow-sm"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            loading={isExporting}
+            disabled={loading || customers.length === 0}
+            className="h-11 gap-1.5 rounded-xl px-4 text-xs font-black"
+          >
+            <Download size={14} />
+            تصدير
+          </Button>
+        </div>
+      </div>
+
+      {/* Select visible / Bulk Actions */}
+      {filteredCustomers.length > 0 && (
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 shadow-soft">
+          <button
+            type="button"
+            onClick={toggleSelectVisible}
+            aria-pressed={allVisibleSelected}
+            className="flex cursor-pointer items-center gap-2 rounded-lg text-xs font-bold text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            <span
+              className={cn(
+                "flex h-5 w-5 items-center justify-center rounded border transition-colors",
+                allVisibleSelected
+                  ? "border-primary bg-primary"
+                  : "border-border hover:border-primary",
+              )}
             >
+              {allVisibleSelected && <Check size={12} className="text-white" />}
+            </span>
+            تحديد الظاهر
+          </button>
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold tabular-nums text-muted">
+                {selectedIds.size} محدد
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 rounded-lg px-2 text-[10px] text-success hover:bg-success-soft"
+                onClick={() => setConfirmAction("bulk_restore")}
+                disabled={isActionLoading}
+              >
+                <RotateCcw size={11} className="ml-1" /> استعادة
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 rounded-lg px-2 text-[10px] text-danger hover:bg-danger-soft"
+                onClick={() => setConfirmAction("bulk_permanent_delete")}
+                disabled={isActionLoading}
+              >
+                <Trash2 size={11} className="ml-1" /> حذف
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={clearSelection}
+                title="إلغاء التحديد"
+                aria-label="إلغاء التحديد"
+              >
+                <X size={12} />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Customer Grid / Loading / Empty */}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <SkeletonCard key={i} variant="content" />
+          ))}
+        </div>
+      ) : filteredCustomers.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-4 py-16 text-center sm:py-20">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-soft sm:h-16 sm:w-16">
+            <Archive size={28} className="text-muted" />
+          </div>
+          <p className="text-sm font-black text-main sm:text-base">
+            {customers.length === 0 ? "الأرشيف فارغ" : "لا توجد نتائج مطابقة"}
+          </p>
+          <p className="mt-1 text-xs font-bold text-muted">
+            {customers.length === 0
+              ? "لا يوجد عملاء محذوفون حالياً"
+              : "جرّب كلمة بحث مختلفة أو امسح البحث لعرض الكل"}
+          </p>
+          {customers.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleSearchChange("")}
+              className="mt-4 gap-1.5 rounded-xl text-xs font-black"
+            >
+              <X size={13} /> مسح البحث
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredCustomers.map((customer) => {
+            const isSelected = selectedIds.has(customer.customer_id);
+            return (
               <div
+                key={customer.customer_id}
                 className={cn(
-                  "flex h-5 w-5 items-center justify-center rounded border transition-colors",
-                  selectAll
-                    ? "border-primary bg-primary"
-                    : "border-border hover:border-primary",
+                  "rounded-2xl border border-border bg-card p-3 shadow-soft transition-all sm:p-4",
+                  isSelected && "border-primary/40 bg-primary-soft/10 ring-2 ring-primary/40",
                 )}
               >
-                {selectAll ? (
-                  <CheckSquare size={12} className="text-white" />
-                ) : (
-                  <Square size={12} />
-                )}
-              </div>
-              تحديد الكل
-            </button>
-            {selectedIds.size > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold text-muted">
-                  {selectedIds.size} محدد
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 rounded-lg px-2 text-[10px] text-success hover:bg-success-soft"
-                  onClick={() => setConfirmAction("bulk_restore")}
-                  disabled={isActionLoading}
-                >
-                  <RotateCcw size={11} className="ml-1" /> استعادة
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 rounded-lg px-2 text-[10px] text-danger hover:bg-danger-soft"
-                  onClick={() => setConfirmAction("bulk_permanent_delete")}
-                  disabled={isActionLoading}
-                >
-                  <Trash2 size={11} className="ml-1" /> حذف
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => {
-                    setSelectedIds(new Set());
-                    setSelectAll(false);
-                  }}
-                >
-                  <X size={12} />
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Customer Grid / Loading / Empty */}
-        {loading ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <PremiumCard key={i} className="animate-pulse p-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-soft" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 w-2/3 rounded bg-soft" />
-                    <div className="h-2 w-1/2 rounded bg-soft" />
-                  </div>
-                </div>
-                <div className="mt-3 space-y-1.5">
-                  <div className="h-2 w-full rounded bg-soft" />
-                  <div className="h-2 w-3/4 rounded bg-soft" />
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <div className="h-8 flex-1 rounded-lg bg-soft" />
-                  <div className="h-8 w-8 rounded-lg bg-soft" />
-                </div>
-              </PremiumCard>
-            ))}
-          </div>
-        ) : filteredCustomers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-4 py-16 text-center sm:py-20">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-soft sm:h-16 sm:w-16">
-              <Archive size={24} className="text-muted sm:hidden" />
-              <Archive size={28} className="hidden text-muted sm:block" />
-            </div>
-            <p className="text-sm font-black text-main sm:text-base">
-              الأرشيف فارغ
-            </p>
-            <p className="mt-1 text-xs font-bold text-muted">
-              لا يوجد عملاء محذوفون حالياً
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredCustomers.map((customer) => {
-              const isSelected = selectedIds.has(customer.customer_id);
-              return (
-                <PremiumCard
-                  key={customer.customer_id}
-                  className={cn(
-                    "group cursor-pointer p-3 transition-all hover:shadow-premium sm:p-4",
-                    isSelected && "ring-2 ring-primary/40 bg-primary-soft/10",
-                  )}
-                   
-                  {...{ onClick: () => toggleSelect(customer.customer_id) } as any}
-                >
-                  <div className="flex items-start gap-3">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleSelect(customer.customer_id);
-                      }}
-                      className={cn(
-                        "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors",
-                        isSelected
-                          ? "border-primary bg-primary"
-                          : "border-border hover:border-primary",
-                      )}
-                    >
-                      {isSelected && (
-                        <CheckSquare size={12} className="text-white" />
-                      )}
-                    </button>
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-danger-soft sm:h-10 sm:w-10">
-                      <UserX size={16} className="text-danger sm:hidden" />
-                      <UserX
-                        size={18}
-                        className="hidden text-danger sm:block"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3
-                        className="truncate text-sm font-black text-main sm:text-base"
-                        title={`${customer.first_name} ${customer.last_name}`}
-                      >
-                        {customer.first_name} {customer.last_name}
-                      </h3>
-                      <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted">
-                        <Calendar size={10} />
-                        <span>حذف: {formatDate(customer.deleted_at)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 space-y-1.5 rounded-lg bg-soft p-2 sm:p-2.5">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted">
-                      <Phone size={10} className="shrink-0" />
-                      <span dir="ltr" className="truncate">
-                        {customer.phone || "---"}
-                      </span>
-                    </div>
-                    {customer.email && (
-                      <div className="flex items-center gap-2 text-[10px] font-bold text-muted">
-                        <Mail size={10} className="shrink-0" />
-                        <span dir="ltr" className="truncate">
-                          {customer.email}
-                        </span>
-                      </div>
+                <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleSelect(customer.customer_id)}
+                    aria-pressed={isSelected}
+                    aria-label={`تحديد ${customer.first_name || ""} ${customer.last_name || ""}`}
+                    title={isSelected ? "إلغاء التحديد" : "تحديد للاجراء الجماعي"}
+                    className={cn(
+                      "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                      isSelected
+                        ? "border-primary bg-primary"
+                        : "border-border hover:border-primary",
                     )}
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted">
-                      <ShieldCheck size={10} className="shrink-0" />
-                      <span>
-                        {customer.current_tier || "Bronze"} •{" "}
-                        {customer.loyalty_points || 0} نقطة
-                      </span>
+                  >
+                    {isSelected && (
+                      <Check size={12} className="text-white" />
+                    )}
+                  </button>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-danger-soft sm:h-10 sm:w-10">
+                    <UserX size={18} className="text-danger" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3
+                      className="truncate text-sm font-black text-main sm:text-base"
+                      title={`${customer.first_name} ${customer.last_name}`}
+                    >
+                      {customer.first_name} {customer.last_name}
+                    </h3>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted">
+                      <Calendar size={10} />
+                      <span>حذف: {customer.deleted_at ? formatDateTime(customer.deleted_at) : "---"}</span>
                     </div>
                   </div>
+                </div>
 
-                  <div className="mt-3 flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openConfirm(customer, "restore");
-                      }}
-                      className="h-8 flex-1 rounded-lg border-success/30 text-[10px] font-black text-success hover:bg-success-soft sm:text-xs"
-                    >
-                      <RotateCcw size={11} className="ml-1" /> استعادة
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openConfirm(customer, "permanent_delete");
-                      }}
-                      className="h-8 w-8 shrink-0 rounded-lg text-danger hover:bg-danger-soft"
-                      title="حذف نهائي"
-                    >
-                      <Trash2 size={13} />
-                    </Button>
+                <div className="mt-3 space-y-1.5 rounded-lg bg-soft p-2 sm:p-2.5">
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-muted">
+                    <Phone size={10} className="shrink-0" />
+                    <span dir="ltr" className="truncate">
+                      {customer.phone || "---"}
+                    </span>
                   </div>
-                </PremiumCard>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                  {customer.email && (
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted">
+                      <Mail size={10} className="shrink-0" />
+                      <span dir="ltr" className="truncate">
+                        {customer.email}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-muted">
+                    <ShieldCheck size={10} className="shrink-0" />
+                    <span>
+                      {customer.current_tier || "Bronze"} •{" "}
+                      {customer.loyalty_points || 0} نقطة
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => openConfirm(customer, "restore")}
+                    className="h-8 flex-1 rounded-lg border-success/30 text-[10px] font-black text-success hover:bg-success-soft sm:text-xs"
+                  >
+                    <RotateCcw size={11} className="ml-1" /> استعادة
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setDetailsTarget(customer)}
+                    className="h-8 w-8 shrink-0 rounded-lg text-primary hover:bg-primary/10"
+                    title="تفاصيل أكثر"
+                    aria-label={`عرض تفاصيل ${customer.first_name || ""} ${customer.last_name || ""}`}
+                  >
+                    <Eye size={14} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => openConfirm(customer, "permanent_delete")}
+                    className="h-8 w-8 shrink-0 rounded-lg text-danger hover:bg-danger-soft"
+                    title="حذف نهائي"
+                    aria-label={`حذف ${customer.first_name || ""} ${customer.last_name || ""} نهائياً`}
+                  >
+                    <Trash2 size={13} />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

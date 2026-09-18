@@ -58,7 +58,7 @@ export default function CashierDashboard() {
   }
 
   return (
-    <div className="erp-page space-y-8 pb-12" dir="rtl">
+    <div className="erp-page space-y-8 pb-12">
       <PageHeader className={undefined}
         title={`أهلاً بك، ${user?.full_name || "زميلنا"}`}
         subtitle={`آخر تحديث: ${lastRefresh.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}`}

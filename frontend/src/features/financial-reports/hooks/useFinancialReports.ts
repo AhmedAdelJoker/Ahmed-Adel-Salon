@@ -436,6 +436,8 @@ export function useFinancialReports() {
               rev,
               exp,
               net: rev - exp,
+              isBucket: true,
+              rangeEnd: last.date,
             });
           }
           prevDailyTrends = buckets;
@@ -457,6 +459,8 @@ export function useFinancialReports() {
             rev,
             exp,
             net: rev - exp,
+            isBucket: true,
+            rangeEnd: last.date,
           });
         }
         dailyTrends = buckets;
@@ -610,7 +614,16 @@ export function useFinancialReports() {
     [],
   );
   const isCurrentMonth = fromDate <= monthStart && toDate >= monthStart;
-  const currentMonthRevenue = isCurrentMonth ? financials.revenue : 0;
+  /** Actual current-month revenue computed from invoice rows (not the whole range). */
+  const currentMonthRevenue = useMemo(() => {
+    if (!isCurrentMonth) return 0;
+    const currentKey = monthKeyOf(toISODate(new Date()));
+    return financials.invoiceRows.reduce((s, inv) => {
+      const d = dayKeyOf(inv.created_at);
+      if (!d || monthKeyOf(d) !== currentKey) return s;
+      return s + safeNum(inv.total_amount);
+    }, 0);
+  }, [isCurrentMonth, financials.invoiceRows]);
   const targetProgress =
     monthlyTarget > 0 ? Math.min(100, (currentMonthRevenue / monthlyTarget) * 100) : 0;
 
@@ -645,6 +658,13 @@ export function useFinancialReports() {
 
   const dayInvoices = useMemo(() => {
     if (!selectedDay) return [];
+    if (selectedDay.isBucket && selectedDay.rangeEnd) {
+      const end = selectedDay.rangeEnd;
+      return financials.invoiceRows.filter((inv) => {
+        const d = dayKeyOf(inv.created_at);
+        return d >= selectedDay.date && d <= end;
+      });
+    }
     return financials.invoiceRows.filter((inv) => {
       const d = dayKeyOf(inv.created_at);
       return d === selectedDay.date;
@@ -653,6 +673,13 @@ export function useFinancialReports() {
 
   const dayExpenses = useMemo(() => {
     if (!selectedDay) return [];
+    if (selectedDay.isBucket && selectedDay.rangeEnd) {
+      const end = selectedDay.rangeEnd;
+      return financials.expenseRows.filter((e) => {
+        const d = dayKeyOf(e.expense_date ?? e.created_at);
+        return d >= selectedDay.date && d <= end;
+      });
+    }
     return financials.expenseRows.filter((e) => {
       const d = dayKeyOf(e.expense_date ?? e.created_at);
       return d === selectedDay.date;
@@ -805,10 +832,18 @@ export function useFinancialReports() {
 
   const handleExportDay = () => {
     if (!selectedDay) return;
+    const rangeSuffix =
+      selectedDay.isBucket && selectedDay.rangeEnd
+        ? `${selectedDay.date}_to_${selectedDay.rangeEnd}`
+        : selectedDay.date;
+    const dayLabel =
+      selectedDay.isBucket && selectedDay.rangeEnd
+        ? `${selectedDay.date} إلى ${selectedDay.rangeEnd}`
+        : selectedDay.date;
     const rows: Array<Array<string | number>> = [];
     dayInvoices.forEach((inv) => {
       rows.push([
-        selectedDay.date,
+        dayLabel,
         "فاتورة",
         String(inv.id ?? ""),
         String(inv.client_name || inv.client_name_ar || "عميل"),
@@ -818,7 +853,7 @@ export function useFinancialReports() {
     });
     dayExpenses.forEach((e) => {
       rows.push([
-        selectedDay.date,
+        dayLabel,
         "مصروف",
         String(e.id ?? ""),
         String(e.title || e.description || "مصروف"),
@@ -830,7 +865,7 @@ export function useFinancialReports() {
       toast.error("لا توجد حركات لهذا اليوم للتصدير");
       return;
     }
-    downloadCsvFile(`day_detail_${selectedDay.date}`, ["التاريخ", "النوع", "الرقم", "البيان", "التصنيف", "المبلغ"], rows);
+    downloadCsvFile(`day_detail_${rangeSuffix}`, ["التاريخ", "النوع", "الرقم", "البيان", "التصنيف", "المبلغ"], rows);
     toast.success("تم تصدير تفاصيل اليوم بنجاح");
   };
 

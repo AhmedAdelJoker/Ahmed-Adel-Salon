@@ -76,7 +76,6 @@ export default function NotificationCenter() {
   return (
     <section
       className="card rounded-3xl border border-border bg-card shadow-soft overflow-hidden"
-      dir="rtl"
     >
       <header className="border-b border-border bg-soft/50 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

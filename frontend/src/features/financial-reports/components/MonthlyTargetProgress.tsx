@@ -13,6 +13,8 @@ export interface MonthlyTargetProgressProps {
   targetDraft: string;
   savingTarget: boolean;
   canEditTarget: boolean;
+  /** When set, the card stays visible but dimmed with this explanation (e.g. range outside current month). */
+  disabledReason?: string | null;
   onTargetDraftChange: (value: string) => void;
   onEditTarget: () => void;
   onCancelEditTarget: () => void;
@@ -29,6 +31,7 @@ export function MonthlyTargetProgress({
   targetDraft,
   savingTarget,
   canEditTarget,
+  disabledReason = null,
   onTargetDraftChange,
   onEditTarget,
   onCancelEditTarget,
@@ -37,6 +40,11 @@ export function MonthlyTargetProgress({
   return (
     <Card className="border-primary/30 bg-primary/5">
       <CardContent className="p-4 sm:p-5">
+        {disabledReason && (
+          <p className="mb-3 rounded-xl border border-dashed border-border bg-card px-3 py-2 text-[11px] font-bold text-muted">
+            {disabledReason}
+          </p>
+        )}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -101,7 +109,7 @@ export function MonthlyTargetProgress({
             </div>
             <p className="mt-1 text-[10px] font-bold text-muted">
               {targetProgress >= 100
-                ? "🎉 تم تحقيق الهدف! تجاوز بنسبة " + (targetProgress - 100).toFixed(1) + "%"
+                ? "تم تحقيق الهدف! تجاوز بنسبة " + (targetProgress - 100).toFixed(1) + "%"
                 : "متبقي " + formatCurrency(Math.max(0, monthlyTarget - currentMonthRevenue)) + " للوصول للهدف"}
             </p>
           </div>

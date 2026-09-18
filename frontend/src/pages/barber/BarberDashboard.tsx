@@ -29,7 +29,7 @@ const BarberDashboard = () => {
   } = useBarberDashboard();
 
   return (
-    <div className="min-h-screen pb-12" dir="rtl">
+    <div className="min-h-screen pb-12">
       <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

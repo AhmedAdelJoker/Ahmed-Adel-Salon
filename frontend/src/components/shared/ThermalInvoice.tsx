@@ -96,7 +96,6 @@ const ThermalInvoice = React.forwardRef<HTMLDivElement, ThermalInvoiceProps>(
     return (
       <div
         ref={ref}
-        dir="rtl"
         style={{
           width: "80mm",
           padding: "4mm",

@@ -1,24 +1,13 @@
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+"""
+Backward-compatibility alias — Phase 2 cleanup.
 
-from app.db.base_class import Base
+The legacy `Barber` model has been replaced by `Employee`. This module
+exposes `Barber` as an alias of `Employee` so the 7 import sites still work
+without code changes. New code should import `Employee` directly.
+"""
+from app.models.employee import Employee
 
+# Re-export so `from app.models.barber import Barber` keeps working.
+Barber = Employee
 
-class Barber(Base):
-    """
-    Legacy Barber model. 
-    Functionality moved to Employee model.
-    This remains for DB compatibility until fully migrated.
-    """
-    __tablename__ = "barbers"
-
-    id = Column(Integer, primary_key=True, index=True)
-    display_name = Column(String(255), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    # Relationships removed to avoid conflicts with Employee model
-    # users = relationship("User", back_populates="barber")
-    # appointments = relationship("Appointment", back_populates="barber")
-    # invoices = relationship("Invoice", back_populates="barber")
-    # sessions = relationship("ServiceSession", back_populates="barber")
+__all__ = ["Barber", "Employee"]

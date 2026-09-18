@@ -10,12 +10,28 @@ export default function CustomerCards({
   isOwner,
   onOpenDetails,
   onDelete,
+  emptyTitle = "لا يوجد عملاء مطابقين",
+  emptyHint,
+  showClearFilter = false,
+  onClearFilter,
 }: {
   rows: any[];
   isOwner: boolean;
   onOpenDetails: (customer: any) => void;
   onDelete: (customer: any) => void;
+  emptyTitle?: string;
+  emptyHint?: string;
+  showClearFilter?: boolean;
+  onClearFilter?: () => void;
 }) {
+  const visitsOf = (customer: any) =>
+    Number(customer.visits_count || customer.visits || 0);
+  const visitsVariant = (customer: any): "warning" | "info" | "outline" => {
+    const visits = visitsOf(customer);
+    if (visits > 10) return "warning";
+    if (visits >= 2) return "info";
+    return "outline";
+  };
   return (
           <div className="p-3 sm:p-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -43,20 +59,10 @@ export default function CustomerCards({
                       </div>
                     </div>
                     <Badge
-                       
-                      variant={
-                        (Number(customer.visits_count || customer.visits || 0) >
-                        10
-                          ? ("accent" as any)
-                          : Number(
-                                customer.visits_count || customer.visits || 0,
-                              ) >= 2
-                            ? "info"
-                            : "outline") as any
-                      }
+                      variant={visitsVariant(customer)}
                       className="rounded-md px-2 py-0.5 text-[8px] font-black shrink-0"
                     >
-                      {customer.visits || 0}
+                      {visitsOf(customer)} زيارة
                     </Badge>
                   </div>
                   <div className="space-y-2 text-xs mb-3">
@@ -106,8 +112,21 @@ export default function CustomerCards({
               ))}
             </div>
             {rows.length === 0 && (
-              <div className="py-12 text-center text-muted font-bold">
-                لا يوجد عملاء مطابقين
+              <div className="py-12 text-center">
+                <p className="font-black text-main">{emptyTitle}</p>
+                {emptyHint ? (
+                  <p className="mt-1 text-xs font-bold text-muted">{emptyHint}</p>
+                ) : null}
+                {showClearFilter && onClearFilter ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onClearFilter}
+                    className="mt-4 rounded-xl text-xs font-black"
+                  >
+                    مسح البحث والفلتر
+                  </Button>
+                ) : null}
               </div>
             )}
           </div>

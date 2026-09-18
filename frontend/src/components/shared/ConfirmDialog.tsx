@@ -30,7 +30,7 @@ export const ConfirmDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md rounded-3xl" dir="rtl">
+      <DialogContent className="max-w-md rounded-3xl">
         <DialogHeader className="text-right">
           <div
             className={`mb-2 flex h-12 w-12 items-center justify-center rounded-2xl border ${

@@ -13,7 +13,6 @@ export default function PageHero({
   return (
     <section
       className={`card card-gold relative min-w-0 overflow-clip rounded-[1.35rem] border border-border bg-card p-4 shadow-soft sm:rounded-3xl sm:p-8 ${className}`}
-      dir="rtl"
     >
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_left,var(--accent-glow),transparent_36%)]" />
 

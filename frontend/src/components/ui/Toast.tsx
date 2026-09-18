@@ -175,7 +175,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             gap: "8px",
             pointerEvents: "none",
           }}
-          dir="rtl"
           aria-live="polite"
           aria-atomic="true"
         >

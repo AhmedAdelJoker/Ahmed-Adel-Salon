@@ -1,5 +1,5 @@
 from datetime import datetime, time, timedelta
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,15 @@ def get_dashboard_stats(
 ):
     # التوافق: الفرونت يرسل ?period=week والقديم ?scope=today
     effective_scope = (scope or period or "today").lower()
+    if effective_scope not in ("today", "yesterday", "week", "month", "year"):
+        effective_scope = "today"
+    if employee_id is not None:
+        if employee_id <= 0:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="معرف الموظف غير صالح")
+        if not db.query(Employee).filter(Employee.id == employee_id).first():
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="الموظف غير موجود")
     # Set date filters based on effective_scope
     today = datetime.now().date()
     end_date = datetime.combine(today, time.max)
@@ -46,6 +55,7 @@ def get_dashboard_stats(
 
     # 1. todayRevenue (for the selected period)
     rev_query = db.query(func.sum(Invoice.total_amount)).filter(
+        Invoice.is_draft == False,
         Invoice.created_at >= start_date,
         Invoice.created_at <= end_date
     )
@@ -74,6 +84,7 @@ def get_dashboard_stats(
 
     # 5. avgInvoice
     inv_count_query = db.query(func.count(Invoice.id)).filter(
+        Invoice.is_draft == False,
         Invoice.created_at >= start_date,
         Invoice.created_at <= end_date
     )
@@ -85,6 +96,7 @@ def get_dashboard_stats(
     # 6. monthGoal
     month_start = datetime.combine(today.replace(day=1), time.min)
     month_rev_query = db.query(func.sum(Invoice.total_amount)).filter(
+        Invoice.is_draft == False,
         Invoice.created_at >= month_start,
         Invoice.created_at <= datetime.combine(today, time.max)
     )
@@ -96,7 +108,7 @@ def get_dashboard_stats(
 
     # 6b. occupancy: appointments vs capacity (employees * 8 slots/day)
     try:
-        emp_count = db.query(func.count(Employee.id)).filter(Employee.is_active == True).scalar() or 1
+        emp_count = db.query(func.count(Employee.id)).filter(Employee.status == "active", Employee.is_active == True).scalar() or 1
         # capacity per period: 8 appointments per barber per day
         days_in_period = max(1, (end_date.date() - start_date.date()).days + 1)
         capacity = max(1, emp_count * 8 * days_in_period)
@@ -109,7 +121,7 @@ def get_dashboard_stats(
     except Exception:
         occupancy = 72
 
-    # 7. weekly_data (last 7 days of daily revenue)
+    # 7. weekly_data — optimized: 2 grouped queries instead of 14
     weekly_data = []
     weekday_map = {
         0: "الإثنين",
@@ -120,32 +132,80 @@ def get_dashboard_stats(
         5: "السبت",
         6: "الأحد"
     }
-
-    for i in range(6, -1, -1):
-        day_date = today - timedelta(days=i)
-        day_start = datetime.combine(day_date, time.min)
-        day_end = datetime.combine(day_date, time.max)
-
-        day_rev_query = db.query(func.sum(Invoice.total_amount)).filter(
-            Invoice.created_at >= day_start,
-            Invoice.created_at <= day_end
-        )
+    try:
+        # Revenue per day in one query
+        week_start = datetime.combine(today - timedelta(days=6), time.min)
+        week_end = datetime.combine(today, time.max)
+        rev_by_day = {}
+        rev_rows = db.query(
+            func.date(Invoice.created_at).label("d"),
+            func.sum(Invoice.total_amount).label("total")
+        ).filter(Invoice.is_draft == False, Invoice.created_at >= week_start, Invoice.created_at <= week_end)
         if employee_id:
-            day_rev_query = day_rev_query.filter(Invoice.barber_id == employee_id)
-        day_revenue = float(day_rev_query.scalar() or 0)
-        day_name_ar = weekday_map[day_date.weekday()]
-        # also count appointments for that day for chart second series
-        day_app_count = db.query(func.count(Appointment.id)).filter(
-            Appointment.appointment_date == day_date
-        )
+            rev_rows = rev_rows.filter(Invoice.barber_id == employee_id)
+        rev_rows = rev_rows.group_by(func.date(Invoice.created_at)).all()
+        for r in rev_rows:
+            # r.d is date string or date object
+            d = r.d
+            if hasattr(d, "isoformat"):
+                d = d.isoformat() if isinstance(d, str) else str(d)
+            else:
+                d = str(d)
+            # Normalize to YYYY-MM-DD
+            try:
+                # Handle both date and datetime strings
+                day_key = str(d)[:10]
+                rev_by_day[day_key] = float(r.total or 0)
+            except Exception:
+                pass
+
+        app_by_day = {}
+        app_rows = db.query(
+            func.date(Appointment.appointment_date).label("d"),
+            func.count(Appointment.id).label("cnt")
+        ).filter(Appointment.appointment_date >= week_start.date(), Appointment.appointment_date <= week_end.date())
         if employee_id:
-            day_app_count = day_app_count.filter(Appointment.barber_id == employee_id)
-        day_appointments = day_app_count.scalar() or 0
-        weekly_data.append({
-            "name": day_name_ar,
-            "revenue": day_revenue,
-            "appointments": day_appointments,
-        })
+            app_rows = app_rows.filter(Appointment.barber_id == employee_id)
+        app_rows = app_rows.group_by(func.date(Appointment.appointment_date)).all()
+        for r in app_rows:
+            d = str(r.d)[:10]
+            app_by_day[d] = int(r.cnt or 0)
+
+        for i in range(6, -1, -1):
+            day_date = today - timedelta(days=i)
+            day_key = day_date.isoformat()
+            day_revenue = rev_by_day.get(day_key, 0.0)
+            day_appointments = app_by_day.get(day_key, 0)
+            day_name_ar = weekday_map[day_date.weekday()]
+            weekly_data.append({
+                "name": day_name_ar,
+                "revenue": day_revenue,
+                "appointments": day_appointments,
+            })
+    except Exception:
+        # Fallback to old loop if grouped query fails
+        for i in range(6, -1, -1):
+            day_date = today - timedelta(days=i)
+            day_start = datetime.combine(day_date, time.min)
+            day_end = datetime.combine(day_date, time.max)
+            day_rev_query = db.query(func.sum(Invoice.total_amount)).filter(
+                Invoice.created_at >= day_start, Invoice.created_at <= day_end
+            )
+            if employee_id:
+                day_rev_query = day_rev_query.filter(Invoice.barber_id == employee_id)
+            day_revenue = float(day_rev_query.scalar() or 0)
+            day_name_ar = weekday_map[day_date.weekday()]
+            day_app_count = db.query(func.count(Appointment.id)).filter(
+                Appointment.appointment_date == day_date
+            )
+            if employee_id:
+                day_app_count = day_app_count.filter(Appointment.barber_id == employee_id)
+            day_appointments = day_app_count.scalar() or 0
+            weekly_data.append({
+                "name": day_name_ar,
+                "revenue": day_revenue,
+                "appointments": day_appointments,
+            })
 
     # 8. service_distribution: top services in period by revenue share
     service_distribution = []
@@ -155,6 +215,7 @@ def get_dashboard_stats(
             func.sum(InvoiceItem.total_price).label("total"),
             func.count(InvoiceItem.id).label("cnt")
         ).join(Invoice, Invoice.id == InvoiceItem.invoice_id).filter(
+            Invoice.is_draft == False,
             Invoice.created_at >= start_date,
             Invoice.created_at <= end_date
         )
@@ -174,6 +235,72 @@ def get_dashboard_stats(
     except Exception:
         service_distribution = []
 
+    # 9. trends — compare current period vs previous period
+    def _trend(curr: float, prev: float) -> int:
+        if prev == 0:
+            return 0 if curr == 0 else 100
+        try:
+            return int(round((curr - prev) / abs(prev) * 100))
+        except Exception:
+            return 0
+
+    try:
+        period_days = max(1, (end_date.date() - start_date.date()).days + 1)
+        prev_start = start_date - timedelta(days=period_days)
+        prev_end = start_date - timedelta(seconds=1)
+        # Previous revenue
+        prev_rev = float(db.query(func.sum(Invoice.total_amount)).filter(Invoice.is_draft == False, Invoice.created_at >= prev_start, Invoice.created_at <= prev_end).scalar() or 0)
+        if employee_id:
+            prev_rev = float(db.query(func.sum(Invoice.total_amount)).filter(Invoice.is_draft == False, Invoice.created_at >= prev_start, Invoice.created_at <= prev_end, Invoice.barber_id == employee_id).scalar() or 0)
+        # Previous expenses
+        prev_exp = float(db.query(func.sum(Expense.amount)).filter(Expense.created_at >= prev_start, Expense.created_at <= prev_end).scalar() or 0)
+        # Previous appointments
+        prev_app = db.query(func.count(Appointment.id)).filter(Appointment.appointment_date >= prev_start.date(), Appointment.appointment_date <= prev_end.date()).scalar() or 0
+        if employee_id:
+            prev_app = db.query(func.count(Appointment.id)).filter(Appointment.appointment_date >= prev_start.date(), Appointment.appointment_date <= prev_end.date(), Appointment.barber_id == employee_id).scalar() or 0
+        # Previous avg invoice
+        prev_inv_cnt = db.query(func.count(Invoice.id)).filter(Invoice.is_draft == False, Invoice.created_at >= prev_start, Invoice.created_at <= prev_end).scalar() or 0
+        if employee_id:
+            prev_inv_cnt = db.query(func.count(Invoice.id)).filter(Invoice.is_draft == False, Invoice.created_at >= prev_start, Invoice.created_at <= prev_end, Invoice.barber_id == employee_id).scalar() or 0
+        prev_avg = (prev_rev / prev_inv_cnt) if prev_inv_cnt else 0
+        # Previous occupancy
+        prev_occupancy = 0
+        try:
+            prev_capacity = max(1, emp_count * 8 * period_days)
+            prev_occupancy = min(100, int((prev_app / prev_capacity) * 100)) if prev_capacity else 0
+            if prev_app > 0 and prev_occupancy < 10:
+                prev_occupancy = 10
+            if prev_app == 0:
+                prev_occupancy = 0
+        except Exception:
+            prev_occupancy = 0
+
+        todayRevenueTrend = _trend(today_revenue, prev_rev)
+        todayExpensesTrend = _trend(today_expenses, prev_exp)
+        netProfitTrend = _trend(net_profit, prev_rev - prev_exp)
+        todayAppointmentsTrend = _trend(today_appointments, prev_app)
+        avgInvoiceTrend = _trend(avg_invoice, prev_avg)
+        occupancyTrend = _trend(occupancy, prev_occupancy)
+    except Exception:
+        todayRevenueTrend = todayExpensesTrend = netProfitTrend = todayAppointmentsTrend = avgInvoiceTrend = occupancyTrend = 0
+
+    # 10. newCustomersThisWeek
+    try:
+        from app.models.customer import Customer
+        week_start_dt = datetime.combine(today - timedelta(days=7), time.min)
+        new_cust_q = db.query(func.count(Customer.customer_id)).filter(Customer.created_at >= week_start_dt)
+        # Exclude soft-deleted if column exists
+        if hasattr(Customer, "is_deleted"):
+            new_cust_q = new_cust_q.filter(Customer.is_deleted == False)
+        # Customer model may not have created_at as datetime; fallback
+        newCustomersThisWeek = int(new_cust_q.scalar() or 0)
+    except Exception:
+        try:
+            # Fallback: count customers with first visit in week (approx via visits)
+            newCustomersThisWeek = 0
+        except Exception:
+            newCustomersThisWeek = 0
+
     return {
         "stats": {
             "todayRevenue": today_revenue,
@@ -183,6 +310,13 @@ def get_dashboard_stats(
             "avgInvoice": avg_invoice,
             "monthGoal": month_goal,
             "occupancy": occupancy,
+            "todayRevenueTrend": todayRevenueTrend,
+            "todayExpensesTrend": todayExpensesTrend,
+            "netProfitTrend": netProfitTrend,
+            "todayAppointmentsTrend": todayAppointmentsTrend,
+            "avgInvoiceTrend": avgInvoiceTrend,
+            "occupancyTrend": occupancyTrend,
+            "newCustomersThisWeek": newCustomersThisWeek,
         },
         "weekly_data": weekly_data,
         "service_distribution": service_distribution,

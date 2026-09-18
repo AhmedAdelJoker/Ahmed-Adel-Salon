@@ -12,7 +12,7 @@ export default function ProtectedRoute({ pageKey, children }) {
   // ---------------------------
   if (loading) {
     return (
-      <div className="p-6 space-y-4" dir="rtl">
+      <div className="p-6 space-y-4">
         <SkeletonCard className="h-32 rounded-3xl" />
         <SkeletonCard className="h-32 rounded-3xl" />
       </div>

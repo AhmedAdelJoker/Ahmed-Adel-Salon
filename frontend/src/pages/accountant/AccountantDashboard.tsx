@@ -127,7 +127,7 @@ export default function AccountantDashboard() {
   }
 
   return (
-    <div className="erp-page space-y-8 pb-8" dir="rtl">
+    <div className="erp-page space-y-8 pb-8">
       <PageHeader
         title={`مرحباً، ${user?.full_name || "المحاسب"}`}
         subtitle="نظام التحليل المالي والتدقيق المحاسبي الموحد."
@@ -172,7 +172,7 @@ export default function AccountantDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <PremiumCard className="lg:col-span-2" noPadding>
+        <PremiumCard wrapperClassName="lg:col-span-2 min-w-0" noPadding>
           <div className="p-6 sm:p-8">
             <h3 className="flex items-center gap-3 text-xl font-black tracking-tight">
               منحنى النمو المالي{" "}

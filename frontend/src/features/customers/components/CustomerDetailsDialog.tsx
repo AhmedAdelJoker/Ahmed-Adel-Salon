@@ -1,5 +1,5 @@
 /** Customers CustomerDetailsDialog (moved from Customers page, no logic changes). */
-import { Clock, CreditCard, History } from "lucide-react";
+import { Archive, Clock, CreditCard, History, RotateCcw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui";
 import {
   Dialog,
@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatCurrency } from "@/lib/core/utils";
+import { formatCurrency, formatDateTime } from "@/lib/core/utils";
 import CustomerMiniStat from "@/features/customers/components/CustomerMiniStat";
 import { customerName, getInitials, secondPhone } from "@/features/customers/utils/customer";
 
@@ -20,21 +20,30 @@ export default function CustomerDetailsDialog({
   loading,
   onEdit,
   onClose,
+  archived = false,
+  onRestore,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer: any;
   loading: boolean;
-  onEdit: () => void;
+  onEdit?: () => void;
   onClose: () => void;
+  /** Archive mode: hides editing, shows archive metadata + restore action. */
+  archived?: boolean;
+  onRestore?: () => void;
 }) {
   return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl" dir="rtl">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>الملف الاستراتيجي للعميل</DialogTitle>
+            <DialogTitle>
+              {archived ? "ملف العميل المؤرشف" : "الملف الاستراتيجي للعميل"}
+            </DialogTitle>
             <DialogDescription>
-              مراجعة بيانات العميل وسجل التعاملات.
+              {archived
+                ? "مراجعة بيانات العميل وسجل ولائه قبل الاستعادة أو الحذف النهائي."
+                : "مراجعة بيانات العميل وسجل التعاملات."}
             </DialogDescription>
           </DialogHeader>
           {customer ? (
@@ -90,18 +99,72 @@ export default function CustomerDetailsDialog({
                   icon={Clock}
                 />
               </div>
+              {archived ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <CustomerMiniStat
+                    label="تاريخ الأرشفة"
+                    value={
+                      customer.deleted_at
+                        ? formatDateTime(customer.deleted_at)
+                        : "---"
+                    }
+                    icon={Archive}
+                  />
+                  <CustomerMiniStat
+                    label="فئة الولاء"
+                    value={customer.current_tier || "Bronze"}
+                    icon={ShieldCheck}
+                  />
+                  <CustomerMiniStat
+                    label="نقاط الولاء"
+                    value={`${customer.loyalty_points || 0} نقطة`}
+                    icon={History}
+                  />
+                </div>
+              ) : null}
+              {customer.email || customer.address || customer.notes ? (
+                <div className="space-y-2 rounded-2xl border border-border/60 bg-card p-4 text-sm">
+                  {customer.email ? (
+                    <p className="font-bold text-main" dir="ltr">
+                      {customer.email}
+                    </p>
+                  ) : null}
+                  {customer.address ? (
+                    <p className="font-bold text-muted">{customer.address}</p>
+                  ) : null}
+                  {customer.notes ? (
+                    <p className="text-xs font-bold leading-relaxed text-muted">
+                      {customer.notes}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : null}
           <DialogFooter>
+            {archived ? (
+              <Button
+                disabled={loading}
+                onClick={() => onRestore?.()}
+                className="gap-1.5"
+              >
+                <RotateCcw size={16} /> استعادة العميل
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  customer && onEdit?.()
+                }
+              >
+                تحديث الملف
+              </Button>
+            )}
             <Button
-              variant="outline"
-              onClick={() =>
-                customer && onEdit()
-              }
+              variant={archived ? "outline" : undefined}
+              disabled={loading && !archived}
+              onClick={() => onClose()}
             >
-              تحديث الملف
-            </Button>
-            <Button disabled={loading} onClick={() => onClose()}>
               إغلاق
             </Button>
           </DialogFooter>

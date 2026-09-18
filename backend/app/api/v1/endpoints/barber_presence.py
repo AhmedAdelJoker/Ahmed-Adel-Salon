@@ -14,6 +14,7 @@ from app.models.employee import Employee
 from app.models.employee_presence_log import EmployeePresenceLog, AttendanceArchive, AttendancePenalty
 from app.models.leave_request import LeaveRequest
 from app.models.business_settings import BusinessSettings
+from app.core.upload_security import validate_data_sheet
 from app.services.websocket import manager
 
 router = APIRouter(prefix="/barber-presence", tags=["Attendance"])
@@ -278,7 +279,8 @@ async def import_biometric(
     current_user: User = Depends(require_cashier_manager_owner),
 ):
     """Import attendance data from biometric device CSV/Excel file."""
-    content = await file.read()
+    # Phase 3: validate MIME/size/filename
+    content = await validate_data_sheet(file, max_size=20 * 1024 * 1024)
     decoded = content.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(decoded))
     
@@ -361,32 +363,44 @@ def get_analytics(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    """Get attendance analytics for a specific month."""
+    """Get attendance analytics for a specific month.
+
+    Phase 2 fix: replaced N+1 (one query per employee) with a single
+    bulk query + Python-side grouping. With 100 employees this goes
+    from 101 queries to 1.
+    """
     if not year_month:
         year_month = datetime.now().strftime("%Y-%m")
-    
+
     year, month = map(int, year_month.split("-"))
-    
+
     employees = db.query(Employee).filter(Employee.is_active == True).all()
+    employee_map = {emp.id: emp for emp in employees}
+
+    # Single query: all logs for the month — grouped in Python below
+    all_logs = (
+        db.query(EmployeePresenceLog)
+        .filter(extract("year", EmployeePresenceLog.created_at) == year)
+        .filter(extract("month", EmployeePresenceLog.created_at) == month)
+        .order_by(EmployeePresenceLog.created_at.asc())
+        .all()
+    )
+
+    logs_by_emp: dict[int, list[EmployeePresenceLog]] = {}
+    for log in all_logs:
+        logs_by_emp.setdefault(log.employee_id, []).append(log)
+
     analytics = []
-    
-    for emp in employees:
-        # Get logs for the month
-        logs = (
-            db.query(EmployeePresenceLog)
-            .filter(EmployeePresenceLog.employee_id == emp.id)
-            .filter(extract("year", EmployeePresenceLog.created_at) == year)
-            .filter(extract("month", EmployeePresenceLog.created_at) == month)
-            .order_by(EmployeePresenceLog.created_at.asc())
-            .all()
-        )
-        
+
+    for emp_id, emp in employee_map.items():
+        logs = logs_by_emp.get(emp_id, [])
+
         # Calculate stats
         work_days = set()
         total_work_minutes = 0
         late_count = 0
         total_late_minutes = 0
-        
+
         daily_logs = {}
         for log in logs:
             day_key = log.created_at.strftime("%Y-%m-%d")
@@ -394,7 +408,7 @@ def get_analytics(
                 daily_logs[day_key] = []
                 work_days.add(day_key)
             daily_logs[day_key].append(log)
-        
+
         for day, day_logs in daily_logs.items():
             session_start = None
             day_minutes = 0
@@ -408,9 +422,9 @@ def get_analytics(
                     day_minutes += (log.created_at - session_start).total_seconds() / 60
                     session_start = None
             total_work_minutes += day_minutes
-        
+
         avg_daily = (total_work_minutes / len(work_days)) if work_days else 0
-        
+
         analytics.append({
             "employee_id": emp.id,
             "employee_name": emp.full_name,
@@ -422,7 +436,7 @@ def get_analytics(
             "avg_daily_hours": round(avg_daily / 60, 1),
             "penalty_amount": total_late_minutes * PENALTY_PER_LATE_MINUTE,
         })
-    
+
     return {
         "year_month": year_month,
         "employee_count": len(analytics),
@@ -550,8 +564,9 @@ async def import_biometric(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
+    # Phase 3: validate MIME/size/filename
+    content = await validate_data_sheet(file, max_size=20 * 1024 * 1024)
     try:
-        content = await file.read()
         decoded = content.decode("utf-8")
         reader = csv.DictReader(io.StringIO(decoded))
         imported = 0
@@ -585,8 +600,9 @@ async def import_excel(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
+    # Phase 3: validate MIME/size/filename
+    content = await validate_data_sheet(file, max_size=20 * 1024 * 1024)
     try:
-        content = await file.read()
         decoded = content.decode("utf-8")
         reader = csv.DictReader(io.StringIO(decoded))
         imported = 0

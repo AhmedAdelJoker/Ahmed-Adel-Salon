@@ -1,16 +1,6 @@
 import React, { useState } from "react";
-
-
-import {
-  Zap,
-} from "lucide-react";
-
-
-
-
-
-
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { SkeletonCard } from "@/components/shared/PremiumUI";
 
 
 import {
@@ -75,22 +65,27 @@ const ServicesManagement = ({ hideHeader = false }: { hideHeader?: boolean }) =>
     toggleOfferService,
     confirmDelete,
   } = useCatalogForms(activeTab, refreshAllData);
-  const loading = servicesLoading || categoriesLoading || offersLoading;
+  const isInitialLoading = servicesLoading && categoriesLoading && offersLoading;
+  const isTabLoading =
+    (activeTab === "services" && servicesLoading) ||
+    (activeTab === "categories" && categoriesLoading) ||
+    (activeTab === "offers" && offersLoading);
 
-  if (loading)
+  if (isInitialLoading)
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-accent">
-          <Zap className="w-10 h-10 animate-pulse" />
-          <p className="text-muted font-bold text-sm">
-            جاري مزامنة لائحة الخدمات...
-          </p>
+      <div className={hideHeader ? "space-y-6" : "erp-page space-y-8 pb-12"}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
         </div>
+        <SkeletonCard variant="content" height={320} />
       </div>
     );
 
   return (
-    <div className={`erp-page space-y-8 pb-12`} dir="rtl">
+    <div className={hideHeader ? "space-y-6" : "erp-page space-y-8 pb-12"}>
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
@@ -107,6 +102,7 @@ const ServicesManagement = ({ hideHeader = false }: { hideHeader?: boolean }) =>
       />
 
       <CatalogHeader
+        hideHeader={hideHeader}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         searchTerm={searchTerm}
@@ -116,16 +112,20 @@ const ServicesManagement = ({ hideHeader = false }: { hideHeader?: boolean }) =>
         onCreate={openCreateDialog}
       />
 
-      {/* ====== TAB: SERVICES ====== */}
-        {activeTab === "services" && (
-          <ServicesPanel
-            summary={serviceSummary}
-            rows={filteredServiceRows}
-            onEdit={startEdit}
-            onDelete={(id) => setDeleteTarget({ id, type: "service" })}
-            pricing={pricing}
-          />
-        )}
+      {isTabLoading ? (
+        <SkeletonCard variant="content" height={320} />
+      ) : (
+        <>
+          {/* ====== TAB: SERVICES ====== */}
+          {activeTab === "services" && (
+            <ServicesPanel
+              summary={serviceSummary}
+              rows={filteredServiceRows}
+              onEdit={startEdit}
+              onDelete={(id) => setDeleteTarget({ id, type: "service" })}
+              pricing={pricing}
+            />
+          )}
 
       {/* ====== TAB: CATEGORIES ====== */}
         {activeTab === "categories" && (
@@ -136,14 +136,16 @@ const ServicesManagement = ({ hideHeader = false }: { hideHeader?: boolean }) =>
           />
         )}
 
-      {/* ====== TAB: OFFERS ====== */}
-        {activeTab === "offers" && (
-          <OffersPanel
-            rows={filteredOfferRows}
-            onEdit={startOfferEdit}
-            onDelete={(id) => setDeleteTarget({ id, type: "offer" })}
-          />
-        )}
+        {/* ====== TAB: OFFERS ====== */}
+          {activeTab === "offers" && (
+            <OffersPanel
+              rows={filteredOfferRows}
+              onEdit={startOfferEdit}
+              onDelete={(id) => setDeleteTarget({ id, type: "offer" })}
+            />
+          )}
+        </>
+      )}
 
       <ServiceFormModal
         open={isModalOpen}

@@ -80,7 +80,7 @@ export default function Invoices() {
   } = useInvoicesData();
 
   return (
-    <div className="min-h-screen pb-12" dir="rtl">
+    <div className="min-h-screen pb-12">
       <div className="mx-auto max-w-7xl space-y-5 px-3 pt-4 sm:px-4 lg:px-6 lg:space-y-6">
         <PageHeader className={undefined}
           title="الفواتير"

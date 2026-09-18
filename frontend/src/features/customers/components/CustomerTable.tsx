@@ -11,6 +11,10 @@ export default function CustomerTable({
   onOpenDetails,
   onNavigate,
   onDelete,
+  emptyTitle = "لا يوجد عملاء مطابقين",
+  emptyHint,
+  showClearFilter = false,
+  onClearFilter,
 }: {
   rows: any[];
   loading: boolean;
@@ -18,7 +22,19 @@ export default function CustomerTable({
   onOpenDetails: (customer: any) => void;
   onNavigate: (id: number | string) => void;
   onDelete: (customer: any) => void;
+  emptyTitle?: string;
+  emptyHint?: string;
+  showClearFilter?: boolean;
+  onClearFilter?: () => void;
 }) {
+  const visitsOf = (customer: any) =>
+    Number(customer.visits_count || customer.visits || 0);
+  const visitsVariant = (customer: any): "warning" | "info" | "outline" => {
+    const visits = visitsOf(customer);
+    if (visits > 10) return "warning";
+    if (visits >= 2) return "info";
+    return "outline";
+  };
   return (
           <div className="overflow-x-auto">
             <table className="min-w-[52rem] w-full text-right">
@@ -72,20 +88,7 @@ export default function CustomerTable({
                       ) : null}
                     </td>
                     <td className="px-6 py-4">
-                      <Badge
-                         
-                        variant={
-                          (Number(
-                            customer.visits_count || customer.visits || 0,
-                          ) > 10
-                            ? ("accent" as any)
-                            : Number(
-                                  customer.visits_count || customer.visits || 0,
-                                ) >= 2
-                              ? "info"
-                              : "outline") as any
-                        }
-                      >
+                      <Badge variant={visitsVariant(customer)}>
                         {customer.visits_count || customer.visits || 0} زيارة
                       </Badge>
                     </td>
@@ -141,9 +144,22 @@ export default function CustomerTable({
                   <tr>
                     <td
                       colSpan={5}
-                      className="px-8 py-16 text-center text-gray-500"
+                      className="px-8 py-16 text-center"
                     >
-                      لا يوجد عملاء مطابقين
+                      <p className="font-black text-main">{emptyTitle}</p>
+                      {emptyHint ? (
+                        <p className="mt-1 text-xs font-bold text-muted">{emptyHint}</p>
+                      ) : null}
+                      {showClearFilter && onClearFilter ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={onClearFilter}
+                          className="mt-4 rounded-xl text-xs font-black"
+                        >
+                          مسح البحث والفلتر
+                        </Button>
+                      ) : null}
                     </td>
                   </tr>
                 ) : null}

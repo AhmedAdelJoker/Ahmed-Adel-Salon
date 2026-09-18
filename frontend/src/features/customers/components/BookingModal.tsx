@@ -182,7 +182,6 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto"
-        dir="rtl"
       >
         <DialogHeader className="p-5 pb-3 border-b border-border/40">
           <DialogTitle className="text-base font-black flex items-center gap-2">

@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Response
 from sqlalchemy.orm import Session, joinedload
 import os
 import uuid
@@ -14,6 +16,7 @@ from app.models.service_product import ServiceProduct
 from app.schemas.inventory import ServiceProductRead
 from app.schemas.service import ServiceCreate, ServiceRead, ServiceUpdate
 from app.utils.media import process_image_content, get_upload_path
+from app.core.upload_security import validate_image
 
 router = APIRouter(prefix="/services", tags=["Services"])
 
@@ -26,8 +29,9 @@ async def upload_service_image(
     """
     Uploads a service image and returns the URL.
     """
+    # Phase 3: validate MIME/size/filename before processing
+    content = await validate_image(file, max_size=5 * 1024 * 1024)
     upload_dir = get_upload_path("business")
-    content = await file.read()
     filename = process_image_content(content, file.filename, upload_dir)
     return {"url": f"/uploads/business/{filename}"}
 
@@ -104,22 +108,49 @@ def _resolve_category(db: Session, payload: ServiceCreate | ServiceUpdate) -> tu
 
 @router.get("", response_model=list[ServiceRead])
 def list_services(
+    response: Response = None,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
+    # Phase 2: modern pagination params + sort
+    skip: int = Query(0, ge=0, description="Records to skip (alias for offset)"),
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=1000),
+    sort: Optional[str] = Query(None, description="Sort field. '-' prefix for DESC"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    rows = (
-        db.query(Service)
-        .options(
-            joinedload(Service.category_rel),
-            joinedload(Service.ingredients).joinedload(ServiceProduct.product),
-        )
-        .order_by(Service.id.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
+    query = db.query(Service).options(
+        joinedload(Service.category_rel),
+        joinedload(Service.ingredients).joinedload(ServiceProduct.product),
     )
+
+    # Phase 2: explicit sort
+    if sort:
+        sort_field = sort.lstrip("-")
+        desc = sort.startswith("-")
+        column = getattr(Service, sort_field, None)
+        if column is not None:
+            query = query.order_by(column.desc() if desc else column.asc())
+    else:
+        query = query.order_by(Service.id.desc())
+
+    # Phase 2: normalize page/page_size → skip/offset, fallback to legacy offset
+    eff_offset = offset
+    eff_limit = limit
+    if page is not None and page_size is not None:
+        eff_offset = (page - 1) * page_size
+        eff_limit = page_size
+    elif skip > 0:
+        eff_offset = skip
+
+    # Phase 2: count + headers
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Page-Size"] = str(eff_limit)
+        if page is not None:
+            response.headers["X-Page"] = str(page)
+    rows = query.offset(eff_offset).limit(eff_limit).all()
     return [_serialize_service(row) for row in rows]
 
 

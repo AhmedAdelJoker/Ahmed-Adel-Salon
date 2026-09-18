@@ -99,4 +99,4 @@ export const DEMO_STATS: DashboardStats = {
   occupancyTrend: -2,
 };
 
-export const DEFAULT_STATS: DashboardStats = DEMO_STATS;
+export const DEFAULT_STATS: DashboardStats = { ...DEMO_STATS };

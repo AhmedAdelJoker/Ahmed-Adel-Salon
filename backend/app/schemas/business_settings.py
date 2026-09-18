@@ -33,7 +33,9 @@ class BusinessSettingsUpdate(BaseModel):
     shop_phone: Optional[str] = Field(default=None, max_length=30)
     shop_whatsapp: Optional[str] = Field(default=None, max_length=30)
     address: Optional[str] = Field(default=None, max_length=500)
-    receipt_footer: Optional[str] = None
+    logo_url: Optional[str] = Field(default=None, max_length=500)
+    google_maps_url: Optional[str] = Field(default=None, max_length=1000)
+    receipt_footer: Optional[str] = Field(default=None, max_length=500)
     currency: Optional[str] = Field(default=None, max_length=10)
     working_hours: Optional[dict[str, Any]] = None
 

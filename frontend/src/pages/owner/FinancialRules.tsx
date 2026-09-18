@@ -10,7 +10,6 @@ import {
   Download,
   FileCheck2,
   FileLock2,
-  Landmark,
   Lock,
   Percent,
   Receipt,
@@ -20,19 +19,23 @@ import {
   ShieldAlert,
   ShieldCheck,
   TrendingUp,
+  Undo2,
   Wallet,
   XCircle,
-  Sparkles,
   Zap,
   BellRing,
   Settings2,
 } from "lucide-react";
-import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 import {
-  StatCard,
+  ContentPanel,
+  PageHeader,
+  SkeletonCard,
 } from "@/components/shared/PremiumUI";
+import {
+  CurrencyStatCard,
+} from "@/components/shared/DisplayComponents";
 import InlineNotice from "@/components/shared/InlineNotice";
 import {
   Table,
@@ -42,24 +45,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/core/utils";
 import { TableEmptyState } from "@/components/shared/TableEmptyState";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { AnimatePresence } from "framer-motion";
 
 import { useFinancialRules, paymentLabels, formatCurrency, formatDate } from "@/features/financial-rules";
 
-const tabs = [
+const TABS = [
   { id: "overview", label: "نظرة عامة والملخص", icon: TrendingUp },
   { id: "rules", label: "قواعد الفواتير والضرائب", icon: Receipt },
   { id: "payments", label: "المدفوعات والورديات", icon: Wallet },
   { id: "audit", label: "سجل الرقابة المالية", icon: FileLock2 },
 ];
 
-export default function FinancialRules() {
+export default function FinancialRules({ hideChrome = false }: { hideChrome?: boolean }) {
   const {
     loading,
     saving,
@@ -67,6 +69,7 @@ export default function FinancialRules() {
     activeTab,
     setActiveTab,
     rules,
+    isDirty,
     searchTerm,
     setSearchTerm,
     syncStatus,
@@ -74,6 +77,7 @@ export default function FinancialRules() {
     filteredAuditRows,
     updateRule,
     updatePaymentMethod,
+    discardChanges,
     saveRules,
     exportRules,
     loadData,
@@ -81,77 +85,85 @@ export default function FinancialRules() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center" dir="rtl">
-        <div className="flex flex-col items-center gap-4 text-accent">
-          <Calculator className="h-12 w-12 animate-pulse" />
-          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
-            جاري مزامنة البروتوكول المالي...
-          </p>
+      <div className="erp-page-container space-y-6 pb-16">
+        <div data-stats-grid="true">
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
         </div>
+        <SkeletonCard variant="content" />
+        <SkeletonCard variant="content" />
       </div>
     );
   }
 
+  const headerActions = (
+    <>
+      {isDirty && (
+        <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-[10px] font-black text-amber-700">
+          تعديلات غير محفوظة
+        </Badge>
+      )}
+      <Button
+        onClick={() => loadData({ background: true })}
+        loading={refreshing}
+        disabled={refreshing}
+        variant="outline"
+        className="h-11 gap-2 text-xs font-black"
+      >
+        <RefreshCw size={15} className={cn(refreshing && "animate-spin")} /> مزامنة
+      </Button>
+      <Button
+        onClick={exportRules}
+        variant="outline"
+        className="h-11 gap-2 text-xs font-black"
+      >
+        <Download size={15} /> تصدير السجل
+      </Button>
+      {isDirty && (
+        <Button
+          onClick={discardChanges}
+          disabled={saving}
+          variant="ghost"
+          className="h-11 gap-2 text-xs font-black text-muted"
+        >
+          <Undo2 size={15} /> تراجع
+        </Button>
+      )}
+      <Button
+        onClick={saveRules}
+        loading={saving}
+        disabled={saving || !isDirty}
+        title={isDirty ? "حفظ القواعد المالية" : "لا توجد تعديلات للحفظ"}
+        className="h-11 gap-2 px-6 text-xs font-black"
+      >
+        <Save size={15} /> توثيق القواعد
+      </Button>
+    </>
+  );
+
   return (
-    <div className="space-y-10 pb-20 animate-fade-in" dir="rtl">
-      {/* Premium Dashboard Header */}
-      <div className="relative overflow-hidden rounded-[32px] bg-zinc-950 text-white p-8 lg:p-10 shadow-2xl shadow-black/20 border border-white/5">
-        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-emerald-500/20 rounded-full blur-[100px] -mr-[200px] -mt-[200px] opacity-60 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[100px] -ml-[200px] -mb-[200px] pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col lg:flex-row gap-8 items-start lg:items-center justify-between">
-          <div className="flex items-center gap-6 max-w-2xl">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow-xl shadow-emerald-500/20 border border-emerald-400/30">
-              <Landmark size={32} />
-            </div>
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-3 backdrop-blur-md">
-                <Sparkles size={12} className="text-emerald-400" />
-                <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-emerald-100">
-                  إدارة اقتصاديات المؤسسة
-                </span>
-              </div>
-              <h1 className="text-3xl lg:text-4xl font-black mb-2 leading-tight">
-                مركز{" "}
-                <span className="bg-gradient-to-l from-white to-white/40 bg-clip-text text-transparent">
-                  القواعد المالية
-                </span>
-              </h1>
-              <p className="text-sm text-white/50 leading-relaxed font-medium max-w-xl">
-                هيكل متقدم للتحكم في الضرائب، سياسات الخصم، طرق الدفع، ومعايير
-                فتح وإغلاق الورديات لضمان أقصى درجات الرقابة.
-              </p>
-            </div>
+    <div className={cn(!hideChrome && "erp-page-container space-y-6 pb-16", hideChrome && "space-y-6")}>
+      {hideChrome ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card p-3 shadow-sm print:hidden">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-black text-main">القواعد المالية</p>
+            <p className="truncate text-[11px] font-bold text-muted">
+              الضرائب، سياسات الخصم، طرق الدفع، ومعايير الورديات
+            </p>
           </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto shrink-0 mt-6 lg:mt-0">
-            <Button
-              onClick={() => loadData({ background: true })}
-              disabled={refreshing}
-              className="h-12 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold transition-all backdrop-blur-md"
-            >
-              <RefreshCw
-                size={16}
-                className={cn("ml-2", refreshing && "animate-spin")}
-              />{" "}
-              مزامنة
-            </Button>
-            <Button
-              onClick={exportRules}
-              className="h-12 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold transition-all backdrop-blur-md"
-            >
-              <Download size={16} className="ml-2" /> تصدير السجل
-            </Button>
-            <Button
-              onClick={saveRules}
-              disabled={saving}
-              className="h-12 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-[0_0_20px_-5px_rgba(16,185,129,0.5)] hover:scale-[1.02]"
-            >
-              <Save size={16} className="ml-2" /> توثيق القواعد
-            </Button>
-          </div>
+          <div className="flex flex-wrap items-center gap-2">{headerActions}</div>
         </div>
-      </div>
+      ) : (
+        <PageHeader
+          title="القواعد المالية"
+          subtitle="التحكم في الضرائب، سياسات الخصم، طرق الدفع، ومعايير فتح وإغلاق الورديات."
+          badge="محرك الرقابة"
+          icon={ShieldCheck}
+          actions={<div className="flex flex-wrap items-center gap-2 print:hidden">{headerActions}</div>}
+        />
+      )}
 
       {syncStatus.lastMessage ? (
         <InlineNotice
@@ -162,65 +174,41 @@ export default function FinancialRules() {
         </InlineNotice>
       ) : null}
 
-      {/* Main Tabs Navigation */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition-all whitespace-nowrap border",
-                isActive
-                  ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white shadow-md"
-                  : "bg-card text-muted-foreground border-border/60 hover:bg-soft",
-              )}
-            >
-              <Icon size={18} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 overflow-x-auto p-1.5 print:hidden">
+          {TABS.map((tab) => (
+            <TabsTrigger key={tab.id} value={tab.id} className="gap-1.5 text-xs font-black">
+              <tab.icon size={14} /> {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {/* Tab Contents with Framer Motion */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.98 }}
-          transition={{ duration: 0.2 }}
-        >
-          {activeTab === "overview" && (
-            <OverviewPanel rules={rules} metrics={metrics} />
-          )}
-          {activeTab === "rules" && (
-            <RulesPanel rules={rules} updateRule={updateRule} />
-          )}
-          {activeTab === "payments" && (
-            <PaymentsPanel
-              rules={rules}
-              updateRule={updateRule}
-              updatePaymentMethod={updatePaymentMethod}
-            />
-          )}
-          {activeTab === "audit" && (
-            <AuditPanel
-              rows={filteredAuditRows}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-            />
-          )}
-        </motion.div>
-      </AnimatePresence>
+        <TabsContent value="overview" className="mt-4">
+          <OverviewPanel rules={rules} metrics={metrics} isDirty={isDirty} />
+        </TabsContent>
+        <TabsContent value="rules" className="mt-4">
+          <RulesPanel rules={rules} updateRule={updateRule} />
+        </TabsContent>
+        <TabsContent value="payments" className="mt-4">
+          <PaymentsPanel
+            rules={rules}
+            updateRule={updateRule}
+            updatePaymentMethod={updatePaymentMethod}
+          />
+        </TabsContent>
+        <TabsContent value="audit" className="mt-4">
+          <AuditPanel
+            rows={filteredAuditRows}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
-function OverviewPanel({ rules, metrics }: { rules: Record<string, any>; metrics: { revenue: number; expenseTotal: number; net: number; discounts: number; openShifts: number } }) {
+function OverviewPanel({ rules, metrics, isDirty }: { rules: Record<string, any>; metrics: { revenue: number; expenseTotal: number; net: number; discounts: number; openShifts: number }; isDirty: boolean }) {
   const checks = [
     { title: "الضرائب مفعّلة (VAT)", value: rules.taxRate > 0, icon: Percent },
     {
@@ -262,130 +250,122 @@ function OverviewPanel({ rules, metrics }: { rules: Record<string, any>; metrics
 
   return (
     <div className="space-y-6">
-      {/* Financial Metrics Row */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
+      <div data-stats-grid="true">
+        <CurrencyStatCard
           label="إيرادات اليوم"
-          value={formatCurrency(metrics.revenue)}
+          value={metrics.revenue}
           icon={Banknote}
           variant="success"
+          hint="فواتير اليوم"
         />
-        <StatCard
+        <CurrencyStatCard
           label="مصروفات اليوم"
-          value={formatCurrency(metrics.expenseTotal)}
+          value={metrics.expenseTotal}
           icon={CreditCard}
-          variant="warning"
+          variant="danger"
+          hint="مصروفات اليوم"
         />
-        <StatCard
+        <CurrencyStatCard
           label="صافي اليوم"
-          value={formatCurrency(metrics.net)}
+          value={metrics.net}
           icon={TrendingUp}
           variant={metrics.net >= 0 ? "primary" : "danger"}
+          hint="الإيراد − المنصرف"
         />
-        <StatCard
+        <CurrencyStatCard
           label="إجمالي الخصومات"
-          value={formatCurrency(metrics.discounts)}
+          value={metrics.discounts}
           icon={BadgePercent}
           variant="secondary"
+          hint="من فواتير اليوم"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="rounded-[32px] border-border/50 bg-card shadow-sm lg:col-span-2 overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-[80px] -mr-32 -mt-32 pointer-events-none" />
-          <CardContent className="p-8">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-xl bg-soft flex items-center justify-center text-main shadow-inner">
-                  <ShieldCheck size={24} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black text-main leading-tight">
-                    حالة الحماية الرقابية
-                  </h2>
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">
-                    مدى صرامة القواعد المطبقة بالنظام
-                  </p>
-                </div>
-              </div>
-              <Badge
-                variant="outline"
-                className="bg-emerald-50 border-emerald-200 text-emerald-600 font-black px-4 py-1"
-              >
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <ContentPanel
+          title={
+            <span className="flex items-center gap-2">
+              <ShieldCheck size={16} className="text-primary" /> حالة الحماية الرقابية
+            </span>
+          }
+          subtitle="مدى صرامة القواعد المطبقة بالنظام"
+          className="lg:col-span-2"
+          actions={
+            isDirty ? (
+              <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-[10px] font-black text-amber-700">
+                مسودة غير محفوظة
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-[10px] font-black text-emerald-700">
                 موثق ومفعل
               </Badge>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {checks.map((check, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-4 rounded-2xl bg-soft/40 border border-border/40 hover:bg-soft transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={cn(
-                        "h-8 w-8 rounded-lg flex items-center justify-center shadow-sm",
-                        check.value
-                          ? "bg-emerald-100 text-emerald-600"
-                          : "bg-red-100 text-red-600",
-                      )}
-                    >
-                      <check.icon size={16} />
-                    </div>
-                    <span className="text-sm font-bold text-main">
-                      {check.title}
-                    </span>
+            )
+          }
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {checks.map((check) => (
+              <div
+                key={check.title}
+                className="flex items-center justify-between rounded-2xl border border-border/40 bg-soft/40 p-4 transition-colors hover:bg-soft"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                      check.value
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+                    )}
+                  >
+                    <check.icon size={16} />
                   </div>
-                  {check.value ? (
-                    <CheckCircle2 size={18} className="text-emerald-500" />
-                  ) : (
-                    <XCircle size={18} className="text-red-500" />
-                  )}
+                  <span className="truncate text-sm font-bold text-main">
+                    {check.title}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-[32px] border-border/50 bg-card shadow-sm overflow-hidden">
-          <CardContent className="p-8">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="h-12 w-12 rounded-xl bg-soft flex items-center justify-center text-main shadow-inner">
-                <Zap size={24} />
+                {check.value ? (
+                  <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />
+                ) : (
+                  <XCircle size={18} className="shrink-0 text-rose-500" />
+                )}
               </div>
-              <h2 className="text-xl font-black text-main leading-tight">
-                ملخص الحركة المباشرة
-              </h2>
-            </div>
+            ))}
+          </div>
+        </ContentPanel>
 
-            <div className="space-y-4">
-              <SummaryLine
-                label="الإيراد المسجل"
-                value={formatCurrency(metrics.revenue)}
-              />
-              <SummaryLine
-                label="المنصرف"
-                value={formatCurrency(metrics.expenseTotal)}
-              />
-              <div className="my-4 border-t border-dashed border-border/60" />
-              <SummaryLine
-                label="الصافي الحالي"
-                value={formatCurrency(metrics.net)}
-                highlight={metrics.net >= 0 ? "success" : "danger"}
-                large
-              />
-              <div className="mt-6 p-4 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-between">
-                <span className="text-xs font-bold text-blue-800">
-                  الورديات المفتوحة (درج النقود)
-                </span>
-                <span className="text-lg font-black text-blue-600">
-                  {metrics.openShifts}
-                </span>
-              </div>
+        <ContentPanel
+          title={
+            <span className="flex items-center gap-2">
+              <Zap size={16} className="text-primary" /> ملخص الحركة المباشرة
+            </span>
+          }
+        >
+          <div className="space-y-4">
+            <SummaryLine
+              label="الإيراد المسجل"
+              value={formatCurrency(metrics.revenue)}
+            />
+            <SummaryLine
+              label="المنصرف"
+              value={formatCurrency(metrics.expenseTotal)}
+            />
+            <div className="my-4 border-t border-dashed border-border/60" />
+            <SummaryLine
+              label="الصافي الحالي"
+              value={formatCurrency(metrics.net)}
+              highlight={metrics.net >= 0 ? "success" : "danger"}
+              large
+            />
+            <div className="mt-6 flex items-center justify-between rounded-2xl border border-primary/20 bg-primary/5 p-4">
+              <span className="text-xs font-bold text-muted">
+                الورديات المفتوحة (درج النقود)
+              </span>
+              <span className="text-lg font-black tabular-nums text-primary">
+                {metrics.openShifts}
+              </span>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ContentPanel>
       </div>
     </div>
   );
@@ -436,13 +416,16 @@ function RulesPanel({ rules, updateRule }: { rules: Record<string, any>; updateR
   ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <Card className="rounded-[32px] border-border/50 bg-card shadow-sm lg:col-span-2 p-8">
-        <h2 className="text-xl font-black text-main mb-6 flex items-center gap-3">
-          <Receipt className="text-muted-foreground" size={24} /> سياسات
-          الفواتير والخصم
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <ContentPanel
+        title={
+          <span className="flex items-center gap-2">
+            <Receipt size={16} className="text-primary" /> سياسات الفواتير والخصم
+          </span>
+        }
+        className="lg:col-span-2"
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {booleanRules.map((rule) => (
             <ToggleRule
               key={rule.key}
@@ -452,19 +435,23 @@ function RulesPanel({ rules, updateRule }: { rules: Record<string, any>; updateR
             />
           ))}
         </div>
-      </Card>
+      </ContentPanel>
 
-      <Card className="rounded-[32px] border-border/50 bg-card shadow-sm p-8">
-        <h2 className="text-xl font-black text-main mb-6 flex items-center gap-3">
-          <Calculator className="text-muted-foreground" size={24} /> القيم
-          والحدود المالية
-        </h2>
-        <div className="space-y-6">
+      <ContentPanel
+        title={
+          <span className="flex items-center gap-2">
+            <Calculator size={16} className="text-primary" /> القيم والحدود المالية
+          </span>
+        }
+      >
+        <div className="space-y-5">
           <NumberField
             label="نسبة الضريبة (VAT) %"
             value={rules.taxRate}
             onChange={(value) => updateRule("taxRate", value)}
             icon={Percent}
+            max={100}
+            hint="النسبة المطبقة على الفواتير (0 – 100)"
           />
           <NumberField
             label="حد خصم الكاشير (%)"
@@ -472,15 +459,17 @@ function RulesPanel({ rules, updateRule }: { rules: Record<string, any>; updateR
             onChange={(value) => updateRule("cashierDiscountLimit", value)}
             icon={BadgePercent}
             max={100}
+            hint="الأعلى من ذلك يتطلب اعتماد مدير (0 – 100)"
           />
           <NumberField
             label="أقصى قيمة للفاتورة بدون اعتماد (ج.م)"
             value={rules.maxInvoiceWithoutApproval}
             onChange={(value) => updateRule("maxInvoiceWithoutApproval", value)}
             icon={Banknote}
+            hint="الفواتير الأعلى من هذا المبلغ تتطلب اعتماداً"
           />
         </div>
-      </Card>
+      </ContentPanel>
     </div>
   );
 }
@@ -489,14 +478,16 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
   const methods = ["cash", "card", "wallet", "instapay"];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <Card className="rounded-[32px] border-border/50 bg-card shadow-sm lg:col-span-2 p-8">
-        <h2 className="text-xl font-black text-main mb-6 flex items-center gap-3">
-          <Lock className="text-muted-foreground" size={24} /> ضوابط درج النقود
-          والورديات
-        </h2>
-
-        <div className="space-y-4 mb-8">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <ContentPanel
+        title={
+          <span className="flex items-center gap-2">
+            <Lock size={16} className="text-primary" /> ضوابط درج النقود والورديات
+          </span>
+        }
+        className="lg:col-span-2"
+      >
+        <div className="mb-6 space-y-3">
           <ToggleRule
             rule={{
               key: "requireOpenShiftForInvoices",
@@ -523,17 +514,17 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
           />
         </div>
 
-        <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground mb-4">
+        <h3 className="mb-3 text-[11px] font-black uppercase tracking-widest text-muted">
           قنوات الدفع المسموحة للعملاء
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {methods.map((method) => (
             <div
               key={method}
-              className="flex items-center justify-between p-4 rounded-2xl bg-soft/50 border border-border/50 hover:bg-soft transition-colors"
+              className="flex items-center justify-between rounded-2xl border border-border/50 bg-soft/50 p-4 transition-colors hover:bg-soft"
             >
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-card border border-border/50 flex items-center justify-center text-main shadow-sm">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/50 bg-card text-main shadow-sm">
                   {method === "cash" ? (
                     <Banknote size={18} />
                   ) : method === "card" ? (
@@ -542,7 +533,7 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
                     <Wallet size={18} />
                   )}
                 </div>
-                <span className="font-bold text-sm text-main">
+                <span className="truncate text-sm font-bold text-main">
                   {paymentLabels[method]}
                 </span>
               </div>
@@ -551,45 +542,52 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
                 onCheckedChange={(checked) =>
                   updatePaymentMethod(method, checked)
                 }
+                aria-label={`تفعيل الدفع عبر ${paymentLabels[method]}`}
               />
             </div>
           ))}
         </div>
-      </Card>
+      </ContentPanel>
 
       <div className="space-y-6">
-        <Card className="rounded-[32px] border-border/50 bg-card shadow-sm p-8">
-          <h2 className="text-xl font-black text-main mb-6 flex items-center gap-3">
-            <CheckCircle2 className="text-muted-foreground" size={24} /> التفضيل
-            الافتراضي للدفع
-          </h2>
-          <div className="space-y-3">
-            {methods.map((method) => (
-              <button
-                key={method}
-                onClick={() => updateRule("defaultPaymentMethod", method)}
-                className={cn(
-                  "w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-sm font-bold text-right",
-                  rules.defaultPaymentMethod === method
-                    ? "border-accent bg-accent/5 text-accent shadow-sm"
-                    : "border-border/50 bg-soft/30 text-muted-foreground hover:bg-soft hover:text-main",
-                )}
-              >
-                <span>{paymentLabels[method]}</span>
-                {rules.defaultPaymentMethod === method && (
-                  <CheckCircle2 size={18} />
-                )}
-              </button>
-            ))}
+        <ContentPanel
+          title={
+            <span className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-primary" /> التفضيل الافتراضي للدفع
+            </span>
+          }
+        >
+          <div className="space-y-2.5">
+            {methods.map((method) => {
+              const selected = rules.defaultPaymentMethod === method;
+              return (
+                <button
+                  key={method}
+                  type="button"
+                  onClick={() => updateRule("defaultPaymentMethod", method)}
+                  aria-pressed={selected}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-2xl border p-4 text-right text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                    selected
+                      ? "border-primary bg-primary/5 text-primary shadow-sm"
+                      : "border-border/50 bg-soft/30 text-muted hover:bg-soft hover:text-main",
+                  )}
+                >
+                  <span>{paymentLabels[method]}</span>
+                  {selected && <CheckCircle2 size={18} />}
+                </button>
+              );
+            })}
           </div>
-        </Card>
+        </ContentPanel>
 
-        <Card className="rounded-[32px] border-border/50 bg-card shadow-sm p-8">
-          <h2 className="text-xl font-black text-main mb-6 flex items-center gap-3">
-            <Settings2 className="text-muted-foreground" size={24} /> إعدادات
-            الإغلاق التلقائي للورديات
-          </h2>
-
+        <ContentPanel
+          title={
+            <span className="flex items-center gap-2">
+              <Settings2 size={16} className="text-primary" /> الإغلاق التلقائي للورديات
+            </span>
+          }
+        >
           <div className="space-y-5">
             <ToggleRule
               rule={{
@@ -613,17 +611,15 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
               icon={Clock}
               min={0}
               max={120}
+              hint="المدة بعد وقت الإغلاق الرسمي قبل الإغلاق التلقائي (0 – 120)"
             />
-            <p className="text-[10px] font-bold text-muted-foreground -mt-2 mr-2">
-              المدة التي ينتظرها النظام بعد وقت الإغلاق الرسمي قبل إغلاق الوردية
-              تلقائياً
-            </p>
 
             <NumberField
               label="ساعات القفل التلقائي للوردية (إذا نُسيت)"
               value={rules.autoLockShiftHours}
               onChange={(value) => updateRule("autoLockShiftHours", value)}
               icon={Clock}
+              hint="إغلاق احترازي إذا تُركت الوردية مفتوحة"
             />
 
             <NumberField
@@ -635,24 +631,22 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
               icon={BellRing}
               min={0}
               max={60}
+              hint="تنبيه الكاشير بقرب الإغلاق التلقائي (0 – 60)"
             />
-            <p className="text-[10px] font-bold text-muted-foreground -mt-4 mr-2">
-              سيظهر تنبيه للكاشير قبل المدة المحددة لإعلامه بقرب الإغلاق
-              التلقائي
-            </p>
-          </div>
 
-          <div className="mt-4 border-t border-border/50 pt-4">
-            <NumberField
-              label="العجز النقدي المسموح دون مساءلة (ج.م)"
-              value={rules.maxCashDiscrepancyWithoutNote}
-              onChange={(value) =>
-                updateRule("maxCashDiscrepancyWithoutNote", value)
-              }
-              icon={AlertTriangle}
-            />
+            <div className="border-t border-border/50 pt-5">
+              <NumberField
+                label="العجز النقدي المسموح دون مساءلة (ج.م)"
+                value={rules.maxCashDiscrepancyWithoutNote}
+                onChange={(value) =>
+                  updateRule("maxCashDiscrepancyWithoutNote", value)
+                }
+                icon={AlertTriangle}
+                hint="عجز أكبر من هذا المبلغ يتطلب ملاحظة توضيحية"
+              />
+            </div>
           </div>
-        </Card>
+        </ContentPanel>
       </div>
     </div>
   );
@@ -660,45 +654,49 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
 
 function AuditPanel({ rows, searchTerm, setSearchTerm }: { rows: Record<string, any>[]; searchTerm: string; setSearchTerm: (v: string) => void }) {
   return (
-    <Card className="rounded-[32px] border-border/50 bg-card shadow-sm overflow-hidden">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-soft/20 border-b border-border/50">
-        <div>
-          <h2 className="text-xl font-black text-main flex items-center gap-3">
-            <Search className="text-muted-foreground" size={20} /> أرشيف الرقابة
-            المتقدم
-          </h2>
-          <p className="mt-1 text-xs font-bold text-muted-foreground uppercase tracking-widest">
-            تتبع العمليات الحساسة كالخصومات، التعديلات، وإلغاء الفواتير.
-          </p>
+    <ContentPanel
+      title={
+        <span className="flex items-center gap-2">
+          <Search size={16} className="text-primary" /> أرشيف الرقابة المتقدم
+        </span>
+      }
+      subtitle="تتبع العمليات الحساسة كالخصومات، التعديلات، وإلغاء الفواتير."
+      actions={
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="shrink-0 tabular-nums">
+            {rows.length} عملية
+          </Badge>
+          <div className="relative w-full sm:w-72">
+            <Search
+              size={16}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted"
+            />
+            <Input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="بحث بالنوع أو الوصف أو القسم..."
+              aria-label="بحث في سجل الرقابة"
+              className="h-11 rounded-xl border-border/60 bg-card pr-11 text-xs font-bold shadow-sm focus-visible:ring-primary/30"
+            />
+          </div>
         </div>
-        <div className="relative w-full md:w-80 group">
-          <Search
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-accent transition-colors"
-            size={16}
-          />
-          <Input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="بحث عن عملية برقم مرجعي..."
-            className="h-12 pr-12 rounded-2xl bg-card border-border/60 focus:border-accent shadow-sm"
-          />
-        </div>
-      </div>
-
+      }
+      noPadding
+    >
       <div className="overflow-x-auto p-2">
         <Table>
           <TableHeader>
             <TableRow className="border-border/50 bg-soft/30 hover:bg-soft/30">
-              <TableHead className="py-4 text-xs font-black uppercase tracking-widest text-muted-foreground text-right rounded-tr-2xl">
+              <TableHead className="rounded-tr-2xl py-4 text-right text-xs font-black uppercase tracking-widest text-muted">
                 نوع الإجراء
               </TableHead>
-              <TableHead className="py-4 text-xs font-black uppercase tracking-widest text-muted-foreground text-right">
+              <TableHead className="py-4 text-right text-xs font-black uppercase tracking-widest text-muted">
                 تفاصيل العملية
               </TableHead>
-              <TableHead className="py-4 text-xs font-black uppercase tracking-widest text-muted-foreground text-right">
+              <TableHead className="py-4 text-right text-xs font-black uppercase tracking-widest text-muted">
                 القسم/الكيان
               </TableHead>
-              <TableHead className="py-4 text-xs font-black uppercase tracking-widest text-muted-foreground text-right rounded-tl-2xl">
+              <TableHead className="rounded-tl-2xl py-4 text-right text-xs font-black uppercase tracking-widest text-muted">
                 طابع زمني
               </TableHead>
             </TableRow>
@@ -707,24 +705,24 @@ function AuditPanel({ rows, searchTerm, setSearchTerm }: { rows: Record<string, 
             {rows.map((row) => (
               <TableRow
                 key={row.id || `${row.action}-${row.created_at}`}
-                className="hover:bg-soft/20 transition-colors"
+                className="transition-colors hover:bg-soft/20"
               >
                 <TableCell className="py-4">
                   <Badge
                     variant="outline"
-                    className="rounded-lg px-3 py-1 bg-card text-[10px] font-bold uppercase tracking-widest"
+                    className="rounded-lg bg-card px-3 py-1 text-[10px] font-bold uppercase tracking-widest"
                   >
                     {row.action || "عملية"}
                   </Badge>
                 </TableCell>
-                <TableCell className="py-4 max-w-sm truncate font-semibold text-main text-sm">
+                <TableCell className="max-w-sm truncate py-4 text-sm font-semibold text-main">
                   {row.description || "لا يوجد وصف"}
                 </TableCell>
-                <TableCell className="py-4 text-xs font-bold text-muted-foreground">
+                <TableCell className="py-4 text-xs font-bold text-muted">
                   {row.entity_type || "عام"}
                 </TableCell>
                 <TableCell
-                  className="py-4 text-xs font-bold text-muted-foreground"
+                  className="py-4 text-xs font-bold tabular-nums text-muted"
                   dir="ltr"
                 >
                   {formatDate(row.created_at || row.createdAt)}
@@ -737,7 +735,7 @@ function AuditPanel({ rows, searchTerm, setSearchTerm }: { rows: Record<string, 
                   <TableEmptyState
                     icon={FileLock2}
                     title="لا توجد عمليات رقابية مسجلة"
-                    description="قم بتوسيع نطاق البحث أو تأكد من ربط النظام بالخادم."
+                    description="جرّب كلمة بحث مختلفة أو تأكد من اتصال النظام بالخادم."
                   />
                 </TableCell>
               </TableRow>
@@ -745,7 +743,7 @@ function AuditPanel({ rows, searchTerm, setSearchTerm }: { rows: Record<string, 
           </TableBody>
         </Table>
       </div>
-    </Card>
+    </ContentPanel>
   );
 }
 
@@ -759,30 +757,31 @@ function ToggleRule({ rule, rules, updateRule, layout = "column" }: { rule: { ke
         layout === "column" ? "flex-col items-start" : "items-center",
       )}
     >
-      <div className="flex items-start gap-4">
+      <div className="flex min-w-0 items-start gap-4">
         <div
           className={cn(
             "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl shadow-sm transition-colors",
             isChecked
-              ? "bg-accent/10 text-accent"
-              : "bg-card border border-border/50 text-muted-foreground",
+              ? "bg-primary/10 text-primary"
+              : "border border-border/50 bg-card text-muted",
           )}
         >
           <Icon size={20} />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-black text-main">{rule.title}</p>
-          <p className="mt-1 text-xs font-bold text-muted-foreground leading-relaxed">
+          <p className="mt-1 text-xs font-bold leading-relaxed text-muted">
             {rule.description}
           </p>
         </div>
       </div>
       <div
-        className={cn(layout === "column" && "w-full flex justify-end mt-2")}
+        className={cn(layout === "column" && "mt-2 flex w-full justify-end")}
       >
         <Switch
           checked={isChecked}
           onCheckedChange={(c) => updateRule(rule.key, c)}
+          aria-label={rule.title}
         />
       </div>
     </div>
@@ -802,15 +801,15 @@ function SummaryLine({
 }) {
   const color =
     highlight === "success"
-      ? "text-emerald-600"
+      ? "text-emerald-600 dark:text-emerald-400"
       : highlight === "danger"
-        ? "text-red-600"
+        ? "text-rose-600 dark:text-rose-400"
         : "text-main";
   return (
     <div className="flex items-center justify-between px-2">
       <span
         className={cn(
-          "font-bold text-muted-foreground",
+          "font-bold text-muted",
           large ? "text-sm" : "text-xs uppercase tracking-widest",
         )}
       >
@@ -818,7 +817,7 @@ function SummaryLine({
       </span>
       <span
         className={cn(
-          "font-black tracking-tight",
+          "font-black tabular-nums tracking-tight",
           color,
           large ? "text-2xl" : "text-lg",
         )}
@@ -836,6 +835,7 @@ function NumberField({
   onChange,
   min = 0,
   max,
+  hint,
   icon: Icon,
 }: {
   label: React.ReactNode;
@@ -843,13 +843,14 @@ function NumberField({
   onChange: (_value: number) => void;
   min?: number;
   max?: number | string;
+  hint?: React.ReactNode;
   icon?: React.ComponentType<{ size?: number | string; className?: string }>;
 }) {
   return (
-    <label className="block space-y-3">
+    <label className="block space-y-2.5">
       <div className="flex items-center gap-2">
-        {Icon && <Icon size={16} className="text-muted-foreground" />}
-        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+        {Icon && <Icon size={16} className="shrink-0 text-muted" />}
+        <span className="text-[10px] font-black uppercase tracking-widest text-muted">
           {label}
         </span>
       </div>
@@ -861,9 +862,12 @@ function NumberField({
         onChange={(event) =>
           onChange(event.target.value ? Number(event.target.value) : 0)
         }
-        className="h-14 rounded-2xl bg-soft/50 border-border/60 focus:border-accent text-lg font-black px-5 shadow-sm"
+        className="h-14 rounded-2xl border-border/60 bg-soft/50 px-5 text-lg font-black tabular-nums shadow-sm focus-visible:ring-primary/30"
         dir="ltr"
       />
+      {hint && (
+        <p className="text-[10px] font-bold leading-relaxed text-muted">{hint}</p>
+      )}
     </label>
   );
 }

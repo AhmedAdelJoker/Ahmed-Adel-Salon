@@ -51,7 +51,6 @@ export default function ServiceFormModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           className="sm:max-w-[620px] bg-card border-border"
-          dir="rtl"
         >
           <DialogHeader className="text-right">
             <DialogTitle className="text-xl font-black text-main">

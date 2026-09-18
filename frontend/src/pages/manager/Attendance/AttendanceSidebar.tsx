@@ -42,7 +42,7 @@ const AttendanceSidebar = ({
           </div>
         </div>
 
-        <Tabs defaultValue="register" className="mt-4 w-full" dir="rtl">
+        <Tabs defaultValue="register" className="mt-4 w-full">
           <TabsList className="h-11 w-full gap-1 rounded-xl bg-soft p-1 sm:h-12">
             <TabsTrigger
               value="register"

@@ -210,7 +210,7 @@ export default function InvoiceAdjustmentRequests() {
   }
 
   return (
-    <div className="erp-page-container space-y-6 pb-24" dir="rtl">
+    <div className="erp-page-container space-y-6 pb-24">
       <Card className="overflow-hidden border-purple-100 bg-linear-to-r from-white via-purple-50/50 to-blue-50 p-7 shadow-sm dark:border-white/10 dark:from-[#171717] dark:via-purple-500/10 dark:to-blue-500/5">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
           <div className="flex items-center gap-4">
@@ -401,7 +401,7 @@ export default function InvoiceAdjustmentRequests() {
         open={Boolean(selectedRequest)}
         onOpenChange={(open) => !open && setSelectedRequest(null)}
       >
-        <DialogContent className="max-w-2xl rounded-3xl" dir="rtl">
+        <DialogContent className="max-w-2xl rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black">
               تفاصيل طلب التعديل
@@ -476,7 +476,7 @@ export default function InvoiceAdjustmentRequests() {
           setDecisionDialog((prev) => ({ ...prev, open }))
         }
       >
-        <DialogContent className="max-w-md rounded-3xl" dir="rtl">
+        <DialogContent className="max-w-md rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black">
               {decisionDialog.action === "approve"

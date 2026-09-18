@@ -43,8 +43,9 @@ def process_image_content(
             detail=f"حجم الملف كبير جداً. الحد الأقصى هو {max_size // (1024*1024)} ميجابايت"
         )
     
-    # 2. Extension & Path Setup
-    ext = Path(original_filename).suffix.lower()
+    # 2. Extension & Path Setup — sanitize filename to prevent traversal
+    safe_name = Path(original_filename).name  # strip directory components
+    ext = Path(safe_name).suffix.lower()
     if not ext:
         ext = ".jpg"
         

@@ -32,7 +32,7 @@ export default function StatusBadge({ value, className = "" }) {
   const label = labelMap[normalized] || value || "-";
 
   return (
-    <span className={`${toneClass} ${className}`} dir="rtl">
+    <span className={`${toneClass} ${className}`}>
       {label}
     </span>
   );

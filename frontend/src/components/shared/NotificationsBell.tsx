@@ -82,7 +82,7 @@ export default function NotificationsBell() {
   }
 
   return (
-    <div ref={rootRef} className="relative" dir="rtl">
+    <div ref={rootRef} className="relative">
       <button
         type="button"
         disabled={loading}

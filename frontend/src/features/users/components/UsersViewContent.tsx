@@ -1,8 +1,9 @@
-import { Edit3, Trash2, Shield } from "lucide-react";
+import { Edit3, Trash2, Shield, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PremiumCard } from "@/components/shared/PremiumUI";
+import { PremiumCard, SkeletonCard } from "@/components/shared/PremiumUI";
+import EmptyState from "@/components/shared/EmptyState";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
 
 export interface UsersViewUser {
@@ -38,14 +39,21 @@ export function UsersViewContent({
     <>
       {/* View Content */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-64 rounded-3xl bg-soft animate-pulse border border-border"
-            />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <SkeletonCard key={i} variant="content" />
           ))}
         </div>
+      ) : filteredUsers.length === 0 ? (
+        <PremiumCard noPadding className="overflow-hidden">
+          <div className="p-4 sm:p-6">
+            <EmptyState
+              title="لا توجد نتائج"
+              text="لم نجد مستخدمين يطابقون بحثك — جرب كلمات أخرى أو امسح الفلتر."
+              icon={Search}
+            />
+          </div>
+        </PremiumCard>
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <AnimatePresence mode="popLayout">
@@ -86,17 +94,19 @@ export function UsersViewContent({
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => onEdit(user)}
-                          className="h-8 w-8 rounded-lg bg-soft text-muted hover:text-primary hover:bg-primary/10 flex items-center justify-center transition-all"
+                          className="h-8 w-8 rounded-lg bg-soft border border-border text-muted hover:text-primary hover:bg-primary/10 hover:border-primary/20 flex items-center justify-center transition-all"
+                          aria-label={`تعديل ${user.username}`}
                         >
                           <Edit3 size={14} />
                         </button>
                         {user.role !== "OWNER" && (
                           <button
                             onClick={() => onDeleteRequest(user.id)}
-                            className="h-8 w-8 rounded-lg bg-soft text-muted hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-all"
+                            className="h-8 w-8 rounded-lg bg-soft border border-border text-muted hover:text-danger hover:bg-danger-soft hover:border-danger/20 flex items-center justify-center transition-all"
+                            aria-label={`حذف ${user.username}`}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -110,8 +120,8 @@ export function UsersViewContent({
                           الرتبة الوظيفية
                         </span>
                         <Badge
-                          variant="secondary"
-                          className="bg-primary/10 text-primary border-none font-black text-[10px] px-2 py-0.5 rounded-lg"
+                          variant={["OWNER", "ADMIN"].includes(String(user.role).toUpperCase()) ? "info" : "secondary"}
+                          className="font-black text-[10px] px-2 py-0.5 rounded-lg"
                         >
                           {user.role}
                         </Badge>

@@ -55,11 +55,15 @@ export function useReportsDashboard() {
 
       const mergedStats = isEmpty ? DEMO_STATS : {
         ...DEMO_STATS,
-        ...Object.fromEntries(Object.entries(data.stats || {}).filter(([_, v]) => Number(v) !== 0)),
-        occupancy: data.stats?.occupancy ?? DEMO_STATS.occupancy,
+        ...Object.fromEntries(
+          Object.entries(data.stats || {}).filter(
+            ([_, v]) => v != null && typeof v !== "object" && String(v) !== "" && !Number.isNaN(Number(v as any))
+          )
+        ),
+        occupancy: data.stats?.occupancy != null ? data.stats.occupancy : DEMO_STATS.occupancy,
       };
 
-      setStats((prev) => ({ ...prev, ...mergedStats }));
+      setStats(mergedStats);
       setWeeklyData(hasRealWeekly && Array.isArray(data.weekly_data) ? data.weekly_data : FALLBACK_WEEKLY);
 
       if (data.service_distribution?.length) {

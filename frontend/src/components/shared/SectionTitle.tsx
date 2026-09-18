@@ -8,7 +8,6 @@ export default function SectionTitle({
   return (
     <div
       className={`section-header flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${className}`}
-      dir="rtl"
     >
       <div className="flex min-w-0 items-start gap-3">
         {icon ? (

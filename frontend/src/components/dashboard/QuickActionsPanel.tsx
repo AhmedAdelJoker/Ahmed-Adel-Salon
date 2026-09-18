@@ -61,7 +61,6 @@ export default function QuickActionsPanel({ className = "" }) {
   return (
     <section
       className={`card rounded-3xl border border-border bg-card p-5 shadow-soft ${className}`}
-      dir="rtl"
     >
       <div className="mb-5 flex flex-col gap-1">
         <h3 className="text-lg font-black tracking-tight text-main">

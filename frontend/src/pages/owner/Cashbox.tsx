@@ -210,7 +210,7 @@ export default function Cashbox() {
 
   if (loading) {
     return (
-      <div className="erp-page space-y-5 pb-10" dir="rtl">
+      <div className="erp-page space-y-5 pb-10">
         <div className="h-20 rounded-2xl bg-soft animate-pulse border border-border" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
@@ -232,7 +232,7 @@ export default function Cashbox() {
   const totalMain = isPeriod ? summary.period_net : summary.cash_balance;
 
   return (
-    <div className="erp-page space-y-5 pb-10" dir="rtl">
+    <div className="erp-page space-y-5 pb-10">
       <PageHeader
         title="الخزنة المركزية"
         subtitle="الخزنة المركزية • نقدي و رقمي — كل وردية وكل حركة تسمع تلقائياً"
@@ -469,7 +469,7 @@ export default function Cashbox() {
       </div>
 
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <DialogContent dir="rtl" className="max-w-lg rounded-2xl p-0 overflow-hidden bg-card max-h-[90vh] flex flex-col">
+        <DialogContent className="max-w-lg rounded-2xl p-0 overflow-hidden bg-card max-h-[90vh] flex flex-col">
           {viewTx ? (
             (() => {
               const creator = getCreator(viewTx);
@@ -570,7 +570,7 @@ export default function Cashbox() {
       </Dialog>
 
       <Dialog open={showCashModal} onOpenChange={setShowCashModal}>
-        <DialogContent dir="rtl" className="max-w-sm rounded-2xl p-0 overflow-hidden">
+        <DialogContent className="max-w-sm rounded-2xl p-0 overflow-hidden">
           <div className={cn("h-1 w-full", cashType === "in" ? "bg-emerald-500" : "bg-rose-500")} />
           <DialogHeader className="p-5 text-center">
             <div className={cn("h-12 w-12 rounded-xl mx-auto flex items-center justify-center mb-2", cashType === "in" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600")}>

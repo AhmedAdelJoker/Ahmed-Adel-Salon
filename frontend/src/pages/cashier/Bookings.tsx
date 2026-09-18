@@ -119,7 +119,6 @@ export default function Bookings() {
   return (
     <div
       className="erp-page space-y-6 sm:space-y-8 pb-12 overflow-x-hidden"
-      dir="rtl"
     >
       {/* ── HEADER WITH ALL ACTION TEXTS ALWAYS VISIBLE ── */}
       <PageHeader

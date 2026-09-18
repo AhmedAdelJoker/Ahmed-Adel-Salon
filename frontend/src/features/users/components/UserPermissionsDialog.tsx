@@ -53,7 +53,6 @@ export function UserPermissionsDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           className="max-w-[950px] p-0 overflow-hidden border-none bg-card shadow-premium rounded-[3rem]"
-          dir="rtl"
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-10 py-10 bg-[#020617] text-white relative overflow-hidden">
             <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/10 rounded-full blur-[100px] -mr-[200px] -mt-[200px] pointer-events-none" />

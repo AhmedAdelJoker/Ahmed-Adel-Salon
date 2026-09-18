@@ -63,7 +63,6 @@ export default function BookingFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-4xl w-[95vw] sm:w-full rounded-[2rem] p-0 border-0 bg-card shadow-premium overflow-hidden flex flex-col max-h-[90vh]"
-        dir="rtl"
       >
         {/* Modal Header */}
         <DialogHeader className="p-6 sm:p-8 pb-5 bg-gradient-to-br from-accent to-accent-strong relative overflow-hidden shrink-0">

@@ -1,54 +1,12 @@
+/**
+ * Invoices pagination — Phase 2: unified <Pagination /> component.
+ *
+ * Replaces the bespoke PageNumbers component with the shared design-token
+ * driven Pagination primitive. Preserves the Arabic stats line.
+ */
 import type { Dispatch, SetStateAction } from "react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/core/utils";
-
-export interface PageNumbersProps {
-  currentPage: number;
-  total: number;
-  pageSize: number;
-  onNavigate: (page: number) => void;
-}
-
-export function PageNumbers({ currentPage, total, pageSize, onNavigate }: PageNumbersProps) {
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  if (pageCount <= 1) return null;
-  const items: (number | string)[] = [];
-  for (let i = 1; i <= pageCount; i++) {
-    if (pageCount > 7 && i > 3 && i < pageCount - 2) {
-      if (!items.includes("…")) items.push("…");
-      i = pageCount - 3;
-      continue;
-    }
-    items.push(i);
-  }
-  return (
-    <div className="flex items-center gap-0.5 sm:gap-1">
-      {items.map((item, idx) =>
-        item === "…" ? (
-          <span
-            key={`d-${idx}`}
-            className="px-0.5 text-[10px] font-black text-muted sm:px-1 sm:text-xs"
-          >
-            …
-          </span>
-        ) : (
-          <button
-            key={item}
-            onClick={() => onNavigate(item as number)}
-            className={cn(
-              "h-8 min-w-7 rounded-lg px-1.5 text-[10px] font-black transition-all sm:h-9 sm:min-w-9 sm:px-2 sm:text-[11px]",
-              item === currentPage
-                ? "bg-primary text-white shadow-sm"
-                : "bg-soft text-muted hover:bg-card hover:text-main",
-            )}
-          >
-            {item}
-          </button>
-        ),
-      )}
-    </div>
-  );
-}
+import { useMemo } from "react";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 
 export interface InvoicesPaginationProps {
   currentPage: number;
@@ -66,12 +24,32 @@ export function InvoicesPagination({
   totalCount,
   filteredCount,
   invoicesCount,
-  totalPages,
+  totalPages: _totalPages,
   onPageChange,
 }: InvoicesPaginationProps) {
+  // Stable paginator instance — mutate .total / .page on every render
+  const paginator = useMemo(
+    () =>
+      createPaginationState({
+        page: currentPage,
+        size: pageSize,
+        total: totalCount,
+      }),
+    [], // intentionally empty — we mutate via direct field assignment
+  );
+  paginator.total = totalCount;
+  paginator.page = currentPage;
+  paginator.size = pageSize;
+
   return (
-    <div className="flex flex-col gap-2 border-t border-border/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3">
-      <p className="text-[10px] font-bold text-muted sm:text-xs">
+    <div className="flex flex-col gap-3 border-t border-border/50 px-3 py-2.5 sm:px-4 sm:py-3">
+      <Pagination
+        paginator={paginator}
+        onPageChange={(p) => onPageChange(p)}
+        showSizeChanger={false}
+        locale="ar"
+      />
+      <p className="text-center text-[10px] font-bold text-muted sm:text-right">
         عرض{" "}
         <span className="tabular-nums">
           {filteredCount ? (currentPage - 1) * pageSize + 1 : 0}
@@ -82,34 +60,45 @@ export function InvoicesPagination({
         </span>{" "}
         من{" "}
         <span className="tabular-nums">{totalCount || filteredCount}</span>
-        {totalCount > filteredCount ? <span className="text-[9px] text-muted/60"> (الصفحة الحالية {filteredCount})</span> : null}
+        {totalCount > filteredCount ? (
+          <span className="text-[9px] text-muted/60">
+            {" "}
+            (الصفحة الحالية {filteredCount})
+          </span>
+        ) : null}
       </p>
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 rounded-lg px-2.5 text-[10px] sm:h-9 sm:px-3"
-          onClick={() => onPageChange((p) => Math.max(1, p - 1))}
-          disabled={currentPage === 1}
-        >
-          السابق
-        </Button>
-        <PageNumbers
-          currentPage={currentPage}
-          total={totalCount || filteredCount}
-          pageSize={pageSize}
-          onNavigate={onPageChange}
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 rounded-lg px-2.5 text-[10px] sm:h-9 sm:px-3"
-          onClick={() => onPageChange((p) => p + 1)}
-          disabled={currentPage >= totalPages || invoicesCount < pageSize}
-        >
-          التالي
-        </Button>
-      </div>
     </div>
+  );
+}
+
+/**
+ * Legacy PageNumbers export kept for backwards compatibility with any
+ * importer — internally forwards to the unified Pagination component.
+ */
+export function PageNumbers(props: {
+  currentPage: number;
+  total: number;
+  pageSize: number;
+  onNavigate: (page: number) => void;
+}) {
+  const paginator = useMemo(
+    () =>
+      createPaginationState({
+        page: props.currentPage,
+        size: props.pageSize,
+        total: props.total,
+      }),
+    [],
+  );
+  paginator.total = props.total;
+  paginator.page = props.currentPage;
+  paginator.size = props.pageSize;
+  return (
+    <Pagination
+      paginator={paginator}
+      onPageChange={props.onNavigate}
+      showSizeChanger={false}
+      locale="ar"
+    />
   );
 }

@@ -68,7 +68,7 @@ export function InvoiceDetailsDialog({
       open={Boolean(selectedInvoice)}
       onOpenChange={(open) => !open && onClose()}
     >
-      <DialogContent className="max-w-lg sm:max-w-2xl" dir="rtl">
+      <DialogContent className="max-w-lg sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-lg font-black sm:text-xl">
             تفاصيل الفاتورة #{selectedInvoice && invoiceNo(selectedInvoice)}
@@ -212,7 +212,7 @@ export function AdjustmentRequestDialog({
       open={adjustmentDialog.open}
       onOpenChange={(open) => onAdjustmentDialogChange((p) => ({ ...p, open }))}
     >
-      <DialogContent className="max-w-sm sm:max-w-md" dir="rtl">
+      <DialogContent className="max-w-sm sm:max-w-md">
         <DialogHeader>
           <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-warning-soft text-warning sm:h-12 sm:w-12">
             <ShieldCheck size={20} />

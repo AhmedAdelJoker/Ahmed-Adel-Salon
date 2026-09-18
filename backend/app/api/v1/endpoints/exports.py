@@ -45,6 +45,23 @@ from app.utils.arabic_pdf import fix_arabic, ensure_pdf_font
 
 router = APIRouter(prefix="/exports", tags=["Exports"])
 
+
+def _enforce_export_permission(current_user: User):
+    """Check restrictExportsToManagers setting."""
+    try:
+        from app.services.runtime_settings_service import get_runtime_settings
+        from app.api.v1.endpoints.security_settings import DEFAULT_SECURITY_SETTINGS
+
+        sec = get_runtime_settings("security_settings", DEFAULT_SECURITY_SETTINGS)
+        if sec.get("restrictExportsToManagers", True):
+            if current_user.role not in ("owner", "admin", "manager", "accountant"):
+                raise HTTPException(status_code=403, detail="التصدير متاح للإدارة فقط")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+
 EXCEL_MEDIA_TYPE = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
@@ -957,6 +974,7 @@ def export_customers_excel(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
+    _enforce_export_permission(current_user)
     rows = _query_customers(
         db,
         search=search,
@@ -984,6 +1002,7 @@ def export_customers_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
+    _enforce_export_permission(current_user)
     rows = _query_customers(
         db,
         search=search,
@@ -1006,6 +1025,7 @@ def export_bookings_excel(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
+    _enforce_export_permission(current_user)
     rows = _booking_rows(
         _query_bookings(
             db,
@@ -1035,6 +1055,7 @@ def export_bookings_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
+    _enforce_export_permission(current_user)
     rows = _booking_rows(
         _query_bookings(
             db,

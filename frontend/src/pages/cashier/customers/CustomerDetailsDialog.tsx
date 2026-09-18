@@ -74,7 +74,6 @@ export function CustomerDetailsDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         className="max-w-2xl rounded-[2.5rem] border-0 bg-card p-0 shadow-premium overflow-hidden"
-        dir="rtl"
       >
         <DialogHeader className="p-8 pb-6 bg-soft relative overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-accent/5 rounded-full -mr-24 -mt-24 blur-3xl" />

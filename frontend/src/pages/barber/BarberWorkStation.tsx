@@ -84,7 +84,7 @@ const BarberWorkStation = () => {
     }
     // Show appointment selection when no appointmentId
     return (
-      <div className="min-h-screen bg-slate-50 pb-12" dir="rtl">
+      <div className="min-h-screen bg-slate-50 pb-12">
         <div className="mx-auto max-w-3xl px-4 py-8">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-black text-main mb-2">محطة العمل</h1>
@@ -154,7 +154,7 @@ const BarberWorkStation = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-12" dir="rtl">
+    <div className="min-h-screen bg-slate-50 pb-12">
       <WorkStationHeader
         status={appointment.status}
         onBack={() => navigate("/barber")}
@@ -200,7 +200,7 @@ const BarberWorkStation = () => {
 
       {/* Complete Dialog */}
       <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
-        <DialogContent className="max-w-md rounded-2xl" dir="rtl">
+        <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center">
@@ -254,7 +254,7 @@ const BarberWorkStation = () => {
 
       {/* Cancel Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent className="max-w-md rounded-2xl" dir="rtl">
+        <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-danger/10 flex items-center justify-center">

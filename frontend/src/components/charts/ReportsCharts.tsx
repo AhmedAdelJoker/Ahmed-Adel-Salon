@@ -63,7 +63,7 @@ export default function ReportsCharts({ reportOverview = {} }: { reportOverview?
   }));
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6" dir="rtl">
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
       {/* Top Barbers */}
       <ContentPanel
         title="أفضل الخبراء"

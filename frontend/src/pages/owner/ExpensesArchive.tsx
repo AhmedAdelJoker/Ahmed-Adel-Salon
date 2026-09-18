@@ -216,7 +216,7 @@ export default function ExpensesArchive() {
   };
 
   return (
-    <div className="erp-page-container space-y-6 pb-10" dir="rtl">
+    <div className="erp-page-container space-y-6 pb-10">
       <PageHeader
         title="أرشيف المصروفات"
         subtitle="السجل التاريخي للمصروفات — فلترة زمنية، بحث فوري، وتصدير"
@@ -417,7 +417,7 @@ export default function ExpensesArchive() {
 
       {/* Detail dialog */}
       <Dialog open={openDetail} onOpenChange={setOpenDetail}>
-        <DialogContent dir="rtl" className="max-w-lg rounded-[24px] border-0 p-0 overflow-hidden bg-card shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)]">
+        <DialogContent className="max-w-lg rounded-[24px] border-0 p-0 overflow-hidden bg-card shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)]">
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white relative overflow-hidden">
             <div className="absolute -left-10 -top-10 h-32 w-32 rounded-full bg-white/5" />
             <div className="relative flex items-center gap-3">

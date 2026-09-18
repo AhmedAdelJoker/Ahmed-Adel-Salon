@@ -66,7 +66,7 @@ export default function ReportsCharts({ reportOverview = {} }: { reportOverview?
   }));
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6" dir="rtl">
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
       <section className="card rounded-3xl border border-border bg-card p-6 shadow-soft">
         <PanelHeader
           icon={<BarChart3 size={20} />}

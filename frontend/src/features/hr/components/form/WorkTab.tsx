@@ -146,13 +146,13 @@ export default function WorkTab({
                   <SelectContent className="rounded-xl">
                     <SelectItem
                       value="active"
-                      className="text-emerald-600 font-bold"
+                      className="text-success font-bold"
                     >
                       نشط
                     </SelectItem>
                     <SelectItem
                       value="suspended"
-                      className="text-rose-600 font-bold"
+                      className="text-danger font-bold"
                     >
                       معلّق
                     </SelectItem>
@@ -164,7 +164,7 @@ export default function WorkTab({
                   <div className="text-xs font-black text-main">
                     الظهور في نقطة البيع
                   </div>
-                  <div className="text-[10px] font-bold text-muted">
+                  <div className="text-xs font-bold text-muted">
                     إتاحة الموظف في شاشة الدفع
                   </div>
                 </div>
@@ -180,7 +180,7 @@ export default function WorkTab({
                   <div className="text-xs font-black text-main">
                     الظهور في الحجوزات
                   </div>
-                  <div className="text-[10px] font-bold text-muted">
+                  <div className="text-xs font-bold text-muted">
                     إتاحة الموظف لجدولة المواعيد
                   </div>
                 </div>

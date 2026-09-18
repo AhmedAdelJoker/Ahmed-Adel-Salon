@@ -34,41 +34,41 @@ export default function ActivityPanel({ logs }: ActivityPanelProps) {
   );
 
   return (
-    <Card className="overflow-hidden rounded-3xl border border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-[#171717]">
-      <div className="border-b border-black/5 p-5 dark:border-white/10">
-        <h2 className="text-xl font-black text-gray-950 dark:text-gray-50">
+    <Card className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm  ">
+      <div className="border-b border-border p-5 ">
+        <h2 className="text-xl font-black text-main">
           سجل المخاطر والعمليات الحساسة
         </h2>
-        <p className="mt-1 text-xs font-bold text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-xs font-bold text-muted">
           آخر العمليات المرتبطة بالحذف، الخصومات، التصدير، الصلاحيات، وتسجيل
           الدخول.
         </p>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto custom-scrollbar">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>الإجراء</TableHead>
-              <TableHead>الوصف</TableHead>
-              <TableHead>الكيان</TableHead>
-              <TableHead>التوقيت</TableHead>
+              <TableHead className="px-4 py-3">الإجراء</TableHead>
+              <TableHead className="px-4 py-3">الوصف</TableHead>
+              <TableHead className="px-4 py-3">الكيان</TableHead>
+              <TableHead className="px-4 py-3">التوقيت</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sensitiveLogs.map((log) => (
-              <TableRow key={String(log.id || `${log.action}-${log.created_at}`)}>
+              <TableRow key={String(log.id || `${log.action}-${log.created_at}`)} className="hover:bg-soft/30">
                 <TableCell>
                   <Badge variant="warning" className="rounded-xl px-3 py-1">
                     {log.action || "عملية"}
                   </Badge>
                 </TableCell>
-                <TableCell className="max-w-105 truncate font-bold text-gray-800 dark:text-gray-100">
+                <TableCell className="max-w-105 truncate font-bold text-main">
                   {log.description || "لا يوجد وصف"}
                 </TableCell>
-                <TableCell className="text-xs text-gray-500 dark:text-gray-400">
+                <TableCell className="text-xs text-muted">
                   {log.entity_type || "عام"}
                 </TableCell>
-                <TableCell className="text-xs text-gray-500 dark:text-gray-400">
+                <TableCell className="text-xs text-muted">
                   {formatDate((log.created_at || log.createdAt) as string | null | undefined)}
                 </TableCell>
               </TableRow>

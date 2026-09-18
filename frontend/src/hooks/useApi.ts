@@ -16,7 +16,9 @@ const queryKeys = {
   employees: ["employees"],
   employeesArchive: ["employees", "archive"],
   employeePerformance: ["reports", "employee-performance"],
+  dailySummary: ["reports", "daily-summary"],
   products: ["products"],
+  inventoryLogs: ["products", "logs"],
   invoices: ["invoices"],
   services: ["services"],
   businessSettings: ["businessSettings"],
@@ -69,6 +71,26 @@ function fetchEmployeePerformance(params: {
   search?: string;
 }): Promise<any> {
   return api.get("/reports/employee-performance", { params }).then((r) => r.data);
+}
+
+export interface InventoryLogsParams {
+  type?: string;
+  product_id?: number;
+  q?: string;
+  from_date?: string;
+  to_date?: string;
+  page?: number;
+  page_size?: number;
+}
+
+function fetchInventoryLogs(params: InventoryLogsParams): Promise<any> {
+  return api.get("/products/logs/all", { params }).then((r) => r.data);
+}
+
+function fetchDailySummary(date: string): Promise<any> {
+  return api.get("/pos-shifts/daily-summary", { params: { date_str: date } }).then(
+    (r) => r.data,
+  );
 }
 
 type QueryOpts<T> = Omit<UseQueryOptions<T>, "queryKey" | "queryFn">;
@@ -185,6 +207,29 @@ export function useEmployeePerformance(
   });
 }
 
+export function useInventoryLogs(
+  params: InventoryLogsParams = {},
+  options: QueryOpts<any> = {},
+) {
+  return useQuery({
+    queryKey: [...queryKeys.inventoryLogs, params],
+    queryFn: () => fetchInventoryLogs(params),
+    staleTime: 30_000,
+    placeholderData: (previousData) => previousData, // keepPreviousData equivalent
+    ...options,
+  });
+}
+
+export function useDailySummary(date: string, options: QueryOpts<any> = {}) {
+  return useQuery({
+    queryKey: [...queryKeys.dailySummary, date],
+    queryFn: () => fetchDailySummary(date),
+    staleTime: 30_000,
+    placeholderData: (previousData) => previousData, // keepPreviousData equivalent
+    ...options,
+  });
+}
+
 export function useInvalidateEmployees(): () => void {
   const qc = useQueryClient();
   return () => {
@@ -196,6 +241,13 @@ export function useInvalidateProducts(): () => void {
   const qc = useQueryClient();
   return () => {
     void qc.invalidateQueries({ queryKey: queryKeys.products });
+  };
+}
+
+export function useInvalidateInventoryLogs(): () => void {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: queryKeys.inventoryLogs });
   };
 }
 

@@ -225,7 +225,6 @@ export function StockWizard({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-xl rounded-[2.5rem] p-0 border-0 bg-card shadow-premium overflow-hidden"
-        dir="rtl"
       >
         {/* Wizard Header */}
         <div className="bg-[#020617] relative overflow-hidden p-6 pb-4">

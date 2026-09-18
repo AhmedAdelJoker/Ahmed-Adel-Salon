@@ -38,7 +38,7 @@ export function ViewInvoiceModal({
       open={viewInvoice.open}
       onOpenChange={(open) => setViewInvoice({ open, data: null })}
     >
-      <DialogContent className="max-w-2xl" dir="rtl">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-black">
             تفاصيل الفاتورة #{viewInvoice.data?.invoice_no || "---"}

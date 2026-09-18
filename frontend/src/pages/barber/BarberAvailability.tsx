@@ -150,7 +150,7 @@ const BarberAvailability = () => {
   const today = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="min-h-screen pb-12" dir="rtl">
+    <div className="min-h-screen pb-12">
       <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
         <PageHeader
           title="ساعات العمل والإجازات"
@@ -364,7 +364,7 @@ const BarberAvailability = () => {
 
       {/* Time Off Modal */}
       <Dialog open={showTimeOffModal} onOpenChange={setShowTimeOffModal}>
-        <DialogContent className="max-w-md rounded-2xl" dir="rtl">
+        <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingTimeOff ? "تعديل إجازة" : "إضافة إجازة جديدة"}

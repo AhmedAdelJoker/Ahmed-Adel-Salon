@@ -32,17 +32,17 @@ export default function CustomerToolbar({
                 key={tab}
                 disabled={loading}
                 onClick={() => onFilter(tab)}
-                className={`whitespace-nowrap rounded-xl px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeFilter === tab ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 dark:bg-sky-400 dark:text-slate-950" : "bg-slate-50 text-slate-400 hover:bg-slate-100 bg-soft dark:text-slate-500"}`}
+                className={`whitespace-nowrap rounded-xl px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeFilter === tab ? "bg-primary text-white shadow-lg shadow-primary/30" : "bg-soft text-muted hover:text-main"}`}
               >
                 {tab}
               </button>
             ))}
           </div>
           <div className="relative flex-1">
-            <Search className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <Input
               placeholder="البحث بالاسم أو رقم الجوال..."
-              className="pr-11 h-12 rounded-xl bg-slate-50 border-none font-bold"
+              className="pr-11 h-12 rounded-xl bg-soft border-border/60 font-bold"
               value={searchTerm || ""}
               onChange={(event) => onSearch(event.target.value)}
             />

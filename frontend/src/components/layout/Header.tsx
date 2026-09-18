@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getHomePath, normalizeRole } from "@/lib/access/roles";
+import LanguageSwitcher from "@/components/shared/LanguageSwitcher";
 
 const roleLabel = (role) =>
   ({
@@ -84,7 +85,6 @@ export default function Header({
   return (
     <header
       className="relative z-50 flex min-h-16 w-full min-w-0 flex-wrap items-center justify-between gap-3 border-b border-border/5 bg-bg-card/40 px-3 py-3 backdrop-blur-xl sm:min-h-20 sm:px-6 lg:flex-nowrap lg:px-8"
-      dir="rtl"
     >
       {/* Decorative Top Glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[1px] w-1/2 bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
@@ -118,7 +118,14 @@ export default function Header({
       </div>
 
       <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-4 lg:flex-none lg:gap-6">
-        {/* Search Command Button */}
+        {/* Search Command Button (full on desktop, icon-only on smaller screens) */}
+        <button
+          onClick={openCommandPalette}
+          aria-label="فتح البحث الذكي"
+          className="focus-ring flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 border border-border/40 text-muted hover:text-accent hover:border-accent/30 hover:bg-accent/5 transition-all lg:hidden"
+        >
+          <Search size={18} />
+        </button>
         <button
           onClick={openCommandPalette}
           aria-label="فتح البحث الذكي"
@@ -152,7 +159,10 @@ export default function Header({
             </span>
           </div>
 
-          {(role === "OWNER" || role === "CASHIER" || role === "ADMIN") && (
+          {(role === "OWNER" ||
+            role === "CASHIER" ||
+            role === "ADMIN" ||
+            role === "ACCOUNTANT") && (
             <div
               onClick={() => navigate("/owner/cashbox")}
               title="الخزنة المركزية — مرتبط بالخزنة (نقدي + رقمي)"
@@ -179,6 +189,9 @@ export default function Header({
         <div className="h-8 w-[1px] bg-border/40 mx-2 hidden sm:block" />
 
         <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+          <div className="hidden sm:block">
+            <LanguageSwitcher />
+          </div>
           <button
             onClick={toggleTheme}
             aria-label={isDark ? "التبديل إلى الوضع الفاتح" : "التبديل إلى الوضع الداكن"}

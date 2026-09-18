@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { formatCurrency } from "@/lib/core/utils";
 import { useCashbox } from "@/features/cashbox/hooks/useCashbox";

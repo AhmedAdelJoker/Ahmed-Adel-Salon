@@ -8,11 +8,14 @@ from datetime import datetime, date, time
 
 from app.db.session import get_db
 from app.api.deps import require_owner_or_manager, require_any_staff
+from app.api.deps_auth import get_current_active_user
+from app.core.rate_limit import rate_limit
 from app.models.employee import Employee
 from app.models.employee_presence_log import EmployeePresenceLog
 from app.models.user import User
 from app.schemas.barber_presence import BarberPresenceRead
 from app.services.activity_service import log_activity
+from app.core.upload_security import validate_data_sheet
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
@@ -119,27 +122,41 @@ def register_attendance(
     
     return {"message": "تم تسجيل العملية بنجاح"}
 
-@router.post("/fingerprint")
+@router.post(
+    "/fingerprint",
+    dependencies=[Depends(rate_limit("attendance_fingerprint", max_requests=30, window_seconds=60))],
+)
 def fingerprint_attendance(
     employee_id: int,
-    type: str, # "in" or "out"
-    db: Session = Depends(get_db)
+    type: str,  # "in" or "out"
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
-    Endpoint for Fingerprint Device Integration
+    Endpoint for Fingerprint Device Integration - requires authentication
     """
+    if type not in ("in", "out", "break", "break_end"):
+        raise HTTPException(status_code=400, detail="نوع الحضور غير صالح")
     employee = db.query(Employee).filter(Employee.id == employee_id).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
-    
+
     new_log = EmployeePresenceLog(
         employee_id=employee_id,
         status=type,
-        created_at=datetime.now()
+        created_at=datetime.now(),
     )
     db.add(new_log)
     db.commit()
-    
+
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="fingerprint",
+        entity_type="attendance",
+        description=f"بصمة {type} للموظف {employee.full_name} عبر الجهاز",
+    )
+
     return {"status": "success", "employee": employee.full_name}
 
 @router.post("/import-excel")
@@ -148,11 +165,10 @@ async def import_attendance_excel(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
-        raise HTTPException(status_code=400, detail="ملف غير مدعوم")
+    # Phase 3: validate MIME/size/filename
+    content = await validate_data_sheet(file, max_size=20 * 1024 * 1024)
 
     try:
-        content = await file.read()
         if file.filename.endswith('.csv'):
             df = pd.read_csv(io.BytesIO(content))
         else:

@@ -1,5 +1,12 @@
 import { Users, Receipt, Wallet, Clock } from "lucide-react";
 
+export const LINK_COLORS: Record<string, string> = {
+  primary: "bg-primary text-white",
+  success: "bg-success text-white",
+  warning: "bg-warning text-white",
+  info: "bg-info text-white",
+};
+
 export const SYSTEM_LINKS = [
   { label: "الموارد البشرية", icon: Users, desc: "بيانات الموظف والعمولة", color: "primary", href: "/owner/hr" },
   { label: "الفواتير", icon: Receipt, desc: "مصدر المبيعات والخدمات", color: "success", href: "/invoices" },

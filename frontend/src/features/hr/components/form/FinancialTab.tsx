@@ -42,7 +42,7 @@ export default function FinancialTab({
                     }
                     className={`${FIELD_INPUT_CLASS} pr-12`}
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-muted">
                     ج.م
                   </span>
                 </div>
@@ -63,7 +63,7 @@ export default function FinancialTab({
                     }
                     className={`${FIELD_INPUT_CLASS} pr-12`}
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-muted">
                     %
                   </span>
                 </div>

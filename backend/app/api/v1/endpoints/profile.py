@@ -7,6 +7,7 @@ from app.api.deps_auth import get_current_active_user
 from app.models.user import User
 from app.schemas.profile import ProfileRead, ProfileUpdate, ChangePasswordPayload
 from app.core.security import verify_password, get_password_hash
+from app.core.upload_security import validate_image
 from app.utils.media import process_image_content, get_upload_path
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
@@ -43,8 +44,9 @@ async def upload_avatar(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
+    # Phase 3: validate MIME/size/filename before processing
+    content = await validate_image(file, max_size=5 * 1024 * 1024)
     upload_dir = get_upload_path("profiles")
-    content = await file.read()
     filename = process_image_content(content, file.filename, upload_dir)
     
     # Save path in DB (relative URL)

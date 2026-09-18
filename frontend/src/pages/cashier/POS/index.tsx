@@ -49,7 +49,7 @@ const POSLayout = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center" dir="rtl">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-primary">
           <RefreshCw className="h-10 w-10 animate-spin" />
           <p className="text-sm font-bold tracking-widest text-muted uppercase">
@@ -63,7 +63,6 @@ const POSLayout = () => {
   return (
     <div
       className="flex h-full max-h-[calc(100vh-80px)] flex-col gap-4 relative overflow-hidden"
-      dir="rtl"
     >
       {/* Success Overlay & Modals */}
       <SuccessOverlay />

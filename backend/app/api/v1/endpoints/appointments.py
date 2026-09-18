@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta, time
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 
@@ -279,26 +279,47 @@ def list_appointments(
     date_filter: str | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
-    limit: int | None = None,
+    # Phase 2: enforce pagination on a previously unbounded list endpoint
+    skip: int = Query(0, ge=0, description="Records to skip"),
+    limit: int = Query(100, ge=1, le=500, description="Max records to return"),
+    page: int | None = Query(None, ge=1, description="Optional 1-indexed page"),
+    page_size: int | None = Query(None, ge=1, le=500, description="Optional page size"),
+    sort: Optional[str] = Query(None, description="Sort field. '-' prefix for DESC"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    query = db.query(Appointment).options(joinedload(Appointment.services)).order_by(Appointment.id.desc())
-    
+    query = db.query(Appointment).options(joinedload(Appointment.services))
+
+    # Phase 2: explicit sort handling
+    if sort:
+        sort_field = sort.lstrip("-")
+        desc = sort.startswith("-")
+        column = getattr(Appointment, sort_field, None)
+        if column is not None:
+            query = query.order_by(column.desc() if desc else column.asc())
+    else:
+        query = query.order_by(Appointment.id.desc())
+
     if date_filter == "today":
         query = query.filter(Appointment.appointment_date == date.today())
     elif date_filter == "custom" and start_date and end_date:
         query = query.filter(Appointment.appointment_date >= start_date, Appointment.appointment_date <= end_date)
-    
+
     if current_user.role == "barber":
         barber_id = getattr(current_user, "barber_id", None) or getattr(current_user, "employee_id", None)
         if not barber_id:
             return []
         query = query.filter(Appointment.barber_id == barber_id)
-        
-    if limit:
-        query = query.limit(limit)
-    return [_appointment_to_read(db, row) for row in query.all()]
+
+    # Phase 2: normalize page/page_size → skip/limit for callers
+    eff_skip = skip
+    eff_limit = limit
+    if page is not None and page_size is not None:
+        eff_skip = (page - 1) * page_size
+        eff_limit = page_size
+
+    rows = query.offset(eff_skip).limit(eff_limit).all()
+    return [_appointment_to_read(db, row) for row in rows]
 
 @router.get("/upcoming", response_model=list[AppointmentRead])
 def list_upcoming_appointments(

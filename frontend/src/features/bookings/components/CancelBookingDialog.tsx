@@ -26,7 +26,6 @@ export default function CancelBookingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-md rounded-[2rem] p-0 border-0 bg-card shadow-premium overflow-hidden"
-        dir="rtl"
       >
         <div className="p-6 bg-rose-600 relative overflow-hidden text-center text-white">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />

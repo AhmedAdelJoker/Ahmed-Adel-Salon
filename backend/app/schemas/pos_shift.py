@@ -1,10 +1,12 @@
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
+
+from app.schemas.expense import ExpenseRead
 
 
 class PosShiftOpen(BaseModel):
@@ -67,6 +69,41 @@ class PosShiftRead(BaseModel):
         populate_by_name=True,
         from_attributes=True
     )
+
+
+class DailySummaryUserRead(BaseModel):
+    full_name: Optional[str] = None
+    username: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DailySummaryShiftRead(BaseModel):
+    """Shift row for the daily summary timeline (typed subset + live sales)."""
+
+    id: int
+    status: str
+    opened_at: datetime
+    closed_at: Optional[datetime] = None
+    total_sales: Decimal = Decimal("0")
+    invoice_count: int = 0
+    user: Optional[DailySummaryUserRead] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DailySummaryTotals(BaseModel):
+    total_sales: Decimal
+    invoice_count: int
+    total_expenses: Decimal
+    shift_count: int
+
+
+class DailySummaryResponse(BaseModel):
+    date: date
+    shifts: list[DailySummaryShiftRead]
+    expenses: list[ExpenseRead]
+    summary: DailySummaryTotals
 
 
 

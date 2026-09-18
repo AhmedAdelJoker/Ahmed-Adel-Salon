@@ -1,6 +1,12 @@
-/** Customers CustomerPagination (moved from Customers page, no logic changes). */
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui";
+/**
+ * Customers pagination — Phase 2: unified <Pagination /> component.
+ *
+ * Reads X-Total-Count from the upstream response and reuses the design
+ * tokens shared with the rest of the app.
+ */
+import { useMemo } from "react";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
+import { CUSTOMERS_PAGE_SIZE } from "@/features/customers/constants";
 
 export default function CustomerPagination({
   currentPage,
@@ -15,34 +21,29 @@ export default function CustomerPagination({
   filteredCount: number;
   onPage: (page: number) => void;
 }) {
+  // Stable paginator instance — we only need .total for display
+  // (page navigation is handled by parent via onPage).
+  const paginator = useMemo(
+    () => createPaginationState({ page: currentPage, size: CUSTOMERS_PAGE_SIZE, total: totalCount }),
+    [],
+  );
+  // Mutate the paginator's totals so <Pagination /> renders the correct window.
+  paginator.total = totalCount;
+  paginator.page = currentPage;
+  paginator.size = CUSTOMERS_PAGE_SIZE;
+
   return (
-          <div className="flex flex-col gap-3 border-t border-black/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/10">
-            <div className="text-center text-xs font-bold text-gray-500 sm:text-right">
-              عرض {filteredCount} من {totalCount}
-            </div>
-            <div className="flex items-center justify-center gap-3 sm:justify-end">
-              <Button
-                variant="outline"
-                size="icon"
-                disabled={currentPage === 1}
-                onClick={() => onPage(Math.max(1, currentPage - 1))}
-              >
-                <ChevronRight size={18} />
-              </Button>
-              <span className="text-xs font-black">
-                {currentPage} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                disabled={currentPage === totalPages}
-                onClick={() =>
-                  onPage(Math.min(totalPages, currentPage + 1))
-                }
-              >
-                <ChevronLeft size={18} />
-              </Button>
-            </div>
-          </div>
+    <div className="card-surface mt-4 rounded-2xl px-2 sm:px-4">
+      <Pagination
+        paginator={paginator}
+        onPageChange={onPage}
+        showSizeChanger={false}
+        sizePosition="right"
+        locale="ar"
+      />
+      <div className="px-3 pb-2 text-center text-[10px] text-muted sm:text-right">
+        عرض {filteredCount} من {totalCount} — صفحة {currentPage} / {totalPages}
+      </div>
+    </div>
   );
 }

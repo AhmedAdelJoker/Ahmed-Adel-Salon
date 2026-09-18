@@ -19,7 +19,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { ContentPanel } from "@/components/shared/PremiumUI";
-import { cn, formatCurrency } from "@/lib/core/utils";
+import { formatCurrency } from "@/lib/core/utils";
 import type { WeeklyRow } from "@/features/reports-dashboard/constants";
 
 export interface RevenueChartProps {
@@ -57,27 +57,6 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
               <SelectItem value="bar">أعمدة</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex rounded-xl border border-border bg-soft p-0.5 hidden sm:flex">
-            {[
-              { label: "أسبوع", value: "week" },
-              { label: "شهر", value: "month" },
-              { label: "سنة", value: "year" },
-            ].map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => onPeriodChange(item.value)}
-                className={cn(
-                  "rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
-                  period === item.value
-                    ? "bg-primary text-white shadow-sm"
-                    : "text-muted hover:text-primary hover:bg-card",
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
       <div className="h-[360px] sm:h-[420px] min-h-[320px]" dir="ltr">

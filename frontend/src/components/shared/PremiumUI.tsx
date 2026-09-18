@@ -9,6 +9,12 @@ import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 interface PremiumCardProps {
   children?: React.ReactNode;
   className?: string;
+  /**
+   * Classes applied to the outer motion wrapper (the actual grid/flex item).
+   * Use for layout placement utilities like col-span/row-span/order —
+   * `className` lands on the inner styled box and is ignored by parent grids.
+   */
+  wrapperClassName?: string;
   noPadding?: boolean;
   hoverable?: boolean;
   animate?: boolean;
@@ -18,6 +24,7 @@ interface PremiumCardProps {
 export const PremiumCard = ({
   children,
   className,
+  wrapperClassName,
   noPadding = false,
   hoverable = true,
   animate = true,
@@ -43,6 +50,7 @@ export const PremiumCard = ({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: delay, ease: "easeOut" }}
+      className={cn("min-w-0", wrapperClassName)}
     >
       {content}
     </motion.div>
@@ -153,9 +161,9 @@ export const StatCard = ({
             className={cn(
               "hidden sm:flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black",
               trend === "positive"
-                ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                ? "bg-success-soft text-success border border-success/20"
                 : trend === "negative"
-                ? "bg-rose-50 text-rose-600 border border-rose-100"
+                ? "bg-danger-soft text-danger border border-danger/20"
                 : "bg-soft text-muted",
             )}
           >

@@ -34,7 +34,7 @@ export default function CustomerFormDialog({
 }) {
   return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md" dir="rtl">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
               {editing ? "تعديل بيانات العميل" : "إضافة عميل جديد"}

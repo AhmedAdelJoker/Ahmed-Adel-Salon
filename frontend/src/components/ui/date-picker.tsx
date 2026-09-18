@@ -135,7 +135,6 @@ const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
         <PopoverContent
           className="w-[280px] p-0 rounded-2xl border border-border bg-card shadow-premium"
           align="start"
-          dir="rtl"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border/50">

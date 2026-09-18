@@ -18,15 +18,41 @@ export const unwrapResponse = (response: any): any => {
 };
 
  
+/**
+ * Read X-Total-Count / X-Page / X-Page-Size from an Axios response.
+ * Phase 2: when the backend emits these pagination headers we prefer them
+ * over body fields, since they reflect the full server-side count even
+ * when the response body is truncated.
+ */
+const readHeaderCount = (
+  response: unknown,
+  key: string,
+): number | null => {
+  if (!response || typeof response !== "object") return null;
+  const headers = (response as UnknownRecord).headers as
+    | Record<string, unknown>
+    | undefined;
+  if (!headers) return null;
+  const value = headers[key] ?? headers[key.toLowerCase()];
+  if (value == null) return null;
+  const parsed = parseInt(String(value), 10);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export const normalizeListResponse = <T = any>(response: unknown): PaginatedResult<T> => {
   const raw = unwrapResponse(response) as unknown;
 
+  // Phase 2: prefer X-Total-Count header when present
+  const headerTotal = readHeaderCount(response, "x-total-count");
+
   if (!raw) {
-    return { items: [], total: 0 };
+    return headerTotal != null
+      ? { items: [], total: headerTotal }
+      : { items: [], total: 0 };
   }
 
   if (Array.isArray(raw)) {
-    return { items: raw as T[], total: raw.length };
+    return { items: raw as T[], total: headerTotal ?? raw.length };
   }
 
   if (typeof raw === "object") {
@@ -45,15 +71,18 @@ export const normalizeListResponse = <T = any>(response: unknown): PaginatedResu
     if (listKey) {
       const items = obj[listKey] as T[];
       const total =
-        Number(obj.total ?? obj.count ?? obj.total_count ?? items.length) ||
-        items.length;
+        headerTotal
+        ?? (Number(obj.total ?? obj.count ?? obj.total_count ?? items.length) || items.length);
       return { items, total };
     }
 
-    return { items: [], total: Number(obj.total ?? obj.count ?? 0) || 0 };
+    return {
+      items: [],
+      total: headerTotal ?? (Number(obj.total ?? obj.count ?? 0) || 0),
+    };
   }
 
-  return { items: [], total: 0 };
+  return { items: [], total: headerTotal ?? 0 };
 };
 
  

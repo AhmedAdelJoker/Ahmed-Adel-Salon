@@ -17,6 +17,9 @@ import {
   ArrowLeft,
   Sparkles,
   Building2,
+  Wallet,
+  Clock,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +37,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   PageHeader,
+  PremiumCard,
 } from "@/components/shared/PremiumUI";
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
@@ -197,7 +201,7 @@ const HRManagement = () => {
   }
 
   return (
-    <div className="erp-page space-y-8 pb-20" dir="rtl">
+    <div className="erp-page space-y-8 pb-20">
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
@@ -231,15 +235,44 @@ const HRManagement = () => {
             <Button
               variant="outline"
               onClick={() => navigate("/owner/hr/archive")}
-              className="h-11 rounded-2xl border-border bg-card/50 px-8 text-sm font-black text-main transition-all hover:border-accent/20"
+              className="h-9 rounded-xl border-border bg-card/50 px-5 text-xs font-black text-muted transition-all hover:border-accent/20 hover:text-main"
             >
-              <Archive className="ml-2" size={20} /> الأرشيف الرقمي
+              <Archive className="ml-2" size={16} /> الأرشيف
             </Button>
           </>
         }
       />
 
       <HrStatsGrid stats={stats} />
+
+      {/* ═══ RELATED NAV — هوية HR (مرحلة 3) ═══ */}
+      <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
+        <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ml-2">
+            <Sparkles size={12} className="text-accent" /> انتقال سريع
+          </span>
+          {[
+            { label: "الرواتب", desc: "المستحقات والسلف", icon: Wallet, href: "/owner/payroll", color: "bg-warning text-white" },
+            { label: "الحضور", icon: Clock, desc: "الانضباط اليومي", href: "/attendance", color: "bg-info text-white" },
+            { label: "أرشيف الموظفين", icon: Archive, desc: "المعلّقون والسجل", href: "/owner/hr/archive", color: "bg-soft text-muted border border-border" },
+            { label: "تقارير الأداء", icon: BarChart3, desc: "الإنتاجية والعمولة", href: "/owner/employee-reports", color: "bg-primary text-white" },
+          ].map((l) => (
+            <button
+              key={l.href}
+              onClick={() => navigate(l.href)}
+              className="inline-flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-right hover:border-accent/20 hover:bg-soft transition-colors group"
+            >
+              <span className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", l.color)}>
+                <l.icon size={14} />
+              </span>
+              <span className="text-right">
+                <span className="block text-xs font-black text-main group-hover:text-accent transition-colors">{l.label}</span>
+                <span className="block text-[10px] font-bold text-muted leading-none">{l.desc}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </PremiumCard>
 
       {/* ═══ FILTER & SEARCH ═══ */}
       <HrToolbar
@@ -271,7 +304,6 @@ const HRManagement = () => {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
           className="flex h-[100dvh] sm:h-[94vh] w-[100vw] sm:w-[96vw] max-w-350 flex-col overflow-hidden rounded-none sm:rounded-[2rem] border-0 bg-card p-0 shadow-[0_50px_150px_-30px_rgba(0,0,0,0.4)]"
-          dir="rtl"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border bg-card/60 px-4 sm:px-8 py-4 sm:py-6 backdrop-blur-xl shrink-0">
@@ -294,7 +326,7 @@ const HRManagement = () => {
             </div>
             <button
               onClick={() => setIsModalOpen(false)}
-              className="h-12 w-12 rounded-2xl bg-soft text-muted transition-all hover:bg-rose-50 hover:text-rose-600 flex items-center justify-center"
+              className="h-12 w-12 rounded-2xl bg-soft text-muted transition-all hover:bg-danger-soft hover:text-danger flex items-center justify-center"
             >
               <X size={24} strokeWidth={3} />
             </button>
@@ -305,7 +337,7 @@ const HRManagement = () => {
             <aside className="hidden w-[380px] xl:flex flex-col border-l border-border bg-gradient-to-b from-card to-soft/30 p-6 lg:p-8 backdrop-blur-md overflow-y-auto custom-scrollbar">
               <div className="mb-6 text-center">
                 <div className="inline-flex items-center gap-2 rounded-full bg-accent/10 border border-accent/15 px-3 py-1">
-                  <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
                   <span className="text-[9px] font-black text-accent uppercase tracking-[0.2em]">معاينة مباشرة</span>
                 </div>
                 <p className="mt-3 text-[11px] font-bold text-muted">هكذا سيظهر الموظف في الكارد والبحث</p>
@@ -330,7 +362,7 @@ const HRManagement = () => {
                         )}
                       </div>
                     </div>
-                    <div className={cn("absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full border-[3px] border-card shadow-md flex items-center justify-center text-white", formData.status === "active" ? "bg-emerald-500" : "bg-rose-500") }>
+                    <div className={cn("absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full border-[3px] border-card shadow-md flex items-center justify-center text-white", formData.status === "active" ? "bg-success" : "bg-danger") }>
                       {formData.status === "active" ? <CheckCircle2 size={14} strokeWidth={3} /> : <X size={14} strokeWidth={3} />}
                     </div>
                   </div>
@@ -354,7 +386,7 @@ const HRManagement = () => {
                     <div className="rounded-2xl bg-soft border border-border/50 p-3 text-center">
                       <div className="text-[8px] font-black text-muted uppercase tracking-widest mb-1">الحالة</div>
                       <div className="flex items-center justify-center gap-1.5">
-                        <div className={cn("h-2 w-2 rounded-full", formData.status==="active"?"bg-emerald-500 animate-pulse":"bg-rose-500")} />
+                        <div className={cn("h-2 w-2 rounded-full", formData.status==="active"?"bg-success animate-pulse":"bg-danger")} />
                         <span className="text-[11px] font-black text-main">{formData.status==="active"?"نشط":"معلّق"}</span>
                       </div>
                     </div>
@@ -393,13 +425,13 @@ const HRManagement = () => {
                     ))}
                   </div>
                 </div>
-                <div className="rounded-2xl bg-slate-900 dark:bg-slate-800 p-4 text-white shadow-lg relative overflow-hidden">
-                  <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/5" />
+                <div className="rounded-2xl border border-border bg-soft p-4 shadow-sm relative overflow-hidden">
+                  <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-accent/5" />
                   <div className="relative flex items-center gap-2.5 mb-2">
-                    <div className="h-7 w-7 rounded-lg bg-white/10 flex items-center justify-center"><Building2 size={14} /></div>
-                    <span className="text-[10px] font-black uppercase tracking-widest">موجز الدور</span>
+                    <div className="h-7 w-7 rounded-lg bg-accent/10 text-accent flex items-center justify-center"><Building2 size={14} /></div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted">موجز الدور</span>
                   </div>
-                  <p className="relative text-[11px] font-medium leading-relaxed text-slate-300 line-clamp-3">{currentBlueprint.summary}</p>
+                  <p className="relative text-[11px] font-medium leading-relaxed text-main line-clamp-3">{currentBlueprint.summary}</p>
                 </div>
                 {formData.bioAr && (
                   <div className="rounded-2xl border border-border bg-card p-4">
@@ -419,7 +451,7 @@ const HRManagement = () => {
                     const isActive = activeTab === tab.id;
                     const isPast = DYNAMIC_TABS.findIndex((t) => t.id === activeTab) > idx;
                     return (
-                      <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={cn("flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[11px] font-black whitespace-nowrap transition-all shrink-0", isActive ? "bg-accent text-white border-accent shadow-md" : isPast ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-card text-muted border-border")}>
+                      <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={cn("flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[11px] font-black whitespace-nowrap transition-all shrink-0", isActive ? "bg-accent text-white border-accent shadow-md" : isPast ? "bg-success-soft text-success border-success/20" : "bg-card text-muted border-border")}>
                         {isPast ? <CheckCircle2 size={14} /> : <tab.icon size={14} />} {tab.label}
                       </button>
                     );
@@ -438,7 +470,7 @@ const HRManagement = () => {
                     <div className="text-[11px] font-black text-main truncate">{formData.fullName || "بدون اسم"}</div>
                     <div className="text-[10px] font-bold text-accent">{currentBlueprint.title}</div>
                     <div className="flex gap-1 mt-1">
-                      <span className={cn("text-[8px] px-1.5 py-0.5 rounded-full font-black border", formData.status==="active"?"bg-emerald-500 text-white border-emerald-500":"bg-rose-500 text-white border-rose-500")}>{formData.status==="active"?"نشط":"معلّق"}</span>
+                      <span className={cn("text-[8px] px-1.5 py-0.5 rounded-full font-black border", formData.status==="active"?"bg-success text-white border-success":"bg-danger text-white border-danger")}>{formData.status==="active"?"نشط":"معلّق"}</span>
                       <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-soft border border-border font-bold text-muted">{Number(formData.baseSalary||0).toLocaleString("ar-EG")} ج.م</span>
                     </div>
                   </div>
@@ -494,7 +526,7 @@ const HRManagement = () => {
               </div>
               {/* Mobile Save Button */}
               <div className="xl:hidden mt-6">
-                <Button onClick={handleSubmit} disabled={isActionLoading || activeTab !== "review"} className={cn("h-12 w-full rounded-xl font-black text-white shadow-lg", activeTab==="review" ? "bg-accent hover:bg-accent/90 shadow-accent/20" : "bg-slate-300 opacity-60 cursor-not-allowed")}>
+                <Button onClick={handleSubmit} disabled={isActionLoading || activeTab !== "review"} className={cn("h-12 w-full rounded-xl font-black text-white shadow-lg", activeTab==="review" ? "bg-accent hover:bg-accent/90 shadow-accent/20" : "bg-soft text-muted opacity-60 cursor-not-allowed")}>
                   <Save size={18} className="ml-2" /> {editingEmp ? "تحديث البيانات" : "حفظ الموظف"}
                 </Button>
                 {activeTab !== "review" && <p className="mt-2 text-center text-[10px] font-bold text-muted">أكمل الخطوات للوصول للمراجعة ثم الحفظ</p>}
@@ -549,7 +581,7 @@ const HRManagement = () => {
                           isActive
                             ? "bg-accent text-white shadow-lg shadow-accent/20 scale-110"
                             : isPast
-                              ? "bg-emerald-500 text-white"
+                              ? "bg-success text-white"
                               : "bg-soft text-muted/40",
                         )}
                       >
@@ -587,7 +619,7 @@ const HRManagement = () => {
                     "h-14 w-full rounded-2xl font-black text-white shadow-xl transition-all",
                     activeTab === "review"
                       ? "bg-accent shadow-accent/20 hover:bg-accent/90"
-                      : "bg-slate-300 cursor-not-allowed opacity-50",
+                      : "bg-soft cursor-not-allowed opacity-50",
                   )}
                 >
                   <Save size={20} className="ml-2" />

@@ -42,9 +42,7 @@ from app.models.cash_transaction import CashTransaction  # noqa
 from app.models.walk_in_queue import WalkInQueue  # noqa
 
 # Availability / Presence / Notifications
-from app.models.barber_working_hour import BarberWorkingHour  # noqa
-from app.models.barber_time_off import BarberTimeOff  # noqa
-from app.models.barber_presence_log import BarberPresenceLog  # noqa
+# Phase 2 cleanup: removed legacy Barber* models (use Employee* equivalents)
 from app.models.employee_working_hour import EmployeeWorkingHour  # noqa
 from app.models.employee_time_off import EmployeeTimeOff  # noqa
 from app.models.employee_presence_log import EmployeePresenceLog  # noqa
@@ -58,3 +56,4 @@ from app.models.invoice_adjustment_request import InvoiceAdjustmentRequest  # no
 from app.models.invoice_payment import InvoicePayment  # noqa
 from app.models.shop_settings import ShopSettings  # noqa
 from app.models.seo_page import SeoPage  # noqa
+from app.models.revoked_token import RevokedToken  # noqa

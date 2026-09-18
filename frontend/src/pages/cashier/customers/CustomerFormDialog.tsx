@@ -27,7 +27,6 @@ export function CustomerFormDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         className="max-w-xl rounded-[2.5rem] p-0 border-0 bg-card shadow-premium overflow-hidden"
-        dir="rtl"
       >
         <DialogHeader className="p-8 pb-6 bg-[#020617] relative overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-accent/10 rounded-full -mr-24 -mt-24 blur-3xl" />

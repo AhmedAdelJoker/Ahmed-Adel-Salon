@@ -176,7 +176,7 @@ const ShiftSidebar = () => {
       toast.error("فشل طباعة التقرير، سيتم فتح نافذة الطباعة");
       // Fallback to browser print
       const reportHtml = `
-        <html dir="rtl" lang="ar">
+        <html lang="ar">
           <head>
             <meta charset="UTF-8">
             <style>
@@ -468,7 +468,6 @@ const ShiftSidebar = () => {
       <Dialog open={showCloseShift} onOpenChange={setShowCloseShift}>
         <DialogContent
           className="max-w-md rounded-[2.5rem] p-8 border-none shadow-2xl"
-          dir="rtl"
         >
           <DialogHeader className="mb-6">
             <DialogTitle className="text-3xl font-black tracking-tight">

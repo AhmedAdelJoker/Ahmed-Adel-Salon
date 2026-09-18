@@ -29,7 +29,7 @@ export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceD
           <>
             <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center">
               <div className="text-3xl sm:text-4xl font-black text-main tracking-tighter tabular-nums">
-                {occupancy ?? 72}%
+                {occupancy ?? 0}%
               </div>
               <div className="mt-0.5 text-[8px] font-black uppercase tracking-widest text-muted">
                 متوسط الإشغال

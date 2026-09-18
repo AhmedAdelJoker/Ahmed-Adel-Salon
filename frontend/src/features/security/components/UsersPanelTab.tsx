@@ -38,50 +38,50 @@ export interface UsersPanelTabProps {
 
 export default function UsersPanelTab({ users, searchTerm, setSearchTerm }: UsersPanelTabProps) {
   return (
-    <Card className="overflow-hidden rounded-3xl border border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-[#171717]">
-      <div className="flex flex-col gap-4 border-b border-black/5 p-5 dark:border-white/10 md:flex-row md:items-center md:justify-between">
+    <Card className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm  ">
+      <div className="flex flex-col gap-4 border-b border-border p-5  md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-xl font-black text-gray-950 dark:text-gray-50">
+          <h2 className="text-xl font-black text-main">
             المستخدمون والأدوار
           </h2>
-          <p className="mt-1 text-xs font-bold text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-xs font-bold text-muted">
             مراجعة الحسابات النشطة ومستويات الوصول.
           </p>
         </div>
         <div className="relative w-full md:w-80">
           <Search
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted"
             size={18}
           />
           <Input
             value={searchTerm || ""}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="بحث عن مستخدم أو دور..."
-            className="h-11 pr-11"
+            className="h-11 pr-11 bg-soft border-border focus:bg-card"
           />
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto custom-scrollbar">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>المستخدم</TableHead>
-              <TableHead>الدور</TableHead>
-              <TableHead>الحالة</TableHead>
-              <TableHead>آخر تحديث</TableHead>
+            <TableRow className="bg-soft/50 text-[10px] font-black uppercase tracking-widest text-muted">
+              <TableHead className="px-4 py-3">المستخدم</TableHead>
+              <TableHead className="px-4 py-3">الدور</TableHead>
+              <TableHead className="px-4 py-3">الحالة</TableHead>
+              <TableHead className="px-4 py-3">آخر تحديث</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.map((user) => {
               const role = getRole(user);
               return (
-                <TableRow key={String(getId(user) || user.username || user.email || Math.random())}>
+                <TableRow key={String(getId(user) || user.username || user.email || Math.random())} className="hover:bg-soft/30">
                   <TableCell>
                     <div>
-                      <p className="font-black text-gray-950 dark:text-gray-50">
+                      <p className="font-black text-main">
                         {getUserName(user)}
                       </p>
-                      <p className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                      <p className="text-xs font-bold text-muted">
                         {String(user?.email || user?.username || "---")}
                       </p>
                     </div>
@@ -102,7 +102,7 @@ export default function UsersPanelTab({ users, searchTerm, setSearchTerm }: User
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs text-gray-500 dark:text-gray-400">
+                  <TableCell className="text-xs text-muted">
                     {formatDate((user?.updated_at || user?.created_at) as string | null | undefined)}
                   </TableCell>
                 </TableRow>

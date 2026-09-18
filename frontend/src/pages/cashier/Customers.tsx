@@ -1,15 +1,10 @@
 import { useAuth } from "@/context/AuthContext";
-import React from "react";
 import { useNavigate } from "react-router-dom";
-
-
-
-
 
 import { Card } from "@/components/ui";
 
-
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { PageHeader, SkeletonCard } from "@/components/shared/PremiumUI";
 import {
   useCustomersList,
   useCustomerDialogs,
@@ -24,15 +19,6 @@ import {
   CustomerFormDialog,
   CustomerDeleteDialog,
 } from "@/features/customers";
-import SkeletonCard from "@/components/shared/SkeletonCard";
-import { SkeletonBlock } from "@/components/shared/SkeletonBlock";
-
-const EMPTY_CUSTOMER_FORM = {
-  name: "",
-  phone: "",
-  phone2: "",
-};
-const pageSize = 10;
 
 export default function Customers() {
   return (
@@ -59,10 +45,8 @@ function CustomersInner() {
     loading,
     currentPage,
     setCurrentPage,
-    totalCount,
     totalPages,
-    duplicateGroups,
-    filteredCustomers,
+    stats,
     fetchCustomers,
     removeCustomer,
     handleExport,
@@ -87,98 +71,36 @@ function CustomersInner() {
     handleDelete,
   } = useCustomerDialogs(fetchCustomers, removeCustomer);
 
-
-  function getInitials(name) {
-    if (!name) return "?";
-    const parts = String(name).trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-    return (
-      parts[0].charAt(0) + parts[parts.length - 1].charAt(0)
-    ).toUpperCase();
-  }
-
-  function customerName(customer) {
-    return (
-      `${customer?.first_name || ""} ${customer?.last_name || ""}`.trim() ||
-      customer?.name ||
-      "عميل"
-    );
-  }
-
-  function secondPhone(customer) {
-    return (
-      customer?.phone2 ||
-      customer?.alternate_phone ||
-      customer?.secondary_phone ||
-      null
-    );
-  }
-
-
-
-
-
-
-
-
-
-
+  const isFiltering = searchTerm.trim() !== "" || activeFilter !== "الكل";
+  const emptyTitle =
+    stats.total === 0 ? "لا يوجد عملاء" : "لا توجد نتائج مطابقة";
+  const emptyHint =
+    stats.total === 0
+      ? "أضف أول عميل من زر إضافة عميل"
+      : "جرّب كلمة بحث مختلفة أو غيّر الفلتر";
 
   if (loading && customers.length === 0) {
     return (
-      <div className="erp-page-container space-y-6 pb-6 sm:space-y-8" dir="rtl">
-        <div className="page-header">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-gray-950 dark:text-gray-50 sm:text-4xl">
-              سجل العملاء
-            </h1>
-            <p className="page-subtitle mt-2">
-              إدارة قاعدة البيانات وبناء علاقات ولاء مستدامة
-            </p>
-          </div>
+      <div className="erp-page-container space-y-6 pb-6 sm:space-y-8">
+        <PageHeader
+          title="سجل العملاء"
+          subtitle="إدارة قاعدة البيانات وبناء علاقات ولاء مستدامة"
+        />
+
+        <div data-stats-grid="true">
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
         </div>
 
-        {/* Skeleton KPIs */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
-
-        {/* Skeleton Table */}
-        <Card className="border-border p-4 shadow-sm">
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 p-4">
-                <SkeletonBlock className="h-11 w-11 shrink-0 rounded-2xl" />
-                <div className="flex-1 space-y-2">
-                  <SkeletonBlock className="h-4 w-1/4" />
-                  <SkeletonBlock className="h-3 w-1/3" />
-                </div>
-                <SkeletonBlock className="h-6 w-20 shrink-0" />
-                <SkeletonBlock className="h-6 w-24 shrink-0" />
-                <SkeletonBlock className="h-8 w-24 shrink-0" />
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Skeleton Pagination */}
-        <div className="flex flex-col gap-3 border-t border-black/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/10">
-          <SkeletonBlock className="h-4 w-32" />
-          <div className="flex items-center justify-center gap-3 sm:justify-end">
-            <SkeletonBlock className="h-8 w-8 rounded-xl" />
-            <SkeletonBlock className="h-8 w-16 rounded-xl" />
-            <SkeletonBlock className="h-8 w-8 rounded-xl" />
-          </div>
-        </div>
+        <SkeletonCard variant="content" />
       </div>
     );
   }
 
   return (
-    <div className="erp-page-container space-y-6 pb-6 sm:space-y-8" dir="rtl">
+    <div className="erp-page-container space-y-6 pb-6 sm:space-y-8">
       <CustomerHeader
         loading={loading}
         isManagerOrOwner={isManagerOrOwner}
@@ -188,9 +110,12 @@ function CustomersInner() {
         onImported={fetchCustomers}
       />
 
-      <CustomerKpis totalCount={totalCount} customers={customers} />
+      <CustomerKpis stats={stats} />
 
-      <DuplicatesAlert groups={duplicateGroups} />
+      <DuplicatesAlert
+        groupCount={stats.duplicate_group_count}
+        customerCount={stats.duplicate_customer_count}
+      />
 
       <CustomerToolbar
         activeFilter={activeFilter}
@@ -206,30 +131,44 @@ function CustomersInner() {
         {/* Table View */}
         {viewMode === "table" && (
           <CustomerTable
-            rows={filteredCustomers}
+            rows={customers}
             loading={loading}
             isOwner={isOwner}
             onOpenDetails={openDetails}
             onNavigate={(id) => navigate(`/customers/${id}`)}
             onDelete={(customer) => setDeleteTarget(customer)}
+            emptyTitle={emptyTitle}
+            emptyHint={emptyHint}
+            showClearFilter={isFiltering}
+            onClearFilter={() => {
+              setSearchTerm("");
+              setActiveFilter("الكل");
+            }}
           />
         )}
 
         {/* Card View */}
         {viewMode === "cards" && (
           <CustomerCards
-            rows={filteredCustomers}
+            rows={customers}
             isOwner={isOwner}
             onOpenDetails={openDetails}
             onDelete={(customer) => setDeleteTarget(customer)}
+            emptyTitle={emptyTitle}
+            emptyHint={emptyHint}
+            showClearFilter={isFiltering}
+            onClearFilter={() => {
+              setSearchTerm("");
+              setActiveFilter("الكل");
+            }}
           />
         )}
       {totalPages > 1 ? (
         <CustomerPagination
           currentPage={currentPage}
           totalPages={totalPages}
-          totalCount={totalCount}
-          filteredCount={filteredCustomers.length}
+          totalCount={stats.total}
+          filteredCount={customers.length}
           onPage={setCurrentPage}
         />
       ) : null}
@@ -239,7 +178,7 @@ function CustomersInner() {
         open={isDetailsOpen}
         onOpenChange={setIsDetailsOpen}
         customer={selectedCustomer}
-        loading={loading}
+        loading={false}
         onEdit={() => selectedCustomer && openEditCustomer(selectedCustomer)}
         onClose={() => setIsDetailsOpen(false)}
       />
@@ -264,44 +203,6 @@ function CustomersInner() {
         onConfirm={handleDelete}
         onClose={() => setDeleteTarget(null)}
       />
-    </div>
-  );
-}
-
-function Kpi({ label, value, icon: Icon, color }: any) {
-  return (
-    <Card className="p-6 border-border border-border shadow-sm hover:shadow-xl transition-all duration-500 group">
-      <div className="flex items-center gap-5">
-        <div
-          className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg transition-transform group-hover:scale-110 ${color}`}
-        >
-          <Icon size={24} />
-        </div>
-        <div>
-          <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-            {label}
-          </div>
-          <div className="mt-1 text-2xl font-black text-main text-main">
-            {value}
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function MiniStat({ label, value, icon: Icon }: any) {
-  return (
-    <div className="rounded-2xl border border-border bg-soft p-4 border-border bg-soft">
-      <div className="mb-2 flex items-center gap-2">
-        <Icon size={14} className="text-indigo-600 dark:text-sky-400" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-          {label}
-        </span>
-      </div>
-      <div className="truncate text-sm font-black text-main text-main">
-        {value}
-      </div>
     </div>
   );
 }

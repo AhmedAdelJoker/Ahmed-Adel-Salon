@@ -140,8 +140,8 @@ const OperationalReports = lazy(
 const LoyaltySettingsPanel = lazy(
   () => import("@/pages/owner/LoyaltySettingsPanel"),
 );
-const WebsiteSettingsPanel = lazy(
-  () => import("@/pages/owner/WebsiteSettingsPanel"),
+const OwnerWebsiteSettingsPage = lazy(
+  () => import("@/pages/owner/OwnerWebsiteSettingsPage"),
 );
 const CustomerArchive = lazy(() => import("@/pages/owner/CustomerArchive"));
 // Manager Pages
@@ -209,7 +209,6 @@ function RouteLoader() {
   return (
     <div
       className="flex min-h-[60vh] flex-col items-center justify-center animate-fade-in"
-      dir="rtl"
     >
       <div className="flex flex-col items-center gap-4 text-accent">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card shadow-soft">
@@ -313,7 +312,6 @@ function MainLayout() {
   return (
     <div
       className="app-shell relative flex h-dvh w-full overflow-hidden bg-slate-100 dark:bg-slate-950"
-      dir="rtl"
     >
       <DynamicBackground />
 
@@ -447,12 +445,7 @@ export default function AppRouter() {
                 />
                 <Route
                   path="/owner/website-settings"
-                  element={
-                    <WebsiteSettingsPanel
-                      onSaved={() => {}}
-                      onChangeDraft={() => {}}
-                    />
-                  }
+                  element={<OwnerWebsiteSettingsPage />}
                 />
               </Route>
 

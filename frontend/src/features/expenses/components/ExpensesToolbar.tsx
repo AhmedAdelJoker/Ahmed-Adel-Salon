@@ -1,6 +1,5 @@
 import { Search, X, ShieldCheck, RefreshCw } from "lucide-react";
 import { PremiumCard } from "@/components/shared/PremiumUI";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {

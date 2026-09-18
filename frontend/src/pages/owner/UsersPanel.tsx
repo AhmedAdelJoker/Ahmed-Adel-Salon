@@ -10,7 +10,7 @@ import {
   UserPermissionsDialog,
 } from "@/features/users";
 
-export default function UsersPanel() {
+export default function UsersPanel({ embedded = false }: { embedded?: boolean }) {
   const {
     users,
     loading,
@@ -41,7 +41,7 @@ export default function UsersPanel() {
   } = useUsersData();
 
   return (
-    <div className="erp-page-container space-y-8 pb-16" dir="rtl">
+    <div className={embedded ? "space-y-6" : "erp-page space-y-6 pb-10"}>
       <ConfirmDialog
         open={!!confirmDelete}
         onOpenChange={(open) => !open && setConfirmDelete(null)}
@@ -51,25 +51,46 @@ export default function UsersPanel() {
         loading={isActionLoading}
       />
 
-      <PageHeader
-        title="إدارة هويات الوصول"
-        subtitle="تحكم كامل في مصفوفة الصلاحيات وبروتوكولات الأمان للكوادر التشغيلية."
-        badge="الأمان والوصول"
-        icon={ShieldCheck}
-        className={undefined}
-        actions={
+      {!embedded && (
+        <PageHeader
+          title="إدارة هويات الوصول"
+          subtitle="تحكم كامل في مصفوفة الصلاحيات وبروتوكولات الأمان للكوادر التشغيلية."
+          badge="الأمان والوصول"
+          icon={ShieldCheck}
+          className={undefined}
+          actions={
+            <Button
+              onClick={() => {
+                resetForm();
+                setIsModalOpen(true);
+              }}
+              className="h-11 px-6 rounded-xl bg-primary text-white font-black shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all flex items-center gap-2"
+            >
+              <Plus size={18} />
+              إصدار هوية وصول جديدة
+            </Button>
+          }
+        />
+      )}
+      {embedded && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border">
+          <div>
+            <h3 className="text-sm font-black text-main flex items-center gap-2">
+              <ShieldCheck size={16} className="text-primary" /> هويات الوصول
+            </h3>
+            <p className="text-[11px] font-bold text-muted mt-1">تحكم في الصلاحيات وحالة الحسابات — يظهر مباشرة في التطبيق</p>
+          </div>
           <Button
             onClick={() => {
               resetForm();
               setIsModalOpen(true);
             }}
-            className="h-11 px-6 rounded-xl bg-primary text-white font-black shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all flex items-center gap-2"
+            className="h-10 rounded-xl px-5 font-black shrink-0"
           >
-            <Plus size={18} />
-            إصدار هوية وصول جديدة
+            <Plus size={16} className="ml-1.5" /> إصدار هوية
           </Button>
-        }
-      />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard

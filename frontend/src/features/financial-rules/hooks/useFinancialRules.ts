@@ -90,16 +90,22 @@ function sanitizeFinancialRules(input = {}) {
 
   return {
     ...merged,
-    taxRate: Math.max(
-      0,
-      Number(merged.taxRate ?? DEFAULT_FINANCIAL_RULES.taxRate) || 0,
+    taxRate: Math.min(
+      100,
+      Math.max(
+        0,
+        Number(merged.taxRate ?? DEFAULT_FINANCIAL_RULES.taxRate) || 0,
+      ),
     ),
-    cashierDiscountLimit: Math.max(
-      0,
-      Number(
-        merged.cashierDiscountLimit ??
-          DEFAULT_FINANCIAL_RULES.cashierDiscountLimit,
-      ) || 0,
+    cashierDiscountLimit: Math.min(
+      100,
+      Math.max(
+        0,
+        Number(
+          merged.cashierDiscountLimit ??
+            DEFAULT_FINANCIAL_RULES.cashierDiscountLimit,
+        ) || 0,
+      ),
     ),
     maxCashDiscrepancyWithoutNote: Math.max(
       0,
@@ -181,6 +187,7 @@ export default function useFinancialRules() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [rules, setRules] = useState(() => readStoredFinancialRules());
+  const [savedRules, setSavedRules] = useState(() => readStoredFinancialRules());
   const [invoices, setInvoices] = useState<AnyRecord[]>([]);
   const [expenses, setExpenses] = useState<AnyRecord[]>([]);
   const [shifts, setShifts] = useState<AnyRecord[]>([]);
@@ -193,11 +200,20 @@ export default function useFinancialRules() {
       if (background) setRefreshing(true);
       else setLoading(true);
 
+      const today = todayKey();
       const [settingsRes, invoicesRes, expensesRes, shiftsRes, auditRes] =
         await Promise.all([
           captureRequest(api.get("/financial-rules")),
-          captureRequest(api.get("/invoices", { params: { limit: 50 } })),
-          captureRequest(api.get("/expenses", { params: { limit: 50 } })),
+          captureRequest(
+            api.get("/invoices", {
+              params: { from_date: today, to_date: today, limit: 500 },
+            }),
+          ),
+          captureRequest(
+            api.get("/expenses", {
+              params: { date_from: today, date_to: today, limit: 500 },
+            }),
+          ),
           captureRequest(api.get("/pos-shifts", { params: { limit: 20 } })),
           captureRequest(
             api.get("/activity-logs", {
@@ -213,6 +229,7 @@ export default function useFinancialRules() {
       if (settingsRes.ok && typeof settingsRes.response?.data === "object") {
         const sanitized = sanitizeFinancialRules(settingsRes.response.data);
         setRules(sanitized);
+        setSavedRules(sanitized);
         localStorage.setItem(
           FINANCIAL_RULES_STORAGE_KEY,
           JSON.stringify(sanitized),
@@ -332,11 +349,21 @@ export default function useFinancialRules() {
     }));
   }
 
+  const isDirty = useMemo(
+    () => JSON.stringify(rules) !== JSON.stringify(savedRules),
+    [rules, savedRules],
+  );
+
+  function discardChanges() {
+    setRules(savedRules);
+  }
+
   async function saveRules() {
     try {
       setSaving(true);
       const sanitizedRules = sanitizeFinancialRules(rules);
       setRules(sanitizedRules);
+      setSavedRules(sanitizedRules);
       await api.put("/financial-rules", sanitizedRules);
       try {
         await api.put("/business-settings", {
@@ -362,6 +389,8 @@ export default function useFinancialRules() {
     } catch (error) {
       console.error("Financial rules save error:", error);
       const sanitizedRules = sanitizeFinancialRules(rules);
+      setRules(sanitizedRules);
+      setSavedRules(sanitizedRules);
       localStorage.setItem(
         FINANCIAL_RULES_STORAGE_KEY,
         JSON.stringify(sanitizedRules),
@@ -408,6 +437,7 @@ export default function useFinancialRules() {
     activeTab,
     setActiveTab,
     rules,
+    isDirty,
     searchTerm,
     setSearchTerm,
     syncStatus,
@@ -415,6 +445,7 @@ export default function useFinancialRules() {
     filteredAuditRows,
     updateRule,
     updatePaymentMethod,
+    discardChanges,
     saveRules,
     exportRules,
     loadData,

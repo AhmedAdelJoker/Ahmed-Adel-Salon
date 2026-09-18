@@ -1,7 +1,7 @@
 from datetime import date
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
@@ -49,15 +49,20 @@ def _waitlist_to_read(db: Session, entry: WaitlistEntry) -> WaitlistEntryRead:
 
 @router.get("", response_model=List[WaitlistEntryRead])
 def list_waitlist_entries(
+    response: Response = None,
     target_date: Optional[date] = None,
     status_filter: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    skip: int = Query(0, ge=0),
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=500),
+    sort: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    query = db.query(WaitlistEntry).order_by(
-        WaitlistEntry.priority.desc(),
-        WaitlistEntry.created_at.asc(),
-    )
+    # Phase 2: was returning ALL entries unbounded
+    query = db.query(WaitlistEntry)
 
     if target_date:
         query = query.filter(WaitlistEntry.preferred_date == target_date)
@@ -67,7 +72,33 @@ def list_waitlist_entries(
     else:
         query = query.filter(WaitlistEntry.status.in_(["waiting", "notified"]))
 
-    return [_waitlist_to_read(db, entry) for entry in query.all()]
+    if sort:
+        sort_field = sort.lstrip("-")
+        desc = sort.startswith("-")
+        column = getattr(WaitlistEntry, sort_field, None)
+        if column is not None:
+            query = query.order_by(column.desc() if desc else column.asc())
+    else:
+        query = query.order_by(
+            WaitlistEntry.priority.desc(),
+            WaitlistEntry.created_at.asc(),
+        )
+
+    eff_offset = offset
+    eff_limit = limit
+    if page is not None and page_size is not None:
+        eff_offset = (page - 1) * page_size
+        eff_limit = page_size
+    elif skip > 0:
+        eff_offset = skip
+
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Page-Size"] = str(eff_limit)
+        if page is not None:
+            response.headers["X-Page"] = str(page)
+    return [_waitlist_to_read(db, entry) for entry in query.offset(eff_offset).limit(eff_limit).all()]
 
 
 @router.post("", response_model=WaitlistEntryRead, status_code=status.HTTP_201_CREATED)

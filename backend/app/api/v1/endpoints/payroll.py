@@ -1,12 +1,12 @@
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from typing import List, Optional
 from datetime import datetime
 
 from app.db.session import get_db
-from app.api.deps import require_owner_or_manager, require_any_staff
+from app.api.deps import require_owner_or_manager, require_any_staff, require_roles
 from app.models.user import User
 from app.models.employee import Employee
 from app.models.payroll_record import PayrollRecord
@@ -21,11 +21,18 @@ router = APIRouter(prefix="/payroll", tags=["Payroll"])
 
 @router.get("", response_model=List[PayrollRead])
 def list_payrolls(
+    response: Response = None,
     db: Session = Depends(get_db),
     month: Optional[int] = None,
     year: Optional[int] = None,
     employee_id: Optional[int] = None,
-    current_user: User = Depends(require_owner_or_manager)
+    # Phase 2: bounded pagination (previously unbounded → catastrophic at scale)
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=500),
+    sort: Optional[str] = Query(None, description="Sort field. '-' prefix for DESC"),
+    current_user: User = Depends(require_owner_or_manager),
 ):
     query = db.query(PayrollRecord)
     if month:
@@ -34,15 +41,70 @@ def list_payrolls(
         query = query.filter(PayrollRecord.period_year == year)
     if employee_id:
         query = query.filter(PayrollRecord.employee_id == employee_id)
-    return query.order_by(PayrollRecord.created_at.desc()).all()
+
+    # Phase 2: explicit sort with sensible default
+    if sort:
+        sort_field = sort.lstrip("-")
+        desc = sort.startswith("-")
+        column = getattr(PayrollRecord, sort_field, None)
+        if column is not None:
+            query = query.order_by(column.desc() if desc else column.asc())
+    else:
+        query = query.order_by(PayrollRecord.created_at.desc())
+
+    # Phase 2: normalize page/page_size → skip/limit
+    eff_skip = skip
+    eff_limit = limit
+    if page is not None and page_size is not None:
+        eff_skip = (page - 1) * page_size
+        eff_limit = page_size
+
+    # Phase 2: count + headers for client-side pagination UIs
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Page-Size"] = str(eff_limit)
+        if page is not None:
+            response.headers["X-Page"] = str(page)
+    return query.offset(eff_skip).limit(eff_limit).all()
 
 
 @router.get("/all", response_model=List[PayrollRead])
 def list_all_payrolls(
+    response: Response = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner_or_manager)
+    # Phase 2: bounded pagination (previously returned ALL rows → catastrophic)
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=500),
+    sort: Optional[str] = Query(None),
+    current_user: User = Depends(require_owner_or_manager),
 ):
-    return db.query(PayrollRecord).order_by(PayrollRecord.created_at.desc()).all()
+    query = db.query(PayrollRecord)
+
+    if sort:
+        sort_field = sort.lstrip("-")
+        desc = sort.startswith("-")
+        column = getattr(PayrollRecord, sort_field, None)
+        if column is not None:
+            query = query.order_by(column.desc() if desc else column.asc())
+    else:
+        query = query.order_by(PayrollRecord.created_at.desc())
+
+    eff_skip = skip
+    eff_limit = limit
+    if page is not None and page_size is not None:
+        eff_skip = (page - 1) * page_size
+        eff_limit = page_size
+
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Page-Size"] = str(eff_limit)
+        if page is not None:
+            response.headers["X-Page"] = str(page)
+    return query.offset(eff_skip).limit(eff_limit).all()
 
 from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
@@ -280,7 +342,7 @@ def pay_payroll(
     payroll_id: int,
     payment_data: Optional[dict] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner_or_manager)
+    current_user: User = Depends(require_roles("owner", "admin")),
 ):
     record = db.query(PayrollRecord).filter(PayrollRecord.id == payroll_id).first()
     if not record:

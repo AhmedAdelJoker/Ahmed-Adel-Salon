@@ -3,7 +3,7 @@ from uuid import uuid4
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -14,6 +14,7 @@ from app.models.expense import Expense
 from app.schemas.expense import ExpenseCreate, ExpenseRead, ExpenseSummary, ExpenseArchiveResponse
 from app.utils.expense_labels import expense_label_ar
 from app.utils.media import process_image_content, get_upload_path
+from app.core.upload_security import validate_image_or_pdf
 from app.crud.core_business import create_cash_transaction
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
@@ -22,6 +23,7 @@ UPLOAD_DIR = get_upload_path("expenses")
 
 @router.get("", response_model=list[ExpenseRead])
 def list_expenses(
+    response: Response = None,
     q: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
@@ -34,6 +36,7 @@ def list_expenses(
     limit: int = Query(100, ge=1, le=200),
     skip: int = Query(0, ge=0),
     page: Optional[int] = Query(None, ge=1),
+    sort: Optional[str] = Query(None, description="Sort field. '-' prefix for DESC"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
@@ -80,13 +83,30 @@ def list_expenses(
             except Exception:
                 pass
 
-    query = query.order_by(Expense.expense_date.desc(), Expense.id.desc())
+    # Phase 2: optional explicit sort (defaults to expense_date DESC)
+    if sort:
+        sort_field = sort.lstrip("-")
+        desc = sort.startswith("-")
+        column = getattr(Expense, sort_field, None)
+        if column is not None:
+            query = query.order_by(column.desc() if desc else column.asc())
+    else:
+        query = query.order_by(Expense.expense_date.desc(), Expense.id.desc())
 
     # Pagination: page overrides skip if provided
+    eff_skip = skip
+    eff_limit = limit
     if page is not None:
-        skip = (page - 1) * limit
+        eff_skip = (page - 1) * eff_limit
 
-    return query.offset(skip).limit(limit).all()
+    # Phase 2: count + headers for client-side pagination UIs
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Page-Size"] = str(eff_limit)
+        if page is not None:
+            response.headers["X-Page"] = str(page)
+    return query.offset(eff_skip).limit(eff_limit).all()
 
 
 @router.get("/archive", response_model=ExpenseArchiveResponse)
@@ -98,6 +118,7 @@ def get_expenses_archive(
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
+    response: Response = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
@@ -140,6 +161,12 @@ def get_expenses_archive(
         .limit(limit)
         .all()
     )
+
+    # Phase 2: also expose X-Total-Count header for consistency
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Page-Size"] = str(limit)
+        response.headers["X-Page"] = str(page)
 
     return {
         "items": items,
@@ -347,9 +374,15 @@ async def upload_invoice_image(
     file: UploadFile = File(...),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    content = await file.read()
-    filename = process_image_content(content, file.filename, UPLOAD_DIR)
-    return {"url": f"/uploads/expenses/{filename}"}
+    """رفع فاتورة مصروف (صورة أو PDF)."""
+    # Phase 3: validate MIME/size/filename before processing
+    content = await validate_image_or_pdf(file, max_size=10 * 1024 * 1024)
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "bin"
+    safe_name = f"{uuid.uuid4().hex}.{ext}"
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    save_path = UPLOAD_DIR / safe_name
+    save_path.write_bytes(content)
+    return {"url": f"/uploads/expenses/{safe_name}"}
 
 
 @router.put("/{expense_id}", response_model=ExpenseRead)

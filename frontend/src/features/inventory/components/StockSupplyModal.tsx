@@ -57,7 +57,6 @@ export function StockSupplyModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-lg rounded-2xl p-0 border-border bg-card shadow-premium"
-        dir="rtl"
       >
         <DialogHeader className="border-b border-border/40 p-4 pb-3 sm:p-5">
           <div className="flex items-center gap-3">

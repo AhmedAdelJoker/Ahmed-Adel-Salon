@@ -212,25 +212,24 @@ export function useCatalogData(searchTerm: string) {
     });
   }, [normalizedSearchTerm, offerRows]);
 
+  const activeRows = useMemo(() => serviceRows.filter((s) => isItemActive(s)), [serviceRows]);
   const serviceSummary = useMemo(
     () => ({
       total: serviceRows.length,
-      active: serviceRows.filter((service) => isItemActive(service)).length,
+      active: activeRows.length,
       categories: new Set(
         serviceRows.map((service) => service.category).filter(Boolean),
       ).size,
       averageMargin:
-        serviceRows.length > 0
-          ? serviceRows.reduce(
-              (sum, service) => sum + pricing.getServiceMargin(service),
-              0,
-            ) / serviceRows.length
+        activeRows.length > 0
+          ? activeRows.reduce((sum, service) => sum + pricing.getServiceMargin(service), 0) /
+            activeRows.length
           : 0,
       lowStock: serviceRows.filter(
         (service) => pricing.getServiceLowStockCount(service) > 0,
       ).length,
     }),
-    [pricing, serviceRows],
+    [pricing, serviceRows, activeRows],
   );
 
   return {

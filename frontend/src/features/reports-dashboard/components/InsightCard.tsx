@@ -15,11 +15,11 @@ export interface InsightCardProps {
 
 export function InsightCard({ icon: Icon, iconColor, title, description, actionLabel, onAction }: InsightCardProps) {
   const colorMap: Record<InsightIconColor, string> = {
-    primary: "text-primary bg-primary/10",
-    success: "text-emerald-600 bg-emerald-500/10",
-    warning: "text-amber-600 bg-amber-500/10",
-    danger: "text-rose-600 bg-rose-500/10",
-    info: "text-blue-600 bg-blue-500/10",
+    primary: "text-primary bg-primary-soft",
+    success: "text-success bg-success-soft",
+    warning: "text-warning bg-warning-soft",
+    danger: "text-danger bg-danger-soft",
+    info: "text-info bg-info-soft",
   };
   return (
     <div className="p-4 rounded-2xl bg-soft/50 border border-border/40 space-y-3">
@@ -37,8 +37,9 @@ export function InsightCard({ icon: Icon, iconColor, title, description, actionL
         size="sm"
         className="w-full justify-start text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5"
         onClick={onAction}
+        aria-label={actionLabel}
       >
-        {actionLabel} <ArrowRight size={12} className="ml-1" />
+        {actionLabel} <ArrowRight size={12} className="ml-1" aria-hidden="true" />
       </Button>
     </div>
   );

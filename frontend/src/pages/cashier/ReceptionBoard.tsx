@@ -278,7 +278,7 @@ export default function ReceptionBoard() {
   };
 
   return (
-    <div className="erp-page-container space-y-6 pb-16 relative" dir="rtl">
+    <div className="erp-page-container space-y-6 pb-16 relative">
       <ReceptionHeader
         connected={connected}
         appointmentsFetching={appointmentsFetching}

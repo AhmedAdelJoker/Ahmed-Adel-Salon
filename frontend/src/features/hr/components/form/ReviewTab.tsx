@@ -31,7 +31,7 @@ export default function ReviewTab({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-3xl border border-border bg-soft/30 p-6 space-y-4">
-                <h4 className="text-[10px] font-black text-muted uppercase tracking-[0.2em] border-b border-border pb-2">
+                <h4 className="text-xs font-black text-muted uppercase tracking-[0.2em] border-b border-border pb-2">
                   الهوية والعمل
                 </h4>
                 <div className="space-y-3">
@@ -47,7 +47,7 @@ export default function ReviewTab({
                     </span>
                     <Badge
                       variant="outline"
-                      className="text-[9px] font-black uppercase"
+                      className="text-xs font-black uppercase"
                     >
                       {isCustomJobTitleValue(formData.jobTitle) && formData.jobTitle
                         ? formData.jobTitle
@@ -66,7 +66,7 @@ export default function ReviewTab({
               </div>
 
               <div className="rounded-3xl border border-border bg-soft/30 p-6 space-y-4">
-                <h4 className="text-[10px] font-black text-muted uppercase tracking-[0.2em] border-b border-border pb-2">
+                <h4 className="text-xs font-black text-muted uppercase tracking-[0.2em] border-b border-border pb-2">
                   الهيكل المالي
                 </h4>
                 <div className="space-y-3">
@@ -74,7 +74,7 @@ export default function ReviewTab({
                     <span className="text-xs font-bold text-muted">
                       الراتب الأساسي:
                     </span>
-                    <span className="text-xs font-black text-emerald-600">
+                    <span className="text-xs font-black text-success">
                       {Number(formData.baseSalary ?? 0).toLocaleString()} ج.م
                     </span>
                   </div>
@@ -100,14 +100,14 @@ export default function ReviewTab({
               {formData.hasLoginAccount && (
                 <div className="md:col-span-2 rounded-3xl border border-accent/20 bg-accent/5 p-6 flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-accent text-white flex items-center justify-center">
+                    <div className="h-12 w-12 shrink-0 rounded-2xl bg-primary-soft text-primary flex items-center justify-center">
                       <ShieldCheck size={24} />
                     </div>
                     <div>
                       <h4 className="text-sm font-black text-main">
                         حساب النظام جاهز
                       </h4>
-                      <p className="text-[10px] font-bold text-muted">
+                      <p className="text-xs font-bold text-muted">
                         اسم المستخدم:{" "}
                         <span className="font-black text-accent">
                           {formData.username}
@@ -115,7 +115,7 @@ export default function ReviewTab({
                       </p>
                     </div>
                   </div>
-                  <Badge className="bg-accent text-white font-black text-[9px] uppercase tracking-widest">
+                  <Badge className="bg-primary-soft text-primary border border-primary/20 font-black text-xs uppercase tracking-widest">
                     {formData.role} ACCESS
                   </Badge>
                 </div>
@@ -126,9 +126,9 @@ export default function ReviewTab({
               ["manager", "accountant", "cashier"].includes(
                 formData.jobTitle ?? "",
               ) && (
-                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 flex items-center gap-4 text-rose-600 animate-pulse">
+                <div className="p-4 rounded-2xl bg-warning-soft border border-warning/20 flex items-start gap-3 text-warning">
                   <ShieldAlert size={20} />
-                  <p className="text-[11px] font-black">
+                  <p className="text-sm font-bold leading-relaxed">
                     تحذير: لا يمكن لهذا الدور العمل بدون حساب نظام. يرجى العودة
                     لخطوة "بوابة النظام".
                   </p>

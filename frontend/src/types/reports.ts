@@ -16,6 +16,10 @@ export interface TrendPoint {
   rev: number;
   exp: number;
   net: number;
+  /** True when this point aggregates several days (ranges > 45 days are bucketed weekly). */
+  isBucket?: boolean;
+  /** Inclusive end date (YYYY-MM-DD) when isBucket is true. */
+  rangeEnd?: string;
 }
 
 export interface ExpenseSlice {

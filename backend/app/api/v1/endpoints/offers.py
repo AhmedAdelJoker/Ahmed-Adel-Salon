@@ -137,7 +137,7 @@ def _prepare_offer_prices(db: Session, payload: OfferCreate | OfferUpdate) -> tu
 def list_offers(
     response: Response,
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
@@ -160,7 +160,7 @@ def list_offers(
 def list_active_offers(
     response: Response,
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):

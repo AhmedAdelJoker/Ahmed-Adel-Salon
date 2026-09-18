@@ -33,19 +33,31 @@ limiter = InMemoryRateLimiter()
 
 
 def _client_identifier(request: Request) -> str:
+    # Prefer direct client IP; only trust proxy headers if request is from localhost/trusted proxy
+    if request.client and request.client.host:
+        # If not from localhost, use direct IP to prevent spoofing
+        if request.client.host not in ("127.0.0.1", "::1", "localhost", "testclient"):
+            return request.client.host
+        # Behind proxy (localhost) — trust forwarded headers
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            first_hop = forwarded_for.split(",")[0].strip()
+            if first_hop:
+                return first_hop
+        real_ip = request.headers.get("x-real-ip")
+        if real_ip:
+            return real_ip.strip()
+        return request.client.host
+
+    # Fallback
     forwarded_for = request.headers.get("x-forwarded-for")
     if forwarded_for:
         first_hop = forwarded_for.split(",")[0].strip()
         if first_hop:
             return first_hop
-
     real_ip = request.headers.get("x-real-ip")
     if real_ip:
         return real_ip.strip()
-
-    if request.client and request.client.host:
-        return request.client.host
-
     return "unknown"
 
 

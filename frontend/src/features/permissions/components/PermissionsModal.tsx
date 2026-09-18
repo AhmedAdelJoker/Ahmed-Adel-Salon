@@ -1,4 +1,4 @@
-import { ShieldCheck, Shield, User, Phone, Lock, Award, Save } from "lucide-react";
+import { Shield, User, Phone, Lock, Award, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -44,7 +44,6 @@ export default function PermissionsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-2xl rounded-[32px] border-border bg-card p-0 shadow-premium overflow-hidden"
-        dir="rtl"
       >
         <DialogHeader className="p-10 pb-6 bg-[#1B1714] relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-[80px] -mr-32 -mt-32" />

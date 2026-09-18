@@ -40,8 +40,8 @@ export default function PoliciesPanel({ settings, updateSetting }: PoliciesPanel
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-      <Card className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-[#171717] xl:col-span-2">
-        <h2 className="mb-5 text-xl font-black text-gray-950 dark:text-gray-50">
+      <Card className="rounded-3xl border border-border bg-card p-6 shadow-sm   xl:col-span-2">
+        <h2 className="mb-5 text-xl font-black text-main">
           سياسات الوصول والحماية
         </h2>
         <div className="space-y-4">
@@ -50,17 +50,17 @@ export default function PoliciesPanel({ settings, updateSetting }: PoliciesPanel
             return (
               <div
                 key={policy.key}
-                className="flex items-center justify-between gap-4 rounded-2xl border border-black/5 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5"
+                className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-soft p-4  dark:bg-card/5"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#6D28D9] shadow-sm dark:bg-black/20 dark:text-[#22D3EE]">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-primary shadow-sm border border-primary/10  ">
                     <Icon size={20} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-black text-gray-950 dark:text-gray-50">
+                    <p className="text-sm font-black text-main">
                       {policy.title}
                     </p>
-                    <p className="mt-1 text-xs font-bold text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs font-bold text-muted">
                       {policy.description}
                     </p>
                   </div>
@@ -77,13 +77,13 @@ export default function PoliciesPanel({ settings, updateSetting }: PoliciesPanel
         </div>
       </Card>
 
-      <Card className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-[#171717]">
-        <h2 className="mb-5 text-xl font-black text-gray-950 dark:text-gray-50">
+      <Card className="rounded-3xl border border-border bg-card p-6 shadow-sm  ">
+        <h2 className="mb-5 text-xl font-black text-main">
           إعدادات الجلسات
         </h2>
         <div className="space-y-5">
           <label className="block space-y-2">
-            <span className="text-xs font-black text-gray-500 dark:text-gray-400">
+            <span className="text-xs font-black text-muted">
               مدة انتهاء الجلسة بالدقائق
             </span>
             <Input
@@ -93,11 +93,11 @@ export default function PoliciesPanel({ settings, updateSetting }: PoliciesPanel
               onChange={(event) =>
                 updateSetting("sessionTimeoutMinutes", Number(event.target.value || 0))
               }
-              className="h-11"
+              className="h-11 bg-soft border-border focus:bg-card"
             />
           </label>
           <label className="block space-y-2">
-            <span className="text-xs font-black text-gray-500 dark:text-gray-400">
+            <span className="text-xs font-black text-muted">
               أقصى محاولات دخول فاشلة
             </span>
             <Input
@@ -107,10 +107,10 @@ export default function PoliciesPanel({ settings, updateSetting }: PoliciesPanel
               onChange={(event) =>
                 updateSetting("maxFailedLoginAttempts", Number(event.target.value || 0))
               }
-              className="h-11"
+              className="h-11 bg-soft border-border focus:bg-card"
             />
           </label>
-          <div className="rounded-2xl bg-amber-50 p-4 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+          <div className="rounded-2xl bg-warning-soft p-4 text-warning border border-warning/20 dark:bg-warning-soft0/10 ">
             <div className="mb-2 flex items-center gap-2">
               <AlertTriangle size={18} />
               <p className="text-sm font-black">تنبيه</p>

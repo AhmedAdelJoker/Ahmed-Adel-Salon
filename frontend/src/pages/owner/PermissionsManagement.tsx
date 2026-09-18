@@ -38,7 +38,7 @@ const PermissionsManagement = () => {
     );
 
   return (
-    <div className="space-y-8 pb-24 erp-page-container" dir="rtl">
+    <div className="space-y-8 pb-24 erp-page-container">
       <ConfirmDialog
         open={!!confirmAction}
         onOpenChange={(open) => !open && setConfirmAction(null)}

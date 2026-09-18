@@ -9,6 +9,7 @@ import {
 import api from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
 import { SocketContext } from "@/context/SocketContext";
+import i18n, { applyDocumentDirection } from "@/i18n";
 
 export type ThemeName = "light" | "dark";
 export type LanguageCode = "ar" | "en";
@@ -217,6 +218,15 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     language: LanguageCode,
   ): Promise<Preferences | null> {
     const nextLanguage: LanguageCode = language === "en" ? "en" : "ar";
+    // Apply immediately (i18next + <html> dir/lang + persisted choice) so the
+    // UI actually switches even before / without the server round-trip.
+    try {
+      localStorage.setItem("language", nextLanguage);
+    } catch {
+      /* storage unavailable (private mode) — non-fatal */
+    }
+    applyDocumentDirection(nextLanguage);
+    void i18n.changeLanguage(nextLanguage).catch(() => undefined);
     const nextPreferences: Preferences = { ...preferences, language: nextLanguage };
     setPreferences(nextPreferences);
     return updatePreferences(nextPreferences);
@@ -231,6 +241,15 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
     applyTheme(preferences.theme);
   }, [preferences.theme]);
+
+  // Keep i18next + <html> dir/lang aligned with prefs (covers server-loaded
+  // language on login / other devices).
+  useEffect(() => {
+    applyDocumentDirection(preferences.language);
+    if ((i18n.language || "").split("-")[0] !== preferences.language) {
+      void i18n.changeLanguage(preferences.language).catch(() => undefined);
+    }
+  }, [preferences.language]);
 
   useEffect(() => {
     if (authLoading) return;

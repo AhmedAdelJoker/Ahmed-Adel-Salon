@@ -34,6 +34,11 @@ const SUB_TABS = [
     label: "التواصل",
     description: "روابط السوشيال التي تظهر في صفحة العميل.",
   },
+  {
+    id: "extras",
+    label: "نصوص إضافية",
+    description: "النصوص الدقيقة للأقسام المتقدمة والختام.",
+  },
 ];
 
 interface UseWebsiteSettingsProps {
@@ -191,8 +196,10 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
       await api.put("/business-settings", settings);
       toast.success("تم حفظ إعدادات الموقع بنجاح");
       onSaved?.();
-    } catch (_err) {
-      toast.error("فشل الحفظ");
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
+      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || "فشل الحفظ — تحقق من البيانات ثم أعد المحاولة";
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -201,6 +208,11 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
   const handleAddPortfolioImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !validateImageSize(file)) return;
+    if ((settings.landingPortfolio?.length || 0) >= 20) {
+      toast.error("الحد الأقصى 20 صورة في المعرض");
+      e.target.value = "";
+      return;
+    }
 
     const formData = new FormData();
     formData.append("file", file);
@@ -218,8 +230,10 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
         landingPortfolio: [...(prev.landingPortfolio || []), newUrl],
       }));
       toast.success("تم إضافة الصورة للمعرض", { id: "upload" });
-    } catch (_err) {
-      toast.error("فشل رفع الصورة", { id: "upload" });
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
+      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || "فشل رفع الصورة";
+      toast.error(msg, { id: "upload" });
     } finally {
       e.target.value = "";
     }
@@ -244,8 +258,10 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
         landingCoverImageUrl: data.url || "",
       }));
       toast.success("تم تحديث صورة الغلاف", { id: "cover-upload" });
-    } catch (_err) {
-      toast.error("فشل رفع صورة الغلاف", { id: "cover-upload" });
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
+      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || "فشل رفع صورة الغلاف";
+      toast.error(msg, { id: "cover-upload" });
     } finally {
       e.target.value = "";
     }

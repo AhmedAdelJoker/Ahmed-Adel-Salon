@@ -58,7 +58,7 @@ const GROUPS = [
 
 export default function ConnectedPages() {
   return (
-    <div className="space-y-8" dir="rtl">
+    <div className="space-y-8">
       <Card className="border-black/10 bg-white/90 dark:border-white/10 dark:bg-[#171717]/90">
         <CardHeader>
           <div className="flex items-center gap-3">

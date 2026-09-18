@@ -96,7 +96,7 @@ const ManagerDashboard = () => {
     );
 
   return (
-    <div className="erp-page space-y-8 pb-12" dir="rtl">
+    <div className="erp-page space-y-8 pb-12">
       <PageHeader
         title="مركز العمليات"
         subtitle="متابعة الأداء الحي وكفاءة الفريق"

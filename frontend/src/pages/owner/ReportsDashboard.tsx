@@ -1,4 +1,4 @@
-import { Activity, LayoutDashboard, Loader2 } from "lucide-react";
+import { Activity, LayoutDashboard, Loader2, ShieldCheck, TrendingUp, Users, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,7 +45,7 @@ export default function ReportsDashboard() {
 
   if (loading && weeklyData.length === 0 && serviceDistribution.length === 0) {
     return (
-      <div className="erp-page space-y-8 pb-8" dir="rtl">
+      <div className="erp-page space-y-8 pb-8" dir="rtl" aria-busy="true" aria-live="polite">
         <PageHeader
           title={`أهلاً بك، ${displayName}`}
           subtitle={scopeLabel}
@@ -54,9 +54,9 @@ export default function ReportsDashboard() {
           actions={undefined}
           className={undefined}
         />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {KPI_CONFIG.map((_, idx) => (
-            <SkeletonCard key={idx} variant="stats" className={undefined} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="جاري تحميل الإحصائيات">
+          {KPI_CONFIG.map((kpi) => (
+            <SkeletonCard key={kpi.key} variant="stats" className={undefined} />
           ))}
         </div>
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3 mt-8">
@@ -77,7 +77,7 @@ export default function ReportsDashboard() {
   }
 
   return (
-    <div className="erp-page space-y-6 pb-8" dir="rtl">
+    <div className="erp-page space-y-6 pb-8" dir="rtl" aria-busy={loading} aria-live="polite">
       <PageHeader
         title={`أهلاً بك، ${displayName}`}
         subtitle={scopeLabel}
@@ -86,7 +86,7 @@ export default function ReportsDashboard() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Select value={period} onValueChange={handlePeriodChange}>
-              <SelectTrigger className="h-10 rounded-xl">
+              <SelectTrigger className="h-10 rounded-xl" aria-label="اختيار الفترة">
                 <SelectValue placeholder="الفترة" />
               </SelectTrigger>
               <SelectContent>
@@ -109,8 +109,8 @@ export default function ReportsDashboard() {
                 {employeeName || `الموظف #${employeeId}`}
               </Badge>
             )}
-            <Button onClick={loadData} variant="outline" className="h-10 rounded-xl" disabled={loading}>
-              <Loader2 className={cn("ml-2 h-4 w-4", loading ? "animate-spin" : "")} />
+            <Button onClick={loadData} variant="outline" className="h-10 rounded-xl" disabled={loading} aria-label="تحديث البيانات">
+              <Loader2 className={cn("ml-2 h-4 w-4", loading ? "animate-spin" : "")} aria-hidden="true" />
               <span className="hidden sm:inline">تحديث</span>
             </Button>
           </div>
@@ -118,9 +118,9 @@ export default function ReportsDashboard() {
         className={undefined}
       />
 
-      {/* Demo Banner */}
+      {/* Demo Banner — توكنز الثيم */}
       {isDemo && !loading && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 px-4 py-3 flex items-center gap-3 text-amber-800 dark:text-amber-200" dir="rtl">
+        <div className="rounded-2xl border border-warning/20 bg-warning-soft px-4 py-3 flex items-center gap-3 text-warning">
           <Activity size={18} className="shrink-0 animate-pulse" />
           <p className="text-xs font-bold">وضع العرض التوضيحي — لا توجد بيانات حقيقية للفترة الحالية. يتم عرض أرقام توضيحية لتوضيح شكل اللوحة.</p>
         </div>
@@ -128,6 +128,35 @@ export default function ReportsDashboard() {
 
       {/* KPI Stats */}
       <KpiStats stats={stats} />
+
+      {/* شريط هوية — انتقال سريع (مرحلة 3) */}
+      <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
+        <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ml-2">
+            <LayoutDashboard size={12} className="text-accent" /> انتقال سريع
+          </span>
+          {[
+            { label: "الموارد البشرية", desc: "الكادر والرواتب", icon: Users, href: "/owner/hr", color: "bg-primary text-white" },
+            { label: "الرواتب", desc: "المستحقات والسلف", icon: Wallet, href: "/owner/payroll", color: "bg-success text-white" },
+            { label: "الأمان", desc: "الصلاحيات والجلسات", icon: ShieldCheck, href: "/owner/security-access", color: "bg-info text-white" },
+            { label: "التشغيل", desc: "التقارير اليومية", icon: TrendingUp, href: "/owner/reports", color: "bg-warning text-white" },
+          ].map((l) => (
+            <button
+              key={l.href}
+              onClick={() => navigate(l.href)}
+              className="inline-flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-right hover:border-accent/20 hover:bg-soft transition-colors group"
+            >
+              <span className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", l.color)}>
+                <l.icon size={14} />
+              </span>
+              <span className="text-right">
+                <span className="block text-xs font-black text-main group-hover:text-accent transition-colors">{l.label}</span>
+                <span className="block text-[10px] font-bold text-muted leading-none">{l.desc}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </PremiumCard>
 
       {/* Main Charts & Insights */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">

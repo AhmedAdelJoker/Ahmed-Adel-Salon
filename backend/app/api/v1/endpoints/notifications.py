@@ -1,7 +1,7 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, Response
 from sqlalchemy.orm import Session
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from app.db.session import get_db
 from app.api.deps import require_any_staff
@@ -51,18 +51,46 @@ manager = ConnectionManager()
 
 @router.get("", response_model=list[NotificationRead])
 def get_notifications(
-    page: int = 1,
-    page_size: int = 20,
+    response: Response = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     unread_only: bool = False,
+    sort: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
+    # Phase 2: legacy skip/limit takes priority if explicitly larger than 0
+    eff_offset = (page - 1) * page_size
+    eff_limit = page_size
+    if skip > 0 or limit != 100:
+        eff_offset = skip
+        eff_limit = limit
+
     query = db.query(Notification).filter(
         Notification.user_id == current_user.id
     )
     if unread_only:
         query = query.filter(Notification.is_read == False)
-    return query.order_by(Notification.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+    # Phase 2: optional sort
+    if sort:
+        sort_field = sort.lstrip("-")
+        desc = sort.startswith("-")
+        column = getattr(Notification, sort_field, None)
+        if column is not None:
+            query = query.order_by(column.desc() if desc else column.asc())
+    else:
+        query = query.order_by(Notification.id.desc())
+
+    # Phase 2: count + headers
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Page-Size"] = str(eff_limit)
+        response.headers["X-Page"] = str(page)
+    return query.offset(eff_offset).limit(eff_limit).all()
 
 
 @router.patch("/{notification_id}/read")

@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Column,
+    Index,
     Integer,
     String,
     Date,
@@ -18,16 +19,20 @@ from app.db.base_class import Base
 
 class Appointment(Base):
     __tablename__ = "appointments"
+    __table_args__ = (
+        Index("ix_appointments_barber_date", "barber_id", "appointment_date"),
+        Index("ix_appointments_barber_date_status", "barber_id", "appointment_date", "status"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
 
-    customer_id = Column(Integer, ForeignKey("customers.customer_id"), nullable=False)
-    barber_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.customer_id"), nullable=False, index=True)
+    barber_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)
 
-    appointment_date = Column(Date, nullable=False)
+    appointment_date = Column(Date, nullable=False, index=True)
     appointment_time = Column(Time, nullable=False)
 
-    status = Column(String(30), nullable=False, default="pending")
+    status = Column(String(30), nullable=False, default="pending", index=True)
     notes = Column(Text, nullable=True)
     cancellation_reason = Column(Text, nullable=True)
 

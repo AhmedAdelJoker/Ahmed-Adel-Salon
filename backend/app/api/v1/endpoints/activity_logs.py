@@ -1,5 +1,5 @@
 from datetime import date
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_cashier_manager_owner
@@ -12,6 +12,7 @@ router = APIRouter(prefix="/activity-logs", tags=["Activity Logs"])
 
 @router.get("", response_model=PaginatedActivityLogsRead)
 def get_activity_logs(
+    response: Response = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=200),
     skip: int | None = Query(default=None),
@@ -41,6 +42,12 @@ def get_activity_logs(
         start_date=start_date,
         end_date=end_date,
     )
+
+    # Phase 2: also expose X-Total-Count header for consistency
+    if response is not None:
+        response.headers["X-Total-Count"] = str(data["total"])
+        response.headers["X-Page-Size"] = str(data["page_size"])
+        response.headers["X-Page"] = str(data["page"])
 
     return {
         "items": [

@@ -118,7 +118,7 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
   );
 
   return (
-    <div className="erp-page-container space-y-8 pb-16" dir="rtl">
+    <div className="erp-page-container space-y-8 pb-16">
       <ConfirmDialog
         open={!!confirmTarget}
         onOpenChange={(open) => !open && setConfirmTarget(null)}

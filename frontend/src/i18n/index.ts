@@ -25,4 +25,20 @@ i18n
     defaultNS: "common",
   });
 
+export function applyDocumentDirection(lng?: string): "rtl" | "ltr" {
+  const lang = (lng || i18n.language || "ar").split("-")[0];
+  const dir = lang === "ar" ? "rtl" : "ltr";
+  if (typeof document !== "undefined") {
+    document.documentElement.dir = dir;
+    document.documentElement.lang = lang;
+  }
+  return dir;
+}
+
+// Keep <html dir/lang> in sync on boot + every language change so layout
+// shells (sidebar/header/drawer) follow the active language instead of a
+// hardcoded dir="rtl".
+applyDocumentDirection();
+i18n.on("languageChanged", (lng) => applyDocumentDirection(lng));
+
 export default i18n;

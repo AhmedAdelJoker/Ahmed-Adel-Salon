@@ -63,11 +63,11 @@ export const JOB_TITLE_BLUEPRINTS: Record<
     summary:
       "المسؤول عن تحقيق الأهداف التشغيلية، قيادة الفريق، واعتماد التقارير الإدارية والخصومات.",
     focus: ["إدارة العمليات", "اعتماد التقارير", "تطوير الفريق"],
-    accent: "bg-indigo-600",
-    colors: { primary: "indigo", secondary: "slate" },
+    accent: "bg-primary",
+    colors: { primary: "primary", secondary: "info" },
     icon: Briefcase,
-    cardBg: "bg-indigo-50/10",
-    badgeClass: "bg-indigo-100/50 text-indigo-700 border-indigo-200",
+    cardBg: "bg-soft",
+    badgeClass: "bg-primary-soft text-primary border-primary/20",
   },
   accountant: {
     eyebrow: "حوكمة مالية",
@@ -75,11 +75,11 @@ export const JOB_TITLE_BLUEPRINTS: Record<
     summary:
       "صلاحية كاملة لمراجعة التدفقات النقدية، تقديم التقارير التحليلية، وتدقيق كشوف الرواتب قبل التنفيذ.",
     focus: ["التدقيق المالي", "تحليل الربحية", "الرقابة النقدية"],
-    accent: "bg-slate-800",
-    colors: { primary: "slate", secondary: "indigo" },
+    accent: "bg-info",
+    colors: { primary: "info", secondary: "primary" },
     icon: Banknote,
-    cardBg: "bg-slate-100/10",
-    badgeClass: "bg-slate-900 text-white border-slate-900",
+    cardBg: "bg-soft",
+    badgeClass: "bg-info-soft text-info border-info/20",
   },
   barber: {
     eyebrow: "هندسة المظهر",
@@ -87,11 +87,11 @@ export const JOB_TITLE_BLUEPRINTS: Record<
     summary:
       "خبير شامل في فنون الحلاقة، تصفيف الشعر، ونحت اللحية بأعلى معايير الإتقان.",
     focus: ["قص وتصفيف الشعر", "نحت اللحية", "علاجات الشعر"],
-    accent: "bg-amber-500",
-    colors: { primary: "amber", secondary: "orange" },
+    accent: "bg-warning",
+    colors: { primary: "warning", secondary: "primary" },
     icon: Scissors,
-    cardBg: "bg-amber-50/10",
-    badgeClass: "bg-amber-100 text-amber-700 border-amber-200",
+    cardBg: "bg-soft",
+    badgeClass: "bg-warning-soft text-warning border-warning/20",
   },
   cashier: {
     eyebrow: "إدارة النقدية",
@@ -99,11 +99,11 @@ export const JOB_TITLE_BLUEPRINTS: Record<
     summary:
       "إدارة عمليات الدفع، إغلاق الورديات، والتأكد من مطابقة المبالغ النقدية.",
     focus: ["نقاط البيع", "تحصيل المدفوعات", "تقفيل الوردية"],
-    accent: "bg-emerald-600",
-    colors: { primary: "emerald", secondary: "teal" },
+    accent: "bg-success",
+    colors: { primary: "success", secondary: "info" },
     icon: Receipt,
-    cardBg: "bg-emerald-50/10",
-    badgeClass: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    cardBg: "bg-soft",
+    badgeClass: "bg-success-soft text-success border-success/20",
   },
   colorist: {
     eyebrow: "فن الألوان",
@@ -111,11 +111,11 @@ export const JOB_TITLE_BLUEPRINTS: Record<
     summary:
       "أخصائي في كيمياء الألوان ومعالجة الشعر التالف بأحدث البروتوكولات الصحية.",
     focus: ["صبغ الشعر", "معالجة البروتين", "كيمياء الألوان"],
-    accent: "bg-purple-600",
-    colors: { primary: "purple", secondary: "pink" },
+    accent: "bg-primary",
+    colors: { primary: "primary", secondary: "info" },
     icon: Sparkles,
-    cardBg: "bg-purple-50/10",
-    badgeClass: "bg-purple-100 text-purple-700 border-purple-200",
+    cardBg: "bg-soft",
+    badgeClass: "bg-primary-soft text-primary border-primary/20",
   },
   esthetician: {
     eyebrow: "صحة البشرة",
@@ -123,11 +123,11 @@ export const JOB_TITLE_BLUEPRINTS: Record<
     summary:
       "تقديم خدمات تنظيف البشرة العميق والترطيب الفاخر باستخدام تقنيات Spa المتقدمة.",
     focus: ["تنظيف البشرة", "أقنعة النضارة", "مساج الوجه"],
-    accent: "bg-emerald-500",
-    colors: { primary: "emerald", secondary: "blue" },
+    accent: "bg-info",
+    colors: { primary: "info", secondary: "success" },
     icon: Sparkles,
-    cardBg: "bg-emerald-50/10",
-    badgeClass: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    cardBg: "bg-soft",
+    badgeClass: "bg-info-soft text-info border-info/20",
   },
   barber_assistant: {
     eyebrow: "إسناد فني",
@@ -135,22 +135,22 @@ export const JOB_TITLE_BLUEPRINTS: Record<
     summary:
       "دعم لوجستي وفني كامل لخبراء الحلاقة، ضمان راحة العميل في منطقة الغسيل والتحضير.",
     focus: ["تحضير العميل", "تقنيات الغسيل", "تنظيم الأدوات"],
-    accent: "bg-emerald-500",
-    colors: { primary: "emerald", secondary: "teal" },
+    accent: "bg-info",
+    colors: { primary: "info", secondary: "success" },
     icon: UserPlus,
-    cardBg: "bg-emerald-50/10",
-    badgeClass: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    cardBg: "bg-soft",
+    badgeClass: "bg-info-soft text-info border-info/20",
   },
   receptionist: {
     eyebrow: "إدارة التجربة",
     title: "سفير الخدمة",
     summary: "نقطة الاتصال الأولى لضمان رحلة عميل سلسة، من الحجز وحتى الوداع.",
     focus: ["لباقة الاستقبال", "إدارة الحجوزات", "تحليل الرضا"],
-    accent: "bg-cyan-500",
-    colors: { primary: "cyan", secondary: "blue" },
+    accent: "bg-info",
+    colors: { primary: "info", secondary: "success" },
     icon: Phone,
-    cardBg: "bg-cyan-50/10",
-    badgeClass: "bg-cyan-100 text-cyan-700 border-cyan-200",
+    cardBg: "bg-soft",
+    badgeClass: "bg-info-soft text-info border-info/20",
   },
   cleaner: {
     eyebrow: "معايير السلامة",
@@ -158,33 +158,33 @@ export const JOB_TITLE_BLUEPRINTS: Record<
     summary:
       "المسؤول عن بيئة العمل المعقمة، سلامة المرافق، والمظهر العام للصالون.",
     focus: ["تعقيم مستمر", "صحة المرافق", "إدارة المستهلكات"],
-    accent: "bg-teal-600",
-    colors: { primary: "gray", secondary: "teal" },
+    accent: "bg-muted",
+    colors: { primary: "muted", secondary: "muted" },
     icon: Trash2,
-    cardBg: "bg-teal-50/10",
-    badgeClass: "bg-teal-100 text-teal-700 border-teal-200",
+    cardBg: "bg-soft",
+    badgeClass: "bg-soft text-muted border-border",
   },
   owner: {
     eyebrow: "القيادة العليا",
     title: "المالك المستثمر",
     summary: "المسؤول عن الرؤية الاستراتيجية وتوسع العلامة التجارية.",
     focus: ["الرؤية الشاملة", "توسع الأعمال", "الرقابة الكلية"],
-    accent: "bg-slate-900",
-    colors: { primary: "slate", secondary: "gray" },
+    accent: "bg-main",
+    colors: { primary: "main", secondary: "muted" },
     icon: Crown,
-    cardBg: "bg-slate-100/10",
-    badgeClass: "bg-slate-900 text-white border-slate-900",
+    cardBg: "bg-soft",
+    badgeClass: "bg-main text-inverse border-main",
   },
   other: {
     eyebrow: "كادر مخصص",
     title: "موظف خاص",
     summary: "مهام إضافية وتخصصات نادرة حسب متطلبات نمو العمل.",
     focus: ["مرونة المهام"],
-    accent: "bg-slate-400",
-    colors: { primary: "slate", secondary: "gray" },
+    accent: "bg-muted/50",
+    colors: { primary: "muted", secondary: "muted" },
     icon: User,
-    cardBg: "bg-slate-50/10",
-    badgeClass: "bg-slate-100 text-slate-600 border-slate-200",
+    cardBg: "bg-soft",
+    badgeClass: "bg-soft text-muted border-border",
   },
 };
 
@@ -264,10 +264,10 @@ export const FORM_TABS = [
 ];
 
 export const FIELD_LABEL_CLASS =
-  "flex items-center gap-2 text-[10px] font-black tracking-widest text-slate-500 uppercase";
+  "flex items-center gap-2 text-[10px] font-black tracking-widest text-muted uppercase";
 export const FIELD_INPUT_CLASS =
-  "h-12 rounded-xl border-slate-200 bg-white/50 px-4 font-bold text-slate-900 shadow-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100";
+  "h-12 rounded-xl border-border bg-soft px-4 font-bold text-main shadow-sm transition-all focus:border-accent focus:bg-card focus:ring-4 focus:ring-accent/10";
 export const FIELD_TEXTAREA_CLASS =
-  "w-full rounded-xl border-slate-200 bg-white/50 p-4 text-sm font-bold text-slate-900 shadow-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100 resize-none";
+  "w-full rounded-xl border-border bg-soft p-4 text-sm font-bold text-main shadow-sm transition-all focus:border-accent focus:bg-card focus:ring-4 focus:ring-accent/10 resize-none";
 export const FIELD_SELECT_CLASS =
-  "h-12 rounded-xl border-slate-200 bg-white/50 px-4 font-bold text-slate-900 shadow-sm focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100";
+  "h-12 rounded-xl border-border bg-soft px-4 font-bold text-main shadow-sm focus:border-accent focus:ring-4 focus:ring-accent/10";

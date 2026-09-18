@@ -17,7 +17,7 @@ export default function SkillsTab({
   return (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="p-6 rounded-[2rem] bg-accent/5 border border-accent/10 flex items-center gap-6">
-              <div className="h-16 w-16 rounded-2xl bg-accent text-white flex items-center justify-center shadow-lg shrink-0">
+              <div className="h-16 w-16 shrink-0 rounded-2xl bg-primary-soft text-primary flex items-center justify-center">
                 <Scissors size={32} />
               </div>
               <div>
@@ -46,7 +46,7 @@ export default function SkillsTab({
                   className={cn(
                     "flex flex-col p-4 rounded-2xl border transition-all text-right group",
                     ((formData.serviceIds as (string | number)[]) ?? []).includes(service.id as string | number)
-                      ? "bg-accent border-accent text-white shadow-lg shadow-accent/20"
+                      ? "bg-primary-soft border-primary/40 text-primary shadow-sm"
                       : "bg-card border-border hover:border-accent/40",
                   )}
                 >
@@ -54,7 +54,7 @@ export default function SkillsTab({
                     className={cn(
                       "text-[13px] font-black",
                       ((formData.serviceIds as (string | number)[]) ?? []).includes(service.id as string | number)
-                        ? "text-white"
+                        ? "text-primary"
                         : "text-main group-hover:text-accent",
                     )}
                   >
@@ -62,7 +62,7 @@ export default function SkillsTab({
                   </div>
                   <div
                     className={cn(
-                      "text-[10px] font-bold mt-1",
+                      "text-xs font-bold mt-1",
                       ((formData.serviceIds as (string | number)[]) ?? []).includes(service.id as string | number)
                         ? "text-white/70"
                         : "text-muted",

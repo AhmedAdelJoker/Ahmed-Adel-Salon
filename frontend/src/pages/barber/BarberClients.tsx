@@ -118,7 +118,7 @@ const BarberClients = () => {
   );
 
   return (
-    <div className="min-h-screen pb-12" dir="rtl">
+    <div className="min-h-screen pb-12">
       <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
         <PageHeader
           title="عملائي"
@@ -241,7 +241,7 @@ const BarberClients = () => {
 
         {/* Add/Edit Modal */}
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogContent className="max-w-lg rounded-2xl" dir="rtl">
+          <DialogContent className="max-w-lg rounded-2xl">
             <DialogHeader>
               <DialogTitle>
                 {isEditing ? "تعديل عميل" : "إضافة عميل جديد"}

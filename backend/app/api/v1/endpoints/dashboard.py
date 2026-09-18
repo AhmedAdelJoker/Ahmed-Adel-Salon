@@ -30,6 +30,19 @@ def _sum_invoice_total(invoices):
     return total
 
 
+def _invoices_revenue_count(db: Session, extra_filters=None):
+    """SQL-side revenue + count (drafts excluded). Scales to 1M+ rows."""
+    q = db.query(
+        sql_func.coalesce(sql_func.sum(Invoice.total_amount), 0),
+        sql_func.count(Invoice.id),
+    ).filter(Invoice.is_draft == False)
+    if extra_filters is not None:
+        for f in extra_filters:
+            q = q.filter(f)
+    total, count = q.one()
+    return float(total or 0), int(count or 0)
+
+
 @router.get("/owner-summary")
 def owner_summary(
     db: Session = Depends(get_db),
@@ -39,9 +52,8 @@ def owner_summary(
     appointments_count = db.query(Appointment).count()
     sessions_count = db.query(ServiceSession).count()
     products_count = db.query(Product).count()
-    # Drafts are not sales: exclude from revenue/count aggregates
-    invoices = db.query(Invoice).filter(Invoice.is_draft == False).all()
-    invoices_count = len(invoices)
+    # Drafts are not sales: exclude from revenue/count aggregates (SQL-side)
+    total_revenue, invoices_count = _invoices_revenue_count(db)
 
     notifications_count = (
         db.query(Notification)
@@ -56,7 +68,7 @@ def owner_summary(
         "productsCount": products_count,
         "invoicesCount": invoices_count,
         "notificationsCount": notifications_count,
-        "totalRevenue": _sum_invoice_total(invoices),
+        "totalRevenue": total_revenue,
     }
 
 
@@ -66,10 +78,10 @@ def manager_summary(
     current_user: User = Depends(require_owner_or_manager),
 ):
     appointments_count = db.query(Appointment).count()
-    sessions = db.query(ServiceSession).all()
+    active_sessions_count = db.query(ServiceSession).filter(ServiceSession.status != "completed").count()
     products_count = db.query(Product).count()
-    # Drafts are not sales: exclude from revenue aggregates
-    invoices = db.query(Invoice).filter(Invoice.is_draft == False).all()
+    # Drafts are not sales: exclude from revenue aggregates (SQL-side)
+    total_revenue, _ = _invoices_revenue_count(db)
 
     notifications_count = (
         db.query(Notification)
@@ -79,10 +91,10 @@ def manager_summary(
 
     return {
         "appointmentsCount": appointments_count,
-        "activeSessionsCount": len([s for s in sessions if s.status != "completed"]),
+        "activeSessionsCount": active_sessions_count,
         "productsCount": products_count,
         "notificationsCount": notifications_count,
-        "totalRevenue": _sum_invoice_total(invoices),
+        "totalRevenue": total_revenue,
     }
 
 
@@ -112,14 +124,10 @@ def cashier_summary(
     if today_appointments > 0:
         cancellation_rate = (today_cancellations / today_appointments) * 100
 
-    # Today's invoices (drafts are not sales)
-    today_invoices = db.query(Invoice).filter(
-        Invoice.created_at >= today_start, Invoice.created_at <= today_end,
-        Invoice.is_draft == False,
-    ).all()
-    
-    # Today's total sales
-    today_sales = _sum_invoice_total(today_invoices)
+    # Today's invoices (drafts are not sales) — SQL-side count + sum
+    today_sales, today_invoices_count = _invoices_revenue_count(
+        db, [Invoice.created_at >= today_start, Invoice.created_at <= today_end]
+    )
     
     # Today's expenses
     today_expenses_result = db.query(sql_func.coalesce(sql_func.sum(Expense.amount), 0)).filter(
@@ -127,15 +135,10 @@ def cashier_summary(
     ).scalar()
     today_expenses = float(today_expenses_result or 0)
 
-    # Low stock count
-    products = db.query(Product).all()
-    low_stock_count = len(
-        [
-            p
-            for p in products
-            if float(p.quantity or 0) <= float(p.min_quantity_alert or 0)
-        ]
-    )
+    # Low stock count — SQL-side (no full-table fetch)
+    low_stock_count = db.query(Product).filter(
+        Product.quantity <= Product.min_quantity_alert
+    ).count()
 
     # Notifications count
     notifications_count = (
@@ -168,7 +171,7 @@ def cashier_summary(
     return {
         "customers_count": customers_count,
         "today_appointments": today_appointments,
-        "invoices_count": len(today_invoices),
+        "invoices_count": today_invoices_count,
         "low_stock_count": low_stock_count,
         "active_notifications": notifications_count,
         "today_sales": float(today_sales),
@@ -195,23 +198,22 @@ def barber_summary(
             "isCheckedIn": False,
         }
 
-    appointments = (
-        db.query(Appointment)
-        .filter(Appointment.barber_id == current_user.barber_id)
-        .all()
+    appointments_count = (
+        db.query(Appointment).filter(Appointment.barber_id == current_user.barber_id).count()
     )
 
-    sessions = (
+    sessions_count = (
+        db.query(ServiceSession).filter(ServiceSession.barber_id == current_user.barber_id).count()
+    )
+    completed_sessions_count = (
         db.query(ServiceSession)
-        .filter(ServiceSession.barber_id == current_user.barber_id)
-        .all()
+        .filter(ServiceSession.barber_id == current_user.barber_id, ServiceSession.status == "completed")
+        .count()
     )
 
     return {
-        "appointmentsCount": len(appointments),
-        "sessionsCount": len(sessions),
-        "completedSessionsCount": len(
-            [s for s in sessions if s.status == "completed"]
-        ),
+        "appointmentsCount": appointments_count,
+        "sessionsCount": sessions_count,
+        "completedSessionsCount": completed_sessions_count,
         "isCheckedIn": True,
     }

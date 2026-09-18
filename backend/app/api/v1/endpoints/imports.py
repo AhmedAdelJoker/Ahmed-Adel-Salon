@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.customer import Customer
 from app.models.product import Product
 from app.services.activity_service import log_activity
+from app.core.upload_security import validate_data_sheet
 
 router = APIRouter(prefix="/imports", tags=["Imports"])
 
@@ -19,14 +20,10 @@ async def import_customers(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    if not file.filename.endswith(('.csv', '.xlsx', '.xls')):
-        raise HTTPException(
-            status_code=400, 
-            detail="ملف غير مدعوم. يرجى رفع ملف CSV أو Excel."
-        )
+    # Phase 3: validate MIME/size/filename (raises 400 on violation)
+    content = await validate_data_sheet(file, max_size=20 * 1024 * 1024)
 
     try:
-        content = await file.read()
         if file.filename.endswith('.csv'):
             df = pd.read_csv(io.BytesIO(content))
         else:
@@ -110,14 +107,10 @@ async def import_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    if not file.filename.endswith(('.csv', '.xlsx', '.xls')):
-        raise HTTPException(
-            status_code=400, 
-            detail="ملف غير مدعوم. يرجى رفع ملف CSV أو Excel."
-        )
+    # Phase 3: validate MIME/size/filename
+    content = await validate_data_sheet(file, max_size=20 * 1024 * 1024)
 
     try:
-        content = await file.read()
         if file.filename.endswith('.csv'):
             df = pd.read_csv(io.BytesIO(content))
         else:

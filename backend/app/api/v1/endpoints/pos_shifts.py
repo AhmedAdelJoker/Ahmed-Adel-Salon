@@ -12,6 +12,12 @@ from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
 from app.models.expense import Expense
 from app.models.business_settings import BusinessSettings
+from app.schemas.pos_shift import (
+    DailySummaryResponse,
+    DailySummaryShiftRead,
+    DailySummaryTotals,
+    DailySummaryUserRead,
+)
 from app.services.pos_shift_service import auto_close_expired_shifts, is_within_working_hours
 
 router = APIRouter(prefix="/pos-shifts", tags=["POS Shifts"])
@@ -183,14 +189,17 @@ def close_shift(
         }
     }
 
-@router.get("/daily-summary")
+@router.get("/daily-summary", response_model=DailySummaryResponse)
 def get_daily_summary(
     date_str: Optional[str] = None, # YYYY-MM-DD
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager)
 ):
     if date_str:
-        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        try:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="صيغة التاريخ غير صحيحة. استخدم YYYY-MM-DD")
     else:
         target_date = datetime.now().date()
         
@@ -212,18 +221,51 @@ def get_daily_summary(
         Invoice.created_at <= end_of_day,
         Invoice.is_draft == False,
     ).all()
+
+    shift_items = []
+    for shift in shifts:
+        if shift.status == "open":
+            # Live sales for open shifts (stored totals are only set on close).
+            # Same linkage as close_shift: invoices by this user since opening.
+            # NOTE: 1s tolerance for the sqlite datetime-precision trap
+            # (see total-balance): opened_at keeps microseconds while
+            # created_at is truncated to the second on read-back.
+            live_invoices = db.query(Invoice).filter(
+                Invoice.created_at >= shift.opened_at - timedelta(seconds=1),
+                Invoice.created_by_user_id == shift.user_id,
+                Invoice.is_draft == False,
+            ).all()
+            sales = sum((inv.total_amount for inv in live_invoices), Decimal("0"))
+            count = len(live_invoices)
+        else:
+            sales = shift.total_sales or Decimal("0")
+            count = shift.invoice_count or 0
+        shift_items.append(
+            DailySummaryShiftRead(
+                id=shift.id,
+                status=shift.status,
+                opened_at=shift.opened_at,
+                closed_at=shift.closed_at,
+                total_sales=sales,
+                invoice_count=count,
+                user=DailySummaryUserRead(
+                    full_name=shift.user.full_name if shift.user else None,
+                    username=shift.user.username if shift.user else None,
+                ),
+            )
+        )
     
-    return {
-        "date": target_date,
-        "shifts": shifts,
-        "expenses": expenses,
-        "summary": {
-            "total_sales": sum(inv.total_amount for inv in invoices),
-            "invoice_count": len(invoices),
-            "total_expenses": sum(Decimal(str(e.amount)) for e in expenses),
-            "shift_count": len(shifts)
-        }
-    }
+    return DailySummaryResponse(
+        date=target_date,
+        shifts=shift_items,
+        expenses=expenses,
+        summary=DailySummaryTotals(
+            total_sales=sum((inv.total_amount for inv in invoices), Decimal("0")),
+            invoice_count=len(invoices),
+            total_expenses=sum((Decimal(str(e.amount)) for e in expenses), Decimal("0")),
+            shift_count=len(shifts),
+        ),
+    )
 
 @router.get("")
 def list_shifts(

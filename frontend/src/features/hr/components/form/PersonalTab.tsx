@@ -46,13 +46,13 @@ export default function PersonalTab({
                       <div className="h-14 w-14 rounded-2xl bg-card border border-border flex items-center justify-center shadow-sm">
                         <ImageIcon size={26} className="text-muted/30" />
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest">أضف صورة</span>
+                      <span className="text-xs font-black uppercase tracking-widest">أضف صورة</span>
                     </div>
                   )}
                   {uploading && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-sm">
                       <div className="h-8 w-8 rounded-full border-2 border-accent/20 border-t-accent animate-spin" />
-                      <span className="text-[9px] font-black text-accent animate-pulse">جاري الرفع...</span>
+                      <span className="text-xs font-black text-accent animate-pulse">جاري الرفع...</span>
                     </div>
                   )}
                 </div>
@@ -67,7 +67,7 @@ export default function PersonalTab({
                       setImagePreview(null);
                       setFormData((p) => ({ ...p, profileImageUrl: "" }));
                     }}
-                    className="absolute -top-2 -left-2 h-8 w-8 rounded-full bg-rose-500 text-white shadow-lg flex items-center justify-center hover:bg-rose-600 transition-colors border-2 border-card"
+                    className="absolute -top-2 -left-2 h-8 w-8 rounded-full bg-danger-soft text-danger shadow-sm flex items-center justify-center hover:bg-danger/15 transition-colors border-2 border-card"
                     title="إزالة الصورة"
                   >
                     <X size={14} strokeWidth={3} />
@@ -81,7 +81,7 @@ export default function PersonalTab({
                 <p className="text-[11px] font-bold text-accent uppercase tracking-widest flex items-center justify-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent" /> {blueprint.title}
                 </p>
-                <p className="text-[10px] font-bold text-muted">يُفضل صورة مربعة 500×500 بصيغة JPG أو PNG</p>
+                <p className="text-xs font-bold text-muted">يُفضل صورة مربعة 500×500 بصيغة JPG أو PNG</p>
               </div>
             </div>
 

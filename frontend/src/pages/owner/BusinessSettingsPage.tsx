@@ -22,10 +22,11 @@ import WebsiteSettingsPanel from "@/pages/owner/WebsiteSettingsPanel";
 import QRCode from "qrcode";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { PremiumCard } from "@/components/shared/PremiumUI";
+import { PremiumCard, PageHeader } from "@/components/shared/PremiumUI";
+import { Badge } from "@/components/ui/badge";
 import { AnimatePresence } from "framer-motion";
 
-export default function BusinessSettingsPage() {
+export default function BusinessSettingsPage({ hideHeader = false }: { hideHeader?: boolean }) {
   const [form, setForm] = useState({
     salon_name: "",
     shop_phone: "",
@@ -244,42 +245,31 @@ export default function BusinessSettingsPage() {
     );
 
   return (
-    <div className="space-y-6" dir="rtl">
-      <PremiumCard className="bg-gradient-to-br from-white to-soft dark:from-slate-900 dark:to-slate-950 border-none">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-black text-main tracking-tight flex items-center gap-3">
-              <Globe className="text-accent" /> الموقع العام والحجز
-            </h2>
-            <p className="text-sm font-bold text-muted">
-              إدارة هويتك الرقمية وتصميم تجربة العميل على الويب.
-            </p>
-          </div>
-          <div className="flex items-center gap-3 bg-white/50 dark:bg-black/20 p-2 rounded-2xl border border-border">
-            <div className="px-4 py-2 text-center">
-              <div className="text-xs font-black text-main">
-                {completedCount}/4
-              </div>
-              <div className="text-[9px] font-bold text-muted uppercase">
-                جاهزية الموقع
-              </div>
+    <div className={hideHeader ? "space-y-6" : "erp-page space-y-6 pb-10"}>
+      {!hideHeader && (
+        <PageHeader
+          title="الموقع العام والحجز"
+          subtitle="إدارة هويتك الرقمية وتصميم تجربة العميل على الويب."
+          badge="الموقع العام"
+          icon={Globe}
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={completedCount === 4 ? "success" : completedCount >= 2 ? "warning" : "secondary"} className="rounded-full h-11 px-4 font-black tabular-nums">
+                {completedCount}/4 جاهزية
+              </Badge>
+              <Button
+                onClick={handlePublish}
+                disabled={publishing || !publication.hasDraftChanges}
+                variant={publication.hasDraftChanges ? "primary" : "outline"}
+                className="h-11 rounded-xl px-6 text-[11px] font-black"
+                loading={publishing}
+              >
+                {publishing ? "جاري النشر..." : publication.hasDraftChanges ? "نشر التعديلات" : "الموقع محدث"}
+              </Button>
             </div>
-            <div className="h-8 w-px bg-border" />
-            <Button
-              onClick={handlePublish}
-              disabled={publishing || !publication.hasDraftChanges}
-              variant={publication.hasDraftChanges ? "primary" : "outline"}
-              className="h-11 rounded-xl px-6 text-[10px] font-black uppercase tracking-widest"
-            >
-              {publishing
-                ? "جاري النشر..."
-                : publication.hasDraftChanges
-                  ? "نشر التعديلات"
-                  : "الموقع محدث"}
-            </Button>
-          </div>
-        </div>
-      </PremiumCard>
+          }
+        />
+      )}
 
       <div className="flex gap-2 p-1.5 bg-soft rounded-2xl border border-border w-fit">
         {MAIN_TABS.map((tab) => (
@@ -307,6 +297,7 @@ export default function BusinessSettingsPage() {
             exit={{ opacity: 0, y: -10 }}
           >
             <WebsiteSettingsPanel
+              embedded
               onSaved={() => setPreviewVersion((v) => v + 1)}
               onChangeDraft={setContentDraft}
             />
@@ -340,7 +331,7 @@ export default function BusinessSettingsPage() {
               }}
             />
 
-            <PremiumCard className="md:col-span-2">
+            <PremiumCard wrapperClassName="md:col-span-2 min-w-0">
               <h4 className="text-xs font-black uppercase tracking-widest mb-4">
                 إعدادات النطاق (Domain)
               </h4>

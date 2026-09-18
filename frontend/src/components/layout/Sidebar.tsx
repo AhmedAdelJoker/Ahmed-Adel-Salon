@@ -200,34 +200,6 @@ const MENU_GROUPS = [
         icon: Package,
         roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN", "ACCOUNTANT"],
       },
-      {
-        key: "inventory-archive",
-        label: "أرشيف المخزن",
-        to: "/inventory/archive",
-        icon: History,
-        roles: ["OWNER", "ADMIN", "MANAGER", "ACCOUNTANT"],
-      },
-      {
-        key: "inventory-bundles",
-        label: "باقات المنتجات",
-        to: "/inventory/bundles",
-        icon: Package,
-        roles: ["OWNER", "ADMIN", "MANAGER"],
-      },
-      {
-        key: "employee-archive",
-        label: "أرشيف الموظفين",
-        to: "/owner/hr/archive",
-        icon: History,
-        roles: ["OWNER", "ADMIN", "MANAGER"],
-      },
-      {
-        key: "customer-archive",
-        label: "أرشيف العملاء",
-        to: "/owner/customers/archive",
-        icon: History,
-        roles: ["OWNER", "ADMIN", "MANAGER"],
-      },
     ],
   },
   {
@@ -490,7 +462,6 @@ export default function Sidebar({
       )}
       onMouseEnter={() => collapsed && setHoverExpanded(true)}
       onMouseLeave={() => setHoverExpanded(false)}
-      dir="rtl"
     >
       {/* Premium Glass Surface */}
       <div className="absolute inset-0 bg-bg-card/95 backdrop-blur-3xl border-l border-border/10 shadow-2xl" />
@@ -640,6 +611,7 @@ export default function Sidebar({
 
           <button
             onClick={() => logout()}
+            aria-label="تسجيل الخروج"
             className={cn(
               "group relative flex h-14 w-full items-center gap-4 rounded-2xl px-5 text-[13px] font-black text-danger/70 hover:text-danger hover:bg-danger/10 transition-all duration-300 overflow-hidden border border-transparent hover:border-danger/20",
               visuallyCollapsed ? "justify-center" : "justify-start",

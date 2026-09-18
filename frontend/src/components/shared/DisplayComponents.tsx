@@ -10,9 +10,23 @@
 // ═══════════════════════════════════════════════════════════════
 
 import React, { type ReactNode } from "react";
-import { cn, formatCurrency as fmtCurrency, formatDate, formatDateTime } from "@/lib/core/utils";
+import {
+  cn,
+  formatCurrency as fmtCurrency,
+  formatDate,
+  formatDateTime,
+} from "@/lib/core/utils";
 
-type Tone = "default" | "muted" | "danger" | "success" | "warning" | "primary" | "info" | "secondary" | "dark";
+type Tone =
+  | "default"
+  | "muted"
+  | "danger"
+  | "success"
+  | "warning"
+  | "primary"
+  | "info"
+  | "secondary"
+  | "dark";
 
 /**
  * DataField
@@ -86,7 +100,11 @@ export function DataField({
           sizes[size],
           tones[tone] || tones.default,
         )}
-        title={typeof valueDisplay === "string" || typeof valueDisplay === "number" ? String(valueDisplay) : undefined}
+        title={
+          typeof valueDisplay === "string" || typeof valueDisplay === "number"
+            ? String(valueDisplay)
+            : undefined
+        }
       >
         {valueDisplay}
       </div>
@@ -122,19 +140,19 @@ export function StatCard({
   value,
   icon: Icon,
   variant = "primary",
-  trend,        // "positive" | "negative" | "neutral"
-  trendValue,   // e.g. "+12%"
-  hint,         // optional small line below the value
+  trend, // "positive" | "negative" | "neutral"
+  trendValue, // e.g. "+12%"
+  hint, // optional small line below the value
   className,
 }: StatCardProps) {
   const variants = {
     primary: "bg-primary-soft/40 text-primary border-primary/20",
     success: "bg-emerald-50/60 text-emerald-700 border-emerald-200/60",
     warning: "bg-amber-50/60 text-amber-700 border-amber-200/60",
-    danger:  "bg-rose-50/60 text-rose-700 border-rose-200/60",
-    info:    "bg-sky-50/60 text-sky-700 border-sky-200/60",
+    danger: "bg-rose-50/60 text-rose-700 border-rose-200/60",
+    info: "bg-sky-50/60 text-sky-700 border-sky-200/60",
     secondary: "bg-soft text-muted border-border",
-    dark:    "bg-slate-900 text-white border-slate-900",
+    dark: "bg-slate-900 text-white border-slate-900",
   };
 
   const trendTone =
@@ -144,12 +162,13 @@ export function StatCard({
         ? "bg-rose-500/10 text-rose-700 border-rose-200"
         : "bg-soft text-muted border-border";
 
-  const valueText = value === null || value === undefined || value === "" ? "—" : value;
+  const valueText =
+    value === null || value === undefined || value === "" ? "—" : value;
 
   return (
     <div
       className={cn(
-        "relative rounded-2xl border shadow-sm p-4 sm:p-5 min-w-0 overflow-hidden h-[110px] flex flex-col justify-between",
+        "relative rounded-2xl border shadow-sm p-4 sm:p-5 min-w-0 overflow-hidden h-27.5 flex flex-col justify-between",
         variants[variant] || variants.primary,
         className,
       )}
@@ -181,7 +200,11 @@ export function StatCard({
           "min-w-0 text-lg sm:text-xl lg:text-2xl font-black tabular-nums truncate leading-tight",
           variant === "dark" ? "text-white" : "text-main",
         )}
-        title={typeof valueText === "string" || typeof valueText === "number" ? String(valueText) : undefined}
+        title={
+          typeof valueText === "string" || typeof valueText === "number"
+            ? String(valueText)
+            : undefined
+        }
       >
         {valueText}
       </div>
@@ -199,7 +222,16 @@ export function StatCard({
  * value is a money amount. Centralises the conversion through
  * `formatCurrency` so dashboards stay consistent.
  */
-export function CurrencyStatCard({ label, value, icon, variant, trend, trendValue, hint, className }: StatCardProps) {
+export function CurrencyStatCard({
+  label,
+  value,
+  icon,
+  variant,
+  trend,
+  trendValue,
+  hint,
+  className,
+}: StatCardProps) {
   return (
     <StatCard
       label={label}
@@ -270,12 +302,18 @@ export function ChartCard({
       <div className="flex items-start justify-between gap-2 mb-3 min-w-0">
         <div className="min-w-0 flex-1">
           {title && (
-            <div className="text-sm font-black text-main truncate" title={typeof title === "string" ? title : undefined}>
+            <div
+              className="text-sm font-black text-main truncate"
+              title={typeof title === "string" ? title : undefined}
+            >
               {title}
             </div>
           )}
           {subtitle && (
-            <div className="text-[11px] font-bold text-muted mt-0.5 line-clamp-2" title={typeof subtitle === "string" ? subtitle : undefined}>
+            <div
+              className="text-[11px] font-bold text-muted mt-0.5 line-clamp-2"
+              title={typeof subtitle === "string" ? subtitle : undefined}
+            >
               {subtitle}
             </div>
           )}
@@ -296,20 +334,34 @@ export function ChartCard({
   );
 }
 
-function ChartEmptyState({ title, hint }: { title?: ReactNode; hint?: ReactNode }) {
+function ChartEmptyState({
+  title,
+  hint,
+}: {
+  title?: ReactNode;
+  hint?: ReactNode;
+}) {
   return (
     <div
       className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted"
       style={{ minHeight: 220 }}
     >
       <div className="h-12 w-12 rounded-2xl bg-soft border border-border flex items-center justify-center">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-40">
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="opacity-40"
+        >
           <path d="M3 3v18h18" />
           <path d="M7 14l4-4 4 4 5-7" />
         </svg>
       </div>
       <p className="text-xs font-black mt-1">{title}</p>
-      <p className="text-[11px] font-bold text-center max-w-[200px]">{hint}</p>
+      <p className="text-[11px] font-bold text-center max-w-50">{hint}</p>
     </div>
   );
 }
@@ -329,7 +381,13 @@ export interface AvatarCircleProps {
   onClick?: () => void;
 }
 
-export function AvatarCircle({ name, imageUrl, size = "lg", className, onClick }: AvatarCircleProps) {
+export function AvatarCircle({
+  name,
+  imageUrl,
+  size = "lg",
+  className,
+  onClick,
+}: AvatarCircleProps) {
   const sizeMap = {
     sm: "h-10 w-10 text-xs",
     md: "h-14 w-14 text-sm",
@@ -352,15 +410,28 @@ export function AvatarCircle({ name, imageUrl, size = "lg", className, onClick }
       className={cn(
         "relative rounded-2xl border-2 border-dashed border-border bg-soft flex items-center justify-center overflow-hidden text-muted shrink-0",
         sizeMap[size] || sizeMap.lg,
-        onClick && "cursor-pointer hover:border-slate-900 hover:text-slate-900 transition-colors",
+        onClick &&
+          "cursor-pointer hover:border-slate-900 hover:text-slate-900 transition-colors",
         className,
       )}
     >
       {imageUrl ? (
-        <img src={imageUrl} alt={name || ""} className="h-full w-full object-cover" />
+        <img
+          src={imageUrl}
+          alt={name || ""}
+          className="h-full w-full object-cover"
+        />
       ) : (
         <div className="flex flex-col items-center gap-0.5 text-muted">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="opacity-60">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="opacity-60"
+          >
             <circle cx="12" cy="8" r="4" />
             <path d="M4 21a8 8 0 0 1 16 0" />
           </svg>
@@ -389,7 +460,12 @@ export interface ProgressBarProps {
   tone?: string;
 }
 
-export function ProgressBar({ value, label, className, tone = "primary" }: ProgressBarProps) {
+export function ProgressBar({
+  value,
+  label,
+  className,
+  tone = "primary",
+}: ProgressBarProps) {
   const safe = Math.max(0, Math.min(100, Number(value) || 0));
   const tones = {
     primary: "bg-slate-900",
@@ -407,7 +483,10 @@ export function ProgressBar({ value, label, className, tone = "primary" }: Progr
       )}
       <div className="h-1.5 w-full rounded-full bg-soft overflow-hidden">
         <div
-          className={cn("h-full rounded-full transition-all", tones[tone] || tones.primary)}
+          className={cn(
+            "h-full rounded-full transition-all",
+            tones[tone] || tones.primary,
+          )}
           style={{ width: `${safe}%` }}
         />
       </div>
@@ -428,7 +507,12 @@ export interface DateTextProps {
   muted?: boolean;
 }
 
-export function DateText({ value, withTime = false, className, muted = false }: DateTextProps) {
+export function DateText({
+  value,
+  withTime = false,
+  className,
+  muted = false,
+}: DateTextProps) {
   const text = withTime ? formatDateTime(value) : formatDate(value);
   return (
     <span
@@ -457,7 +541,12 @@ export interface CurrencyTextProps {
   bold?: boolean;
 }
 
-export function CurrencyText({ value, className, tone = "default", bold = true }: CurrencyTextProps) {
+export function CurrencyText({
+  value,
+  className,
+  tone = "default",
+  bold = true,
+}: CurrencyTextProps) {
   const tones = {
     default: "text-main",
     muted: "text-muted",

@@ -67,7 +67,6 @@ export const EmployeeQuickView = ({ employeeId, open, onOpenChange }: EmployeeQu
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="sm:max-w-[480px] rounded-3xl border border-border shadow-2xl overflow-hidden p-0 bg-card dark:bg-slate-900"
-        dir="rtl"
       >
         <DialogTitle className="sr-only">
           بيانات الموظف: {data?.full_name}

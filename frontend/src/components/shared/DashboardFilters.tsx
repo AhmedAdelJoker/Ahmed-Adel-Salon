@@ -38,7 +38,6 @@ export default function DashboardFilters({
   return (
     <section
       className="card premium-filter-shell rounded-3xl border border-border shadow-soft p-5 sm:p-6"
-      dir="rtl"
     >
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>

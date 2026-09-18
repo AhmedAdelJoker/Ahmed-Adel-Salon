@@ -1,49 +1,27 @@
-import { usePayroll, MONTHS, YEARS, toNumber, formatSignedPct, pctLabel, calculateNetSalary, PeriodChartPanel, StaffSnapshot, PayrollTable, PayrollModals } from "@/features/payroll";
+import { usePayroll, MONTHS, toNumber, formatSignedPct, PeriodChartPanel, StaffSnapshot, PayrollTable, PayrollModals } from "@/features/payroll";
 import exportService from "@/services/exportService";
-import api from "@/services/api";
 import {
-  AlertCircle,
   Archive,
   Banknote,
   FileSpreadsheet,
   MinusCircle,
-  MoreVertical,
   RefreshCw,
-  Pencil,
   Trash2,
   Clock,
-  ShieldCheck,
-  Users,
-  Search,
-  LayoutGrid,
-  List as ListIcon,
-  TrendingDown,
   ArrowUpRight,
   Wallet,
   Building2,
   Printer,
   CheckSquare,
-  Square,
-  ChevronUp,
-  ChevronDown,
   Sparkles,
-  TrendingUp,
   Target,
-  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 import { cn, formatCurrency } from "@/lib/core/utils";
 import { PageHeader, PremiumCard, SkeletonCard } from "@/components/shared/PremiumUI";
 import { CurrencyStatCard, StatCard as DisplayStatCard } from "@/components/shared/DisplayComponents";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { DialogFooter, DialogHeader } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Payroll() {
   const {
@@ -124,7 +102,7 @@ export default function Payroll() {
 
   if (loading && rawRows.length === 0) {
     return (
-      <div className="erp-page-container space-y-6 pb-10" dir="rtl">
+      <div className="erp-page-container space-y-6 pb-10">
         <div className="flex flex-col items-center gap-3 py-10">
           <Sparkles className="h-10 w-10 animate-pulse text-primary" />
           <p className="text-[11px] font-black uppercase tracking-[0.3em] text-muted">جاري تدقيق الرواتب...</p>
@@ -141,7 +119,7 @@ export default function Payroll() {
   }
 
   return (
-    <div className="erp-page-container space-y-6 pb-10" dir="rtl">
+    <div className="erp-page-container space-y-6 pb-10">
       <ConfirmDialog open={!!cancelId} onOpenChange={(o) => !o && setCancelId(null)} title="إلغاء السجل؟" description="سيتم إلغاء هذا القيد من كشف الرواتب." onConfirm={handleCancel} />
 
       <PageHeader

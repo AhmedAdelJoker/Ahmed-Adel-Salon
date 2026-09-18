@@ -52,7 +52,6 @@ export default function FastClientDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="sm:max-w-[850px] p-0 border-none bg-card rounded-[2rem] shadow-premium overflow-hidden"
-        dir="rtl"
       >
         <DialogHeader className="p-6 sm:p-8 pb-5 bg-gradient-to-br from-accent to-accent-strong relative overflow-hidden">
           <div className="absolute top-0 right-0 w-full h-full bg-white/10 blur-[80px] pointer-events-none" />

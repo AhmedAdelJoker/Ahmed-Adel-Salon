@@ -18,13 +18,13 @@ class Customer(Base):
     # Loyalty Fields
     loyalty_points = Column(Numeric(10, 2), nullable=False, default=0)
     lifetime_spend = Column(Numeric(12, 2), nullable=False, default=0)
-    visits_count = Column(Integer, nullable=False, default=0)
+    visits_count = Column(Integer, nullable=False, default=0, index=True)
     current_tier = Column(String(50), nullable=False, default="Bronze") # Bronze, Silver, Gold
     loyalty_points_earned_at = Column(DateTime(timezone=True), nullable=True)  # آخر كسب نقاط — أساس حساب انتهاء الصلاحية
     cancellation_count = Column(Integer, nullable=False, default=0)
     
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    is_deleted = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     deleted_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     archive_reason = Column(String(500), nullable=True)

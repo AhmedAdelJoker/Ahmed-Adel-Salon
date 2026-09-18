@@ -28,6 +28,32 @@ class InventoryLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class InventoryLogWithProductRead(InventoryLogRead):
+    """Inventory log enriched with product display fields (avoids N+1 on the client)."""
+
+    product_name: Optional[str] = None
+    product_category: Optional[str] = None
+    product_unit: Optional[str] = None
+    created_by_name: Optional[str] = None
+    stock_before: Optional[Decimal] = None
+    stock_after: Optional[Decimal] = None
+
+
+class InventoryLogSummary(BaseModel):
+    total: int
+    adds: int
+    removes: int
+    net: Decimal
+
+
+class InventoryLogListResponse(BaseModel):
+    items: list[InventoryLogWithProductRead]
+    total: int
+    page: int
+    page_size: int
+    summary: InventoryLogSummary
+
+
 class ServiceProductCreate(BaseModel):
     product_id: int
     amount_used: Decimal = Field(..., gt=0)

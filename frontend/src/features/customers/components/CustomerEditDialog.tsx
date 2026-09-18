@@ -28,7 +28,7 @@ export default function CustomerEditDialog({
 }) {
   return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="max-w-lg rounded-2xl" dir="rtl">
+          <DialogContent className="max-w-lg rounded-2xl">
             <DialogHeader className="p-5 pb-3 border-b border-border/40">
               <DialogTitle className="text-base font-black flex items-center gap-2">
                 <Edit3 size={16} className="text-primary" /> تعديل بيانات العميل

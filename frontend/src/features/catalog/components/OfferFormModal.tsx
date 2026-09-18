@@ -37,7 +37,6 @@ export default function OfferFormModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           className="sm:max-w-[520px] bg-card border-border"
-          dir="rtl"
         >
           <DialogHeader className="text-right">
             <DialogTitle className="text-xl font-black text-main">

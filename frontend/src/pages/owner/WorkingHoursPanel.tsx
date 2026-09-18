@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   CalendarRange,
   CheckCircle2,
-  Clock,
   Copy,
   RotateCcw,
   Save,
@@ -17,12 +16,18 @@ import { motion } from "framer-motion";
 import { businessSettingsService } from "@/services/businessSettingsService";
 import type { DayConfig } from "@/types/attendance";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { PremiumCard, SkeletonCard } from "@/components/shared/PremiumUI";
+import { PremiumCard, ContentPanel, SkeletonCard } from "@/components/shared/PremiumUI";
 import { StatCard } from "@/components/shared/DisplayComponents";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/core/utils";
 
 const DAYS_AR: Record<string, string> = {
@@ -114,35 +119,47 @@ const normalizeWorkingHours = (rawHours: Record<string, unknown> = {}): Record<D
     return acc;
   }, {} as Record<DayKey, DayConfig>);
 
-const WorkingHoursPanel = () => {
+type WorkingHoursPanelProps = {
+  onDirtyChange?: (dirty: boolean) => void;
+};
+
+const WorkingHoursPanel = ({ onDirtyChange }: WorkingHoursPanelProps) => {
   const [hours, setHours] = useState<Record<DayKey, DayConfig>>(() => normalizeWorkingHours());
   const [initialHours, setInitialHours] = useState<Record<DayKey, DayConfig>>(() => normalizeWorkingHours());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [applySource, setApplySource] = useState<DayKey>("saturday");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const todayKey: DayKey = useMemo(() => JS_DAY_TO_KEY[new Date().getDay()], []);
 
+  const fetchHours = async () => {
+    try {
+      setLoading(true);
+      setLoadError(null);
+      const settings = await businessSettingsService.get();
+      const normalized = normalizeWorkingHours(
+        (settings?.working_hours || settings?.workingHours || {}) as Record<string, unknown>,
+      );
+      setHours(normalized);
+      setInitialHours(normalized);
+    } catch {
+      setLoadError("تعذر تحميل ساعات العمل. تحقق من الاتصال ثم أعد المحاولة.");
+      toast.error("فشل تحميل ساعات العمل");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchHours = async () => {
-      try {
-        setLoading(true);
-        const settings = await businessSettingsService.get();
-        const normalized = normalizeWorkingHours(
-          (settings?.working_hours || settings?.workingHours || {}) as Record<string, unknown>,
-        );
-        setHours(normalized);
-        setInitialHours(normalized);
-      } catch {
-        toast.error("فشل تحميل ساعات العمل");
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchHours();
   }, []);
 
   const isDirty = useMemo(() => JSON.stringify(hours) !== JSON.stringify(initialHours), [hours, initialHours]);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -291,58 +308,22 @@ const WorkingHoursPanel = () => {
     );
   }
 
-  return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300" dir="rtl">
-      {/* Header intro — compact because outer Settings already has PageHeader, but keep context when used standalone */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/10 flex items-center justify-center text-primary">
-              <Clock size={18} />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-main flex items-center gap-2">
-                بروتوكول ساعات التشغيل
-                {isDirty && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[9px] font-black text-amber-700">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                    تعديلات غير محفوظة
-                  </span>
-                )}
-              </h3>
-              <p className="text-[11px] font-bold text-muted mt-0.5">
-                تتحكم هذه المواعيد في الحجز العام، توفر المواعيد، وفتح الورديات. الجمعة مغلق افتراضياً.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleResetAll}
-              disabled={!isDirty || saving}
-              className="h-9 rounded-xl font-black text-[11px] gap-2"
-            >
-              <RotateCcw size={14} /> تراجع
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={!isDirty || hasErrors || saving}
-              className="h-9 rounded-xl font-black text-[11px] gap-2 px-6 shadow-soft"
-            >
-              <Save size={14} /> {saving ? "جاري الحفظ..." : "حفظ المواعيد"}
-            </Button>
-          </div>
+  if (loadError) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 flex flex-col items-center gap-4 text-center">
+          <p className="text-sm font-black text-main">تعذر تحميل بروتوكول التشغيل</p>
+          <p className="text-xs font-bold text-muted max-w-md">{loadError}</p>
+          <Button onClick={fetchHours} className="h-11 rounded-xl px-6 text-xs font-black">
+            <RotateCcw size={14} className="ml-2" /> إعادة المحاولة
+          </Button>
         </div>
-
-        {hasErrors && (
-          <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[11px] font-black text-rose-700">
-            <AlertTriangle size={16} className="shrink-0" />
-            يوجد خطأ في أحد الأيام — راجع الحقول المميزة باللون الأحمر قبل الحفظ.
-          </div>
-        )}
       </div>
+    );
+  }
 
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
       {/* KPI Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -375,8 +356,49 @@ const WorkingHoursPanel = () => {
         />
       </div>
 
-      {/* Visual week strip */}
-      <PremiumCard noPadding hoverable={false} className="overflow-hidden border-border/60" animate={false}>
+      <ContentPanel
+        title="بروتوكول ساعات التشغيل"
+        subtitle="تتحكم هذه المواعيد في الحجز العام، توفر المواعيد، وفتح الورديات. الجمعة مغلق افتراضياً."
+        actions={
+          <div className="flex items-center gap-2">
+            {isDirty && (
+              <Badge variant="warning" className="rounded-full px-3 py-1 text-[10px] font-black">
+                غير محفوظ
+              </Badge>
+            )}
+            {hasErrors && (
+              <Badge variant="danger" className="rounded-full px-3 py-1 text-[10px] font-black">
+                راجع الأخطاء
+              </Badge>
+            )}
+            <Button
+              variant="outline"
+              onClick={handleResetAll}
+              disabled={!isDirty || saving}
+              className="h-9 rounded-xl px-4 text-xs font-black hidden sm:inline-flex"
+            >
+              <RotateCcw size={14} className="ml-1" /> تراجع
+            </Button>
+            <Button
+              onClick={handleSave}
+              loading={saving}
+              disabled={!isDirty || hasErrors}
+              className="h-9 rounded-xl px-5 text-xs font-black"
+            >
+              <Save size={14} className="ml-1" /> حفظ المواعيد
+            </Button>
+          </div>
+        }
+      >
+        {hasErrors && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[11px] font-black text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">
+            <AlertTriangle size={16} className="shrink-0" />
+            يوجد خطأ في أحد الأيام — راجع الحقول المميزة باللون الأحمر قبل الحفظ.
+          </div>
+        )}
+
+        {/* Visual week strip */}
+        <PremiumCard noPadding hoverable={false} className="overflow-hidden border-border/60 mb-6" animate={false}>
         <div className="p-4 sm:p-5">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-[11px] font-black uppercase tracking-widest text-muted flex items-center gap-2">
@@ -440,7 +462,8 @@ const WorkingHoursPanel = () => {
       </PremiumCard>
 
       {/* Presets + apply-to-all */}
-      <Card className="rounded-2xl border-border/60 p-4 flex flex-col gap-4">
+      <PremiumCard noPadding hoverable={false} animate={false} className="overflow-hidden border-border/60 mb-6">
+        <div className="p-4 flex flex-col gap-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-black uppercase tracking-widest text-muted ml-1">قوالب سريعة:</span>
@@ -457,17 +480,18 @@ const WorkingHoursPanel = () => {
           <div className="flex items-center gap-2 w-full lg:w-auto">
             <div className="flex items-center gap-2 flex-1 lg:flex-none bg-soft rounded-xl border border-border p-1">
               <span className="text-[10px] font-black text-muted px-2 whitespace-nowrap">نسخ من</span>
-              <select
-                value={applySource}
-                onChange={(e) => setApplySource(e.target.value as DayKey)}
-                className="h-8 flex-1 rounded-lg border border-border bg-card px-2 text-[11px] font-black text-main outline-none focus:border-primary"
-              >
-                {ORDER.map((d) => (
-                  <option key={d} value={d}>
-                    {DAYS_AR[d]} {hours[d]?.is_open ? `(${hours[d].open_time}-${hours[d].close_time})` : "(مغلق)"}
-                  </option>
-                ))}
-              </select>
+              <Select value={applySource} onValueChange={(v) => setApplySource(v as DayKey)}>
+                <SelectTrigger className="h-8 flex-1 min-w-[160px] rounded-lg bg-card border-border text-[11px] font-black">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ORDER.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      {DAYS_AR[d]} {hours[d]?.is_open ? `(${hours[d].open_time}-${hours[d].close_time})` : "(مغلق)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button
                 variant="primary"
                 size="sm"
@@ -482,10 +506,11 @@ const WorkingHoursPanel = () => {
         <p className="text-[10px] font-bold text-muted leading-relaxed">
           القوالب تكتب فوق المواعيد الحالية فوراً — يمكنك التراجع قبل الحفظ. "تطبيق على الكل" ينسخ حالة يوم واحد (مفتوح/مغلق مع أوقاته) إلى باقي الأسبوع.
         </p>
-      </Card>
+        </div>
+      </PremiumCard>
 
       {/* Days list */}
-      <Card className="rounded-[26px] border border-border bg-card shadow-soft overflow-hidden p-0">
+      <PremiumCard noPadding hoverable={false} animate={false} className="overflow-hidden p-0 mb-6">
         <div className="divide-y divide-border">
           {ORDER.map((day) => {
             const cfg = hours[day] || DEFAULT_DAY_CONFIG;
@@ -628,14 +653,14 @@ const WorkingHoursPanel = () => {
             );
           })}
         </div>
-      </Card>
+      </PremiumCard>
 
       {/* Impact */}
       <div
         className={cn(
           "rounded-2xl border p-4 flex gap-3 transition-colors",
           isDirty
-            ? "border-amber-200 bg-amber-50/80 text-amber-900"
+            ? "border-amber-200 bg-amber-50/80 text-amber-900 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-200"
             : "border-border bg-soft/30 text-muted",
         )}
       >
@@ -659,29 +684,10 @@ const WorkingHoursPanel = () => {
         </div>
       </div>
 
-      {/* Footer actions (sticky-like on mobile) */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:justify-end pt-2">
-        <Button
-          variant="outline"
-          onClick={handleResetAll}
-          disabled={!isDirty || saving}
-          className="h-11 rounded-xl font-black text-[11px] order-2 sm:order-1"
-        >
-          <RotateCcw size={14} className="ml-1" /> إلغاء التعديلات
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={!isDirty || hasErrors || saving}
-          className="h-11 rounded-xl font-black text-[11px] px-10 shadow-soft order-1 sm:order-2"
-        >
-          <Save size={16} className="ml-2" />
-          {saving ? "جاري الحفظ..." : hasErrors ? "راجع الأخطاء أولاً" : "حفظ بروتوكول التشغيل"}
-        </Button>
-      </div>
-
       <p className="text-center text-[10px] font-bold text-muted">
         نصيحة: اجعل الجمعة مغلقاً لتطابق العطلة الرسمية، واستخدم القوالب لتطبيق نفس الدوام بسرعة.
       </p>
+      </ContentPanel>
     </div>
   );
 };

@@ -43,7 +43,7 @@ export function AdjustmentRequestModal({
       open={adjInvoice.open}
       onOpenChange={(open) => setAdjInvoice({ open, data: null })}
     >
-      <DialogContent className="max-w-md" dir="rtl">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-black">
             طلب تعديل مالي

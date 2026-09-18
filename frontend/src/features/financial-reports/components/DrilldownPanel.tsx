@@ -53,7 +53,9 @@ export function DrilldownPanel({
           <div>
             <CardTitle className="text-lg">
               {selectedDay
-                ? `تفاصيل ${selectedDay.date} — ${shortLabel(selectedDay.date)}`
+                ? selectedDay.isBucket && selectedDay.rangeEnd
+                  ? `تفاصيل الفترة ${selectedDay.date} إلى ${selectedDay.rangeEnd} (تجميع أسبوعي)`
+                  : `تفاصيل ${selectedDay.date} — ${shortLabel(selectedDay.date)}`
                 : selectedExpenseCategory
                   ? `تفاصيل البند: ${selectedExpenseCategory.name}`
                   : `تحصيلات: ${selectedPayment ? paymentLabel(selectedPayment.name) : ""}`}

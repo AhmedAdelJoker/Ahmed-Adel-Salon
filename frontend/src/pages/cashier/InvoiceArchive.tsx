@@ -51,7 +51,7 @@ function InvoiceArchive() {
   } = useInvoiceArchive();
 
   return (
-    <div className="min-h-screen" dir="rtl">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-6">
         <PageHeader className={undefined}
           title="الأرشيف الشهري للفواتير"

@@ -32,16 +32,16 @@ export default function SystemTab({
 }) {
   return (
           <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between p-6 rounded-2xl bg-accent text-white shadow-xl shadow-accent/20">
+            <div className="flex flex-wrap items-center justify-between gap-4 p-6 rounded-2xl border border-primary/20 bg-primary-soft text-main">
               <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md">
+                <div className="h-12 w-12 shrink-0 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                   <Fingerprint size={24} />
                 </div>
                 <div>
                   <div className="text-sm font-black uppercase tracking-widest">
                     حساب دخول الموظف
                   </div>
-                  <div className="text-[10px] font-bold opacity-80 uppercase tracking-widest">
+                  <div className="text-xs font-medium text-muted leading-relaxed">
                     تفعيل الصلاحيات التقنية للمنظومة
                   </div>
                 </div>

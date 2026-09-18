@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, Body
 from fastapi.responses import JSONResponse
+from sqlalchemy import or_
 from sqlalchemy.sql import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
@@ -25,28 +26,118 @@ from app.schemas.customer import (
     CustomerArchiveRead,
 )
 from app.services.loyalty_service import sweep_expired_points
+from app.core.pagination import PageParams, paginate
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
 
 
 @router.get("", response_model=list[CustomerRead])
 def list_customers(
-    limit: int = 100,
-    offset: int = 0,
+    response: Response = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
+    # Legacy params (kept for backward compatibility)
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    skip: Optional[int] = Query(None, ge=0),
+    # Modern pagination — Phase 2
+    page: int = Query(1, ge=1, le=10_000, description="1-indexed page"),
+    size: int = Query(25, ge=1, le=500, description="Items per page"),
+    sort: Optional[str] = Query(None, description="Sort field. '-' prefix for DESC"),
+    # Filters
+    q: Optional[str] = Query(None, max_length=100),
+    segment: str = Query("all"),
 ):
+    query = db.query(Customer).filter(Customer.is_deleted == False)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Customer.first_name.ilike(like),
+                Customer.last_name.ilike(like),
+                Customer.phone.ilike(like),
+                Customer.email.ilike(like),
+            )
+        )
+    seg = (segment or "all").lower()
+    if seg == "vip":
+        query = query.filter(Customer.visits_count > 10)
+    elif seg == "regular":
+        query = query.filter(Customer.visits_count.between(2, 10))
+    elif seg == "new":
+        query = query.filter(Customer.visits_count <= 1)
+
+    # Phase 2: use PageParams for consistent envelope, but preserve legacy
+    # `limit`/`offset`/`skip` behavior for callers that still use them.
+    if page > 1 or size != 25:
+        # Modern path — use paginate() helper
+        params = PageParams(page=page, size=size, sort=sort)
+        result = paginate(
+            query, params,
+            sort_columns={
+                "id": Customer.customer_id,
+                "name": Customer.first_name,
+                "created_at": Customer.created_at,
+                "visits_count": Customer.visits_count,
+            },
+        )
+        if sweep_expired_points(db, list(result.items)):
+            db.commit()
+        if response is not None:
+            response.headers["X-Total-Count"] = str(result.total)
+            response.headers["X-Page"] = str(result.page)
+            response.headers["X-Page-Size"] = str(result.size)
+        return list(result.items)
+
+    # Legacy path — preserve original behavior
+    total = query.count()
+    eff_offset = skip if skip is not None else max(offset, 0)
+    eff_limit = max(1, min(limit, 1000))
     customers = (
-        db.query(Customer)
-        .filter(Customer.is_deleted == False)
-        .order_by(Customer.customer_id.desc())
-        .offset(offset)
-        .limit(limit)
+        query.order_by(Customer.customer_id.desc())
+        .offset(eff_offset)
+        .limit(eff_limit)
         .all()
     )
     if sweep_expired_points(db, customers):
         db.commit()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
     return customers
+
+
+@router.get("/stats")
+def customers_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_staff),
+):
+    """Aggregated customer stats (scales: no row fetching)."""
+    base = db.query(Customer).filter(Customer.is_deleted == False)
+    total = base.count()
+    vip_count = base.filter(Customer.visits_count > 10).count()
+    regular_count = base.filter(Customer.visits_count.between(2, 10)).count()
+    new_count = base.filter(Customer.visits_count <= 1).count()
+    avg_spend = base.with_entities(func.avg(Customer.lifetime_spend)).scalar()
+    dup_rows = (
+        db.query(Customer.phone, func.count(Customer.customer_id).label("cnt"))
+        .filter(Customer.is_deleted == False)
+        .filter(Customer.phone.isnot(None))
+        .group_by(Customer.phone)
+        .having(func.count(Customer.customer_id) > 1)
+        .order_by(func.count(Customer.customer_id).desc())
+        .limit(5000)
+        .all()
+    )
+    return {
+        "total": total,
+        "vip_count": vip_count,
+        "regular_count": regular_count,
+        "new_count": new_count,
+        "avg_spend": round(float(avg_spend or 0), 2),
+        "duplicate_group_count": len(dup_rows),
+        "duplicate_customer_count": sum(int(r.cnt) for r in dup_rows),
+        "duplicates_truncated": len(dup_rows) >= 5000,
+    }
 
 
 @router.get("/search", response_model=list[CustomerRead])

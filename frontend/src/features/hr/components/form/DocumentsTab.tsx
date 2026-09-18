@@ -24,7 +24,7 @@ export default function DocumentsTab({
   return (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="p-6 rounded-[2rem] bg-accent/5 border border-accent/10 flex flex-col md:flex-row items-center gap-6">
-              <div className="h-16 w-16 rounded-2xl bg-accent text-white flex items-center justify-center shadow-lg shrink-0">
+              <div className="h-16 w-16 shrink-0 rounded-2xl bg-primary-soft text-primary flex items-center justify-center">
                 <Archive size={32} />
               </div>
               <div className="flex-1 text-center md:text-right">
@@ -107,17 +107,17 @@ export default function DocumentsTab({
                         <div className="flex items-center gap-3 mt-1">
                           <Badge
                             variant="outline"
-                            className="rounded-lg px-2 py-0 text-[8px] font-black uppercase tracking-widest border-border text-muted"
+                            className="rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest border-border text-muted"
                           >
                             {(doc as DocumentRecord).file_type || "OTHER"}
                           </Badge>
                           {doc.expiry_date && (
                             <div
                               className={cn(
-                                "flex items-center gap-1 text-[9px] font-bold",
+                                "flex items-center gap-1 text-xs font-bold",
                                 new Date(doc.expiry_date) < new Date()
-                                  ? "text-rose-500"
-                                  : "text-emerald-600",
+                                  ? "text-danger"
+                                  : "text-success",
                               )}
                             >
                               <Clock size={10} /> ينتهي في:{" "}
@@ -154,7 +154,7 @@ export default function DocumentsTab({
                             }
                           }
                         }}
-                        className="h-10 w-10 rounded-xl text-muted hover:bg-rose-50 hover:text-rose-600"
+                        className="h-10 w-10 rounded-xl text-muted hover:bg-danger-soft hover:text-danger"
                       >
                         <Trash2 size={18} />
                       </Button>

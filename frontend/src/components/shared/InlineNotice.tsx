@@ -17,7 +17,6 @@ export default function InlineNotice({
   return (
     <div
       className={`rounded-2xl border px-4 py-3 text-sm font-bold leading-relaxed ${toneClass} ${className}`}
-      dir="rtl"
       role="status"
     >
       {children}

@@ -12,7 +12,7 @@ import { LOYALTY_LIMITS, useLoyaltySettings } from "@/features/loyalty";
 const labelCls = "text-[10px] font-bold uppercase tracking-wider text-muted";
 const hintCls = "text-[10px] font-medium text-muted";
 
-export default function LoyaltySettingsPanel() {
+export default function LoyaltySettingsPanel({ embedded = false }: { embedded?: boolean }) {
   const {
     settings,
     loading,
@@ -27,7 +27,7 @@ export default function LoyaltySettingsPanel() {
 
   if (loading) {
     return (
-      <div className="space-y-6" dir="rtl">
+      <div className="space-y-6">
         <div className="h-20 animate-pulse rounded-2xl border border-border bg-soft" />
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
           <SkeletonCard variant="content" className="xl:col-span-8" />
@@ -41,25 +41,38 @@ export default function LoyaltySettingsPanel() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4" dir="rtl">
-      <PageHeader
-        title="نظام الولاء"
-        subtitle="تحفيز العودة • نقاط ومستويات"
-        badge="Loyalty"
-        icon={Trophy}
-        actions={
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-2.5">
-            <span className="text-xs font-black text-main">حالة النظام</span>
-            <Switch checked={settings.enabled} onCheckedChange={setEnabled} />
-            <Badge
-              variant={settings.enabled ? "success" : "secondary"}
-              className="rounded-xl px-3 py-1"
-            >
-              {settings.enabled ? "نشط" : "معطل"}
-            </Badge>
+    <div className={`space-y-6 ${embedded ? "" : "animate-in fade-in slide-in-from-bottom-4"}`}>
+      {!embedded ? (
+        <PageHeader
+          title="نظام الولاء"
+          subtitle="تحفيز العودة • نقاط ومستويات"
+          badge="Loyalty"
+          icon={Trophy}
+          actions={
+            <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-2.5">
+              <span className="text-xs font-black text-main">حالة النظام</span>
+              <Switch checked={settings.enabled} onCheckedChange={setEnabled} />
+              <Badge variant={settings.enabled ? "success" : "secondary"} className="rounded-xl px-3 py-1">
+                {settings.enabled ? "نشط" : "معطل"}
+              </Badge>
+            </div>
+          }
+        />
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border">
+          <div>
+            <h3 className="text-sm font-black text-main flex items-center gap-2">
+              <Trophy size={16} className="text-primary" /> نظام الولاء
+            </h3>
+            <p className="text-[11px] font-bold text-muted mt-1">حالة النظام والمستويات • يطبق تلقائياً</p>
           </div>
-        }
-      />
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
+            <span className="text-xs font-black text-main hidden sm:inline">حالة النظام</span>
+            <Switch checked={settings.enabled} onCheckedChange={setEnabled} />
+            <Badge variant={settings.enabled ? "success" : "secondary"} className="rounded-full text-[10px]"> {settings.enabled ? "نشط" : "معطل"} </Badge>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <ContentPanel

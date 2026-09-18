@@ -64,7 +64,6 @@ export default function PublicLayout() {
   return (
     <div
       className="min-h-screen bg-main text-main selection:bg-accent-glow"
-      dir="rtl"
     >
       {/* Navbar */}
       <nav

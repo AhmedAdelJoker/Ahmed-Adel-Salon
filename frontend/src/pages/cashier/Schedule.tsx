@@ -68,7 +68,7 @@ function SchedulePage() {
   } = useSchedule();
 
   return (
-    <div className="erp-page-container space-y-8 pb-16 relative" dir="rtl">
+    <div className="erp-page-container space-y-8 pb-16 relative">
       <PageHeader className={undefined}
         title="مخطط المواعيد الذكي"
         subtitle="إدارة المواعيد اليومية بدقة واحترافية"

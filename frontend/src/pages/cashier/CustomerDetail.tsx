@@ -94,7 +94,7 @@ function CustomerDetailPage() {
 
   if (customerLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Skeleton className="h-20 w-20 rounded-2xl" />
           <Skeleton className="h-4 w-40" />
@@ -105,7 +105,7 @@ function CustomerDetailPage() {
 
   if (customerError || !customer) {
     return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center">
           <AlertCircle size={48} className="text-rose-400" />
           <h3 className="text-lg font-black text-main">العميل غير موجود</h3>
@@ -122,7 +122,7 @@ function CustomerDetailPage() {
   }
 
   return (
-    <div className="min-h-screen pb-12" dir="rtl">
+    <div className="min-h-screen pb-12">
       <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
         <PageHeader className={undefined}
           title={`${customer.first_name} ${customer.last_name || ""}`}

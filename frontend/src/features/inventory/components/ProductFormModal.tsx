@@ -65,7 +65,6 @@ export function ProductFormModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-2xl rounded-2xl p-0 border-border bg-card shadow-premium sm:max-w-3xl sm:rounded-2xl"
-        dir="rtl"
       >
         <DialogHeader className="border-b border-border/40 p-4 pb-3 sm:p-5">
           <div className="flex items-center gap-3">

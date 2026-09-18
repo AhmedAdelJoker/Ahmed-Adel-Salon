@@ -17,10 +17,8 @@ import {
   Banknote,
   CalendarDays,
   Receipt,
-  Scissors,
   Activity,
   FileSpreadsheet,
-  Globe,
   Trophy,
 } from "lucide-react";
 

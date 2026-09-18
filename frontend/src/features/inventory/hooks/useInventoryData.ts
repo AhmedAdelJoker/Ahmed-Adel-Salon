@@ -28,31 +28,89 @@ export interface CategoryTone {
 /**
  * Inventory listing data: fetch (debounced search), tab filtering,
  * derived stats and category list. Extracted from pages/cashier/Inventory.
+ *
+ * Phase 2: backed by server-side pagination — only one page of products
+ * is held in memory at a time. X-Total-Count is read from response headers.
  */
+export const INVENTORY_PAGE_SIZE = 50;
+
 export function useInventoryData() {
-   
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("active");
+  const [page, setPage] = useState(1);
+  const [size] = useState(INVENTORY_PAGE_SIZE);
+  const [totalCount, setTotalCount] = useState(0);
 
   const STATIC_BASE_URL = useMemo(
     () => baseURL.replace("/api/v1", ""),
     [],
   );
 
-  const fetchProducts = useCallback(async (query = "") => {
-    try {
-      setLoading(true);
-      const response = await api.get("/products", { params: { q: query } });
-      setProducts(normalizeListResponse(response).items || []);
-    } catch (err) {
-      toast.error("فشل مزامنة المخزون");
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Phase 2: paginator instance for <Pagination />
+  const paginator = useMemo(
+    () => ({
+      total: 0,
+      page: 1,
+      size: INVENTORY_PAGE_SIZE,
+      setResponse: (response: { headers?: Record<string, unknown> }) => {
+        const h = response.headers ?? {};
+        const raw = h["x-total-count"] ?? h["X-Total-Count"];
+        const n = Number(raw);
+        if (Number.isFinite(n) && n >= 0) {
+          setTotalCount(n);
+          paginator.total = n;
+        }
+        const pRaw = h["x-page"] ?? h["X-Page"];
+        const p = Number(pRaw);
+        if (Number.isFinite(p) && p >= 1) {
+          paginator.page = p;
+        }
+      },
+    }),
+    [],
+  );
+
+  const fetchProducts = useCallback(
+    async (query = "") => {
+      try {
+        setLoading(true);
+        const response = await api.get("/products", {
+          params: { q: query, page, size },
+        });
+        const { items } = normalizeListResponse(response);
+        setProducts(items || []);
+        // Sync total from X-Total-Count header (preferred) or fallback to body
+        const headers = response.headers ?? {};
+        const totalRaw = headers["x-total-count"] ?? headers["X-Total-Count"];
+        const totalNum = Number(totalRaw);
+        if (Number.isFinite(totalNum) && totalNum >= 0) {
+          setTotalCount(totalNum);
+          paginator.total = totalNum;
+          paginator.page = page;
+        } else {
+          // Fallback: assume single-page result, total = items.length
+          setTotalCount(items.length);
+          paginator.total = items.length;
+          paginator.page = 1;
+        }
+      } catch (err) {
+        toast.error("فشل مزامنة المخزون");
+        setProducts([]);
+        setTotalCount(0);
+        paginator.total = 0;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page, size, paginator],
+  );
+
+  // Reset page to 1 whenever the search term changes
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
 
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
@@ -177,5 +235,11 @@ export function useInventoryData() {
     STATIC_BASE_URL,
     getCategoryTone,
     handleExport,
+    // Phase 2: pagination state
+    page,
+    setPage,
+    size,
+    totalCount,
+    paginator,
   };
 }

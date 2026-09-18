@@ -1,4 +1,4 @@
-import { ContentPanel, StatCard } from "@/components/shared/PremiumUI";
+import { StatCard } from "@/components/shared/PremiumUI";
 import { KPI_CONFIG } from "@/features/reports-dashboard/constants";
 import type { DashboardStats } from "@/features/reports-dashboard/constants";
 import { formatStatValue, getTrendVariant } from "@/features/reports-dashboard/utils";
@@ -9,8 +9,7 @@ export interface KpiStatsProps {
 
 export function KpiStats({ stats }: KpiStatsProps) {
   return (
-    <ContentPanel title={undefined} subtitle={undefined} actions={undefined} className={undefined}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {KPI_CONFIG.map((kpi, idx) => {
           const value = stats[kpi.key] ?? 0;
           const rawTrend = stats[kpi.trendKey];
@@ -28,6 +27,5 @@ export function KpiStats({ stats }: KpiStatsProps) {
           return <StatCard key={kpi.key} {...cardProps} />;
         })}
       </div>
-    </ContentPanel>
   );
 }

@@ -97,8 +97,8 @@ export default function EmployeeCardGrid({
                         className=""
                       />
                     </div>
-                    <div className={cn("absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-[3px] border-card shadow-md flex items-center justify-center", statusActive ? "bg-emerald-500" : "bg-rose-500")}>
-                      <div className={cn("h-2 w-2 rounded-full bg-white", statusActive && "animate-pulse")} />
+                    <div className={cn("absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-[3px] border-card shadow-md flex items-center justify-center text-white", statusActive ? "bg-success" : "bg-danger")}>
+                      <div className={cn("h-2 w-2 rounded-full bg-white", statusActive ? "animate-pulse" : "")} />
                     </div>
                   </div>
                   <div className="min-w-0 flex-1 space-y-1.5">
@@ -117,7 +117,7 @@ export default function EmployeeCardGrid({
                       >
                         {isCustomJobTitleValue(emp.jobTitle) && emp.jobTitle ? emp.jobTitle : bp.title}
                       </Badge>
-                      <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black border", statusActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200")}>
+                      <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black border", statusActive ? "bg-success-soft text-success border-success/20" : "bg-danger-soft text-danger border-danger/20")}>
                         {statusActive ? <CheckCircle2 size={10} /> : <XCircle size={10} />} {statusActive ? "نشط" : "معلّق"}
                       </span>
                     </div>
@@ -159,20 +159,20 @@ export default function EmployeeCardGrid({
 
               {/* Stats */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="group/stat rounded-2xl bg-soft border border-border/60 p-3 sm:p-4 hover:border-accent/20 hover:bg-card transition-colors">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center"><Wallet size={14} /></div>
-                    <span className="text-[9px] font-black text-muted uppercase tracking-widest">الراتب الأساسي</span>
+                  <div className="group/stat rounded-2xl bg-soft border border-border/60 p-3 sm:p-4 hover:border-primary/20 hover:bg-card transition-colors">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="h-7 w-7 rounded-lg bg-success-soft text-success flex items-center justify-center"><Wallet size={14} /></div>
+                      <span className="text-[9px] font-black text-muted uppercase tracking-widest">الراتب الأساسي</span>
+                    </div>
+                    <div className="text-[15px] font-black text-main">
+                      {Number(emp.baseSalary).toLocaleString("ar-EG")} <span className="text-[10px] font-bold text-muted">ج.م</span>
+                    </div>
                   </div>
-                  <div className="text-[15px] font-black text-main">
-                    {Number(emp.baseSalary).toLocaleString("ar-EG")} <span className="text-[10px] font-bold text-muted">ج.م</span>
-                  </div>
-                </div>
-                <div className="group/stat rounded-2xl bg-soft border border-border/60 p-3 sm:p-4 hover:border-accent/20 hover:bg-card transition-colors">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center"><TrendingUp size={14} /></div>
-                    <span className="text-[9px] font-black text-muted uppercase tracking-widest">العمولة</span>
-                  </div>
+                  <div className="group/stat rounded-2xl bg-soft border border-border/60 p-3 sm:p-4 hover:border-primary/20 hover:bg-card transition-colors">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="h-7 w-7 rounded-lg bg-warning-soft text-warning flex items-center justify-center"><TrendingUp size={14} /></div>
+                      <span className="text-[9px] font-black text-muted uppercase tracking-widest">العمولة</span>
+                    </div>
                   <div className="text-[15px] font-black text-main">
                     {emp.commissionRate} <span className="text-[10px] font-bold text-muted">%</span>
                   </div>

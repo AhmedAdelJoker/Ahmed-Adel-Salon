@@ -79,7 +79,7 @@ export default function NotificationDrawer() {
   const unreadCount = items.filter((i) => !i.is_read).length;
 
   return (
-    <div className="relative" dir="rtl">
+    <div className="relative">
       <button
         type="button"
         disabled={loading}

@@ -106,7 +106,6 @@ export default function ReadyBookingsForPosPanel({ onSelectBooking }: { onSelect
   return (
     <Card
       className="mb-4 border-cyan-100 bg-cyan-50/50 p-4 shadow-sm dark:border-cyan-400/20 dark:bg-cyan-400/5"
-      dir="rtl"
     >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">

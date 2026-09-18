@@ -100,7 +100,6 @@ const ManagerApprovalModal = () => {
     <Dialog open={showApprovalModal} onOpenChange={setShowApprovalModal}>
       <DialogContent
         className="max-w-md rounded-[2.5rem] border-none p-0 overflow-hidden bg-white dark:bg-slate-900 shadow-3xl"
-        dir="rtl"
       >
         <div className="bg-slate-950 text-white p-8 relative">
           <div className="absolute top-0 left-0 w-full h-full bg-primary/10 blur-3xl opacity-50" />

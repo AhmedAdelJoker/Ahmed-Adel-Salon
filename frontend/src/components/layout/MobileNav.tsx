@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Home, ShoppingBag } from "lucide-react";
+import { Home, ShoppingBag, Briefcase, Wallet, Users as UsersIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/core/utils";
 import { Calendar, Users, Zap } from "lucide-react";
@@ -35,6 +35,24 @@ const MOBILE_LINKS = [
     label: "الحجوزات",
     to: "/bookings",
     roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN", "BARBER"],
+  },
+  {
+    icon: Briefcase,
+    label: "محطتي",
+    to: "/barber/workstation",
+    roles: ["BARBER"],
+  },
+  {
+    icon: Wallet,
+    label: "أرباحي",
+    to: "/barber/earnings",
+    roles: ["BARBER"],
+  },
+  {
+    icon: UsersIcon,
+    label: "عملائي",
+    to: "/barber/clients",
+    roles: ["BARBER"],
   },
   {
     icon: Users,

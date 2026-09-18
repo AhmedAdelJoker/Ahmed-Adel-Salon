@@ -140,7 +140,7 @@ const SmartAlerts = () => {
   };
 
   return (
-    <div className="space-y-6 pb-24 sm:space-y-8" dir="rtl">
+    <div className="space-y-6 pb-24 sm:space-y-8">
       <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-soft sm:h-14 sm:w-14">

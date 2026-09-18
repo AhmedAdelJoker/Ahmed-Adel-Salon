@@ -14,7 +14,7 @@ export default function StaggerGrid<T extends { id?: string | number; key?: stri
   step = 80,
 }: StaggerGridProps<T>) {
   return (
-    <div className={className} dir="rtl">
+    <div className={className}>
       {items.map((item, index) => (
         <FadeIn key={item?.id ?? item?.key ?? index} delay={index * step}>
           {renderItem?.(item, index)}

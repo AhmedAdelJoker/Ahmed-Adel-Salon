@@ -15,6 +15,7 @@ from app.models.user import User
 from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeRead, EmployeeListItem
 from app.utils.media import process_image_content, get_upload_path
 from app.core.security import get_password_hash
+from app.core.upload_security import validate_image
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
@@ -23,15 +24,16 @@ async def upload_employee_image(
     file: UploadFile = File(...),
     current_user: User = Depends(require_owner_or_manager),
 ):
+    # Phase 3: validate MIME/size/filename before processing
+    content = await validate_image(file, max_size=5 * 1024 * 1024)
     upload_dir = get_upload_path("profiles")
-    content = await file.read()
     filename = process_image_content(content, file.filename, upload_dir)
     return {"url": f"/uploads/profiles/{filename}"}
 
 @router.get("", response_model=List[EmployeeListItem])
 def list_employees(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_owner_or_manager),
     job_title: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
 ):
@@ -89,7 +91,7 @@ def list_archived_employees(
 def get_employee(
     employee_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_owner_or_manager),
 ):
     employee = db.query(Employee).options(
         joinedload(Employee.assistant_of), 

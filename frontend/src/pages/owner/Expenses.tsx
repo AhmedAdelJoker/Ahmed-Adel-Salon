@@ -102,7 +102,7 @@ const ExpensesPage = () => {
   } = useExpensesData(isOwner);
 
   return (
-    <div className="erp-page space-y-6 pb-10" dir="rtl">
+    <div className="erp-page space-y-6 pb-10">
       <PageHeader
         title="إدارة المصاريف"
         subtitle="مركز التحكم المالي — تتبع التدفقات النقدية وتكاليف التشغيل لحظياً"
@@ -268,7 +268,7 @@ const ExpensesPage = () => {
       )}
 
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <DialogContent dir="rtl" className="max-w-lg rounded-[2rem] border-0 p-0 overflow-hidden bg-card shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)]">
+        <DialogContent className="max-w-lg rounded-[2rem] border-0 p-0 overflow-hidden bg-card shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)]">
           <ExpenseDetailsPanel
             viewItem={viewItem}
             isOwner={isOwner}
@@ -280,7 +280,7 @@ const ExpensesPage = () => {
       </Dialog>
 
       <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsModalOpen(open); }}>
-        <DialogContent className="max-w-lg rounded-[1.75rem] p-0 overflow-hidden border-border bg-card shadow-premium" dir="rtl" aria-describedby="expense-dialog-desc">
+        <DialogContent className="max-w-lg rounded-[1.75rem] p-0 overflow-hidden border-border bg-card shadow-premium" aria-describedby="expense-dialog-desc">
           <DialogHeader className="p-6 pb-4 border-b border-border/40 bg-gradient-to-br from-slate-50 to-white">
             <DialogTitle className="text-base font-black flex items-center gap-3">
               <span className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center"><Wallet size={16} /></span>

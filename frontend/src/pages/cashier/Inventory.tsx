@@ -35,6 +35,7 @@ import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { formatNumber } from "@/lib/core/utils";
+import { Pagination } from "@/components/shared/Pagination";
 
 export default function Inventory() {
   const navigate = useNavigate();
@@ -55,6 +56,11 @@ export default function Inventory() {
     STATIC_BASE_URL,
     getCategoryTone,
     handleExport,
+    // Phase 2: pagination
+    page,
+    setPage,
+    totalCount,
+    paginator,
   } = useInventoryData();
   const {
     saving,
@@ -98,7 +104,7 @@ export default function Inventory() {
 
   if (loading && filteredProducts.length === 0) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center" dir="rtl">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-primary">
           <Activity className="h-8 w-8 animate-pulse" />
           <p className="text-xs font-bold text-muted">جاري تحميل المخزون...</p>
@@ -108,7 +114,7 @@ export default function Inventory() {
   }
 
   return (
-    <div className="min-h-screen pb-12" dir="rtl">
+    <div className="min-h-screen pb-12">
       <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
         <PageHeader className={undefined}
           title="إدارة المستودع"
@@ -220,6 +226,59 @@ export default function Inventory() {
                   {stats.total}
                 </p>
               </div>
+            </div>
+          </PremiumCard>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 print:hidden">
+          <PremiumCard
+            noPadding
+            className="overflow-hidden border-primary/20 bg-gradient-to-l from-primary-soft via-card to-card"
+          >
+            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-lg shadow-primary/20">
+                <History size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-black text-main sm:text-base">
+                  سجل حركات المخزون
+                </h3>
+                <p className="mt-0.5 text-[11px] font-bold leading-relaxed text-muted sm:text-xs">
+                  كل عمليات التوريد والصرف والتعديلات — بالرصيد قبل وبعد واسم
+                  المنشئ. للمراجعة والتدقيق فقط.
+                </p>
+              </div>
+              <Button
+                onClick={() => navigate("/inventory/archive")}
+                className="h-11 shrink-0 gap-2 rounded-xl px-6 text-xs font-black"
+              >
+                <History size={15} /> فتح سجل الحركات
+              </Button>
+            </div>
+          </PremiumCard>
+
+          <PremiumCard
+            noPadding
+            className="overflow-hidden border-amber-200 bg-gradient-to-l from-amber-50 via-card to-card dark:from-amber-950/20 dark:border-amber-900"
+          >
+            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-500/20">
+                <Gift size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-black text-main sm:text-base">
+                  باقات المنتجات
+                </h3>
+                <p className="mt-0.5 text-[11px] font-bold leading-relaxed text-muted sm:text-xs">
+                  تجميع أصناف في عروض وحزم جاهزة للبيع المباشر.
+                </p>
+              </div>
+              <Button
+                onClick={() => navigate("/inventory/bundles")}
+                className="h-11 shrink-0 gap-2 rounded-xl px-6 text-xs font-black bg-amber-500 hover:bg-amber-600 text-white"
+              >
+                <Gift size={15} /> إدارة الباقات
+              </Button>
             </div>
           </PremiumCard>
         </div>
@@ -461,6 +520,18 @@ export default function Inventory() {
           onSave={handleSave}
           isOwner={isOwner}
         />
+
+        {/* Phase 2: unified pagination — reads X-Total-Count header */}
+        {totalCount > 0 && (
+          <div className="card-surface mt-4 rounded-2xl">
+            <Pagination
+              paginator={paginator}
+              onPageChange={setPage}
+              showSizeChanger={false}
+              locale="ar"
+            />
+          </div>
+        )}
 
         <StockSupplyModal
           open={isStockModalOpen}

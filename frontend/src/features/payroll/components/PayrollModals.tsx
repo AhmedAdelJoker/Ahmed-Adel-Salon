@@ -74,7 +74,7 @@ export default function PayrollModals({
   return (
     <>
       <Dialog open={isEditModalOpen} onOpenChange={(o) => !o && closeEditModal()}>
-        <DialogContent className="max-w-3xl rounded-[1.5rem] p-0 overflow-hidden max-h-[90vh] flex flex-col" dir="rtl">
+        <DialogContent className="max-w-3xl rounded-[1.5rem] p-0 overflow-hidden max-h-[90vh] flex flex-col">
           <DialogHeader className="p-6 bg-slate-900 text-white shrink-0">
             <DialogTitle className="text-xl font-black flex items-center gap-3"><span className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center"><Pencil size={16} /></span> تعديل بنود الراتب</DialogTitle>
             <DialogDescription className="text-white/60 text-xs font-bold">مراجعة يدوية للفترة {String(editingRecord?.period_month)}/{String(editingRecord?.period_year)} • {String(editingRecord?.employee_name_snapshot || "")} • تحقق يمنع صافي سالب</DialogDescription>
@@ -111,7 +111,7 @@ export default function PayrollModals({
       </Dialog>
 
       <Dialog open={isPayModalOpen} onOpenChange={setIsPayModalOpen}>
-        <DialogContent className="max-w-md rounded-[1.5rem] p-0 overflow-hidden" dir="rtl">
+        <DialogContent className="max-w-md rounded-[1.5rem] p-0 overflow-hidden">
           <DialogHeader className="p-6 bg-emerald-600 text-white">
             <DialogTitle className="text-lg font-black flex items-center gap-2"><Banknote size={18} /> صرف المستحقات</DialogTitle>
             <DialogDescription className="text-white/80 text-xs font-bold">سينشئ مصروف رواتب ويخصم من الخزنة</DialogDescription>
@@ -130,7 +130,7 @@ export default function PayrollModals({
       </Dialog>
 
       <Dialog open={isAdvanceModalOpen} onOpenChange={setIsAdvanceModalOpen}>
-        <DialogContent className="max-w-lg rounded-[1.5rem] p-0 overflow-hidden" dir="rtl">
+        <DialogContent className="max-w-lg rounded-[1.5rem] p-0 overflow-hidden">
           <DialogHeader className="p-6 bg-rose-600 text-white">
             <DialogTitle className="text-lg font-black flex items-center gap-2"><MinusCircle size={18} /> تسجيل سلفة</DialogTitle>
             <DialogDescription className="text-white/70 text-xs font-bold">ستُخصم تلقائياً من الراتب القادم</DialogDescription>
@@ -153,7 +153,7 @@ export default function PayrollModals({
       </Dialog>
 
       <Dialog open={isExpectedModalOpen} onOpenChange={setIsExpectedModalOpen}>
-        <DialogContent className="max-w-lg rounded-[1.5rem] p-0 overflow-hidden" dir="rtl">
+        <DialogContent className="max-w-lg rounded-[1.5rem] p-0 overflow-hidden">
           <DialogHeader className="bg-sky-600 p-6 text-white">
             <DialogTitle className="text-lg font-black flex items-center gap-2"><ShieldCheck size={16} /> تحليل الانضباط</DialogTitle>
             <DialogDescription className="text-white/70 text-xs font-bold">تأثير الحضور على الحوافز</DialogDescription>

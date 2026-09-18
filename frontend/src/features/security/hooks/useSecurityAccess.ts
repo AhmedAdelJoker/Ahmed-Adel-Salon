@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
-import { getApiErrorMessage } from "@/lib/core/utils";
 import {
-  DEFAULT_SECURITY_SETTINGS,
   SECURITY_SETTINGS_STORAGE_KEY,
   DEFAULT_SECURITY_SYNC_STATUS,
 } from "../constants";

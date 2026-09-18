@@ -47,7 +47,6 @@ export function UserFormModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           className="max-w-[600px] p-0 overflow-hidden border-none bg-card shadow-premium rounded-[2.5rem]"
-          dir="rtl"
         >
           <div className="px-10 py-8 border-b border-border/40 bg-[#020617] relative overflow-hidden text-white">
             <div className="absolute top-0 right-0 w-full h-full bg-primary/10 blur-[100px] pointer-events-none" />

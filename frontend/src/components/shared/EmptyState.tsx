@@ -24,7 +24,6 @@ export default function EmptyState({
         "empty-state flex flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-border/60 bg-soft/20 py-20 px-10 text-center transition-all hover:bg-soft/40",
         className,
       )}
-      dir="rtl"
     >
       <div className="w-20 h-20 rounded-full bg-card border border-border/40 flex items-center justify-center text-muted shadow-sm mb-8 transition-transform hover:scale-105">
         <Icon size={40} strokeWidth={1} />

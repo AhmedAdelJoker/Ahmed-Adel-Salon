@@ -45,7 +45,6 @@ export class ErrorBoundary extends Component<SharedErrorBoundaryProps, SharedErr
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="flex flex-col items-center justify-center py-24 px-6 text-center"
-          dir="rtl"
         >
           <div className="bg-rose-50 dark:bg-rose-950/20 p-8 rounded-[3rem] border border-rose-200 dark:border-rose-800/30 shadow-lg mb-8">
             <AlertTriangle size={64} className="text-rose-400" />

@@ -6,8 +6,7 @@ import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { adaptList } from "@/services/apiAdapter";
 import { getApiErrorMessage } from "@/lib/core/utils";
-import { invoiceCustomer, invoiceNo, invoiceId, invoiceTotal, invoicePayment, invoiceStatus, isInvoiceEditable } from "@/features/invoices/utils/invoice";
-import { printThermalReceipt } from "@/lib/print/receipt";
+import { invoiceCustomer, invoiceNo, invoiceId, invoiceTotal, invoicePayment, isInvoiceEditable } from "@/features/invoices/utils/invoice";
 
 export function useInvoicesData() {
   const [invoices, setInvoices] = useState<any[]>([]);

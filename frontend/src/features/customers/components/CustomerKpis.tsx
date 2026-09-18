@@ -1,61 +1,37 @@
-/** Customers CustomerKpis (moved from Customers page, no logic changes). */
+/** Customers CustomerKpis — system-wide figures from GET /customers/stats. */
 import { Star, TrendingUp, UserPlus, Users } from "lucide-react";
 import { formatCurrency } from "@/lib/core/utils";
 import CustomerKpi from "@/features/customers/components/CustomerKpi";
+import type { CustomerStats } from "@/features/customers/hooks/useCustomersList";
 
 export default function CustomerKpis({
-  totalCount,
-  customers,
+  stats,
 }: {
-  totalCount: number;
-  customers: any[];
+  stats: CustomerStats;
 }) {
   return (
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <CustomerKpi
           label="إجمالي المنظومة"
-          value={totalCount || ""}
+          value={stats.total || ""}
           icon={Users}
           color="bg-[#6D28D9]"
         />
         <CustomerKpi
           label="نخبة VIP"
-          value={
-            customers.filter(
-              (customer) =>
-                Number(customer.visits_count || customer.visits || 0) > 10,
-            ).length || ""
-          }
+          value={stats.vip_count || ""}
           icon={Star}
           color="bg-amber-500"
         />
         <CustomerKpi
           label="العملاء الجدد"
-          value={
-            customers.filter(
-              (customer) =>
-                Number(customer.visits_count || customer.visits || 0) <= 1,
-            ).length || ""
-          }
+          value={stats.new_count || ""}
           icon={UserPlus}
           color="bg-emerald-600"
         />
         <CustomerKpi
           label="متوسط الإنفاق"
-          value={
-            formatCurrency(
-              customers.length > 0
-                ? customers.reduce(
-                    (sum, c) =>
-                      sum +
-                      Number(
-                        c.lifetime_spend || c.total_spend || c.totalSpend || 0,
-                      ),
-                    0,
-                  ) / customers.length
-                : 0,
-            ) || ""
-          }
+          value={formatCurrency(stats.avg_spend) || ""}
           icon={TrendingUp}
           color="bg-blue-600"
         />

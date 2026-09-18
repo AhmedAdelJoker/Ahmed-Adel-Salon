@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import api from "@/services/api";
 import { toast } from "react-hot-toast";
-import { getApiErrorMessage } from "@/lib/core/utils";
-import { PERMISSION_PAGES, DEFAULT_ROLE_PERMISSIONS } from "../constants";
+import { PERMISSION_PAGES, DEFAULT_ROLE_PERMISSIONS } from "@/features/users/constants";
 
 interface UserFormData {
   username: string;
@@ -126,15 +125,17 @@ export function useUsersData() {
     });
   }, []);
 
-  const filteredUsers = useMemo(
-    () =>
-      users.filter(
-        (u) =>
-          u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (u.full_name && u.full_name.toLowerCase().includes(searchTerm.toLowerCase())),
-      ),
-    [users, searchTerm],
-  );
+  const filteredUsers = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(
+      (u) =>
+        u.username.toLowerCase().includes(q) ||
+        (u.full_name && u.full_name.toLowerCase().includes(q)) ||
+        (u.email && String(u.email).toLowerCase().includes(q)) ||
+        String(u.role || "").toLowerCase().includes(q),
+    );
+  }, [users, searchTerm]);
 
   const stats = useMemo(
     () => ({

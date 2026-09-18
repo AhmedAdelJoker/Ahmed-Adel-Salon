@@ -1,413 +1,758 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
+  Calendar,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Download,
   History,
-  Search,
-  ArrowLeft,
+  Minus,
   Package,
   Plus,
-  Minus,
+  Printer,
+  RefreshCw,
+  RotateCcw,
+  Search,
   Settings,
-  Calendar,
-  User,
-  ExternalLink,
   Eye,
-  FileText,
-  Hash,
-  Clock,
+  Scale,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
-import api from "@/services/api";
-import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
+import api, { baseURL } from "@/services/api";
 import { useNavigate } from "react-router-dom";
-import { cn, formatNumber } from "@/lib/core/utils";
+import { cn, formatDate, formatNumber } from "@/lib/core/utils";
 import EmptyState from "@/components/shared/EmptyState";
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  PageHeader,
+  PremiumCard,
+  SkeletonCard,
+  StatCard,
+} from "@/components/shared/PremiumUI";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useInventoryLogs } from "@/hooks/useApi";
+import {
+  LOG_TYPE_OPTIONS,
+  LogDetailDialog,
+  buildInventoryLogsCsv,
+  downloadCsv,
+  formatTimeOnly,
+  getLogTypeMeta,
+  resolveCreatorName,
+  resolveLogProduct,
+  type InventoryLog,
+  type ProductMap,
+} from "@/features/inventory-archive";
+
+const PAGE_SIZE = 25;
 
 export default function SuppliesArchive() {
-   
-  const [logs, setLogs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("all"); // all, add, remove, adjust
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [page, setPage] = useState(1);
   const navigate = useNavigate();
-   
-  const [selectedLog, setSelectedLog] = useState<any>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-   
-  const [productMap, setProductMap] = useState<Record<string, any>>({});
 
-  const fetchLogs = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/products/logs/all", {
-        params: { limit: 200 },
-      });
-      setLogs(res.data || []);
-    } catch (_err) {
-      toast.error("فشل تحميل سجل التوريدات");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [selectedLog, setSelectedLog] = useState<InventoryLog | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const [productMap, setProductMap] = useState<ProductMap>({});
+
+  const staticBaseUrl = useMemo(() => baseURL.replace("/api/v1", ""), []);
+
+  // Debounce search to avoid a request per keystroke (server-side search)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  const { data, isLoading, isFetching, error, refetch } = useInventoryLogs({
+    ...(filterType !== "all" ? { type: filterType } : {}),
+    ...(debouncedSearch.trim() ? { q: debouncedSearch.trim() } : {}),
+    ...(fromDate ? { from_date: fromDate } : {}),
+    ...(toDate ? { to_date: toDate } : {}),
+    page,
+    page_size: PAGE_SIZE,
+  });
+
+  const rows: InventoryLog[] = data?.items || [];
+  const totalCount: number = Number(data?.total ?? 0);
+  const summary = data?.summary;
+  const totalPages = data ? Math.max(1, Math.ceil(totalCount / PAGE_SIZE)) : 1;
 
   const fetchProductsMap = useCallback(async () => {
     try {
       const res = await api.get("/products", { params: { limit: 1000 } });
       const items = res.data || [];
-       
-      const map: Record<string, any> = {};
+      const map: ProductMap = {};
       (Array.isArray(items) ? items : []).forEach((p) => {
         map[p.id] = p;
       });
       setProductMap(map);
-    } catch (err) {
-      // silent
+    } catch (_err) {
+      // silent — product names fall back to server-enriched fields, images to placeholder
     }
   }, []);
 
   useEffect(() => {
-    fetchLogs();
     fetchProductsMap();
-  }, [fetchLogs, fetchProductsMap]);
+  }, [fetchProductsMap]);
 
-  const openDetail = (log) => {
+  const openDetail = (log: InventoryLog) => {
     setSelectedLog(log);
     setIsDetailOpen(true);
   };
 
-  const filteredLogs = logs.filter((log) => {
-    const matchesSearch = log.note
-      ?.toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesType = filterType === "all" || log.type === filterType;
-    return matchesSearch && matchesType;
-  });
+  const loadFailed = Boolean(error) && rows.length === 0 && !isLoading;
+
+  // Export covers the WHOLE filtered scope (not just the visible page):
+  // pages through the same server filters, capped to protect the browser.
+  const EXPORT_PAGE_SIZE = 200;
+  const EXPORT_MAX_PAGES = 10; // 2000 rows max
+
+  const baseExportParams = {
+    ...(filterType !== "all" ? { type: filterType } : {}),
+    ...(debouncedSearch.trim() ? { q: debouncedSearch.trim() } : {}),
+    ...(fromDate ? { from_date: fromDate } : {}),
+    ...(toDate ? { to_date: toDate } : {}),
+  };
+
+  const handleExport = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const first = await api.get("/products/logs/all", {
+        params: { ...baseExportParams, page: 1, page_size: EXPORT_PAGE_SIZE },
+      });
+      const total = Number(first.data?.total ?? 0);
+      const all: InventoryLog[] = Array.isArray(first.data?.items)
+        ? [...first.data.items]
+        : [];
+      if (total === 0 || all.length === 0) {
+        toast.error("لا توجد بيانات للتصدير في النطاق الحالي");
+        return;
+      }
+      const pages = Math.min(
+        Math.ceil(total / EXPORT_PAGE_SIZE),
+        EXPORT_MAX_PAGES,
+      );
+      for (let p = 2; p <= pages; p += 1) {
+        const res = await api.get("/products/logs/all", {
+          params: { ...baseExportParams, page: p, page_size: EXPORT_PAGE_SIZE },
+        });
+        const items = Array.isArray(res.data?.items) ? res.data.items : [];
+        all.push(...items);
+        if (items.length < EXPORT_PAGE_SIZE) break;
+      }
+      const csv = buildInventoryLogsCsv(all, productMap);
+      downloadCsv(
+        `inventory_logs_${new Date().toISOString().slice(0, 10)}.csv`,
+        csv,
+      );
+      if (total > all.length) {
+        toast.success(
+          `تم تصدير ${formatNumber(all.length)} من ${formatNumber(total)} (الحد الأقصى ${formatNumber(EXPORT_PAGE_SIZE * EXPORT_MAX_PAGES)})`,
+        );
+      } else {
+        toast.success(`تم تصدير ${formatNumber(all.length)} حركة بنجاح`);
+      }
+    } catch (_err) {
+      toast.error("فشل التصدير — تحقق من الاتصال ثم أعد المحاولة");
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, filterType, debouncedSearch, fromDate, toDate, productMap]);
+
+  const handleReset = useCallback(() => {
+    setSearchTerm("");
+    setDebouncedSearch("");
+    setFilterType("all");
+    setFromDate("");
+    setToDate("");
+    setPage(1);
+  }, []);
+
+  const hasActiveFilters =
+    searchTerm.trim() !== "" ||
+    filterType !== "all" ||
+    fromDate !== "" ||
+    toDate !== "";
+
+  const handlePrint = useCallback(() => {
+    window.print();
+  }, []);
+
+  if (isLoading && !data) {
+    return (
+      <div className="erp-page space-y-6 pb-10">
+        <PageHeader
+          title="أرشيف المخزن"
+          subtitle="سجل حركة المخزن والمنتجات المؤرشفة — قراءة فقط"
+          badge="سجل المخزون"
+          icon={History}
+          className={undefined}
+          actions={undefined}
+        />
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
+          <SkeletonCard variant="stats" />
+        </div>
+        <SkeletonCard variant="content" />
+      </div>
+    );
+  }
 
   return (
-    <div className="erp-page-container space-y-8 pb-10" dir="rtl">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
+    <div className="erp-page space-y-6 pb-10">
+      <PageHeader
+        title="أرشيف المخزن"
+        subtitle="سجل حركة المخزن والمنتجات المؤرشفة — قراءة فقط"
+        badge="سجل المخزون"
+        icon={History}
+        className={undefined}
+        actions={
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Button
-              variant="ghost"
-              size="icon"
+              variant="outline"
               onClick={() => navigate("/inventory")}
-              className="rounded-xl border border-border bg-white shadow-sm"
+              className="h-11 rounded-xl px-4 font-black border-border bg-card"
             >
-              <ArrowLeft size={18} />
+              <ChevronRight size={16} className="ml-1.5" /> المستودع
             </Button>
-            <h1 className="text-3xl font-black text-slate-900">
-              أرشيف التوريدات والحركات
-            </h1>
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              loading={exporting}
+              disabled={exporting || totalCount === 0}
+              title={`تصدير كامل النطاق المفلتر (${formatNumber(totalCount)} حركة)`}
+              className="h-11 rounded-xl px-4 font-black border-border bg-card"
+            >
+              <Download size={16} className="ml-1.5" /> تصدير CSV
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handlePrint}
+              className="h-11 rounded-xl px-4 font-black border-border bg-card"
+            >
+              <Printer size={16} className="ml-1.5" /> طباعة / PDF
+            </Button>
+            <Button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="h-11 rounded-xl px-5"
+            >
+              <RefreshCw
+                size={16}
+                className={isFetching ? "ml-1.5 animate-spin" : "ml-1.5"}
+              />
+              تحديث
+            </Button>
           </div>
-          <p className="text-slate-500 font-bold mr-12">
-            سجل تاريخي مفصل لجميع عمليات دخول وخروج الأصناف من المستودع.
-          </p>
-        </div>
+        }
+      />
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <StatCard
+          label="إجمالي الحركات"
+          value={formatNumber(summary?.total || 0)}
+          icon={History}
+          variant="primary"
+          delay={0}
+        />
+        <StatCard
+          label="عمليات توريد"
+          value={formatNumber(summary?.adds || 0)}
+          icon={Plus}
+          variant="success"
+          delay={0.05}
+        />
+        <StatCard
+          label="عمليات صرف"
+          value={formatNumber(summary?.removes || 0)}
+          icon={Minus}
+          variant="danger"
+          delay={0.1}
+        />
+        <StatCard
+          label="صافي الكمية"
+          value={`${Number(summary?.net || 0) > 0 ? "+" : ""}${formatNumber(Number(summary?.net || 0))}`}
+          icon={Scale}
+          variant="info"
+          delay={0.15}
+        />
       </div>
 
-      <Card className="rounded-[2rem] border border-border shadow-soft overflow-hidden">
-        <CardContent className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="relative col-span-1 md:col-span-2">
-              <Search
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
-                size={18}
-              />
+      {/* Filters */}
+      <PremiumCard className="p-4 sm:p-5 print:hidden">
+        <div className="flex items-center gap-2 mb-3">
+          <CalendarDays size={14} className="text-primary" />
+          <span className="text-xs font-black text-muted uppercase tracking-widest">
+            نطاق السجل والبحث
+          </span>
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleReset}
+              className="mr-auto h-8 gap-1 rounded-xl text-xs font-black"
+            >
+              <RotateCcw size={12} /> إعادة ضبط
+            </Button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[1.5fr_1fr_1fr_1fr_auto]">
+          <div className="space-y-1.5">
+            <label htmlFor="inv-archive-search" className="text-[10px] font-black text-muted uppercase">
+              بحث في السجل
+            </label>
+            <div className="relative">
+              <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
               <Input
+                id="inv-archive-search"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="ابحث في ملاحظات الحركة..."
-                className="h-12 rounded-2xl pr-11 font-bold"
+                placeholder="ابحث باسم الصنف أو الملاحظة أو رقم الحركة..."
+                aria-label="بحث في سجل المخزون"
+                className="h-11 pr-10 rounded-xl bg-soft border-border font-bold"
               />
             </div>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="h-12 rounded-2xl border border-border bg-soft px-4 text-sm font-bold text-main outline-none focus:border-accent"
-            >
-              <option value="all">كل الحركات</option>
-              <option value="add">عمليات التوريد (إضافة)</option>
-              <option value="remove">عمليات الصرف (سحب)</option>
-              <option value="adjust">تعديلات المخزون</option>
-            </select>
-            <Button
-              onClick={fetchLogs}
-              variant="outline"
-              className="h-12 rounded-2xl font-black"
-            >
-              تحديث البيانات
-            </Button>
           </div>
-
-          {loading ? (
-            <div className="py-20 flex flex-col items-center gap-4">
-              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-slate-500 font-bold">جاري مراجعة الأرشيف...</p>
-            </div>
-          ) : filteredLogs.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-right border-separate border-spacing-y-3">
-                <thead>
-                  <tr className="text-slate-400 text-xs font-black uppercase tracking-widest">
-                    <th className="px-4 py-2">النوع</th>
-                    <th className="px-4 py-2">التفاصيل / الملاحظات</th>
-                    <th className="px-4 py-2 text-center">الكمية</th>
-                    <th className="px-4 py-2">التاريخ</th>
-                    <th className="px-4 py-2 text-center">الحالة</th>
-                    <th className="px-4 py-2 text-left">عرض</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLogs.map((log) => (
-                    <tr
-                      key={log.id}
-                      className="bg-white group hover:bg-slate-50/50 transition-colors"
-                    >
-                      <td className="px-4 py-4 first:rounded-r-2xl border-y border-r border-border/60">
-                        <div
-                          className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center",
-                            log.type === "add"
-                              ? "bg-emerald-50 text-emerald-600"
-                              : log.type === "remove"
-                                ? "bg-rose-50 text-rose-600"
-                                : "bg-sky-50 text-sky-600",
-                          )}
-                        >
-                          {log.type === "add" ? (
-                            <Plus size={18} />
-                          ) : log.type === "remove" ? (
-                            <Minus size={18} />
-                          ) : (
-                            <Settings size={18} />
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 border-y border-border/60">
-                        <div className="space-y-1">
-                          <div className="text-sm font-black text-slate-900">
-                            {log.note || "حركة مخزنية"}
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
-                            <Package size={12} /> معرف الصنف: #{log.product_id}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 border-y border-border/60 text-center">
-                        <div
-                          className={cn(
-                            "text-lg font-black",
-                            log.change_amount > 0
-                              ? "text-emerald-600"
-                              : log.change_amount < 0
-                                ? "text-rose-600"
-                                : "text-slate-600",
-                          )}
-                        >
-                          {log.change_amount > 0 ? "+" : ""}
-                          {formatNumber(log.change_amount)}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 border-y border-border/60">
-                        <div className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                          <Calendar size={12} className="text-slate-300" />
-                          {new Date(log.created_at).toLocaleDateString("ar-EG")}
-                        </div>
-                        <div className="text-[10px] font-bold text-slate-400 mt-1">
-                          {new Date(log.created_at).toLocaleTimeString(
-                            "ar-EG",
-                            { hour: "2-digit", minute: "2-digit" },
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 border-y border-border/60 text-center">
-                        <Badge
-                          variant="outline"
-                          className="rounded-full bg-slate-50 border-slate-200 text-[10px] font-black"
-                        >
-                          تم التسجيل
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-4 last:rounded-l-2xl border-y border-l border-border/60 text-left">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openDetail(log)}
-                          className="h-9 w-9 rounded-xl bg-card border border-border text-muted hover:bg-accent hover:text-white hover:border-accent shadow-sm"
-                          title="عرض التفاصيل (قراءة فقط)"
-                        >
-                          <Eye size={16} />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState
-              title="الأرشيف فارغ"
-              text="لم نجد أي عمليات مسجلة تطابق بحثك."
-              icon={History}
+          <div className="space-y-1.5">
+            <label htmlFor="inv-archive-type" className="text-[10px] font-black text-muted uppercase">
+              نوع الحركة
+            </label>
+            <Select
+              value={filterType}
+              onValueChange={(v) => {
+                setFilterType(v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger id="inv-archive-type" className="h-11 w-full rounded-xl bg-soft border-border font-bold">
+                <SelectValue placeholder="نوع الحركة" />
+              </SelectTrigger>
+              <SelectContent>
+                {LOG_TYPE_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="inv-archive-from" className="text-[10px] font-black text-muted uppercase">من تاريخ</label>
+            <Input
+              id="inv-archive-from"
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setPage(1);
+              }}
+              aria-label="من تاريخ"
+              className="h-11 rounded-xl bg-soft border-border font-bold"
             />
-          )}
-        </CardContent>
-      </Card>
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="inv-archive-to" className="text-[10px] font-black text-muted uppercase">إلى تاريخ</label>
+            <Input
+              id="inv-archive-to"
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setPage(1);
+              }}
+              aria-label="إلى تاريخ"
+              className="h-11 rounded-xl bg-soft border-border font-bold"
+            />
+          </div>
+          <div className="flex items-end">
+            <Badge variant="primary" className="rounded-full h-11 px-5 text-xs font-black tabular-nums">
+              {formatNumber(totalCount)} حركة في النطاق
+            </Badge>
+          </div>
+        </div>
+      </PremiumCard>
 
-      {/* Detail View Dialog - Read Only */}
-      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent
-          dir="rtl"
-          className="max-w-lg rounded-[2rem] border-0 p-0 overflow-hidden bg-card shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)]"
-        >
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white relative overflow-hidden">
-            <div className="absolute -left-10 -top-10 h-32 w-32 rounded-full bg-white/5" />
-            <div className="absolute -right-10 -bottom-10 h-24 w-24 rounded-full bg-accent/10" />
-            <div className="relative flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-2xl bg-white/10 backdrop-blur flex items-center justify-center border border-white/10">
-                  <FileText size={22} className="text-white" />
-                </div>
-                <div>
-                  <DialogTitle className="text-lg font-black text-white">تفاصيل الحركة</DialogTitle>
-                  <DialogDescription className="text-xs font-bold text-slate-300">عرض قراءة فقط - بدون تعديل</DialogDescription>
-                </div>
-              </div>
-              <Badge
-                className={cn(
-                  "rounded-full px-3 py-1 text-[10px] font-black border-0",
-                  selectedLog?.type === "add"
-                    ? "bg-emerald-500 text-white"
-                    : selectedLog?.type === "remove"
-                      ? "bg-rose-500 text-white"
-                      : "bg-sky-500 text-white",
-                )}
-              >
-                {selectedLog?.type === "add" ? "توريد" : selectedLog?.type === "remove" ? "صرف" : "تعديل"}
-              </Badge>
-            </div>
-            {selectedLog && (
-              <div className="relative mt-4 flex items-center gap-2 text-[11px] font-bold text-slate-400">
-                <Hash size={12} />
-                <span>رقم الحركة #{selectedLog.id}</span>
-                <span className="mx-1">•</span>
-                <Calendar size={12} />
-                <span>{new Date(selectedLog.created_at).toLocaleString("ar-EG")}</span>
-              </div>
+      {/* Logs Table */}
+      <PremiumCard noPadding className="overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-border bg-soft/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h2 className="text-sm font-black flex items-center gap-2">
+            <History size={16} className="text-primary" /> سجل الحركات التفصيلي
+          </h2>
+          <div className="flex items-center gap-2 text-[11px] font-bold">
+            <span className="hidden sm:inline text-muted">يعرض</span>
+            <Badge variant="primary" className="rounded-full tabular-nums">
+              {formatNumber(rows.length)} من {formatNumber(totalCount)}
+            </Badge>
+            {isFetching && !isLoading && (
+              <span className="text-muted flex items-center gap-1">
+                <RefreshCw size={12} className="animate-spin" /> جاري التحديث...
+              </span>
             )}
           </div>
+        </div>
 
-          {selectedLog ? (
-            <div className="p-6 space-y-5">
-              {/* Product Info */}
-              <div className="rounded-2xl border border-border bg-soft/50 p-4 flex items-center gap-4">
-                <div className="h-14 w-14 rounded-xl bg-card border border-border flex items-center justify-center overflow-hidden shrink-0">
-                  {productMap[selectedLog.product_id]?.image_url ? (
-                    <img
-                      src={
-                        productMap[selectedLog.product_id].image_url.startsWith("http")
-                          ? productMap[selectedLog.product_id].image_url
-                          : `${api.defaults.baseURL?.replace("/api/v1","")}${productMap[selectedLog.product_id].image_url}`
-                      }
-                      alt={productMap[selectedLog.product_id].name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <Package size={20} className="text-muted" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-black text-main truncate">
-                    {productMap[selectedLog.product_id]?.name || `صنف #${selectedLog.product_id}`}
-                  </div>
-                  <div className="text-[11px] font-bold text-muted truncate">
-                    {productMap[selectedLog.product_id]?.category || "غير مصنف"} • {productMap[selectedLog.product_id]?.company_name || "---"}
-                  </div>
-                  <div className="text-[10px] font-bold text-muted/70">معرف الصنف: #{selectedLog.product_id}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-soft border border-border/60 p-4">
-                  <div className="flex items-center gap-2 text-[9px] font-black text-muted uppercase tracking-widest mb-2">
-                    <Clock size={12} /> الكمية المتغيرة
-                  </div>
-                  <div className={cn("text-xl font-black", selectedLog.change_amount > 0 ? "text-emerald-600" : selectedLog.change_amount < 0 ? "text-rose-600" : "text-main")}>
-                    {selectedLog.change_amount > 0 ? "+" : ""}{formatNumber(selectedLog.change_amount)}
-                  </div>
-                  <div className="text-[10px] font-bold text-muted mt-1">الوحدة: {productMap[selectedLog.product_id]?.unit || "---"}</div>
-                </div>
-                <div className="rounded-2xl bg-soft border border-border/60 p-4">
-                  <div className="text-[9px] font-black text-muted uppercase tracking-widest mb-2">نوع العملية</div>
-                  <div className="text-sm font-black text-main">
-                    {selectedLog.type === "add" ? "إضافة مخزون (توريد)" : selectedLog.type === "remove" ? "صرف مخزون" : "تعديل يدوي"}
-                  </div>
-                  <div className="text-[10px] font-bold text-muted mt-1">النوع: {selectedLog.type}</div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-[10px] font-black text-muted uppercase tracking-widest flex items-center gap-1">
-                  <FileText size={12} /> الملاحظات / التفاصيل
-                </div>
-                <div className="rounded-2xl border border-border bg-card p-4 min-h-[70px]">
-                  <p className="text-sm font-bold leading-relaxed text-main whitespace-pre-wrap">
-                    {selectedLog.note || "لا توجد ملاحظات إضافية لهذه الحركة."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-xl bg-soft border border-border p-3">
-                  <div className="text-[9px] font-black text-muted uppercase mb-1">تاريخ الإنشاء</div>
-                  <div className="font-black text-main flex items-center gap-1.5">
-                    <Calendar size={12} className="text-muted" />
-                    {new Date(selectedLog.created_at).toLocaleDateString("ar-EG")}
-                  </div>
-                  <div className="text-[10px] font-bold text-muted mt-0.5">{new Date(selectedLog.created_at).toLocaleTimeString("ar-EG")}</div>
-                </div>
-                <div className="rounded-xl bg-soft border border-border p-3">
-                  <div className="text-[9px] font-black text-muted uppercase mb-1">المنشئ</div>
-                  <div className="font-black text-main flex items-center gap-1.5">
-                    <User size={12} className="text-muted" />
-                    {selectedLog.created_by_user_id ? `مستخدم #${selectedLog.created_by_user_id}` : "النظام"}
-                  </div>
-                  <div className="text-[10px] font-bold text-emerald-600 mt-1">• قراءة فقط - لا يمكن التعديل من الأرشيف</div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 flex gap-3">
-                <div className="h-8 w-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
-                  <Eye size={14} />
-                </div>
-                <p className="text-[11px] font-bold leading-relaxed text-amber-800">
-                  هذا العرض للقراءة فقط. لإجراء أي تعديل أو توريد جديد يرجى العودة لصفحة <span className="underline">إدارة المستودع</span>.
-                </p>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <Button onClick={() => setIsDetailOpen(false)} variant="outline" className="flex-1 h-11 rounded-xl font-black">
-                  إغلاق
-                </Button>
-                <Button onClick={() => { setIsDetailOpen(false); navigate("/inventory"); }} className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black">
-                  الذهاب للمخزون <ExternalLink size={14} className="mr-2" />
-                </Button>
-              </div>
+        {isLoading ? (
+          <div className="flex min-h-[200px] items-center justify-center gap-2 text-muted">
+            <RefreshCw className="h-5 w-5 animate-spin" /> جاري مراجعة الأرشيف...
+          </div>
+        ) : loadFailed ? (
+          <div className="p-4 sm:p-6">
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-danger/20 bg-danger-soft px-4 py-10 text-center">
+              <AlertTriangle size={26} className="text-danger" />
+              <p className="text-sm font-black text-main">تعذر تحميل سجل المخزون</p>
+              <p className="max-w-sm text-xs font-bold text-muted">
+                تحقق من الاتصال بالخادم ثم أعد المحاولة.
+              </p>
+              <Button
+                onClick={() => refetch()}
+                disabled={isFetching}
+                variant="outline"
+                size="sm"
+                className="rounded-xl font-black"
+              >
+                <RefreshCw size={14} className="ml-1" /> إعادة المحاولة
+              </Button>
             </div>
-          ) : (
-            <div className="p-10 text-center text-muted font-bold">جاري التحميل...</div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="p-4 sm:p-6">
+            <EmptyState
+              title="الأرشيف فارغ"
+              text="لم نجد أي عمليات مسجلة تطابق بحثك — جرب توسيع نطاق التاريخ أو مسح البحث."
+              icon={History}
+              action={
+                <Button
+                  onClick={() => navigate("/inventory")}
+                  className="h-10 rounded-xl px-5 text-xs font-black"
+                >
+                  العودة للمستودع
+                </Button>
+              }
+            />
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden lg:block overflow-x-auto custom-scrollbar">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-soft/50 text-[10px] font-black uppercase tracking-widest text-muted">
+                    <TableHead className="px-4 py-4 sm:px-5">النوع</TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5">
+                      التفاصيل / الملاحظات
+                    </TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5 text-center">
+                      الكمية
+                    </TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5 text-center">
+                      الرصيد
+                    </TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5">التاريخ</TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5">
+                      المنشئ
+                    </TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5 print:hidden">عرض</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border/40">
+                  {rows.map((log) => {
+                    const meta = getLogTypeMeta(log.type);
+                    const product = resolveLogProduct(log, productMap);
+                    return (
+                      <TableRow
+                        key={log.id}
+                        className="hover:bg-soft/30 transition-colors"
+                      >
+                        <TableCell className="px-4 py-4 sm:px-5">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={cn(
+                                "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                                meta.iconBg,
+                              )}
+                            >
+                              {log.type === "add" ? (
+                                <Plus size={16} />
+                              ) : log.type === "remove" ? (
+                                <Minus size={16} />
+                              ) : (
+                                <Settings size={16} />
+                              )}
+                            </div>
+                            <Badge
+                              variant={meta.badgeVariant}
+                              className="rounded-full"
+                            >
+                              {meta.label}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-4 py-4 sm:px-5">
+                          <div className="text-sm font-black text-main truncate max-w-[280px]">
+                            {log.note || "حركة مخزنية"}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted mt-1">
+                            <Package size={12} />
+                            <span className="truncate">{product.name}</span>
+                            <span>•</span>
+                            <span>#{log.id}</span>
+                          </div>
+                          <div className="text-[10px] font-bold text-muted/80 mt-0.5 truncate max-w-[280px]">
+                            {product.category || "غير مصنف"}
+                            {product.unit ? ` • ${product.unit}` : ""}
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-4 py-4 sm:px-5 text-center">
+                          <span
+                            className={cn(
+                              "text-base font-black tabular-nums",
+                              log.change_amount > 0
+                                ? "text-success"
+                                : log.change_amount < 0
+                                  ? "text-danger"
+                                  : "text-muted",
+                            )}
+                          >
+                            {log.change_amount > 0 ? "+" : ""}
+                            {formatNumber(log.change_amount)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-4 py-4 sm:px-5 text-center">
+                          {log.stock_before === null ||
+                          log.stock_before === undefined ||
+                          log.stock_after === null ||
+                          log.stock_after === undefined ? (
+                            <span className="text-xs font-bold text-muted">—</span>
+                          ) : (
+                            <span
+                              className="text-xs font-black tabular-nums text-main whitespace-nowrap"
+                              title={`من ${formatNumber(log.stock_before)} إلى ${formatNumber(log.stock_after)}`}
+                            >
+                              {formatNumber(log.stock_before)}
+                              <span className="mx-1 text-muted">←</span>
+                              {formatNumber(log.stock_after)}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 py-4 sm:px-5">
+                          <div className="text-xs font-bold tabular-nums text-main flex items-center gap-1.5">
+                            <Calendar size={12} className="text-muted" />
+                            {formatDate(log.created_at)}
+                          </div>
+                          <div className="text-[10px] font-bold tabular-nums text-muted mt-1">
+                            {formatTimeOnly(log.created_at)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-4 py-4 sm:px-5">
+                          <span
+                            className="block max-w-[140px] truncate text-xs font-bold text-main"
+                            title={resolveCreatorName(log)}
+                          >
+                            {resolveCreatorName(log)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-4 py-4 sm:px-5 print:hidden">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openDetail(log)}
+                            className="h-9 w-9 rounded-xl"
+                            title="عرض التفاصيل (قراءة فقط)"
+                            aria-label={`عرض تفاصيل الحركة رقم ${log.id}`}
+                          >
+                            <Eye size={16} />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="grid grid-cols-1 gap-3 p-4 lg:hidden">
+              <AnimatePresence>
+                {rows.map((log, idx) => {
+                  const meta = getLogTypeMeta(log.type);
+                  const product = resolveLogProduct(log, productMap);
+                  return (
+                    <motion.div
+                      key={log.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(idx * 0.03, 0.3) }}
+                      className="rounded-2xl border border-border bg-card p-4 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={cn(
+                              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                              meta.iconBg,
+                            )}
+                          >
+                            {log.type === "add" ? (
+                              <Plus size={16} />
+                            ) : log.type === "remove" ? (
+                              <Minus size={16} />
+                            ) : (
+                              <Settings size={16} />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-black truncate">
+                              {log.note || "حركة مخزنية"}
+                            </div>
+                            <div className="text-[11px] font-bold text-muted truncate">
+                              {product.name} • #{log.id}
+                            </div>
+                            <div className="text-[10px] font-bold text-muted/80 truncate">
+                              {product.category || "غير مصنف"}
+                              {product.unit ? ` • ${product.unit}` : ""}
+                              {" • "}
+                              {resolveCreatorName(log)}
+                            </div>
+                          </div>
+                        </div>
+                        <Badge variant={meta.badgeVariant} className="rounded-full shrink-0">
+                          {meta.label}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="flex items-center justify-between rounded-xl bg-soft border border-border p-3">
+                          <span className="text-[11px] font-bold text-muted">
+                            الكمية
+                          </span>
+                          <span
+                            className={cn(
+                              "text-sm font-black tabular-nums",
+                              log.change_amount > 0
+                                ? "text-success"
+                                : log.change_amount < 0
+                                  ? "text-danger"
+                                  : "text-main",
+                            )}
+                          >
+                            {log.change_amount > 0 ? "+" : ""}
+                            {formatNumber(log.change_amount)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-xl bg-soft border border-border p-3">
+                          <span className="text-[11px] font-bold text-muted">
+                            الرصيد
+                          </span>
+                          {log.stock_before === null ||
+                          log.stock_before === undefined ||
+                          log.stock_after === null ||
+                          log.stock_after === undefined ? (
+                            <span className="text-xs font-bold text-muted">—</span>
+                          ) : (
+                            <span className="text-xs font-black tabular-nums text-main whitespace-nowrap">
+                              {formatNumber(log.stock_before)}
+                              <span className="mx-1 text-muted">←</span>
+                              {formatNumber(log.stock_after)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-[11px] font-bold tabular-nums text-muted">
+                          {formatDate(log.created_at)} • {formatTimeOnly(log.created_at)}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openDetail(log)}
+                          className="rounded-xl font-black"
+                        >
+                          <Eye size={14} className="ml-1" /> التفاصيل
+                        </Button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="p-4 border-t border-border flex items-center justify-between gap-2 print:hidden">
+                <span className="text-sm font-bold tabular-nums text-muted">
+                  صفحة {formatNumber(page)} من {formatNumber(totalPages)} — إجمالي {formatNumber(totalCount)} حركة
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1 || isFetching}
+                    aria-label="الصفحة السابقة"
+                  >
+                    <ChevronRight size={16} /> السابق
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages || isFetching}
+                    aria-label="الصفحة التالية"
+                  >
+                    التالي <ChevronLeft size={16} />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </PremiumCard>
+
+      <LogDetailDialog
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        log={selectedLog}
+        product={
+          selectedLog ? resolveLogProduct(selectedLog, productMap) : undefined
+        }
+        staticBaseUrl={staticBaseUrl}
+        onGoInventory={() => {
+          setIsDetailOpen(false);
+          navigate("/inventory");
+        }}
+      />
     </div>
   );
 }

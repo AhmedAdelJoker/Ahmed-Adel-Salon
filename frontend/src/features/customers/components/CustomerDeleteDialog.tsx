@@ -30,12 +30,13 @@ export default function CustomerDeleteDialog({
         open={!!customer}
         onOpenChange={(open) => !open && onClose()}
       >
-        <DialogContent dir="rtl">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>حذف العميل؟</DialogTitle>
+            <DialogTitle>نقل العميل إلى الأرشيف؟</DialogTitle>
             <DialogDescription>
-              سيتم حذف بيانات{" "}
-              {customer ? customerName(customer) : "العميل"} بشكل نهائي.
+              سيتم نقل بيانات{" "}
+              {customer ? customerName(customer) : "العميل"} إلى أرشيف
+              العملاء، ويمكن استعادته في أي وقت من صفحة الأرشيف.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -47,7 +48,7 @@ export default function CustomerDeleteDialog({
               إلغاء
             </Button>
             <Button variant="danger" disabled={loading} onClick={onConfirm}>
-              تأكيد الحذف
+              نقل للأرشيف
             </Button>
           </DialogFooter>
         </DialogContent>

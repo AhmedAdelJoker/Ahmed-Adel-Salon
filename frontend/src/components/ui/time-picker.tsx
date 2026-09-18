@@ -103,7 +103,6 @@ const TimePicker = React.forwardRef<HTMLButtonElement, TimePickerProps>(
         <PopoverContent
           className="w-[240px] p-0 rounded-2xl border border-border bg-card shadow-premium"
           align="start"
-          dir="rtl"
         >
           {/* Time Display */}
           <div className="flex items-center justify-center gap-4 p-6 border-b border-border/50">
