@@ -30,6 +30,15 @@ def _ensure_index(connection, index_name: str, ddl: str) -> None:
 def ensure_runtime_schema() -> None:
     Base.metadata.create_all(bind=engine)
 
+    # Everything below is SQLite-specific DDL/DML (PRAGMA table_info,
+    # sqlite_master, ALTER TABLE ... ADD COLUMN with SQLite types, and raw
+    # UPDATE backfills). On other dialects (e.g. Postgres) Alembic
+    # migrations are the single source of truth — bail out instead of
+    # executing SQLite-dialect statements that would fail there.
+    # Behavior on SQLite is unchanged.
+    if engine.dialect.name != "sqlite":
+        return
+
     with engine.begin() as connection:
         _ensure_column(
             connection,
