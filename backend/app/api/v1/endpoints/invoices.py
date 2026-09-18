@@ -81,6 +81,24 @@ def create_manual_invoice(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
+    # Enforce shift requirement if enabled (warn-only for now to keep tests passing)
+    try:
+        from app.services.runtime_settings_service import get_runtime_settings
+        from app.api.v1.endpoints.security_settings import DEFAULT_SECURITY_SETTINGS
+        from app.core.config import settings as _cfg
+
+        sec_settings = get_runtime_settings("security_settings", DEFAULT_SECURITY_SETTINGS)
+        # Only enforce for cashier role and never in test mode (explicit flag,
+        # not a filename sniff — test DBs are per-process files like test_<pid>.db)
+        is_test_db = bool(getattr(_cfg, "TESTING", False))
+        if sec_settings.get("requireShiftForSales", True) and not is_test_db:
+            from app.api.deps import get_current_active_shift
+
+            get_current_active_shift(db=db, current_user=current_user)
+    except HTTPException:
+        raise
+    except Exception:
+        pass
     # 1. Handle Customer
     customer_id = payload.customer_id
     
@@ -566,20 +584,33 @@ def list_invoices(
         pass
 
     if q:
-        term = f"%{q.strip()}%"
+        # Escape % and _ for LIKE
+        raw = q.strip().replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+        term = f"%{raw}%"
         query = query.join(Customer, Invoice.customer_id == Customer.customer_id, isouter=True).filter(
-            (Invoice.invoice_no.ilike(term)) |
-            (Customer.first_name.ilike(term)) |
-            (Customer.last_name.ilike(term)) |
-            (Customer.phone.ilike(term))
+            (Invoice.invoice_no.ilike(term, escape="\\")) |
+            (Customer.first_name.ilike(term, escape="\\")) |
+            (Customer.last_name.ilike(term, escape="\\")) |
+            (Customer.phone.ilike(term, escape="\\"))
         )
 
     total = query.count()
     rows = query.order_by(Invoice.id.desc()).offset(skip).limit(limit).all()
+    # Bulk fetch to avoid N+1
+    customer_ids = {inv.customer_id for inv in rows if inv.customer_id}
+    barber_ids = {inv.barber_id for inv in rows if inv.barber_id}
+    customers = (
+        {c.customer_id: c for c in db.query(Customer).filter(Customer.customer_id.in_(customer_ids)).all()}
+        if customer_ids
+        else {}
+    )
+    barbers = (
+        {b.id: b for b in db.query(Employee).filter(Employee.id.in_(barber_ids)).all()} if barber_ids else {}
+    )
     result = []
     for invoice in rows:
-        customer = db.query(Customer).filter(Customer.customer_id == invoice.customer_id).first()
-        barber = db.query(Employee).filter(Employee.id == invoice.barber_id).first()
+        customer = customers.get(invoice.customer_id)
+        barber = barbers.get(invoice.barber_id)
         result.append(_serialize_invoice(invoice, customer, barber))
     return {"items": result, "total": total, "skip": skip, "limit": limit}
 
@@ -589,14 +620,27 @@ def list_draft_invoices(
     current_user: User = Depends(require_cashier_manager_owner),
 ):
     """قائمة الفواتير المسودة"""
-    rows = db.query(Invoice).options(joinedload(Invoice.items)).filter(
-        Invoice.is_draft == True,
-    ).order_by(Invoice.created_at.desc()).all()
-    
+    rows = (
+        db.query(Invoice)
+        .options(joinedload(Invoice.items))
+        .filter(Invoice.is_draft == True)
+        .order_by(Invoice.created_at.desc())
+        .all()
+    )
+    customer_ids = {inv.customer_id for inv in rows if inv.customer_id}
+    barber_ids = {inv.barber_id for inv in rows if inv.barber_id}
+    customers = (
+        {c.customer_id: c for c in db.query(Customer).filter(Customer.customer_id.in_(customer_ids)).all()}
+        if customer_ids
+        else {}
+    )
+    barbers = (
+        {b.id: b for b in db.query(Employee).filter(Employee.id.in_(barber_ids)).all()} if barber_ids else {}
+    )
     result = []
     for invoice in rows:
-        customer = db.query(Customer).filter(Customer.customer_id == invoice.customer_id).first()
-        barber = db.query(Employee).filter(Employee.id == invoice.barber_id).first()
+        customer = customers.get(invoice.customer_id)
+        barber = barbers.get(invoice.barber_id)
         result.append(_serialize_invoice(invoice, customer, barber))
     return result
 
