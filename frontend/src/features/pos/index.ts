@@ -5,3 +5,5 @@
 export * from "@/features/pos/types";
 export { usePOSLogic, usePOSData } from "@/features/pos/hooks/usePOSLogic";
 export { POSContext, POSProvider, usePOS } from "@/features/pos/POSContext";
+export { triggerSuccessEffect } from "@/features/pos/utils";
+export * from "@/features/pos/components";
