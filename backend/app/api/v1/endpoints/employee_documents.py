@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
@@ -11,6 +11,7 @@ from app.api.deps import require_owner_or_manager
 from app.models.user import User
 from app.models.employee import Employee
 from app.models.employee_document import EmployeeDocument
+from app.core.upload_security import validate_image_or_pdf
 
 router = APIRouter(prefix="/employees", tags=["Employee Documents"])
 
@@ -20,6 +21,7 @@ from datetime import timedelta
 @router.get("/expiring")
 def get_expiring_documents(
     days: int = 15,
+    limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
@@ -33,7 +35,7 @@ def get_expiring_documents(
             EmployeeDocument.expiry_date <= threshold,
             EmployeeDocument.expiry_date >= datetime.now()
         )
-    ).all()
+    ).order_by(EmployeeDocument.expiry_date.asc()).limit(limit).all()
     
     result = []
     for doc in docs:
@@ -49,7 +51,7 @@ def get_expiring_documents(
     return result
 
 @router.post("/{employee_id}/documents")
-def upload_employee_document(
+async def upload_employee_document(
     employee_id: int,
     title: str = Form(...),
     file_type: str = Form("other"),
@@ -63,22 +65,26 @@ def upload_employee_document(
     if not employee:
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
 
+    # Phase 3: validate MIME/size/filename BEFORE writing to disk
+    content = await validate_image_or_pdf(file, max_size=10 * 1024 * 1024)
+
     # Ensure directory exists
     os.makedirs("uploads/documents", exist_ok=True)
-    
+
     # Professional Naming Convention: EMP_NAME_TYPE_DATE_UUID{EXT}
+    # Use the sanitized filename set by validate_image_or_pdf
     ext = os.path.splitext(file.filename)[1]
     safe_name = (employee.full_name or "EMP").replace(" ", "_")[:20]
     safe_type = file_type.replace(" ", "_").upper()
     date_str = datetime.now().strftime("%Y%m%d")
     unique_id = uuid.uuid4().hex[:6]
-    
+
     filename = f"EMP_{safe_name}_{safe_type}_{date_str}_{unique_id}{ext}"
     file_path = os.path.join("uploads/documents", filename)
-    
-    # Save file
+
+    # Save file (already validated — content is in memory)
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(content)
     
     parsed_expiry = None
     if expiry_date:

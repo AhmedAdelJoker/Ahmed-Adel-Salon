@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import require_any_staff
@@ -16,6 +16,7 @@ from app.schemas.offer import OfferCreate, OfferRead, OfferServiceRead, OfferPro
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.orm import Session, joinedload
 from app.utils.media import process_image_content, get_upload_path
+from app.core.upload_security import validate_image
 
 router = APIRouter(prefix="/offers", tags=["Offers"])
 
@@ -25,8 +26,9 @@ async def upload_offer_image(
     file: UploadFile = File(...),
     current_user: User = Depends(require_any_staff),
 ):
+    # Phase 3: validate MIME/size/filename before processing
+    content = await validate_image(file, max_size=5 * 1024 * 1024)
     upload_dir = get_upload_path("offers")
-    content = await file.read()
     filename = process_image_content(content, file.filename, upload_dir)
     return {"url": f"/uploads/offers/{filename}"}
 
@@ -133,16 +135,22 @@ def _prepare_offer_prices(db: Session, payload: OfferCreate | OfferUpdate) -> tu
 
 @router.get("", response_model=list[OfferRead])
 def list_offers(
+    response: Response,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
+    query = db.query(Offer).order_by(Offer.id.desc())
+    response.headers["X-Total-Count"] = str(query.count())
     rows = (
-        db.query(Offer)
+        query
         .options(
             joinedload(Offer.offer_services).joinedload(OfferService.service),
             joinedload(Offer.offer_products).joinedload(OfferProduct.product)
         )
-        .order_by(Offer.id.desc())
+        .offset(skip)
+        .limit(limit)
         .all()
     )
     return [_serialize_offer(row) for row in rows]
@@ -150,20 +158,29 @@ def list_offers(
 
 @router.get("/active", response_model=list[OfferRead])
 def list_active_offers(
+    response: Response,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
     today = date.today()
-    rows = (
+    query = (
         db.query(Offer)
-        .options(
-            joinedload(Offer.offer_services).joinedload(OfferService.service),
-            joinedload(Offer.offer_products).joinedload(OfferProduct.product)
-        )
         .filter(Offer.is_active == True)
         .filter((Offer.start_date.is_(None)) | (Offer.start_date <= today))
         .filter((Offer.end_date.is_(None)) | (Offer.end_date >= today))
         .order_by(Offer.id.desc())
+    )
+    response.headers["X-Total-Count"] = str(query.count())
+    rows = (
+        query
+        .options(
+            joinedload(Offer.offer_services).joinedload(OfferService.service),
+            joinedload(Offer.offer_products).joinedload(OfferProduct.product)
+        )
+        .offset(skip)
+        .limit(limit)
         .all()
     )
     return [_serialize_offer(row) for row in rows]

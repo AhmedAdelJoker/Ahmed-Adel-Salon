@@ -2,7 +2,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_cashier_manager_owner, require_owner_or_manager
@@ -43,13 +43,17 @@ def _serialize_request(db: Session, row: DiscountApprovalRequest):
 
 @router.get("")
 def list_discount_approvals(
+    response: Response,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
     query = db.query(DiscountApprovalRequest).order_by(DiscountApprovalRequest.id.desc())
     if current_user.role == "cashier":
         query = query.filter(DiscountApprovalRequest.requested_by_user_id == current_user.id)
-    return [_serialize_request(db, row) for row in query.all()]
+    response.headers["X-Total-Count"] = str(query.count())
+    return [_serialize_request(db, row) for row in query.offset(skip).limit(limit).all()]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
