@@ -3,6 +3,11 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Smoke E2E: built frontend (preview) + real backend (uvicorn + sqlite).
  * Proves the full stack boots and login works end to end.
+ *
+ * NOTE: the bundle must be built with the E2E backend URL, otherwise the
+ * app talks to the dev server (:8000) and login fails:
+ *   $env:VITE_API_URL="http://127.0.0.1:18001/api/v1"; npm run build
+ * Preview runs on :5174 so human dev on :5173 is never disturbed.
  */
 export default defineConfig({
   testDir: './src/test/e2e',
@@ -12,7 +17,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5174',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -34,8 +39,8 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      command: 'npm run preview -- --port 5173',
-      url: 'http://localhost:5173',
+      command: 'npm run preview -- --port 5174',
+      url: 'http://localhost:5174',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
     },
