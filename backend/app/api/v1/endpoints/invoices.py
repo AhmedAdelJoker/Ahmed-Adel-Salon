@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 
@@ -327,6 +327,8 @@ def _serialize_invoice(invoice: Invoice, customer: Customer | None, barber: Empl
 
 @router.get("/today")
 def list_today_invoices(
+    response: Response,
+    limit: int = Query(2000, ge=1, le=5000),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner)
 ):
@@ -334,17 +336,21 @@ def list_today_invoices(
     today_start = datetime.combine(date.today(), time.min)
     today_end = datetime.combine(date.today(), time.max)
 
-    query = db.query(Invoice).options(joinedload(Invoice.items)).filter(
-        Invoice.created_at >= today_start, 
+    # Eager-load customer + barber (was N+1: 2 extra queries per invoice)
+    query = db.query(Invoice).options(
+        joinedload(Invoice.items),
+        joinedload(Invoice.customer),
+        joinedload(Invoice.barber),
+    ).filter(
+        Invoice.created_at >= today_start,
         Invoice.created_at <= today_end
     )
 
-    rows = query.order_by(Invoice.id.desc()).all()
+    response.headers["X-Total-Count"] = str(query.count())
+    rows = query.order_by(Invoice.id.desc()).limit(limit).all()
     result = []
     for invoice in rows:
-        customer = db.query(Customer).filter(Customer.customer_id == invoice.customer_id).first()
-        barber = db.query(Employee).filter(Employee.id == invoice.barber_id).first()
-        result.append(_serialize_invoice(invoice, customer, barber))
+        result.append(_serialize_invoice(invoice, invoice.customer, invoice.barber))
     return result
 
 @router.get("/archive/monthly")
@@ -354,8 +360,12 @@ def get_monthly_archive(
 ):
     """تجميع الفواتير حسب الشهر مع الإحصائيات"""
     from sqlalchemy import func, extract
-    
-    rows = db.query(Invoice).options(joinedload(Invoice.items)).all()
+
+    # NOTE: items are NOT needed for month aggregates — do not eager-load them
+    # (previously joinedload(items) fetched every line item of every invoice).
+    # Full-history scan is required for correct totals; move to SQL GROUP BY
+    # if this becomes a bottleneck (see Phase 2 backlog).
+    rows = db.query(Invoice).order_by(Invoice.created_at.desc()).all()
     
     months = {}
     for invoice in rows:
