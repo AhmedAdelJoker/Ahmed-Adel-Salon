@@ -1,0 +1,97 @@
+import type { Dispatch, SetStateAction } from "react";
+import type { ID } from "@/types/common";
+
+export type POSRecord = Record<string, any>;
+
+export interface CartItem extends POSRecord {
+  id: ID;
+  uid: string;
+  name: string;
+  price: number;
+  type: string;
+  barberId: ID | null;
+  barberName: string;
+}
+
+export interface POSContextValue {
+  categories: POSRecord[];
+  services: POSRecord[];
+  products: POSRecord[];
+  offers: POSRecord[];
+  barbers: POSRecord[];
+  customers: POSRecord[];
+  readyAppointments: POSRecord[];
+  businessSettings: POSRecord | null;
+  currentShift: POSRecord | null;
+  setCurrentShift: Dispatch<SetStateAction<POSRecord | null>>;
+  isShopOpen: boolean;
+  refreshBalance: () => Promise<void>;
+  loading: boolean;
+  readyAppointmentsLoading: boolean;
+  shiftLoading: boolean;
+  showApprovalModal: boolean;
+  setShowApprovalModal: Dispatch<SetStateAction<boolean>>;
+  isSubmitting: boolean;
+  setIsSubmitting: Dispatch<SetStateAction<boolean>>;
+  setLastInvoice: Dispatch<SetStateAction<POSRecord | null>>;
+  lastInvoice: POSRecord | null;
+  completedCustomerName: string;
+  setCompletedCustomerName: Dispatch<SetStateAction<string>>;
+  completedBarberName: string;
+  setCompletedBarberName: Dispatch<SetStateAction<string>>;
+  itemSearchQuery: string;
+  setItemSearchQuery: Dispatch<SetStateAction<string>>;
+  customerSearchQuery: string;
+  setCustomerSearchQuery: Dispatch<SetStateAction<string>>;
+  activeCategory: string;
+  setActiveCategory: Dispatch<SetStateAction<string>>;
+  categoryTabs: string[];
+  filteredItems: POSRecord[];
+  filteredCustomers: POSRecord[];
+  cart: CartItem[];
+  setCart: Dispatch<SetStateAction<CartItem[]>>;
+  selectedBarberId: string;
+  setSelectedBarberId: Dispatch<SetStateAction<string>>;
+  selectedCustomerId: string;
+  setSelectedCustomerId: Dispatch<SetStateAction<string>>;
+  discount: number;
+  setDiscount: Dispatch<SetStateAction<number>>;
+  loyaltyDiscount: number;
+  paymentMethod: string;
+  setPaymentMethod: Dispatch<SetStateAction<string>>;
+  activeAppointmentId: ID | null;
+  setActiveAppointmentId: Dispatch<SetStateAction<ID | null>>;
+  activeInvoiceId: ID | null;
+  setActiveInvoiceId: Dispatch<SetStateAction<ID | null>>;
+  isReviewing: boolean;
+  setIsReviewing: Dispatch<SetStateAction<boolean>>;
+  isNewCustomer: boolean;
+  setIsNewCustomer: Dispatch<SetStateAction<boolean>>;
+  newCustomerFirstName: string;
+  setNewCustomerFirstName: Dispatch<SetStateAction<string>>;
+  newCustomerPhone: string;
+  setNewCustomerPhone: Dispatch<SetStateAction<string>>;
+  isSplitPayment: boolean;
+  setIsSplitPayment: Dispatch<SetStateAction<boolean>>;
+  splitCashAmount: number;
+  setSplitCashAmount: Dispatch<SetStateAction<number>>;
+  splitCardAmount: number;
+  setSplitCardAmount: Dispatch<SetStateAction<number>>;
+  subtotal: number;
+  finalTotal: number;
+  fetchReadyAppointments: () => Promise<void>;
+  fetchShift: () => Promise<void>;
+  fetchData: () => Promise<void>;
+  addToCart: (item: POSRecord, type: string) => void;
+  removeFromCart: (uid: string) => void;
+  resetPOS: () => void;
+  updateCartItemBarber: (uid: string, newBarberId: ID) => void;
+  assignBarberToAll: (barberId: ID) => void;
+  isInvoiceEditable: (invoice: POSRecord | null | undefined) => boolean;
+  editInvoice: (invoice: POSRecord | null | undefined) => void;
+  requestInvoiceAdjustment: (
+    invoiceId: ID,
+    pin?: string | null,
+    reason?: string,
+  ) => Promise<unknown>;
+}
