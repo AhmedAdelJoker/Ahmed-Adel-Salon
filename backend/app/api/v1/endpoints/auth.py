@@ -2,6 +2,8 @@ from datetime import timedelta, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm, HTTPAuthorizationCredentials, HTTPBearer
+import jwt
+from jwt.exceptions import ExpiredSignatureError, PyJWTError as JWTError
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -10,9 +12,16 @@ from app.core.config import settings
 from app.core.security import (
     DUMMY_PASSWORD_HASH,
     create_access_token,
+    create_refresh_token,
+    decode_token,
+    is_jti_revoked,
+    revoke_jti,
+    token_version_of,
     verify_password,
 )
 from app.core.rate_limit import rate_limit
+from app.core.account_lockout import get_lockout
+from app.core.audit import audit_log
 from app.models.user import User
 
 from app.api.deps_auth import get_current_active_user, oauth2_scheme
@@ -57,34 +66,164 @@ class RefreshTokenPayload(BaseModel):
 
 @router.post("/change-password")
 def change_password(
+    request: Request,
     payload: ChangePasswordPayload,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    from app.core.security import verify_password, get_password_hash
+    from app.core.security import verify_password, get_password_hash, validate_password_strength
+    from app.services.runtime_settings_service import get_runtime_settings
+    from app.api.v1.endpoints.security_settings import DEFAULT_SECURITY_SETTINGS
+
     if not verify_password(payload.current_password, current_user.hashed_password):
+        audit_log(
+            db, request, current_user,
+            action="change_password_failed",
+            entity_type="auth",
+            description={"reason": "wrong_current"},
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="كلمة المرور الحالية غير صحيحة",
         )
+    # Enforce strong passwords if enabled
+    sec_settings = get_runtime_settings("security_settings", DEFAULT_SECURITY_SETTINGS)
+    if sec_settings.get("enforceStrongPasswords", True):
+        try:
+            validate_password_strength(payload.new_password)
+        except ValueError as e:
+            audit_log(
+                db, request, current_user,
+                action="change_password_failed",
+                entity_type="auth",
+                description={"reason": "weak_password"},
+            )
+            raise HTTPException(status_code=400, detail=str(e))
     current_user.hashed_password = get_password_hash(payload.new_password)
+    # Phase 3: invalidate every previously issued token (logout everywhere).
+    current_user.token_version = token_version_of(current_user) + 1
     db.add(current_user)
     db.commit()
+    audit_log(
+        db, request, current_user,
+        action="change_password",
+        entity_type="auth",
+        description={"username": current_user.username},
+    )
     return {"message": "تم تغيير كلمة المرور بنجاح"}
 
 
 @router.post("/refresh")
-def refresh_token(payload: RefreshTokenPayload):
+def refresh_token(
+    payload: RefreshTokenPayload,
+    db: Session = Depends(get_db),
+):
     """
-    تجديد توكن الوصول (Stub)
+    Mint a new access token using a valid refresh token.
+
+    The refresh token must be:
+      - Signed with the current SECRET_KEY
+      - Not expired (default 7 days)
+      - Of type=refresh (rejects access tokens)
     """
-    # NOTE: In a real implementation, you would verify the refresh token
-    # and issue a new access token. For now, we return 401 to force re-login
-    # or implement basic logic if needed.
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Token refresh not fully implemented",
+    try:
+        decoded = decode_token(payload.refresh_token, expected_type="refresh")
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.",
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="رمز التحديث غير صالح",
+        )
+
+    username = decoded.get("sub")
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="رمز التحديث لا يحتوي على هوية المستخدم",
+        )
+
+    user = db.query(User).filter(User.username == username).first()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="المستخدم غير موجود أو غير نشط",
+        )
+
+    # Phase 3: a rotated/stolen refresh token must not be reusable.
+    old_jti = decoded.get("jti")
+    if is_jti_revoked(db, old_jti):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="رمز التحديث تم إبطاله. يرجى تسجيل الدخول مرة أخرى.",
+        )
+
+    ver = token_version_of(user)
+    new_access = create_access_token(subject=user.username, extra_claims={"ver": ver})
+    new_refresh = create_refresh_token(subject=user.username, extra_claims={"ver": ver})
+
+    # Refresh rotation: the presented refresh token is single-use.
+    try:
+        exp_ts = decoded.get("exp")
+        exp_at = datetime.fromtimestamp(exp_ts, tz=timezone.utc) if exp_ts else None
+    except (TypeError, ValueError, OSError):
+        exp_at = None
+    revoke_jti(
+        db, old_jti, user_id=user.id, token_type="refresh",
+        reason="rotation", expires_at=exp_at,
     )
+    db.commit()
+
+    return {
+        "access_token": new_access,
+        "refresh_token": new_refresh,
+        "token_type": "bearer",
+    }
+
+
+class LogoutPayload(BaseModel):
+    refresh_token: str | None = None
+
+
+@router.post("/logout")
+def logout(
+    payload: LogoutPayload,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Revoke the current access token (and the given refresh token, if any)."""
+    revoked_any = False
+    if credentials is not None and credentials.credentials:
+        try:
+            access_payload = decode_token(credentials.credentials, expected_type="access")
+            revoked_any = revoke_jti(
+                db, access_payload.get("jti"), user_id=current_user.id,
+                token_type="access", reason="logout",
+            ) or revoked_any
+        except Exception:
+            pass
+    if payload.refresh_token:
+        try:
+            refresh_payload = decode_token(payload.refresh_token, expected_type="refresh")
+            revoked_any = revoke_jti(
+                db, refresh_payload.get("jti"), user_id=current_user.id,
+                token_type="refresh", reason="logout",
+            ) or revoked_any
+        except Exception:
+            pass
+    db.commit()
+    audit_log(
+        db, request, current_user,
+        action="logout",
+        entity_type="auth",
+        description={"username": current_user.username},
+    )
+    return {"message": "تم تسجيل الخروج بنجاح"}
 
 
 @router.get("/sessions")
@@ -129,33 +268,87 @@ def get_active_sessions(
     ],
 )
 def login(
+    request: Request,
     db: Session = Depends(get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
 ):
+    # Phase 3: account lockout by username + IP.
+    # The check is per-identifier so a single user can't lock out everyone.
+    lockout = get_lockout()
+    ip = request.client.host if request.client else "unknown"
+    user_identifier = f"user:{form_data.username}"
+    ip_identifier = f"ip:{ip}"
+
+    for identifier in (user_identifier, ip_identifier):
+        is_locked, retry_after = lockout.is_locked(identifier)
+        if is_locked:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="تم قفل الحساب مؤقتاً بسبب محاولات فاشلة متكررة. حاول بعد "
+                       f"{retry_after} ثانية.",
+                headers={"Retry-After": str(retry_after)},
+            )
 
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user:
+        # Constant-time-ish dummy verify to avoid leaking whether the user exists
         verify_password(form_data.password, DUMMY_PASSWORD_HASH)
+        for identifier in (user_identifier, ip_identifier):
+            lockout.record_failure(identifier)
+        audit_log(
+            db, request, None,
+            action="login_failed",
+            entity_type="auth",
+            description={"username": form_data.username, "reason": "user_not_found"},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="اسم المستخدم أو كلمة المرور غير صحيحة",
         )
 
     if not verify_password(form_data.password, user.hashed_password):
+        for identifier in (user_identifier, ip_identifier):
+            lockout.record_failure(identifier)
+        audit_log(
+            db, request, user,
+            action="login_failed",
+            entity_type="auth",
+            description={"username": form_data.username, "reason": "wrong_password"},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="اسم المستخدم أو كلمة المرور غير صحيحة",
         )
 
     if not user.is_active:
+        audit_log(
+            db, request, user,
+            action="login_failed",
+            entity_type="auth",
+            description={"username": form_data.username, "reason": "inactive"},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="المستخدم غير نشط",
         )
 
+    # Success: reset failure counters
+    for identifier in (user_identifier, ip_identifier):
+        lockout.record_success(identifier)
+    audit_log(
+        db, request, user,
+        action="login_success",
+        entity_type="auth",
+        description={"username": form_data.username},
+    )
+
     access_token = create_access_token(
         subject=user.username,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        extra_claims={"ver": token_version_of(user)},
+    )
+    refresh_token_value = create_refresh_token(
+        subject=user.username, extra_claims={"ver": token_version_of(user)}
     )
 
     profile_image_url = user.profile_image_url
@@ -164,7 +357,9 @@ def login(
 
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token_value,
         "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         "user": {
             "id": user.id,
             "username": user.username,
