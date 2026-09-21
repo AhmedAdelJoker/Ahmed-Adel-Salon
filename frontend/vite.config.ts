@@ -5,23 +5,21 @@ import checker from "vite-plugin-checker";
 
 const chunkGroups = [
   {
+    // CSS class utilities are imported by lib/core/utils.ts, which every
+    // route uses. They MUST NOT float into reports-vendor, otherwise each
+    // page (including /login) downloads recharts (~84KiB wasted, LCP +0.4s).
+    // A dedicated chunk (not merged into ui-vendor) is what Rolldown honors
+    // deterministically here.
+    name: "css-utils",
+    packages: ["clsx", "tailwind-merge", "class-variance-authority"],
+  },
+  {
     name: "react-vendor",
     packages: ["react", "react-dom", "react-router-dom"],
   },
   {
     name: "ui-vendor",
-    // NOTE: clsx / tailwind-merge / class-variance-authority are imported by
-    // lib/core/utils.ts which every route uses. They MUST live here — if
-    // left ungrouped, the bundler merges them into reports-vendor and every
-    // page (including /login) downloads recharts (~84KiB wasted, LCP +0.4s).
-    packages: [
-      "axios",
-      "lucide-react",
-      "react-hot-toast",
-      "clsx",
-      "tailwind-merge",
-      "class-variance-authority",
-    ],
+    packages: ["axios", "lucide-react", "react-hot-toast"],
   },
   {
     name: "i18n-vendor",
