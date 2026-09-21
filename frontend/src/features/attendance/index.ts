@@ -11,3 +11,6 @@ export { EmployeeCardStats } from "@/features/attendance/components/EmployeeCard
 export { EmployeeCardDetailsDialog } from "@/features/attendance/components/EmployeeCard/EmployeeCardDetailsDialog";
 export { useAttendanceData } from "@/features/attendance/hooks/useAttendanceData";
 export { useAttendanceOps } from "@/features/attendance/hooks/useAttendanceOps";
+export { default as DailySummary } from "@/features/attendance/components/DailySummary/DailySummary";
+export { statusConfig as dailySummaryStatusConfig, aiConfig as dailySummaryAiConfig } from "@/features/attendance/components/DailySummary/constants";
+export { formatTime, formatDateTime } from "@/features/attendance/components/DailySummary/utils";
