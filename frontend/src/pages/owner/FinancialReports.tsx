@@ -73,51 +73,22 @@ import {
 } from "@/components/shared/DisplayComponents";
 import {
   AnomalyAlerts,
+  CashflowTab,
   CHART_COLORS,
   DrilldownPanel,
+  FilterBar,
   FinanceTooltip,
+  ForecastTab,
+  KpiRow,
   MonthlyTargetProgress,
   PRESETS,
+  REPORT_EXPORTS,
   compactTick,
   formatSignedPct,
   useFinancialReports,
 } from "@/features/financial-reports";
 
-const REPORT_EXPORTS = [
-  {
-    title: "التدقيق الاستراتيجي للنمو",
-    desc: "تقرير شامل يجمع الأداء المالي والخدمات الأكثر ربحية وإنتاجية الفريق بنظرة استراتيجية.",
-    details: "يتضمن: ملخص KPIs، قائمة Top 5 خدمات، ترتيب أداء الموظفين.",
-    icon: Sparkles,
-    color: "text-purple-600 bg-purple-500/10",
-    format: "PREMIUM PDF",
-    endpoint: "/exports/reports/strategic-growth/pdf",
-    type: "pdf" as const,
-    file: "strategic_growth_report",
-  },
-  {
-    title: "تقرير الإيرادات التفصيلي",
-    desc: "كشف محاسبي بالمبيعات والتحصيلات مفصلاً حسب طريقة الدفع لمطابقة الخزينة.",
-    details: "يتضمن: التاريخ، رقم الفاتورة، العميل، طريقة الدفع، القيمة الصافية.",
-    icon: FileSpreadsheet,
-    color: "text-indigo-600 bg-indigo-500/10",
-    format: "EXCEL SHEET",
-    endpoint: "/exports/reports/revenue/excel",
-    type: "excel" as const,
-    file: "revenue_report",
-  },
-  {
-    title: "كشف ميزان العمليات اليومي",
-    desc: "سجل زمني دقيق للحركات النقدية اليومية خلال الفترة المختارة لضمان دقة الأرشفة.",
-    details: "يتضمن: تفصيل الحركات اليومية وإجمالي الوارد والصادر لكل يوم.",
-    icon: History,
-    color: "text-amber-600 bg-amber-500/10",
-    format: "ACCOUNTING PDF",
-    endpoint: "/exports/reports/daily/pdf",
-    type: "pdf" as const,
-    file: "daily_operations_report",
-  },
-];
+
 
 export default function FinancialReports() {
   const {
@@ -283,165 +254,23 @@ export default function FinancialReports() {
         icon={Banknote}
       />
 
-      {/* Sticky filter bar — glass, same language as DailySummary header */}
-      <div className="sticky top-0 z-20 rounded-[1.5rem] border border-border/60 bg-card/85 p-3 shadow-soft backdrop-blur-md print:hidden">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div
-            className="flex flex-wrap items-center gap-2"
-            role="group"
-            aria-label="نطاقات زمنية سريعة"
-          >
-            {PRESETS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => applyPreset(p.id)}
-                aria-pressed={preset === p.id}
-                className={cn(
-                  "h-9 rounded-xl border px-4 text-[11px] font-black transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                  preset === p.id
-                    ? "border-primary bg-primary text-white shadow-lg shadow-primary/20"
-                    : "border-border bg-card text-muted hover:border-primary/40 hover:text-main",
-                )}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-1 items-center gap-2 rounded-xl border border-border bg-card p-1.5 shadow-sm xl:flex-none">
-              <label className="flex items-center gap-2 px-2">
-                <Calendar size={14} className="shrink-0 text-muted" />
-                <span className="sr-only">من تاريخ</span>
-                <input
-                  type="date"
-                  value={fromDate}
-                  max={toDate}
-                  onChange={(e) => {
-                    setFromDate(e.target.value);
-                  }}
-                  aria-label="من تاريخ"
-                  className="h-8 w-32 bg-transparent text-[11px] font-black tabular-nums text-main outline-none"
-                />
-              </label>
-              <span className="h-5 w-px bg-border" aria-hidden="true" />
-              <label className="flex items-center gap-2 px-2">
-                <Calendar size={14} className="shrink-0 text-muted" />
-                <span className="sr-only">إلى تاريخ</span>
-                <input
-                  type="date"
-                  value={toDate}
-                  min={fromDate}
-                  onChange={(e) => {
-                    setToDate(e.target.value);
-                  }}
-                  aria-label="إلى تاريخ"
-                  className="h-8 w-32 bg-transparent text-[11px] font-black tabular-nums text-main outline-none"
-                />
-              </label>
-            </div>
-            <Button
-              onClick={fetchFinancials}
-              loading={refreshing}
-              className="h-10 gap-2 px-5 text-xs font-black"
-            >
-              <RefreshCw size={15} /> تحديث
-            </Button>
-            <Button
-              onClick={handlePrint}
-              variant="outline"
-              className="h-10 gap-2 px-4 text-xs font-black"
-              title="طباعة التقرير أو حفظه PDF"
-            >
-              <Printer size={15} /> طباعة / PDF
-            </Button>
-            <label className="flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 text-[11px] font-black text-muted">
-              <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} aria-label="تحديث تلقائي" />
-              تلقائي
-            </label>
-          </div>
-        </div>
-        <p className="mt-2 px-1 text-[10px] font-bold tabular-nums text-muted">
-          آخر تدقيق: {formatDateTime(lastUpdated)} • النطاق {fromDate} إلى {toDate}
-          {financials.prevRange && (
-            <> • مقارنة بالفترة {financials.prevRange.from} إلى {financials.prevRange.to}</>
-          )}
-        </p>
-      </div>
+      <FilterBar
+        fromDate={fromDate}
+        toDate={toDate}
+        preset={preset}
+        lastUpdated={lastUpdated}
+        prevRange={financials.prevRange}
+        refreshing={refreshing}
+        autoRefresh={autoRefresh}
+        setFromDate={setFromDate}
+        setToDate={setToDate}
+        setAutoRefresh={setAutoRefresh}
+        applyPreset={applyPreset}
+        fetchFinancials={fetchFinancials}
+        onPrint={handlePrint}
+      />
 
-      {/* KPI row — unified stat cards */}
-      <div data-stats-grid="true">
-        <CurrencyStatCard
-          label="إجمالي الإيرادات"
-          value={financials.revenue}
-          icon={TrendingUp}
-          variant="success"
-          trend={
-            financials.growth.revenue === null
-              ? undefined
-              : financials.growth.revenue >= 0
-                ? "positive"
-                : "negative"
-          }
-          trendValue={
-            financials.growth.revenue === null
-              ? undefined
-              : formatSignedPct(financials.growth.revenue)
-          }
-          hint={`${financials.invoiceCount} فاتورة • متوسط ${formatCurrency(financials.avgTicket)}`}
-        />
-        <CurrencyStatCard
-          label="إجمالي المصروفات"
-          value={financials.expenses}
-          icon={TrendingDown}
-          variant="danger"
-          trend={
-            financials.growth.expenses === null
-              ? undefined
-              : financials.growth.expenses > 0
-                ? "negative"
-                : "positive"
-          }
-          trendValue={
-            financials.growth.expenses === null
-              ? undefined
-              : formatSignedPct(financials.growth.expenses)
-          }
-          hint={`${financials.expenseCount} بند • ${financials.expenseRatio.toFixed(1)}% من الإيراد`}
-        />
-        <CurrencyStatCard
-          label="صافي الربح"
-          value={financials.netProfit}
-          icon={Wallet}
-          trend={
-            financials.growth.net === null
-              ? financials.netProfit >= 0
-                ? "positive"
-                : "negative"
-              : financials.growth.net >= 0
-                ? "positive"
-                : "negative"
-          }
-          trendValue={
-            financials.growth.net === null ? undefined : formatSignedPct(financials.growth.net)
-          }
-          variant="primary"
-          hint={`هامش ${financials.margin.toFixed(1)}%`}
-        />
-        <StatCardDisplay
-          label="هامش الربح"
-          value={`${financials.margin.toFixed(1)}%`}
-          icon={Target}
-          variant="warning"
-          hint={
-            financials.growth.marginDelta === null
-              ? financials.netProfit >= 0
-                ? "أداء موجب"
-                : "يحتاج مراجعة"
-              : `Δ ${formatSignedPct(financials.growth.marginDelta)} نقطة مئوية عن الفترة السابقة`
-          }
-        />
-      </div>
+      <KpiRow financials={financials} />
 
       {/* Quick metrics — collapsible */}
       <Card>
@@ -602,217 +431,17 @@ export default function FinancialReports() {
           </ContentPanel>
         </TabsContent>
 
-        {/* ── Cashflow & collection ────────────────── */}
         <TabsContent value="cashflow" className="mt-4">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <ChartCard
-              title={
-                <span className="flex items-center gap-2">
-                  <Activity size={16} className="text-primary" /> تحليل التدفقات النقدية
-                </span>
-              }
-              subtitle={`مقارنة الإيرادات بالمصروفات • ${financials.dailyTrends.length} نقطة زمنية حقيقية من الفواتير والمصروفات`}
-              data={financials.dailyTrends}
-              height={320}
-              emptyTitle="لا توجد حركات في هذه الفترة"
-              emptyHint="جرّب توسيع النطاق الزمني أو اختيار نطاق مختلف لعرض التدفقات النقدية."
-              className="overflow-hidden lg:col-span-2"
-              actions={
-                financials.prevDailyTrends.length > 0 ? (
-                  <label className="flex shrink-0 items-center gap-1.5 rounded-xl border border-border bg-soft/60 px-2.5 py-1.5 text-[10px] font-black text-muted">
-                    <History size={12} />
-                    <Switch
-                      checked={showPrev}
-                      onCheckedChange={setShowPrev}
-                      aria-label="إظهار الفترة السابقة"
-                    />
-                    الفترة السابقة
-                  </label>
-                ) : undefined
-              }
-              badge={
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge variant="outline" className="gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" /> الإيرادات
-                  </Badge>
-                  <Badge variant="outline" className="gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-rose-500" /> المصروفات
-                  </Badge>
-                </div>
-              }
-            >
-              <div className="h-[300px] w-full sm:h-[320px]" dir="ltr">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart
-                    data={financials.dailyTrends}
-                    margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="finRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.28} />
-                        <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="finExp" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.28} />
-                        <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="var(--border)" opacity={0.5} />
-                    <XAxis
-                      dataKey="label"
-                      axisLine={false}
-                      tickLine={false}
-                      minTickGap={24}
-                      tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
-                      dy={8}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      width={56}
-                      tickFormatter={compactTick}
-                      tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
-                    />
-                    <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
-                    {showPrev && financials.prevDailyTrends.length > 0 && (
-                      <>
-                        <Line
-                          type="monotone"
-                          data={financials.prevDailyTrends}
-                          dataKey="rev"
-                          name="إيرادات الفترة السابقة"
-                          stroke="#10B981"
-                          strokeWidth={1.5}
-                          strokeDasharray="6 4"
-                          strokeOpacity={0.6}
-                          dot={false}
-                          activeDot={{ r: 4, strokeWidth: 2, stroke: "#10B981", fill: "#fff", strokeOpacity: 0.6 }}
-                        />
-                        <Line
-                          type="monotone"
-                          data={financials.prevDailyTrends}
-                          dataKey="exp"
-                          name="مصروفات الفترة السابقة"
-                          stroke="#F43F5E"
-                          strokeWidth={1.5}
-                          strokeDasharray="6 4"
-                          strokeOpacity={0.6}
-                          dot={false}
-                          activeDot={{ r: 4, strokeWidth: 2, stroke: "#F43F5E", fill: "#fff", strokeOpacity: 0.6 }}
-                        />
-                      </>
-                    )}
-                    <Area
-                      type="monotone"
-                      dataKey="rev"
-                      name="الإيرادات"
-                      stroke="#10B981"
-                      strokeWidth={2.5}
-                      fill="url(#finRev)"
-                      dot={false}
-                      activeDot={{ r: 5, strokeWidth: 2, stroke: "#10B981", fill: "#fff" }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="exp"
-                      name="المصروفات"
-                      stroke="#F43F5E"
-                      strokeWidth={2.5}
-                      fill="url(#finExp)"
-                      dot={false}
-                      activeDot={{ r: 5, strokeWidth: 2, stroke: "#F43F5E", fill: "#fff" }}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </ChartCard>
-
-            <ChartCard
-              title={
-                <span className="flex items-center gap-2">
-                  <PieChartIcon size={16} className="text-amber-600" /> طرق التحصيل
-                </span>
-              }
-              subtitle="توزيع المبيعات حسب وسيلة الدفع — اضغط أي وسيلة لعرض فواتيرها"
-              data={paymentsWithPct}
-              height={300}
-              emptyTitle="لا توجد مدفوعات مسجلة"
-              emptyHint="ستظهر وسائل الدفع فور تسجيل الفواتير."
-              className="overflow-hidden"
-            >
-              <div className="relative mx-auto h-[200px] w-full" dir="ltr">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={paymentsWithPct}
-                      innerRadius="62%"
-                      outerRadius="88%"
-                      paddingAngle={4}
-                      dataKey="value"
-                      nameKey="label"
-                      strokeWidth={0}
-                    >
-                      {paymentsWithPct.map((p) => (
-                        <Cell
-                          key={p.name}
-                          fill={p.color}
-                          onClick={() => {
-                            setSelectedDay(null);
-                            setSelectedExpenseCategory(null);
-                            setSelectedPayment({ name: p.name, value: p.value });
-                          }}
-                          style={{ cursor: "pointer", outline: "none" }}
-                          opacity={selectedPayment && selectedPayment.name !== p.name ? 0.45 : 1}
-                        />
-                      ))}
-                    </Pie>
-                    <ReTooltip content={<FinanceTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-muted">
-                    الإجمالي
-                  </span>
-                  <span className="max-w-[160px] truncate text-lg font-black tabular-nums text-main">
-                    {formatCurrency(financials.revenue)}
-                  </span>
-                </div>
-              </div>
-              <div className="mt-4 max-h-[220px] space-y-2 overflow-y-auto">
-                {paymentsWithPct.map((p) => (
-                  <button
-                    key={p.name}
-                    type="button"
-                    onClick={() => {
-                      setSelectedDay(null);
-                      setSelectedExpenseCategory(null);
-                      setSelectedPayment(
-                        selectedPayment?.name === p.name ? null : { name: p.name, value: p.value },
-                      );
-                    }}
-                    aria-pressed={selectedPayment?.name === p.name}
-                    className={cn(
-                      "flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-right transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                      selectedPayment?.name === p.name
-                        ? "border-primary bg-primary/5"
-                        : "border-border/50 bg-soft/60 hover:bg-soft",
-                    )}
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
-                      <span className="truncate text-xs font-black text-main">{p.label}</span>
-                      <span className="shrink-0 text-[10px] font-black tabular-nums text-muted">
-                        {p.pct.toFixed(0)}%
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-xs font-black tabular-nums text-main">
-                      {formatCurrency(p.value)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </ChartCard>
-          </div>
+          <CashflowTab
+            financials={financials}
+            paymentsWithPct={paymentsWithPct}
+            selectedPayment={selectedPayment}
+            showPrev={showPrev}
+            setShowPrev={setShowPrev}
+            setSelectedDay={setSelectedDay}
+            setSelectedExpenseCategory={setSelectedExpenseCategory}
+            setSelectedPayment={setSelectedPayment}
+          />
         </TabsContent>
 
         {/* ── Expenses ───────────────────────────────── */}
@@ -872,197 +501,15 @@ export default function FinancialReports() {
           </ChartCard>
         </TabsContent>
 
-        {/* ── Forecast ───────────────────────────────── */}
         <TabsContent value="forecast" className="mt-4 space-y-6">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {!monthlyLoaded ? (
-              <Card className="overflow-hidden">
-                <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-                  <CalendarRange size={26} className="text-muted" />
-                  <p className="text-sm font-black text-main">المقارنة الشهرية جاهزة عند الطلب</p>
-                  <p className="text-xs font-bold text-muted">اضغط تحميل لجلب 6 شهور وتجميعها شهرياً.</p>
-                  <Button
-                    onClick={fetchSixMonths}
-                    loading={monthlyLoading}
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 shrink-0 gap-2 text-[11px] font-black"
-                  >
-                    <BarChart3 size={14} /> تحميل المقارنة
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <ChartCard
-                title={
-                  <span className="flex items-center gap-2">
-                    <CalendarRange size={16} className="text-indigo-600" /> مقارنة آخر 6 شهور
-                  </span>
-                }
-                subtitle="الإيرادات مقابل المصروفات شهرياً من البيانات الحقيقية"
-                data={monthly}
-                height={260}
-                className="overflow-hidden"
-              >
-                <div className="h-[260px] w-full" dir="ltr">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={monthly} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="var(--border)" opacity={0.5} />
-                      <XAxis
-                        dataKey="label"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
-                        dy={8}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        width={56}
-                        tickFormatter={compactTick}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
-                      />
-                      <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
-                      <Legend wrapperStyle={{ fontSize: 11, fontWeight: 800 }} />
-                      <Bar dataKey="rev" name="الإيرادات" fill="#10B981" radius={[6, 6, 0, 0]} maxBarSize={28} />
-                      <Bar dataKey="exp" name="المصروفات" fill="#F43F5E" radius={[6, 6, 0, 0]} maxBarSize={28} />
-                      <Line
-                        type="monotone"
-                        dataKey="net"
-                        name="الصافي"
-                        stroke="#6366F1"
-                        strokeWidth={2.5}
-                        dot={{ r: 3, fill: "#6366F1" }}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              </ChartCard>
-            )}
-
-            {!forecast ? (
-              <Card className="overflow-hidden">
-                <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-                  <Zap size={26} className="text-muted" />
-                  <p className="text-sm font-black text-main">لا توجد بيانات كافية للإسقاط</p>
-                  <p className="text-xs font-bold text-muted">اختر نطاقاً زمنياً فيه حركات مالية.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <ChartCard
-                title={
-                  <span className="flex items-center gap-2">
-                    <Zap size={16} className="text-violet-600" /> إسقاط التدفق النقدي — 30 يوم
-                  </span>
-                }
-                subtitle={`بناءً على متوسط آخر ${forecast.basisDays} يوم من الفترة الحالية`}
-                data={forecast.cumulative}
-                height={260}
-                className="overflow-hidden"
-              >
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-3">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">إيراد متوقع</p>
-                    <p className="mt-1 text-sm font-black tabular-nums text-emerald-600">
-                      {formatCurrency(forecast.projRev)}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-3">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-rose-600">مصروف متوقع</p>
-                    <p className="mt-1 text-sm font-black tabular-nums text-rose-600">
-                      {formatCurrency(forecast.projExp)}
-                    </p>
-                  </div>
-                  <div
-                    className={cn(
-                      "rounded-2xl border p-3",
-                      forecast.projNet >= 0
-                        ? "border-emerald-500/20 bg-emerald-500/5"
-                        : "border-rose-500/20 bg-rose-500/5",
-                    )}
-                  >
-                    <p className="text-[9px] font-black uppercase tracking-widest text-muted">صافي متوقع</p>
-                    <p
-                      className={cn(
-                        "mt-1 text-sm font-black tabular-nums",
-                        forecast.projNet >= 0 ? "text-emerald-600" : "text-rose-600",
-                      )}
-                    >
-                      {formatCurrency(forecast.projNet)}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 h-[150px] w-full" dir="ltr">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={forecast.cumulative} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="finForecast" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.28} />
-                          <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="var(--border)" opacity={0.5} />
-                      <XAxis
-                        dataKey="name"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
-                        dy={8}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        width={56}
-                        tickFormatter={compactTick}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
-                      />
-                      <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
-                      <Area
-                        type="monotone"
-                        dataKey="net"
-                        name="الصافي التراكمي المتوقع"
-                        stroke="#8B5CF6"
-                        strokeWidth={2.5}
-                        strokeDasharray="6 4"
-                        fill="url(#finForecast)"
-                        dot={false}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-                <p className="mt-3 text-[10px] font-bold text-muted">
-                  متوسط يومي: إيراد {formatCurrency(forecast.avgRev)} • مصروف {formatCurrency(forecast.avgExp)} — الإسقاط خطي ويفترض استمرار نفس الوتيرة.
-                </p>
-              </ChartCard>
-            )}
-          </div>
-
-          <PremiumCard
-            hoverable={false}
-            className="border-primary/20 bg-gradient-to-br from-indigo-500/[0.06] via-card to-violet-500/[0.06]"
-          >
-            <div className="space-y-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="rounded-2xl border border-primary/20 bg-primary/10 p-3 text-primary">
-                    <Sparkles size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black tracking-tight text-main sm:text-2xl">
-                      المستشار المالي الذكي
-                    </h3>
-                    <p className="mt-1 text-[11px] font-black uppercase tracking-[0.2em] text-muted">
-                      تحليل فعلي للبيانات الحالية وتوصيات نمو قابلة للتنفيذ
-                    </p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="w-fit text-[10px] font-black">
-                  AI POWERED
-                </Badge>
-              </div>
-              <AIInsights data={aiInsights} isSidebar />
-            </div>
-          </PremiumCard>
+          <ForecastTab
+            monthly={monthly}
+            monthlyLoading={monthlyLoading}
+            monthlyLoaded={monthlyLoaded}
+            forecast={forecast}
+            aiInsights={aiInsights}
+            fetchSixMonths={fetchSixMonths}
+          />
         </TabsContent>
 
         {/* ── Reports & schedules ──────────────────── */}

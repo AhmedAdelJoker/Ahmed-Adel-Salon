@@ -1,3 +1,5 @@
+import { FileSpreadsheet, History, Sparkles } from "lucide-react";
+
 export const CHART_COLORS = [
   "#6366F1",
   "#10B981",
@@ -30,3 +32,41 @@ export const PRESETS: Array<{ id: PresetId; label: string }> = [
   { id: "month", label: "الشهر" },
   { id: "quarter", label: "90 يوم" },
 ];
+
+export const REPORT_EXPORTS = [
+  {
+    title: "التدقيق الاستراتيجي للنمو",
+    desc: "تقرير شامل يجمع الأداء المالي والخدمات الأكثر ربحية وإنتاجية الفريق بنظرة استراتيجية.",
+    details: "يتضمن: ملخص KPIs، قائمة Top 5 خدمات، ترتيب أداء الموظفين.",
+    icon: Sparkles,
+    color: "text-purple-600 bg-purple-500/10",
+    format: "PREMIUM PDF",
+    endpoint: "/exports/reports/strategic-growth/pdf",
+    type: "pdf" as const,
+    file: "strategic_growth_report",
+  },
+  {
+    title: "تقرير الإيرادات التفصيلي",
+    desc: "كشف محاسبي بالمبيعات والتحصيلات مفصلاً حسب طريقة الدفع لمطابقة الخزينة.",
+    details: "يتضمن: التاريخ، رقم الفاتورة، العميل، طريقة الدفع، القيمة الصافية.",
+    icon: FileSpreadsheet,
+    color: "text-indigo-600 bg-indigo-500/10",
+    format: "EXCEL SHEET",
+    endpoint: "/exports/reports/revenue/excel",
+    type: "excel" as const,
+    file: "revenue_report",
+  },
+  {
+    title: "كشف ميزان العمليات اليومي",
+    desc: "سجل زمني دقيق للحركات النقدية اليومية خلال الفترة المختارة لضمان دقة الأرشفة.",
+    details: "يتضمن: تفصيل الحركات اليومية وإجمالي الوارد والصادر لكل يوم.",
+    icon: History,
+    color: "text-amber-600 bg-amber-500/10",
+    format: "ACCOUNTING PDF",
+    endpoint: "/exports/reports/daily/pdf",
+    type: "pdf" as const,
+    file: "daily_operations_report",
+  },
+] as const;
+
+export type ReportExport = (typeof REPORT_EXPORTS)[number];
