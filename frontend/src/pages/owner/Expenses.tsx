@@ -33,6 +33,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import {
   CurrencyText,
   DateText,
@@ -252,20 +253,26 @@ const ExpensesPage = () => {
         </div>
       )}
 
-      {totalPages > 1 && (
-        <PremiumCard className="p-3 flex items-center justify-between">
-          <p className="text-xs font-black text-muted">صفحة <span className="text-main">{currentPage}</span> من {totalPages}</p>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
-              <ChevronRight size={16} />
-            </Button>
-            <span className="text-sm font-black min-w-[40px] text-center bg-soft rounded-xl py-1.5 px-3 border border-border">{currentPage}</span>
-            <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
-              <ChevronLeft size={16} />
-            </Button>
-          </div>
-        </PremiumCard>
-      )}
+      {totalPages > 1 && (() => {
+        const paginator = createPaginationState({
+          page: currentPage,
+          size: totalCount > 0 ? Math.ceil(totalCount / totalPages) : 25,
+          total: totalCount,
+        });
+        return (
+          <PremiumCard className="p-3">
+            <Pagination
+              paginator={paginator}
+              onPageChange={(p) => setCurrentPage(p)}
+              showSizeChanger={false}
+              locale="ar"
+            />
+            <p className="mt-1 text-center text-[10px] font-bold text-muted">
+              صفحة {currentPage} من {totalPages} • {totalCount} سجل
+            </p>
+          </PremiumCard>
+        );
+      })()}
 
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
         <DialogContent className="max-w-lg rounded-[2rem] border-0 p-0 overflow-hidden bg-card shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)]">

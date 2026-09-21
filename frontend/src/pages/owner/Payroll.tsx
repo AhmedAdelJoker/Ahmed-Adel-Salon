@@ -1,4 +1,5 @@
 import { usePayroll, MONTHS, toNumber, formatSignedPct, PeriodChartPanel, StaffSnapshot, PayrollTable, PayrollModals } from "@/features/payroll";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import exportService from "@/services/exportService";
 import {
   Archive,
@@ -81,6 +82,11 @@ export default function Payroll() {
     handleSaveEdit,
     rawRows,
     filteredRows,
+    // Phase 2: pagination
+    page,
+    setPage,
+    size,
+    totalCount,
     editedNetSalary,
     growth,
     paidGrowth,
@@ -284,6 +290,28 @@ export default function Payroll() {
           </div>
         </PremiumCard>
       </div>
+
+      {/* Phase 2: unified pagination — reads X-Total-Count header */}
+      {totalCount > 0 && (() => {
+        const paginator = createPaginationState({
+          page,
+          size,
+          total: totalCount,
+        });
+        return (
+          <PremiumCard className="p-3">
+            <Pagination
+              paginator={paginator}
+              onPageChange={setPage}
+              showSizeChanger={false}
+              locale="ar"
+            />
+            <p className="mt-1 text-center text-[10px] font-bold text-muted">
+              صفحة {page} • {totalCount} سجل إجمالي
+            </p>
+          </PremiumCard>
+        );
+      })()}
 
       <PayrollModals
         isEditModalOpen={isEditModalOpen}

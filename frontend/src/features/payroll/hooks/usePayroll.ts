@@ -5,6 +5,13 @@ import payrollService from "@/services/payrollService";
 import salaryAdvanceService from "@/features/payroll/services/salaryAdvanceService";
 import { adaptList, adaptObject } from "@/services/apiAdapter";
 import api from "@/services/api";
+
+function readTotalCount(response: unknown, fallback: number): number {
+  const h = (response as { headers?: Record<string, unknown> } | null)?.headers ?? {};
+  const raw = h["x-total-count"] ?? h["X-Total-Count"];
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
 import toast from "react-hot-toast";
 import { formatCurrency } from "@/lib/core/utils";
 import { pctGrowth } from "@/lib/money/financialAnalytics";
@@ -85,6 +92,10 @@ export function usePayroll() {
   const [sortKey, setSortKey] = useState<"net" | "name" | "base">("net");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [showAllStaff, setShowAllStaff] = useState(false);
+  // Phase 2: pagination — server-side via /payroll?page=&size=
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkPaying, setBulkPaying] = useState(false);
 
@@ -95,7 +106,7 @@ export function usePayroll() {
     try {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
-      const payrollParams = { ...period, employee_id: employeeIdFilter || undefined };
+      const payrollParams = { ...period, employee_id: employeeIdFilter || undefined, page, size };
       const prev = prevPeriodOf(period);
       const [listRes, summaryRes, prevSummaryRes, advancesRes, employeesRes] = await Promise.all([
         payrollService.list(payrollParams),
@@ -105,6 +116,8 @@ export function usePayroll() {
         api.get("/employees"),
       ]);
       setPayrolls(adaptList(listRes));
+      // Phase 2: read X-Total-Count header (set by /payroll endpoint)
+      setTotalCount(readTotalCount(listRes, adaptList(listRes).length));
       setSummary(adaptObject(summaryRes, { total_payroll: 0, total_employees: 0 }) as PayrollSummary);
       setPrevSummary(prevSummaryRes ? (adaptObject(prevSummaryRes, null) as PayrollSummary | null) : null);
       setAdvances(adaptList(advancesRes));
@@ -377,6 +390,12 @@ export function usePayroll() {
     filteredRows,
     editedNetSalary,
     growth,
+    // Phase 2: pagination
+    page,
+    setPage,
+    size,
+    setSize,
+    totalCount,
     paidGrowth,
     unpaidGrowth,
     avgSalary,

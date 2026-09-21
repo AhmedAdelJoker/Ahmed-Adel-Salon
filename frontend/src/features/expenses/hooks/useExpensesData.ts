@@ -52,11 +52,18 @@ export function useExpensesData(isOwner: boolean) {
       const data = listRes.data;
       const items: ExpenseRecord[] = Array.isArray(data) ? data : data.items || data.data || [];
       setExpenses(items);
-      setTotalCount(Array.isArray(data)
-        ? (items.length < PAGE_SIZE && currentPage === 1 ? items.length : items.length + (currentPage - 1) * PAGE_SIZE)
-        : data.total || items.length);
-      if (Array.isArray(data) && items.length === PAGE_SIZE) {
-        setTotalCount((prev) => Math.max(prev, items.length + 1));
+
+      // Phase 2: prefer X-Total-Count header (set by /expenses endpoint)
+      const headers = (listRes as { headers?: Record<string, unknown> }).headers ?? {};
+      const headerTotal = headers["x-total-count"] ?? headers["X-Total-Count"];
+      const headerNum = Number(headerTotal);
+      if (Number.isFinite(headerNum) && headerNum >= 0) {
+        setTotalCount(headerNum);
+      } else {
+        // Fallback for old responses: best-effort estimate
+        setTotalCount(Array.isArray(data)
+          ? (items.length < PAGE_SIZE && currentPage === 1 ? items.length : items.length + (currentPage - 1) * PAGE_SIZE)
+          : (data as { total?: number })?.total ?? items.length);
       }
       setSummary(summaryRes.data || null);
     } catch (_err) {

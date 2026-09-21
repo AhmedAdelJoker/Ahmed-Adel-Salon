@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PageHeader, PremiumCard, SkeletonCard } from "@/components/shared/PremiumUI";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import { formatCurrency } from "@/lib/core/utils";
 
 const CATEGORIES = [
@@ -399,18 +400,29 @@ export default function ExpensesArchive() {
               {sortedItems.length === 0 && <div className="py-10 text-center font-bold text-muted">لا توجد نتائج</div>}
             </div>
 
-            {/* Pagination */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border p-4 bg-soft/20 print:hidden">
-              <Button variant="outline" disabled={filters.page <= 1 || loading} onClick={() => setFilters((p) => ({ ...p, page: Math.max(1, p.page - 1) }))} className="h-9 rounded-xl font-black w-full sm:w-auto">السابق</Button>
-              <div className="flex items-center gap-2 text-xs font-bold text-muted">
-                <span>صفحة {filters.page} من {totalPages}</span><span className="hidden sm:inline">•</span><span>{total} عملية</span>
-                <Select value={String(filters.limit)} onValueChange={(v) => setFilters((p) => ({ ...p, limit: Number(v), page: 1 }))}>
-                  <SelectTrigger className="h-8 w-24 rounded-xl bg-card text-xs font-black"><SelectValue /></SelectTrigger>
-                  <SelectContent>{LIMITS.map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <Button variant="outline" disabled={filters.page >= totalPages || loading} onClick={() => setFilters((p) => ({ ...p, page: Math.min(totalPages, p.page + 1) }))} className="h-9 rounded-xl font-black w-full sm:w-auto">التالي</Button>
-            </div>
+            {/* Phase 2: unified pagination — reads X-Total-Count header */}
+            {total > 0 && (() => {
+              const paginator = createPaginationState({
+                page: filters.page,
+                size: filters.limit,
+                total,
+              });
+              return (
+                <div className="border-t border-border bg-soft/20 px-2 py-3 print:hidden">
+                  <Pagination
+                    paginator={paginator}
+                    onPageChange={(p) => setFilters((prev) => ({ ...prev, page: p }))}
+                    onSizeChange={(s) => setFilters((prev) => ({ ...prev, limit: s, page: 1 }))}
+                    locale="ar"
+                  />
+                  <div className="flex items-center justify-center gap-2 px-3 pb-1 text-[10px] font-bold text-muted">
+                    <span>صفحة {filters.page} من {totalPages}</span>
+                    <span>•</span>
+                    <span>{total} عملية</span>
+                  </div>
+                </div>
+              );
+            })()}
           </>
         )}
       </Card>
