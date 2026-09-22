@@ -18,6 +18,7 @@ class ProfileRead(BaseModel):
     profile_image_url: Optional[str] = None
     display_name: Optional[str] = None
     bio_ar: Optional[str] = None
+    totp_enabled: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
