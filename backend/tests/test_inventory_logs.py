@@ -20,11 +20,14 @@ def _seed_product(db_session, name="Shampoo", category="Care"):
 
 
 def _seed_log(db_session, product_id, change, log_type="add", note="توريد", log_no=None):
+    from datetime import datetime
+
     log = InventoryLog(
         product_id=product_id,
         change_amount=Decimal(str(change)),
         type=log_type,
         note=f"{note} {log_no}" if log_no is not None else note,
+        created_at=datetime.now(),
     )
     db_session.add(log)
     db_session.commit()

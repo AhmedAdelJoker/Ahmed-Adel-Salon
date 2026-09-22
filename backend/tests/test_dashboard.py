@@ -19,6 +19,8 @@ def _seed_customer(db_session, first_name="Sara", phone="01001234567", is_delete
 
 
 def _seed_invoice(db_session, customer_id, total, invoice_no, is_draft=False):
+    from datetime import datetime
+
     invoice = Invoice(
         invoice_no=invoice_no,
         customer_id=customer_id,
@@ -26,6 +28,7 @@ def _seed_invoice(db_session, customer_id, total, invoice_no, is_draft=False):
         subtotal_amount=Decimal(str(total)),
         total_amount=Decimal(str(total)),
         is_draft=is_draft,
+        created_at=datetime.now(),
     )
     db_session.add(invoice)
     db_session.commit()

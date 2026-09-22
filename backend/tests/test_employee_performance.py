@@ -48,6 +48,8 @@ def _seed_invoice_with_item(
     service_name="Haircut",
     is_draft=False,
 ):
+    from datetime import datetime
+
     invoice = Invoice(
         invoice_no=invoice_no,
         customer_id=customer_id,
@@ -56,6 +58,7 @@ def _seed_invoice_with_item(
         subtotal_amount=Decimal(str(total)),
         total_amount=Decimal(str(total)),
         is_draft=is_draft,
+        created_at=datetime.now(),
     )
     db_session.add(invoice)
     db_session.commit()

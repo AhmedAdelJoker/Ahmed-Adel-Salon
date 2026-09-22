@@ -22,6 +22,8 @@ def _seed_customer(db_session, phone="01009998888"):
 
 
 def _seed_invoice(db_session, customer_id, user_id, total, invoice_no, is_draft=False):
+    from datetime import datetime
+
     invoice = Invoice(
         invoice_no=invoice_no,
         customer_id=customer_id,
@@ -30,6 +32,7 @@ def _seed_invoice(db_session, customer_id, user_id, total, invoice_no, is_draft=
         total_amount=Decimal(str(total)),
         created_by_user_id=user_id,
         is_draft=is_draft,
+        created_at=datetime.now(),
     )
     db_session.add(invoice)
     db_session.commit()
@@ -38,7 +41,11 @@ def _seed_invoice(db_session, customer_id, user_id, total, invoice_no, is_draft=
 
 
 def _seed_shift(db_session, user_id, status="open"):
-    shift = PosShift(user_id=user_id, status=status)
+    from datetime import datetime
+
+    shift = PosShift(user_id=user_id, status=status, opened_at=datetime.now())
+    if status == "closed":
+        shift.closed_at = datetime.now()
     db_session.add(shift)
     db_session.commit()
     db_session.refresh(shift)
@@ -46,7 +53,9 @@ def _seed_shift(db_session, user_id, status="open"):
 
 
 def _seed_expense(db_session, amount, description="قرطاسية"):
-    expense = Expense(amount=float(amount), category="تشغيل", description=description)
+    from datetime import datetime
+
+    expense = Expense(amount=float(amount), category="تشغيل", description=description, created_at=datetime.now())
     db_session.add(expense)
     db_session.commit()
     db_session.refresh(expense)
