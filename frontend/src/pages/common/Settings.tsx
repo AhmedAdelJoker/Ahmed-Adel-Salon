@@ -32,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/core/utils";
 import { validateImageSize } from "@/lib/media/upload";
 import { PageHeader, PremiumCard, ContentPanel, SkeletonCard } from "@/components/shared/PremiumUI";
+import TwoFactorPanel from "@/features/security/components/TwoFactorPanel";
 import { AnimatePresence } from "framer-motion";
 
 const SETTINGS_TABS = [
@@ -530,6 +531,9 @@ export default function Settings() {
                     </div>
                   </form>
                 </ContentPanel>
+                <div className="mt-6">
+                  <TwoFactorPanel />
+                </div>
               </motion.div>
             )}
 
