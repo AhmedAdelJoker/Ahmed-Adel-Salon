@@ -110,20 +110,7 @@ def process_image_content(
         raise HTTPException(status_code=500, detail="حدث خطأ أثناء معالجة الصورة")
 
 def get_upload_path(folder_name: str) -> Path:
-    """Gets absolute path for uploads folder - must match main.py."""
-    import os
-    env_dir = os.getenv("UPLOADS_DIR")
-    if env_dir:
-        return Path(env_dir) / folder_name
-    try:
-        from app.core.paths import get_uploads_dir
-        return get_uploads_dir() / folder_name
-    except Exception:
-        pass
-    cur = Path(__file__).resolve()
-    # Docker
-    if cur.as_posix().startswith("/app/"):
-        return Path("/app/uploads") / folder_name
-    # Local: backend/app/utils/media.py -> parents[3] == project root (Salon-Management-Pro)
-    # Verified: parents[0]=utils,1=app,2=backend,3=project root
-    return cur.parents[3] / "uploads" / folder_name
+    """Single canonical path — delegates to app.core.paths.get_uploads_dir (SOT)."""
+    from app.core.paths import get_uploads_dir
+
+    return get_uploads_dir() / folder_name

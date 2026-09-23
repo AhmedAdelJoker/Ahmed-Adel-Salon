@@ -19,6 +19,7 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import settings
+from app.core.paths import get_uploads_dir as _get_uploads_dir  # SOT delegation for §5.2
 
 
 # Filename pattern: letters, digits, dashes, underscores, dots, spaces, and
@@ -237,3 +238,13 @@ async def validate_data_sheet(
     """Validate an Excel/CSV data import."""
     with _only(_DATA_EXTS):
         return await validate_upload(upload, max_size=max_size)
+
+
+def get_upload_root() -> Path:
+    """Canonical uploads root — delegates to app.core.paths (single source of truth)."""
+    return _get_uploads_dir()
+
+
+def get_upload_path(folder: str) -> Path:
+    """Convenience: uploads subfolder via central paths helper."""
+    return _get_uploads_dir() / folder

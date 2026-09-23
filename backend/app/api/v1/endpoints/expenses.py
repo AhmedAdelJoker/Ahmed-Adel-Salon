@@ -18,7 +18,7 @@ from app.core.upload_security import validate_image_or_pdf
 from app.crud.core_business import create_cash_transaction
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
-UPLOAD_DIR = get_upload_path("expenses")
+# UPLOAD_DIR now resolved lazily via get_upload_path("expenses") (SOT §5.2)
 
 
 @router.get("", response_model=list[ExpenseRead])
@@ -378,9 +378,10 @@ async def upload_invoice_image(
     # Phase 3: validate MIME/size/filename before processing
     content = await validate_image_or_pdf(file, max_size=10 * 1024 * 1024)
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "bin"
-    safe_name = f"{uuid.uuid4().hex}.{ext}"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    save_path = UPLOAD_DIR / safe_name
+    safe_name = f"{uuid4().hex}.{ext}"
+    upload_dir = get_upload_path("expenses")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    save_path = upload_dir / safe_name
     save_path.write_bytes(content)
     return {"url": f"/uploads/expenses/{safe_name}"}
 

@@ -12,6 +12,8 @@ from app.models.user import User
 from app.models.employee import Employee
 from app.models.employee_document import EmployeeDocument
 from app.core.upload_security import validate_image_or_pdf
+from app.utils.media import get_upload_path
+from app.core.paths import get_uploads_dir
 
 router = APIRouter(prefix="/employees", tags=["Employee Documents"])
 
@@ -68,8 +70,9 @@ async def upload_employee_document(
     # Phase 3: validate MIME/size/filename BEFORE writing to disk
     content = await validate_image_or_pdf(file, max_size=10 * 1024 * 1024)
 
-    # Ensure directory exists
-    os.makedirs("uploads/documents", exist_ok=True)
+    # Canonical uploads dir via SOT (unified §5.2)
+    upload_dir = get_upload_path("documents")
+    upload_dir.mkdir(parents=True, exist_ok=True)
 
     # Professional Naming Convention: EMP_NAME_TYPE_DATE_UUID{EXT}
     # Use the sanitized filename set by validate_image_or_pdf
@@ -80,11 +83,10 @@ async def upload_employee_document(
     unique_id = uuid.uuid4().hex[:6]
 
     filename = f"EMP_{safe_name}_{safe_type}_{date_str}_{unique_id}{ext}"
-    file_path = os.path.join("uploads/documents", filename)
+    file_path = upload_dir / filename
 
     # Save file (already validated — content is in memory)
-    with open(file_path, "wb") as buffer:
-        buffer.write(content)
+    file_path.write_bytes(content)
     
     parsed_expiry = None
     if expiry_date:
@@ -126,13 +128,33 @@ def delete_employee_document(
     if not doc:
         raise HTTPException(status_code=404, detail="المستند غير موجود")
     
-    # Delete file from disk
-    file_url = doc.file_url
-    if file_url.startswith("/"):
-        file_url = file_url[1:]
-    
-    if os.path.exists(file_url):
-        os.remove(file_url)
+    # Delete file from disk — resolve via canonical uploads dir (SOT)
+    file_url = doc.file_url or ""
+    target = None
+    if file_url.startswith("/uploads/"):
+        rel = file_url[len("/uploads/"):]
+        target = get_uploads_dir() / rel
+        if target.exists():
+            try:
+                target.unlink()
+            except Exception:
+                pass
+        else:
+            # legacy fallback: relative path uploads/...
+            legacy = __import__("pathlib").Path(file_url.lstrip("/"))
+            if legacy.exists():
+                try:
+                    legacy.unlink()
+                except Exception:
+                    pass
+    elif file_url:
+        # fallback for any other relative form
+        legacy = __import__("pathlib").Path(file_url.lstrip("/"))
+        if legacy.exists():
+            try:
+                legacy.unlink()
+            except Exception:
+                pass
         
     db.delete(doc)
     db.commit()

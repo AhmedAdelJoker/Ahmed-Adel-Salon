@@ -15,8 +15,7 @@ from app.core.upload_security import validate_image
 
 router = APIRouter(prefix="/business-settings", tags=["Business Settings"])
 
-# uploads/business  (relative to project root  →  backend/../uploads/business)
-UPLOADS_DIR = get_upload_path("business")
+# uploads/business now resolved lazily via get_upload_path("business") (SOT §5.2)
 
 def _get_or_create_business_settings(db: Session) -> BusinessSettings:
     row = db.query(BusinessSettings).first()
@@ -88,7 +87,8 @@ async def upload_business_logo(
     row = _get_or_create_business_settings(db)
     # Phase 3: validate MIME/size/filename before processing
     content = await validate_image(file, max_size=5 * 1024 * 1024)
-    filename = process_image_content(content, file.filename, UPLOADS_DIR)
+    upload_dir = get_upload_path("business")
+    filename = process_image_content(content, file.filename, upload_dir)
     row.logo_url = f"/uploads/business/{filename}"
     db.add(row)
     db.commit()
@@ -105,7 +105,8 @@ async def upload_business_media(
     """رفع صورة للصفحة العامة (غلاف أو معرض)."""
     # Phase 3: validate MIME/size/filename before processing
     content = await validate_image(file, max_size=10 * 1024 * 1024)
-    filename = process_image_content(content, file.filename, UPLOADS_DIR)
+    upload_dir = get_upload_path("business")
+    filename = process_image_content(content, file.filename, upload_dir)
     # رابط نسبي — الفرونت-إند يضيف STATIC_URL أمامه
     url = f"/uploads/business/{filename}"
     return {"url": url}

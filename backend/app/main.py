@@ -120,53 +120,24 @@ scheduler.start()
 
 
 def _resolve_uploads_dir() -> Path:
-    import os
-    env_dir = os.getenv("UPLOADS_DIR")
-    if env_dir:
-        return Path(env_dir)
-    cur = Path(__file__).resolve()
-    # Docker detection: code lives under /app
-    if cur.as_posix().startswith("/app/"):
-        return Path("/app/uploads")
-    # Local dev: backend/app/main.py -> parents[2] == project root (Salon-Management-Pro)
-    # parents[2] works for both local and keeps backward compat
-    candidate = cur.parents[2] / "uploads"
-    # Fallback to parents[3] for legacy media.py location handling
-    if candidate.exists() or (cur.parents[2] / "backend").exists():
-        return candidate
-    return cur.parents[3] / "uploads"
+    """Single canonical resolver — delegates to app.core.paths (SOT) with idempotent migration."""
+    from app.core.paths import get_uploads_dir, migrate_legacy_data
+
+    try:
+        migrate_legacy_data()
+    except Exception:
+        pass
+    return get_uploads_dir()
 
 uploads_dir = _resolve_uploads_dir()
 uploads_dir.mkdir(parents=True, exist_ok=True)
 
-# ensure sub-directories exist
-for sub in ["business", "products", "services", "employees", "invoices", "documents", "profiles", "expenses"]:
+# ensure sub-directories exist (idempotent)
+for sub in [
+    "business", "products", "services", "employees", "invoices",
+    "documents", "profiles", "expenses", "offers", "scheduled_reports",
+]:
     (uploads_dir / sub).mkdir(parents=True, exist_ok=True)
-
-# Ensure backward-compat: migrate files from legacy wrong paths
-try:
-    import shutil
-    legacy_paths = [
-        Path(__file__).resolve().parents[3] / "uploads",  # Downloads/uploads (old bug)
-        Path(__file__).resolve().parents[2] / "backend" / "uploads",  # backend/uploads (intermediate bug)
-    ]
-    for legacy_wrong in legacy_paths:
-        if legacy_wrong.exists() and legacy_wrong.resolve() != uploads_dir.resolve():
-            for sub in ["profiles", "business", "products", "services", "documents", "expenses"]:
-                src_sub = legacy_wrong / sub
-                if src_sub.exists():
-                    dest_sub = uploads_dir / sub
-                    dest_sub.mkdir(parents=True, exist_ok=True)
-                    for item in src_sub.glob("*"):
-                        if item.is_file():
-                            dest = dest_sub / item.name
-                            if not dest.exists():
-                                try:
-                                    shutil.copy2(item, dest)
-                                except Exception:
-                                    pass
-except Exception as _e:
-    logger.warning("[uploads] legacy migration warning: %s", _e)
 
 app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
