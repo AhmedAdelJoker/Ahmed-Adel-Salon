@@ -519,7 +519,7 @@ export default function OperationalReports() {
                     <span className="text-[10px] font-black uppercase tracking-widest text-muted">
                       إجمالي المصروف
                     </span>
-                    <span className="max-w-[170px] truncate text-lg font-black tabular-nums text-main">
+                    <span className="max-w-[170px] truncate-1 text-lg font-black tabular-nums text-main">
                       {formatCurrency(financialMetrics.expenseTotal)}
                     </span>
                   </div>
@@ -535,7 +535,7 @@ export default function OperationalReports() {
                               className="h-2.5 w-2.5 shrink-0 rounded-full"
                               style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
                             />
-                            <span className="truncate">{c.name}</span>
+                            <span className="truncate-1">{c.name}</span>
                           </span>
                           <span className="shrink-0 text-xs font-black tabular-nums text-main">
                             {formatCurrency(c.value)} • {pct.toFixed(0)}%

@@ -286,7 +286,7 @@ export default function FinancialReports() {
 
       {/* Main tabs — same pattern as Settings / HRManagement */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 overflow-x-auto p-1.5 print:hidden">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 scroll-x p-1.5 print:hidden">
           <TabsTrigger value="overview" className="gap-1.5 text-xs font-black">
             <LayoutGrid size={14} /> نظرة عامة
           </TabsTrigger>

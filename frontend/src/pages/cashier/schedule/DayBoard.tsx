@@ -79,7 +79,7 @@ const DayBoard = memo(function DayBoard({
   const gridTemplate = `${TIME_COL_WIDTH}px repeat(${barbers.length}, minmax(${BARBER_COL_MIN}px, 1fr))`;
 
   return (
-    <div className="overflow-x-auto overflow-y-auto custom-scrollbar max-h-[72vh] rounded-2xl">
+    <div className="scroll-x overflow-y-auto custom-scrollbar max-h-[72vh] rounded-2xl">
       <div className="min-w-[640px]">
         <div
           ref={headerRef}
