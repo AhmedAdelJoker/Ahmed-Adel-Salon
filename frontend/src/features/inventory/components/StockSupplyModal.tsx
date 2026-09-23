@@ -16,7 +16,7 @@ import {
   formatQuantity,
   getAvailablePacks,
 } from "@/features/inventory/design-tokens";
-import { FormField } from "@/features/inventory/components/FormField";
+import { FormField } from "@/features/inventory";
 import type {
   InventoryProductAny,
   StockFormData,

@@ -14,7 +14,7 @@ import {
   UNIT_OPTIONS,
   normalizeUnit,
 } from "@/features/inventory/design-tokens";
-import { FormField } from "@/features/inventory/components/FormField";
+import { FormField } from "@/features/inventory";
 import {
   NATIVE_SELECT_CLASS,
   TEXTAREA_CLASS,

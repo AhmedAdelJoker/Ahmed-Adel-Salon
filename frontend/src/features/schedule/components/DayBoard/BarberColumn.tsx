@@ -10,9 +10,7 @@ import {
   getAppointmentDuration,
   isPastTime,
 } from "@/pages/cashier/schedule/scheduleUtils";
-import { SlotDropZone } from "@/features/schedule/components/DayBoard/SlotDropZone";
-import { computeLanes, hourLineClass } from "@/features/schedule/components/DayBoard/utils";
-import { dirIsRtl } from "@/features/schedule/components/DayBoard/constants";
+import { SlotDropZone, computeLanes, hourLineClass, dirIsRtl } from "@/features/schedule";
 
 type BarberAppointment = {
   id: string | number;

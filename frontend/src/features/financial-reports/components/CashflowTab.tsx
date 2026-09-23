@@ -4,7 +4,6 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
-  Legend,
   Line,
   Pie,
   PieChart,
@@ -17,10 +16,10 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { cn, formatCurrency } from "@/lib/core/utils";
 import { ChartCard } from "@/components/shared/DisplayComponents";
-import { FinanceTooltip } from "@/features/financial-reports/components/FinancialChartBits";
+import { FinanceTooltip } from "@/features/financial-reports";
 import { compactTick } from "@/features/financial-reports/utils";
 import type { FinancialsState, TrendPoint } from "@/types/reports";
-import type { SelectedPayment } from "@/features/financial-reports/components/DrilldownPanel";
+import type { SelectedPayment } from "@/features/financial-reports";
 
 export interface CashflowTabProps {
   financials: FinancialsState;

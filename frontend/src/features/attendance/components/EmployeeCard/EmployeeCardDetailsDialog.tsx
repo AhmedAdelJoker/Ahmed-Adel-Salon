@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
 import { Badge } from "@/components/ui/badge";
-import { statusConfig } from "@/features/attendance/components/EmployeeCard/constants";
+import { statusConfig } from "@/features/attendance";
 
 interface EmployeeCardDetailsDialogProps {
   open: boolean;

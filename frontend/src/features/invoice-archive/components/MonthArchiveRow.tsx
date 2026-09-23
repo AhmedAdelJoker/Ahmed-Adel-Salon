@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/core/utils";
 import { Button } from "@/components/ui/button";
-import { CheckIcon, Loader } from "@/features/invoice-archive/components/ArchiveIcons";
+import { CheckIcon, Loader } from "@/features/invoice-archive";
 import type {
   ArchiveMonth,
   MonthInvoice,

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn, formatCurrency } from "@/lib/core/utils";
 import { ChartCard } from "@/components/shared/DisplayComponents";
 import { PremiumCard } from "@/components/shared/PremiumUI";
-import { FinanceTooltip } from "@/features/financial-reports/components/FinancialChartBits";
+import { FinanceTooltip } from "@/features/financial-reports";
 import { compactTick } from "@/features/financial-reports/utils";
 import AIInsights from "@/components/AIInsights";
 import type { MonthlyBucket } from "@/lib/money/financialAnalytics";

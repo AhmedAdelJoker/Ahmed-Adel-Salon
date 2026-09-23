@@ -3,47 +3,25 @@ import {
   Activity,
   AlertTriangle,
   Banknote,
-  BarChart3,
   BellRing,
   Calculator,
   Calendar,
-  CalendarRange,
   ChevronDown,
   CreditCard,
   Download,
   FileDown,
-  FileSpreadsheet,
-  History,
   Info,
   LayoutGrid,
-  PieChart as PieChartIcon,
   Play,
-  Printer,
   Receipt,
   RefreshCw,
   Sparkles,
-  Target,
   Trash2,
-  TrendingDown,
-  TrendingUp,
   Wallet,
   Zap,
 } from "lucide-react";
-import {
-  Area,
-  Bar,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Legend,
-  Line,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip as ReTooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+
+
 import { staticURL } from "@/services/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,18 +36,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import AIInsights from "@/components/AIInsights";
 import { cn, formatCurrency, formatDateTime } from "@/lib/core/utils";
 import {
   ContentPanel,
   PageHeader,
-  PremiumCard,
   SkeletonCard,
 } from "@/components/shared/PremiumUI";
 import {
   ChartCard,
-  CurrencyStatCard,
-  StatCard as StatCardDisplay,
 } from "@/components/shared/DisplayComponents";
 import {
   AnomalyAlerts,
@@ -77,14 +51,10 @@ import {
   CHART_COLORS,
   DrilldownPanel,
   FilterBar,
-  FinanceTooltip,
   ForecastTab,
   KpiRow,
   MonthlyTargetProgress,
-  PRESETS,
   REPORT_EXPORTS,
-  compactTick,
-  formatSignedPct,
   useFinancialReports,
 } from "@/features/financial-reports";
 

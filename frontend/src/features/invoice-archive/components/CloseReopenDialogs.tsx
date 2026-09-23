@@ -8,7 +8,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader } from "@/features/invoice-archive/components/ArchiveIcons";
+import { Loader } from "@/features/invoice-archive";
 import type { ArchiveMonth } from "@/features/invoice-archive/types";
 
 export interface CloseReopenDialogsProps {

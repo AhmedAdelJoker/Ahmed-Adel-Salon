@@ -3,7 +3,7 @@ import {
   getAppointmentDuration,
   timeToMinutes,
 } from "@/pages/cashier/schedule/scheduleUtils";
-import { MAX_LANES } from "@/features/schedule/components/DayBoard/constants";
+import { MAX_LANES } from "@/features/schedule";
 
 export function hourLineClass(index: number): boolean {
   return index % 2 === 0;

@@ -24,7 +24,7 @@ import {
   getAvailablePacks,
   getEstimatedUnitCost,
 } from "@/features/inventory/design-tokens";
-import { Metric } from "@/features/inventory/components/ProductCard";
+import { Metric } from "@/features/inventory";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { AnimatePresence } from "framer-motion";

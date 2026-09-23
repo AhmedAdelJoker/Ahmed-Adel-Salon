@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { statusConfig, aiConfig } from "@/features/attendance/components/EmployeeCard/constants";
-import { EmployeeCardHeader } from "@/features/attendance/components/EmployeeCard/EmployeeCardHeader";
-import { EmployeeCardStats } from "@/features/attendance/components/EmployeeCard/EmployeeCardStats";
-import { EmployeeCardDetailsDialog } from "@/features/attendance/components/EmployeeCard/EmployeeCardDetailsDialog";
+import { statusConfig, aiConfig, EmployeeCardHeader, EmployeeCardStats, EmployeeCardDetailsDialog } from "@/features/attendance";
 
 const EmployeeCard = ({ rec, employees }: { rec: any; employees: any[] }) => {
   const [showDetails, setShowDetails] = useState(false);

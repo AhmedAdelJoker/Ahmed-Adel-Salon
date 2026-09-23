@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Archive, FileDown, FileUp, Plus } from "lucide-react";
 import { Button } from "@/components/ui";
-import { importService } from "@/features/customers/services/importService";
+import { importService } from "@/features/customers";
 
 export default function CustomerHeader({
   loading,

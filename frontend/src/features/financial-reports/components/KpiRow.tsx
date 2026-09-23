@@ -1,5 +1,5 @@
 import { Target, TrendingDown, TrendingUp, Wallet } from "lucide-react";
-import { ChartCard, CurrencyStatCard, StatCard as StatCardDisplay } from "@/components/shared/DisplayComponents";
+import { CurrencyStatCard, StatCard as StatCardDisplay } from "@/components/shared/DisplayComponents";
 import { formatCurrency } from "@/lib/core/utils";
 import { formatSignedPct } from "@/features/financial-reports/hooks/useFinancialReports";
 import type { FinancialsState } from "@/types/reports";

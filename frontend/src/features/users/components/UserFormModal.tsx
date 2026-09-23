@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { UsersViewUser } from "@/features/users/components/UsersViewContent";
+import type { UsersViewUser } from "@/features/users";
 import { Fingerprint, Lock, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {

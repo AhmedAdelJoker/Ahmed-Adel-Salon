@@ -11,8 +11,7 @@ import {
   analyzeProductivity,
 } from "@/lib/domain/attendance";
 import { Badge } from "@/components/ui/badge";
-import { statusConfig, aiConfig } from "@/features/attendance/components/DailySummary/constants";
-import { formatTime } from "@/features/attendance/components/DailySummary/utils";
+import { statusConfig, aiConfig, formatTime } from "@/features/attendance";
 
 const DailySummary = ({ todayRecords, employees }) => {
   const summaryData = useMemo(() => {

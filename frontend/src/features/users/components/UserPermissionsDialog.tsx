@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import type { UserFormData } from "@/features/users/components/UserFormModal";
+import type { UserFormData } from "@/features/users";
 import {
   Shield,
   ShieldCheck,

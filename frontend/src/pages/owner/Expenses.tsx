@@ -13,8 +13,6 @@ import {
   Download,
   Save,
   Image as ImageIcon,
-  ChevronLeft,
-  ChevronRight,
   RefreshCw,
   ShieldCheck,
   CheckCircle2,

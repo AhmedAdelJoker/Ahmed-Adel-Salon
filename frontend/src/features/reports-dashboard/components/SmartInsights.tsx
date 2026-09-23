@@ -1,7 +1,7 @@
 import { Activity, AlertTriangle, Target, TrendingUp, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ContentPanel } from "@/components/shared/PremiumUI";
-import { InsightCard } from "@/features/reports-dashboard/components/InsightCard";
+import { InsightCard } from "@/features/reports-dashboard";
 
 export interface SmartInsightsProps {
   newCustomersThisWeek: number | undefined;
