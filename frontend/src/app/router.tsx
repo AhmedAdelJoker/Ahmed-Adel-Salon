@@ -24,6 +24,7 @@ import DynamicBackground from "@/components/layout/DynamicBackground";
 import { cn } from "@/lib/core/utils";
 import { AnimatePresence } from "framer-motion";
 import { Scissors } from "lucide-react";
+import i18n from "@/i18n";
 
 const PAGE_TITLES = Object.freeze({
   "/owner": "التقارير الإحصائية",
@@ -311,6 +312,7 @@ function MainLayout() {
 
   return (
     <div
+      dir={i18n.dir() as "rtl" | "ltr"}
       className="app-shell relative flex h-dvh w-full overflow-hidden bg-slate-100 dark:bg-slate-950"
     >
       <DynamicBackground />

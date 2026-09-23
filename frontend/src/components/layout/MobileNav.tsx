@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { Home, ShoppingBag, Briefcase, Wallet, Users as UsersIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/core/utils";
@@ -70,6 +70,7 @@ const MOBILE_LINKS = [
 
 export default function MobileNav() {
   const { user } = useAuth();
+  const location = useLocation();
   const role = String(user?.role ?? "").toUpperCase();
   const homePath = getMobileHomePath(role);
 
@@ -95,26 +96,24 @@ export default function MobileNav() {
         <div className={`grid gap-1 ${gridCols}`}>
           {resolvedLinks.map((link) => {
             const Icon = link.icon;
+            const isActive =
+              location.pathname === link.to ||
+              location.pathname.startsWith(`${link.to}/`);
             return (
               <NavLink
                 key={link.label + link.to}
                 to={link.to}
                 aria-label={link.label}
-                className={({ isActive }) =>
-                  cn(
-                    "flex flex-col items-center justify-center gap-1 rounded-xl py-2 transition-all",
-                    isActive
-                      ? "bg-primary-soft text-primary"
-                      : "text-muted hover:bg-soft",
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
-                    <span className="text-[10px] font-bold">{link.label}</span>
-                  </>
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1 rounded-xl py-2 transition-all",
+                  isActive
+                    ? "bg-primary-soft text-primary"
+                    : "text-muted hover:bg-soft",
                 )}
+              >
+                <Icon size={18} strokeWidth={isActive ? 2.5 : 2} aria-hidden="true" />
+                <span className="text-[10px] font-bold">{link.label}</span>
               </NavLink>
             );
           })}

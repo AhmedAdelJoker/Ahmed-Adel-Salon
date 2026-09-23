@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui";
 
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { PageHeader, SkeletonCard } from "@/components/shared/PremiumUI";
+import { PageHeader } from "@/components/shared/PremiumUI";
+import { LoadingState } from "@/components/shared";
 import {
   useCustomersList,
   useCustomerDialogs,
@@ -86,15 +87,7 @@ function CustomersInner() {
           title="سجل العملاء"
           subtitle="إدارة قاعدة البيانات وبناء علاقات ولاء مستدامة"
         />
-
-        <div data-stats-grid="true">
-          <SkeletonCard variant="stats" />
-          <SkeletonCard variant="stats" />
-          <SkeletonCard variant="stats" />
-          <SkeletonCard variant="stats" />
-        </div>
-
-        <SkeletonCard variant="content" />
+        <LoadingState variant="page" label="جاري تحميل العملاء..." />
       </div>
     );
   }

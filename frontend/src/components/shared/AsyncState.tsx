@@ -15,11 +15,17 @@ import { AlertTriangle, Inbox, Loader2, RefreshCw } from "lucide-react";
 
 /* ----------------------------- Loading ----------------------------- */
 
+export interface LoadingStateProps {
+  label?: string;
+  variant?: "page" | "section" | "inline";
+  className?: string;
+}
+
 export function LoadingState({
   label = "جاري التحميل...",
-  variant = "page", // "page" | "section" | "inline"
+  variant = "page",
   className = "",
-}) {
+}: LoadingStateProps) {
   const isInline = variant === "inline";
   const isPage = variant === "page";
 
@@ -51,6 +57,15 @@ export function LoadingState({
 
 /* ------------------------------ Error ------------------------------ */
 
+export interface ErrorStateProps {
+  title?: string;
+  message?: string;
+  onRetry?: () => void;
+  retryLabel?: string;
+  variant?: "page" | "section" | "inline";
+  className?: string;
+}
+
 export function ErrorState({
   title = "حدث خطأ غير متوقع",
   message,
@@ -58,7 +73,7 @@ export function ErrorState({
   retryLabel = "إعادة المحاولة",
   variant = "page",
   className = "",
-}) {
+}: ErrorStateProps) {
   const isPage = variant === "page";
 
   return (
@@ -112,6 +127,15 @@ export function ErrorState({
 
 /* ------------------------------ Empty ------------------------------ */
 
+export interface EmptyStateProps {
+  title?: string;
+  message?: string;
+  icon?: React.ReactNode;
+  action?: React.ReactNode;
+  variant?: "page" | "section" | "inline";
+  className?: string;
+}
+
 export function EmptyState({
   title = "لا توجد بيانات",
   message,
@@ -119,7 +143,7 @@ export function EmptyState({
   action,
   variant = "page",
   className = "",
-}) {
+}: EmptyStateProps) {
   const isPage = variant === "page";
 
   return (

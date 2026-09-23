@@ -1,5 +1,6 @@
 import { Activity, LayoutDashboard, Loader2, ShieldCheck, TrendingUp, Users, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import i18n from "@/i18n";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -45,7 +46,7 @@ export default function ReportsDashboard() {
 
   if (loading && weeklyData.length === 0 && serviceDistribution.length === 0) {
     return (
-      <div className="erp-page space-y-8 pb-8" dir="rtl" aria-busy="true" aria-live="polite">
+      <div className="erp-page space-y-8 pb-8" dir={i18n.dir() as "rtl" | "ltr"} aria-busy="true" aria-live="polite">
         <PageHeader
           title={`أهلاً بك، ${displayName}`}
           subtitle={scopeLabel}
@@ -77,7 +78,7 @@ export default function ReportsDashboard() {
   }
 
   return (
-    <div className="erp-page space-y-6 pb-8" dir="rtl" aria-busy={loading} aria-live="polite">
+    <div className="erp-page space-y-6 pb-8" dir={i18n.dir() as "rtl" | "ltr"} aria-busy={loading} aria-live="polite">
       <PageHeader
         title={`أهلاً بك، ${displayName}`}
         subtitle={scopeLabel}

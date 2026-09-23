@@ -3,6 +3,7 @@ import { Eye, History, Trash2 } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
 import { formatCurrency } from "@/lib/core/utils";
 import { customerId, customerName, getInitials, secondPhone } from "@/features/customers/utils/customer";
+import { EmptyState } from "@/components/shared";
 
 export default function CustomerTable({
   rows,
@@ -36,7 +37,7 @@ export default function CustomerTable({
     return "outline";
   };
   return (
-          <div className="overflow-x-auto">
+          <div className="scroll-x">
             <table className="min-w-[52rem] w-full text-right">
               <thead>
                 <tr className="border-b border-black/5 bg-gray-50 dark:border-white/10 bg-soft">
@@ -142,24 +143,24 @@ export default function CustomerTable({
                 ))}
                 {rows.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="px-8 py-16 text-center"
-                    >
-                      <p className="font-black text-main">{emptyTitle}</p>
-                      {emptyHint ? (
-                        <p className="mt-1 text-xs font-bold text-muted">{emptyHint}</p>
-                      ) : null}
-                      {showClearFilter && onClearFilter ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={onClearFilter}
-                          className="mt-4 rounded-xl text-xs font-black"
-                        >
-                          مسح البحث والفلتر
-                        </Button>
-                      ) : null}
+                    <td colSpan={5} className="px-4 py-6">
+                      <EmptyState
+                        title={emptyTitle}
+                        message={emptyHint}
+                        variant="section"
+                        action={
+                          showClearFilter && onClearFilter ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={onClearFilter}
+                              className="mt-2 rounded-xl text-xs font-black"
+                            >
+                              مسح البحث والفلتر
+                            </Button>
+                          ) : undefined
+                        }
+                      />
                     </td>
                   </tr>
                 ) : null}

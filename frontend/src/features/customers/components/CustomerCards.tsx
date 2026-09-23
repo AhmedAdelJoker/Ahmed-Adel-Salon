@@ -4,6 +4,7 @@ import { History, Trash2 } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
 import { formatCurrency } from "@/lib/core/utils";
 import { customerId, customerName, getInitials } from "@/features/customers/utils/customer";
+import { EmptyState } from "@/components/shared";
 
 export default function CustomerCards({
   rows,
@@ -112,22 +113,23 @@ export default function CustomerCards({
               ))}
             </div>
             {rows.length === 0 && (
-              <div className="py-12 text-center">
-                <p className="font-black text-main">{emptyTitle}</p>
-                {emptyHint ? (
-                  <p className="mt-1 text-xs font-bold text-muted">{emptyHint}</p>
-                ) : null}
-                {showClearFilter && onClearFilter ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onClearFilter}
-                    className="mt-4 rounded-xl text-xs font-black"
-                  >
-                    مسح البحث والفلتر
-                  </Button>
-                ) : null}
-              </div>
+              <EmptyState
+                title={emptyTitle}
+                message={emptyHint}
+                variant="section"
+                action={
+                  showClearFilter && onClearFilter ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onClearFilter}
+                      className="mt-2 rounded-xl text-xs font-black"
+                    >
+                      مسح البحث والفلتر
+                    </Button>
+                  ) : undefined
+                }
+              />
             )}
           </div>
   );
