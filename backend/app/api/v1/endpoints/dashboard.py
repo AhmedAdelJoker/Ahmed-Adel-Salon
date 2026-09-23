@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Depends
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
+
+from app.core.pagination import PageParams, paginate
 
 from app.db.session import get_db
 from app.api.deps import (
@@ -183,6 +187,48 @@ def cashier_summary(
         "present_employees_count": present_employees_count,
         "waiting_customers": waiting_customers,
     }
+
+
+@router.get("/low-stock")
+def low_stock(
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+    page: int = Query(1, ge=1, le=10_000, description="1-indexed page"),
+    size: int = Query(25, ge=1, le=200, description="Items per page"),
+    sort: Optional[str] = Query(None, description="Sort field. '-' prefix for DESC"),
+    q: Optional[str] = Query(None, max_length=100, description="Search by product name"),
+):
+    """Paginated low-stock products (quantity <= min_quantity_alert).
+
+    Phase 2 slice: bounded list + X-Total-Count + PageParams helper.
+    Previously only a count was exposed (cashier-summary low_stock_count) —
+    list fetches were unbounded in product code. This endpoint is
+    backward compatible (additive) — no existing URL changes.
+    Callers without pagination params get page 1 / size 25 (bounded, safe).
+    """
+    query = db.query(Product).filter(Product.quantity <= Product.min_quantity_alert)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        query = query.filter(Product.name.ilike(like))
+
+    params = PageParams(page=page, size=size, sort=sort)
+    result = paginate(
+        query,
+        params,
+        sort_columns={
+            "name": Product.name,
+            "quantity": Product.quantity,
+            "created_at": Product.created_at,
+            "id": Product.id,
+        },
+    )
+    response.headers["X-Total-Count"] = str(result.total)
+    response.headers["X-Page"] = str(result.page)
+    response.headers["X-Page-Size"] = str(result.size)
+    # Envelope keeps total/page/size/pages alongside items — backward compatible
+    # with paginatedGet/frontend readers that check X-Total-Count first.
+    return result.dict()
 
 
 @router.get("/barber-summary")

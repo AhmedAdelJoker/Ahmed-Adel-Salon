@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from datetime import date, datetime, timedelta
@@ -115,11 +115,22 @@ def get_barber_stats(
 
 @router.get("/queue")
 def get_barber_queue(
+    response: Response = None,
+    skip: int = Query(0, ge=0, description="Records to skip"),
+    limit: int = Query(200, ge=1, le=500, description="Max records per section"),
+    page: Optional[int] = Query(None, ge=1, description="Optional 1-indexed page"),
+    page_size: Optional[int] = Query(None, ge=1, le=500, description="Optional page size"),
+    sort: Optional[str] = Query(None, description="Sort field. '-' prefix for DESC"),
     db: Session = Depends(deps.get_db),
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
     """
     Get the barber's specific queue (waiting and completed).
+
+    Phase 2 slice: bounded + paginated + X-Total-Count headers.
+    Previously hard-capped at 200 with no count headers — kept 200 as
+    default so callers without params see identical behavior (backward compat).
+    N+1 already fixed via joinedload(customer/services) for each section.
     """
     barber_id = current_user.barber_id or current_user.employee_id
     if not barber_id:
@@ -127,27 +138,96 @@ def get_barber_queue(
 
     today = date.today()
 
-    waiting = db.query(Appointment).options(
+    # Base queries (eager-load customer + services — N+1 fixed)
+    waiting_q = db.query(Appointment).options(
         joinedload(Appointment.customer),
         joinedload(Appointment.services),
     ).filter(
         Appointment.barber_id == barber_id,
         Appointment.status.in_(["waiting", "in-service", "pending"]),
         Appointment.appointment_date == today
-    ).order_by(Appointment.appointment_time.asc()).limit(200).all()
-
-    completed = db.query(Appointment).options(
+    )
+    completed_q = db.query(Appointment).options(
         joinedload(Appointment.customer),
         joinedload(Appointment.services),
     ).filter(
         Appointment.barber_id == barber_id,
         Appointment.status.in_(["completed", "ready_for_payment"]),
         Appointment.appointment_date == today
-    ).order_by(Appointment.appointment_time.asc()).limit(200).all()
-    
+    )
+
+    # Phase 2: normalize page/page_size -> skip/limit
+    eff_skip = skip
+    eff_limit = limit
+    if page is not None and page_size is not None:
+        eff_skip = (page - 1) * page_size
+        eff_limit = page_size
+
+    # Counts for headers (before offset/limit)
+    waiting_total = waiting_q.count()
+    completed_total = completed_q.count()
+
+    if response is not None:
+        response.headers["X-Total-Count"] = str(waiting_total + completed_total)
+        response.headers["X-Waiting-Count"] = str(waiting_total)
+        response.headers["X-Completed-Count"] = str(completed_total)
+        response.headers["X-Page-Size"] = str(eff_limit)
+        if page is not None:
+            response.headers["X-Page"] = str(page)
+
+    def _serialize_queue_apt(apt: Appointment) -> dict:
+        cust = getattr(apt, "customer", None)
+        services = getattr(apt, "services", None) or []
+        customer_name = (
+            f"{cust.first_name} {(cust.last_name or '')}".strip()
+            if cust and getattr(cust, "first_name", None)
+            else "عميل نقدي"
+        )
+        service_name = ", ".join(
+            s.service_name_snapshot for s in services if getattr(s, "service_name_snapshot", None)
+        ) or "خدمة"
+        return {
+            "id": apt.id,
+            "customer_id": apt.customer_id,
+            "customer_name": customer_name,
+            "customer_phone": getattr(cust, "phone", "") if cust else "",
+            "service_name": service_name,
+            "appointment_date": str(apt.appointment_date) if getattr(apt, "appointment_date", None) else None,
+            "appointment_time": apt.appointment_time.strftime("%H:%M") if getattr(apt, "appointment_time", None) else "",
+            "status": apt.status,
+            "total_amount": float(getattr(apt, "total_estimated_price", 0) or 0),
+            "notes": apt.notes or "",
+            "barber_id": apt.barber_id,
+            "booking_source": getattr(apt, "booking_source", "shop"),
+        }
+
+    # Optional sort override (defaults to appointment_time asc)
+    if sort:
+        sort_field = sort.lstrip("-")
+        desc = sort.startswith("-")
+        col = getattr(Appointment, sort_field, None)
+        if col is not None:
+            waiting_q = waiting_q.order_by(col.desc() if desc else col.asc())
+            completed_q = completed_q.order_by(col.desc() if desc else col.asc())
+            waiting_rows = waiting_q.offset(eff_skip).limit(eff_limit).all()
+            completed_rows = completed_q.offset(eff_skip).limit(eff_limit).all()
+            return {
+                "waiting": [_serialize_queue_apt(r) for r in waiting_rows],
+                "completed": [_serialize_queue_apt(r) for r in completed_rows],
+                "waiting_total": waiting_total,
+                "completed_total": completed_total,
+                "total": waiting_total + completed_total,
+            }
+
+    waiting_rows = waiting_q.order_by(Appointment.appointment_time.asc()).offset(eff_skip).limit(eff_limit).all()
+    completed_rows = completed_q.order_by(Appointment.appointment_time.asc()).offset(eff_skip).limit(eff_limit).all()
+
     return {
-        "waiting": waiting,
-        "completed": completed
+        "waiting": [_serialize_queue_apt(r) for r in waiting_rows],
+        "completed": [_serialize_queue_apt(r) for r in completed_rows],
+        "waiting_total": waiting_total,
+        "completed_total": completed_total,
+        "total": waiting_total + completed_total,
     }
 
 @router.post("/update-status/{appointment_id}")
