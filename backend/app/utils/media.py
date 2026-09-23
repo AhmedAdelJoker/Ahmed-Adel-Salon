@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB — unified with config MAX_UPLOAD_SIZE_BYTES
 MAX_DIMENSION = 1920  # Max width or height
 DEFAULT_QUALITY = 85
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
@@ -115,6 +115,11 @@ def get_upload_path(folder_name: str) -> Path:
     env_dir = os.getenv("UPLOADS_DIR")
     if env_dir:
         return Path(env_dir) / folder_name
+    try:
+        from app.core.paths import get_uploads_dir
+        return get_uploads_dir() / folder_name
+    except Exception:
+        pass
     cur = Path(__file__).resolve()
     # Docker
     if cur.as_posix().startswith("/app/"):
