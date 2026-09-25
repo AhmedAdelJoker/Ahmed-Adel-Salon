@@ -381,15 +381,28 @@ const AttendanceManagement = () => {
 
       {/* Settings Modal */}
       {showSettings && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setShowSettings(false)}
-        >
+         <div
+           role="button"
+           tabIndex={0}
+           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+           onClick={() => setShowSettings(false)}
+           onKeyDown={(event) => {
+             if (event.key === "Escape") {
+               setShowSettings(false);
+             }
+           }}
+         >
+
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+             className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl"
+             role="dialog"
+             aria-modal="true"
+             tabIndex={-1}
+             onClick={(e) => e.stopPropagation()}
+             onKeyDown={(e) => e.stopPropagation()}
+
           >
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-black text-main">إعدادات الحضور</h3>
@@ -473,15 +486,28 @@ const AttendanceManagement = () => {
 
       {/* Leave Form Modal */}
       {showLeaveForm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setShowLeaveForm(false)}
-        >
+         <div
+           role="button"
+           tabIndex={0}
+           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+           onClick={() => setShowLeaveForm(false)}
+           onKeyDown={(event) => {
+             if (event.key === "Escape") {
+               setShowLeaveForm(false);
+             }
+           }}
+         >
+
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+             className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl"
+             role="dialog"
+             aria-modal="true"
+             tabIndex={-1}
+             onClick={(e) => e.stopPropagation()}
+             onKeyDown={(e) => e.stopPropagation()}
+
           >
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-black text-main">طلب إجازة جديد</h3>

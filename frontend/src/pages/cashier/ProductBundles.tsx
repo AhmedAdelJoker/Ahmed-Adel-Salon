@@ -530,10 +530,19 @@ export default function ProductBundles() {
                       </div>
                     </>
                   ) : (
-                    <div
-                      className="flex flex-col items-center gap-3 text-muted group-hover:text-primary transition-colors cursor-pointer p-6 text-center"
-                      onClick={() => (document.getElementById("bundle-img") as HTMLInputElement | null)?.click()}
-                    >
+                     <div
+                       role="button"
+                       tabIndex={0}
+                       className="flex flex-col items-center gap-3 text-muted group-hover:text-primary transition-colors cursor-pointer p-6 text-center"
+                       onClick={() => (document.getElementById("bundle-img") as HTMLInputElement | null)?.click()}
+                       onKeyDown={(event) => {
+                         if (event.key === "Enter" || event.key === " ") {
+                           event.preventDefault();
+                           (document.getElementById("bundle-img") as HTMLInputElement | null)?.click();
+                         }
+                       }}
+                     >
+
                       {uploading ? <RefreshCw className="h-9 w-9 animate-spin" /> : <ImageIcon className="h-9 w-9" />}
                       <span className="text-xs font-black">اسحب الصورة أو انقر هنا</span>
                       <span className="text-[10px] font-bold opacity-60">PNG / JPG حتى 5MB</span>

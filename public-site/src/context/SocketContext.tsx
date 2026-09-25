@@ -16,11 +16,6 @@ export interface SocketContextValue {
   notifications: NotificationItem[];
   setNotifications: React.Dispatch<React.SetStateAction<NotificationItem[]>>;
   clearNotifications: () => void;
-  sendNotification: (
-    targetId: ID,
-    message: string,
-    extra?: Record<string, unknown>,
-  ) => boolean;
   connected: boolean;
   socket: WebSocket | null;
 }
@@ -51,9 +46,8 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated || !userId) return;
-
-    if (!isAuthenticated || !userId) {
+    const accessToken = localStorage.getItem("token");
+    if (!isAuthenticated || !userId || !accessToken) {
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
@@ -63,7 +57,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const wsUrl = buildSocketUrl(userId);
-    const socket = new WebSocket(wsUrl);
+    const socket = new WebSocket(wsUrl, ["access-token", accessToken]);
     socketRef.current = socket;
 
     socket.onopen = () => {
@@ -109,27 +103,6 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [isAuthenticated, userId]);
 
-  const sendNotification = useCallback(
-    (
-      targetId: ID,
-      message: string,
-      extra: Record<string, unknown> = {},
-    ): boolean => {
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(
-        JSON.stringify({
-          targetId,
-          message,
-          ...extra,
-        }),
-      );
-      return true;
-    }
-
-    return false;
-    },
-    [],
-  );
 
   const clearNotifications = useCallback(() => setNotifications([]), []);
 
@@ -138,11 +111,10 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
       notifications,
       setNotifications,
       clearNotifications,
-      sendNotification,
       connected,
       socket: socketRef.current,
     }),
-    [notifications, clearNotifications, sendNotification, connected],
+    [notifications, clearNotifications, connected],
   );
 
   return (

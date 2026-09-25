@@ -64,3 +64,21 @@ def test_archive_status_filter_and_search(client, db_session):
     assert resp.status_code == 200, resp.text
     assert len(resp.json()) == 1
     assert resp.json()[0]["status"] == "resigned"
+
+
+def test_employee_list_pagination_headers(client, db_session):
+    headers = _owner_headers(client, db_session)
+    _seed(db_session, "Active One", "01000000011", "active")
+    _seed(db_session, "Active Two", "01000000012", "active")
+    _seed(db_session, "Active Three", "01000000013", "active")
+
+    resp = client.get(
+        "/api/v1/employees",
+        params={"page": 1, "page_size": 2},
+        headers=headers,
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert len(resp.json()) == 2
+    assert resp.headers["X-Total-Count"] == "3"
+    assert resp.headers["X-Page"] == "1"

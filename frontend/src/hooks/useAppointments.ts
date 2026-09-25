@@ -60,7 +60,7 @@ export function useAppointments({
   return useQuery({
     queryKey: QUERY_KEYS.appointmentsByDate(dateFilter, startDate, endDate),
     queryFn: async () => {
-      const params: Record<string, unknown> = { date_filter: dateFilter, limit: 1000 };
+      const params: Record<string, unknown> = { date_filter: dateFilter, limit: 500 };
       if (dateFilter === "custom" && startDate && endDate) {
         params.start_date = startDate;
         params.end_date = endDate;

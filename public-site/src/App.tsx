@@ -66,7 +66,7 @@ export default function App() {
         <SalonProvider>
           <SocketProvider>
             <TooltipProvider delayDuration={400}>
-              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <BrowserRouter>
                 {/* Accessibility: Skip to main content link */}
                 <a
                   href="#main-content"

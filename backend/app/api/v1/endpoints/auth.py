@@ -154,6 +154,16 @@ def refresh_token(
             detail="المستخدم غير موجود أو غير نشط",
         )
 
+    try:
+        refresh_version = int(decoded.get("ver", 0) or 0)
+    except (TypeError, ValueError):
+        refresh_version = 0
+    if refresh_version != token_version_of(user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.",
+        )
+
     # Phase 3: a rotated/stolen refresh token must not be reusable.
     old_jti = decoded.get("jti")
     if is_jti_revoked(db, old_jti):

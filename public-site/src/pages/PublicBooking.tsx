@@ -350,6 +350,7 @@ export default function PublicBooking({ embedded = false }: { embedded?: boolean
       
       const submissionData = {
         ...bookingData,
+        salon_slug: publicSlug,
         email: bookingData.email?.trim() === "" ? null : bookingData.email
       };
 

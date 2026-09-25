@@ -1,30 +1,30 @@
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel
+from typing import Literal, Optional
+from pydantic import BaseModel, Field
 
 
 class ShopSettingsBase(BaseModel):
-    shop_name: Optional[str] = None
-    legal_name: Optional[str] = None
-    phone: Optional[str] = None
-    whatsapp: Optional[str] = None
-    email: Optional[str] = None
-    address: Optional[str] = None
-    tax_number: Optional[str] = None
-    commercial_register: Optional[str] = None
-    logo_url: Optional[str] = None
-    invoice_footer: Optional[str] = None
-    currency_code: Optional[str] = None
-    currency_symbol: Optional[str] = None
-    default_language: Optional[str] = None
-    default_direction: Optional[str] = None
-    receipt_width: Optional[str] = None
-    tax_enabled: Optional[int] = None
-    tax_rate: Optional[float] = None
-    discount_enabled: Optional[int] = None
-    allow_negative_cash: Optional[int] = None
-    max_upload_size_mb: Optional[int] = None
+    shop_name: Optional[str] = Field(default=None, max_length=255)
+    legal_name: Optional[str] = Field(default=None, max_length=255)
+    phone: Optional[str] = Field(default=None, max_length=30)
+    whatsapp: Optional[str] = Field(default=None, max_length=30)
+    email: Optional[str] = Field(default=None, max_length=255)
+    address: Optional[str] = Field(default=None, max_length=500)
+    tax_number: Optional[str] = Field(default=None, max_length=100)
+    commercial_register: Optional[str] = Field(default=None, max_length=100)
+    logo_url: Optional[str] = Field(default=None, max_length=500)
+    invoice_footer: Optional[str] = Field(default=None, max_length=2000)
+    currency_code: Optional[str] = Field(default=None, min_length=3, max_length=10)
+    currency_symbol: Optional[str] = Field(default=None, max_length=10)
+    default_language: Optional[Literal["ar", "en"]] = None
+    default_direction: Optional[Literal["rtl", "ltr"]] = None
+    receipt_width: Optional[str] = Field(default=None, max_length=20)
+    tax_enabled: Optional[int] = Field(default=None, ge=0, le=1)
+    tax_rate: Optional[float] = Field(default=None, ge=0, le=100)
+    discount_enabled: Optional[int] = Field(default=None, ge=0, le=1)
+    allow_negative_cash: Optional[int] = Field(default=None, ge=0, le=1)
+    max_upload_size_mb: Optional[int] = Field(default=None, ge=1, le=100)
 
 
 class ShopSettingsOut(ShopSettingsBase):

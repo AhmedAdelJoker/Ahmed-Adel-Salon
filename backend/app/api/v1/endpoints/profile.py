@@ -113,6 +113,7 @@ def change_password(
         )
 
     current_user.hashed_password = get_password_hash(payload.new_password)
+    current_user.token_version = int(current_user.token_version or 0) + 1
     db.add(current_user)
     db.commit()
 

@@ -15,7 +15,6 @@ import { barberService } from "@/services/barberService";
 import { sessionService } from "@/services/sessionService";
 import { invoiceService } from "@/services/invoiceService";
 import { reportService } from "@/services/reportService";
-import { dashboardService } from "@/services/dashboardService";
 import { businessSettingsService } from "@/services/businessSettingsService";
 import { posShiftService } from "@/services/posShiftService";
 import cashboxService from "@/services/cashboxService";
@@ -122,12 +121,6 @@ export function SalonProvider({ children }: { children: ReactNode }) {
         setInvoices(toArray(invoicesRes.value));
       if (reportsRes.status === "fulfilled")
         setReportOverview(reportsRes.value || null);
-      try {
-        const widgets = await dashboardService.widgets?.();
-        setDashboardWidgets(widgets || null);
-      } catch (err) {
-        console.error("Dashboard widgets error:", err);
-      }
       try {
         const summary = await cashboxService.getSummary();
         const cashBal = Number(summary?.cash_balance_detail ?? summary?.cash_balance ?? 0);

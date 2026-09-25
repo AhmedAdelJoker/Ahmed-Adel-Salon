@@ -3,8 +3,6 @@ import { toast } from "react-hot-toast";
 import {
   Activity,
   AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
   ClipboardList,
   Download,
   Printer,
@@ -25,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableEmptyState } from "@/components/shared/TableEmptyState";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -561,40 +560,27 @@ export default function ActivityLogs() {
             )}
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-border bg-soft/30 p-4 print:hidden">
-              <div className="text-xs font-bold tabular-nums text-muted">
-                عرض {formatNumber(logs.length)} من أصل {formatNumber(totalCount)} سجل
+          {/* Phase 2: unified pagination — reads X-Total-Count header */}
+          {totalPages > 1 && (() => {
+            const paginator = createPaginationState({
+              page,
+              size: PAGE_SIZE,
+              total: totalCount,
+            });
+            return (
+              <div className="border-t border-border bg-soft/30 print:hidden">
+                <Pagination
+                  paginator={paginator}
+                  onPageChange={(p) => setPage(p)}
+                  showSizeChanger={false}
+                  locale="ar"
+                />
+                <div className="px-3 pb-2 text-center text-[10px] font-bold text-muted">
+                  عرض {formatNumber(logs.length)} من أصل {formatNumber(totalCount)} سجل • صفحة {formatNumber(page)} / {formatNumber(totalPages)}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 rounded-lg"
-                  aria-label="الصفحة السابقة"
-                  onClick={() => setPage((prev: number) => Math.max(1, prev - 1))}
-                  disabled={page === 1}
-                >
-                  <ChevronRight size={16} />
-                </Button>
-                <span className="text-xs font-black tabular-nums text-main">
-                  {formatNumber(page)} / {formatNumber(totalPages)}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 rounded-lg"
-                  aria-label="الصفحة التالية"
-                  onClick={() => setPage((prev: number) => Math.min(totalPages, prev + 1))}
-                  disabled={page === totalPages}
-                >
-                  <ChevronLeft size={16} />
-                </Button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </PremiumCard>
       )}
     </div>

@@ -3,7 +3,7 @@ import { cleanParams } from "@/services/exportService";
 
 export const reportService = {
   overview: async () => {
-    const response = await api.get("/reports/");
+    const response = await api.get("/reports/overview");
     return response.data;
   },
 

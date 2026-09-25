@@ -5,9 +5,15 @@ from reportlab.lib.units import mm
 from app.utils.arabic_pdf import fix_arabic, ensure_pdf_font
 
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-PDF_DIR = BASE_DIR / "generated_invoices"
-RECEIPT_DIR = BASE_DIR / "generated_receipts"
+try:
+    from app.core.paths import get_pdf_dir, get_receipt_dir
+    PDF_DIR = get_pdf_dir()
+    RECEIPT_DIR = get_receipt_dir()
+    BASE_DIR = PDF_DIR.parent
+except Exception:
+    BASE_DIR = Path(__file__).resolve().parents[2]
+    PDF_DIR = BASE_DIR / "generated_invoices"
+    RECEIPT_DIR = BASE_DIR / "generated_receipts"
 
 
 def ensure_pdf_dir():

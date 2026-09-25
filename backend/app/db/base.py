@@ -40,6 +40,7 @@ from app.models.session_product import SessionProduct  # noqa
 from app.models.pos_shift import PosShift  # noqa
 from app.models.cash_transaction import CashTransaction  # noqa
 from app.models.walk_in_queue import WalkInQueue  # noqa
+from app.models.waitlist_entry import WaitlistEntry  # noqa
 
 # Availability / Presence / Notifications
 # Phase 2 cleanup: removed legacy Barber* models (use Employee* equivalents)

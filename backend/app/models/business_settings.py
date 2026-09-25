@@ -19,7 +19,6 @@ class BusinessSettings(Base):
     receipt_footer = Column(Text, nullable=True)
     currency = Column(String(10), nullable=False, default="EGP")
     public_slug = Column(String(255), nullable=True)
-    manager_approval_pin = Column(String(20), nullable=True, default="1234")
 
     cashier_discount_limit_type = Column(String(20), nullable=False, default="percent")
     cashier_discount_limit_value = Column(Numeric(10, 2), nullable=False, default=10)

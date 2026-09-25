@@ -9,13 +9,16 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=sqlite:///./salon_pro.db
-      - SECRET_KEY=${SECRET_KEY:-change_me_in_production}
-      - BACKEND_CORS_ORIGINS=http://localhost,http://localhost:80,http://localhost:5173
-      - ALLOWED_HOSTS=localhost,127.0.0.1
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD:?FIRST_SUPERUSER_PASSWORD must be set}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost,http://127.0.0.1,http://localhost:80,http://localhost:5173,http://127.0.0.1:5173}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
     volumes:
       - backend_data:/app
       - uploads_data:/app/uploads
       - invoices_data:/app/generated_invoices
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]

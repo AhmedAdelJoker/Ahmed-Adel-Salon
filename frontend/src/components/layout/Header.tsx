@@ -163,7 +163,8 @@ export default function Header({
             role === "CASHIER" ||
             role === "ADMIN" ||
             role === "ACCOUNTANT") && (
-            <div
+            <button
+              type="button"
               onClick={() => navigate("/owner/cashbox")}
               title="الخزنة المركزية — مرتبط بالخزنة (نقدي + رقمي)"
               className="flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-accent/5 border border-accent/20 shadow-sm group hover:bg-accent/10 transition-all cursor-pointer"
@@ -182,7 +183,7 @@ export default function Header({
                   نقدي {formatCurrency(vaultCashBalance)}
                 </span>
               </div>
-            </div>
+            </button>
           )}
         </div>
 

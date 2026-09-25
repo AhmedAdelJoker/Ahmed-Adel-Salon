@@ -44,7 +44,6 @@ export function useInvoicesData() {
     reason: "",
     new_value: "",
     notes: "",
-    manager_pin: "",
   });
   const [adjustmentSubmitting, setAdjustmentSubmitting] = useState(false);
   const [busyPdfId, setBusyPdfId] = useState<number | string | null>(null);
@@ -258,7 +257,6 @@ export function useInvoicesData() {
         request_type: adjustmentDialog.type,
         reason: adjustmentDialog.reason,
         notes: adjustmentDialog.notes,
-        manager_pin: adjustmentDialog.manager_pin || null,
         old_values: {
           total_amount: invoiceTotal(adjustmentDialog.invoice),
           payment_method: invoicePayment(adjustmentDialog.invoice),
@@ -275,7 +273,6 @@ export function useInvoicesData() {
       setAdjustmentDialog({
         ...adjustmentDialog,
         open: false,
-        manager_pin: "",
       });
       fetchInvoices();
     } catch (err) {

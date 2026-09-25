@@ -26,7 +26,6 @@ export function useCashierDashboard() {
     type: "discount",
     reason: "",
     newValue: "",
-    managerPin: "",
   });
   const [submittingAdj, setSubmittingAdj] = useState(false);
 
@@ -105,7 +104,7 @@ export function useCashierDashboard() {
 
   const handleRequestAdjustment = (invoice) => {
     setAdjInvoice({ open: true, data: invoice });
-    setAdjForm({ type: "discount", reason: "", newValue: "", managerPin: "" });
+    setAdjForm({ type: "discount", reason: "", newValue: "" });
   };
 
   const submitAdjustment = async () => {
@@ -116,7 +115,6 @@ export function useCashierDashboard() {
         request_type: adjForm.type,
         reason: adjForm.reason,
         notes: "",
-        manager_pin: adjForm.managerPin,
         requested_values:
           adjForm.type === "void"
             ? { status: "cancelled" }

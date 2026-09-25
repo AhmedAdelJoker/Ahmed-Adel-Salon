@@ -112,9 +112,18 @@ export default function BookingCardFull({
       <div className="flex items-start justify-between gap-2 relative z-10">
         <div className="space-y-1 min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <h4
-              onClick={() => onOpenCustomer(booking.customer_id)}
-              className="text-sm sm:text-base font-black text-main group-hover:text-primary transition-colors cursor-pointer flex items-center gap-1"
+             <h4
+               role="button"
+               tabIndex={0}
+               onClick={() => onOpenCustomer(booking.customer_id)}
+               onKeyDown={(event) => {
+                 if (event.key === "Enter" || event.key === " ") {
+                   event.preventDefault();
+                   onOpenCustomer(booking.customer_id);
+                 }
+               }}
+               className="text-sm sm:text-base font-black text-main group-hover:text-primary transition-colors cursor-pointer flex items-center gap-1"
+
               title="عرض سجل العميل الكامل"
             >
               <span className="break-words leading-snug">

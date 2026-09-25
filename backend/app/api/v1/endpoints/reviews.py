@@ -15,6 +15,20 @@ from app.schemas.review import ReviewCreate, ReviewRead
 router = APIRouter(prefix="/reviews", tags=["Reviews & Ratings"])
 
 
+def _serialize_review(review: Review) -> ReviewRead:
+    return ReviewRead(
+        id=review.id,
+        rating=review.rating,
+        comment=review.comment,
+        customer_name_snapshot=review.customer_name_snapshot,
+        is_public=review.is_public,
+        is_verified_visit=review.is_verified_visit,
+        created_at=review.created_at,
+        employee_id=review.employee_id,
+        barber_id=review.employee_id,
+    )
+
+
 @router.get("", response_model=List[ReviewRead])
 def list_reviews(
     db: Session = Depends(get_db),
@@ -25,54 +39,66 @@ def list_reviews(
     query = db.query(Review).order_by(Review.created_at.desc())
 
     if current_user.role == "barber":
-        target_barber_id = current_user.barber_id
-        if not target_barber_id:
+        target_employee_id = current_user.barber_id or current_user.employee_id
+        if not target_employee_id:
             return []
-        query = query.filter(Review.barber_id == target_barber_id)
+        query = query.filter(Review.employee_id == target_employee_id)
     elif barber_id is not None:
-        query = query.filter(Review.barber_id == barber_id)
+        query = query.filter(Review.employee_id == barber_id)
 
-    return query.limit(limit).all()
+    return [_serialize_review(review) for review in query.limit(limit).all()]
 
 
 @router.get("/public", response_model=List[ReviewRead])
 def list_public_reviews(db: Session = Depends(get_db), limit: int = 10):
-    return (
+    reviews = (
         db.query(Review)
         .filter(Review.is_public == True)
         .order_by(Review.created_at.desc())
         .limit(limit)
         .all()
     )
+    return [_serialize_review(review) for review in reviews]
 
 @router.post("", response_model=ReviewRead, status_code=status.HTTP_201_CREATED)
 def create_review(payload: ReviewCreate, db: Session = Depends(get_db)):
-    # If appointment_id is provided, ensure it's not already reviewed
+    review_data = payload.model_dump(exclude={"barber_id"})
     if payload.appointment_id:
-        existing = db.query(Review).filter(Review.appointment_id == payload.appointment_id).first()
+        existing = (
+            db.query(Review)
+            .filter(Review.appointment_id == payload.appointment_id)
+            .first()
+        )
         if existing:
             raise HTTPException(status_code=400, detail="هذا الموعد تم تقييمه بالفعل")
-            
-        appointment = db.query(Appointment).filter(Appointment.id == payload.appointment_id).first()
-        if appointment:
-            # Auto-assign barber and customer from appointment
-            review = Review(
-                **payload.model_dump(),
-                customer_id=appointment.customer_id,
-                barber_id=appointment.barber_id,
-                is_verified_visit=True
-            )
-            db.add(review)
-            db.commit()
-            db.refresh(review)
-            return review
 
-    # Fallback for general review
-    review = Review(**payload.model_dump(), is_verified_visit=False)
+        appointment = (
+            db.query(Appointment)
+            .filter(Appointment.id == payload.appointment_id)
+            .first()
+        )
+        if not appointment:
+            raise HTTPException(status_code=404, detail="الموعد غير موجود")
+        if appointment.status not in {"completed", "done", "checked_out", "paid"}:
+            raise HTTPException(status_code=400, detail="يمكن تقييم الموعد بعد اكتماله فقط")
+
+        review = Review(
+            **review_data,
+            customer_id=appointment.customer_id,
+            employee_id=appointment.barber_id,
+            is_verified_visit=True,
+        )
+    else:
+        review = Review(
+            **review_data,
+            employee_id=payload.barber_id,
+            is_verified_visit=False,
+        )
+
     db.add(review)
     db.commit()
     db.refresh(review)
-    return review
+    return _serialize_review(review)
 
 
 

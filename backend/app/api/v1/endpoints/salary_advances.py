@@ -58,18 +58,17 @@ def create_salary_advance(
     db.add(db_obj)
     db.flush()
     
-    # Create Expense
     expense = Expense(
         title=f"سلفة موظف: {employee.full_name}",
         description=f"سلفة نقدية. {payload.description or ''}",
-        amount=payload.amount,
+        amount=float(payload.amount),
         category="سلف",
         payment_method="cash",
         expense_date=datetime.now(),
         status="approved",
-        is_advance=True,
-        employee_id=employee.id,
-        created_by_user_id=current_user.id
+        reference_type="salary_advance",
+        reference_id=db_obj.id,
+        created_by_user_id=current_user.id,
     )
     db.add(expense)
 
@@ -91,10 +90,21 @@ def delete_salary_advance(
         
     if db_obj.is_deducted:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="لا يمكن حذف سلفة تم خصمها بالفعل من الراتب"
         )
-        
+
+    linked_expense = (
+        db.query(Expense)
+        .filter(
+            Expense.reference_type == "salary_advance",
+            Expense.reference_id == db_obj.id,
+        )
+        .first()
+    )
+    if linked_expense:
+        db.delete(linked_expense)
+
     db.delete(db_obj)
     db.commit()
     return None

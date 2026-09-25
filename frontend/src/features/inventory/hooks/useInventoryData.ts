@@ -77,7 +77,7 @@ export function useInventoryData() {
       try {
         setLoading(true);
         const response = await api.get("/products", {
-          params: { q: query, page, size },
+          params: { q: query, page, page_size: size },
         });
         const { items } = normalizeListResponse(response);
         setProducts(items || []);

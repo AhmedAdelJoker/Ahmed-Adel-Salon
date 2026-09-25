@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Index, Integer, String, Numeric, DateTime, ForeignKey, Boolean
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -10,6 +10,11 @@ class Invoice(Base):
     __table_args__ = (
         Index("ix_invoices_barber_created", "barber_id", "created_at"),
         Index("ix_invoices_created_draft", "created_at", "is_draft"),
+        UniqueConstraint(
+            "created_by_user_id",
+            "idempotency_key",
+            name="uq_invoices_creator_idempotency_key",
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -25,6 +30,8 @@ class Invoice(Base):
     total_amount = Column(Numeric(10, 2), nullable=False, default=0)
 
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    idempotency_key = Column(String(128), nullable=True)
+    request_hash = Column(String(64), nullable=True)
     pdf_path = Column(String(500), nullable=True)
 
     is_closed = Column(Boolean, default=False, nullable=False, index=True)

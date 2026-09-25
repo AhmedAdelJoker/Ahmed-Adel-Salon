@@ -45,7 +45,15 @@ function DayCell({
   return (
     <div
       ref={setNodeRef}
-      onClick={() => day !== null && onSelectDay?.(dateStr)}
+       onClick={() => day !== null && onSelectDay?.(dateStr)}
+       onKeyDown={(event) => {
+         if (day !== null && (event.key === "Enter" || event.key === " ")) {
+           event.preventDefault();
+           onSelectDay?.(dateStr);
+         }
+       }}
+       tabIndex={day === null ? -1 : 0}
+
       className={cn(
         "relative h-9 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all duration-200",
         day === null && "pointer-events-none opacity-0",

@@ -25,9 +25,6 @@ import {
   ReceptionActionDialogs,
 } from "@/features/reception";
 
-
-
-
 export default function ReceptionBoard() {
   const navigate = useNavigate();
   const socketCtx = useSocket();
@@ -35,14 +32,11 @@ export default function ReceptionBoard() {
   const connected = socketCtx?.connected ?? false;
   const queryClient = useQueryClient();
   const [isFastClientModalOpen, setIsFastClientModalOpen] = useState(false);
-   
-  const [assigningAppt, setAssigningAppt] = useState<any>(null);
-   
-  const [cancelAppt, setCancelAppt] = useState<any>(null);
-   
-   
 
-   
+  const [assigningAppt, setAssigningAppt] = useState<any>(null);
+
+  const [cancelAppt, setCancelAppt] = useState<any>(null);
+
   const [fastClientData, setFastClientData] = useState<any>({
     phone: "",
     firstName: "",
@@ -51,7 +45,6 @@ export default function ReceptionBoard() {
     notes: "",
   });
 
-   
   const [foundCustomer, setFoundCustomer] = useState<any>(null);
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   const [activeCategory, setActiveCategory] = useState("الكل");
@@ -143,7 +136,6 @@ export default function ReceptionBoard() {
     }
   }, [fastClientData.phone]);
 
-
   const filteredServices = useMemo(() => {
     if (activeCategory === "الكل") return services;
     return services.filter(
@@ -191,7 +183,9 @@ export default function ReceptionBoard() {
       toast.success("تم تحديث الحالة");
     } catch (error) {
       const apiErr = error as { response?: { data?: { detail?: unknown } } };
-      toast.error((apiErr?.response?.data?.detail as string) || "فشل تحديث الحالة");
+      toast.error(
+        (apiErr?.response?.data?.detail as string) || "فشل تحديث الحالة",
+      );
     }
   };
 
@@ -266,7 +260,9 @@ export default function ReceptionBoard() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.appointments });
     } catch (error) {
       const apiErr = error as { response?: { data?: { detail?: unknown } } };
-      toast.error((apiErr?.response?.data?.detail as string) || "فشل تسجيل العميل");
+      toast.error(
+        (apiErr?.response?.data?.detail as string) || "فشل تسجيل العميل",
+      );
     }
   };
 
@@ -347,7 +343,3 @@ export default function ReceptionBoard() {
     </div>
   );
 }
-
-
-
-

@@ -1,0 +1,36 @@
+name: Accessibility
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+      - 'public-site/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+      - 'public-site/**'
+  workflow_dispatch:
+
+jobs:
+  frontend-accessibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Static accessibility lint
+        working-directory: frontend
+        run: npm run lint:a11y
+      - name: Accessibility unit tests
+        working-directory: frontend
+        run: npm run test:a11y -- --run
+        env:
+          CI: true

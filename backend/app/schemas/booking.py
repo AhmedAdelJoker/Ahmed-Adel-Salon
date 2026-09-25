@@ -10,6 +10,7 @@ class PublicBookingServiceItem(BaseModel):
 
 
 class PublicBookingCreate(BaseModel):
+    salon_slug: Optional[str] = Field(default=None, max_length=255)
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
     phone: str = Field(..., min_length=5, max_length=30)

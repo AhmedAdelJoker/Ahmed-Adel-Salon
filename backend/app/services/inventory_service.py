@@ -23,6 +23,8 @@ def add_stock(db: Session, *, product: Product, amount: Decimal, note: str | Non
 def remove_stock(db: Session, *, product: Product, amount: Decimal, note: str | None, created_by_user_id: int | None):
     current_qty = Decimal(str(product.quantity or 0))
     amount = Decimal(str(amount))
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="كمية خصم المخزون يجب أن تكون أكبر من صفر")
     if current_qty < amount:
         raise HTTPException(status_code=400, detail="الكمية غير كافية في المخزون")
     product.quantity = current_qty - amount
@@ -71,7 +73,36 @@ def deduct_stock_for_invoice(db: Session, invoice_id: int, created_by_user_id: i
 
     items = db.query(InvoiceItem).filter(InvoiceItem.invoice_id == invoice.id).all()
 
+    from app.models.offer import Offer
+
     for item in items:
+        if item.offer_id:
+            offer = db.query(Offer).filter(Offer.id == item.offer_id).first()
+            if offer:
+                for offer_product in offer.offer_products:
+                    if offer_product.product:
+                        remove_stock(
+                            db,
+                            product=offer_product.product,
+                            amount=Decimal(str(offer_product.quantity or 0))
+                            * Decimal(str(item.quantity or 1)),
+                            note=f"عرض {offer.name} - فاتورة {invoice.invoice_no}",
+                            created_by_user_id=created_by_user_id,
+                        )
+                for offer_service in offer.offer_services:
+                    service = offer_service.service
+                    if service and service.ingredients:
+                        for ingredient in service.ingredients:
+                            if ingredient.product:
+                                remove_stock(
+                                    db,
+                                    product=ingredient.product,
+                                    amount=Decimal(str(ingredient.amount_used))
+                                    * Decimal(str(item.quantity or 1)),
+                                    note=f"خدمة داخل العرض {offer.name} - فاتورة {invoice.invoice_no}",
+                                    created_by_user_id=created_by_user_id,
+                                )
+
         # 1. If it's a direct product sale
         if item.product_id:
             product = db.query(Product).filter(Product.id == item.product_id).first()

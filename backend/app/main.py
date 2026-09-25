@@ -139,7 +139,19 @@ for sub in [
 ]:
     (uploads_dir / sub).mkdir(parents=True, exist_ok=True)
 
-app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+for public_subdir in (
+    "business",
+    "products",
+    "services",
+    "employees",
+    "profiles",
+    "offers",
+):
+    app.mount(
+        f"/uploads/{public_subdir}",
+        StaticFiles(directory=str(uploads_dir / public_subdir)),
+        name=f"uploads-{public_subdir}",
+    )
 
 
 # Use configured allowed hosts, fallback to localhost for dev

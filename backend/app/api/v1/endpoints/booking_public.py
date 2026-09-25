@@ -1,12 +1,19 @@
+import asyncio
+import json
 import logging
+import threading
+import time
+from collections import deque
 from decimal import Decimal
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.api.v1.endpoints.member_public import get_optional_member
 from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.service import Service
@@ -26,9 +33,58 @@ from app.services.meta_whatsapp_service import send_booking_confirmation_templat
 
 router = APIRouter(prefix="/public", tags=["Public Booking"])
 logger = logging.getLogger(__name__)
+_events: dict[str, deque] = {}
+_event_sequences: dict[str, int] = {}
+_events_lock = threading.Lock()
 
 
-def _get_or_create_customer(db: Session, payload: PublicBookingCreate) -> Customer:
+def _event_key(slug: str) -> str:
+    return slug.strip().lower() or "default"
+
+
+def publish_booking_event(slug: str, event_type: str, data: dict) -> None:
+    key = _event_key(slug)
+    with _events_lock:
+        sequence = _event_sequences.get(key, 0) + 1
+        _event_sequences[key] = sequence
+        bucket = _events.setdefault(key, deque(maxlen=100))
+        bucket.append(
+            {
+                "sequence": sequence,
+                "event": {
+                    "type": event_type,
+                    "timestamp": time.time(),
+                    "data": data,
+                },
+            }
+        )
+
+
+def _events_after(slug: str, sequence: int) -> list[dict]:
+    key = _event_key(slug)
+    with _events_lock:
+        return [item for item in _events.get(key, ()) if item["sequence"] > sequence]
+
+
+def _latest_sequence(slug: str) -> int:
+    key = _event_key(slug)
+    with _events_lock:
+        return _event_sequences.get(key, 0)
+
+
+def _get_or_create_customer(
+    db: Session,
+    payload: PublicBookingCreate,
+    member: Customer | None = None,
+) -> Customer:
+    if member is not None:
+        if payload.email:
+            member.email = payload.email
+        member.phone = payload.phone
+        db.add(member)
+        db.flush()
+        return member
+
     customer = db.query(Customer).filter(Customer.phone == payload.phone).first()
     last_name = payload.last_name or ""
 
@@ -278,6 +334,7 @@ def get_time_slots(
 def create_public_booking(
     payload: PublicBookingCreate,
     db: Session = Depends(get_db),
+    member: Customer | None = Depends(get_optional_member),
 ):
     if not payload.services:
         raise HTTPException(
@@ -339,7 +396,7 @@ def create_public_booking(
             detail="لا يمكن إنشاء حجز في وقت ماضٍ",
         )
 
-    customer = _get_or_create_customer(db, payload)
+    customer = _get_or_create_customer(db, payload, member)
 
     appointment = Appointment(
         customer_id=customer.customer_id,
@@ -358,6 +415,23 @@ def create_public_booking(
 
     db.commit()
     db.refresh(appointment)
+
+    business_settings = db.query(BusinessSettings).first()
+    public_slug = payload.salon_slug or (
+        business_settings.public_slug if business_settings else None
+    )
+    publish_booking_event(
+        public_slug or "default",
+        "booking.created",
+        {
+            "bookingId": appointment.id,
+            "status": appointment.status,
+            "scheduledAt": datetime.combine(
+                appointment.appointment_date,
+                appointment.appointment_time,
+            ).isoformat(),
+        },
+    )
 
     # إشعارات داخل النظام
     cashier_notification = Notification(
@@ -400,4 +474,66 @@ def create_public_booking(
         message="تم تسجيل الحجز بنجاح",
         appointment_id=appointment.id,
         customer_id=customer.customer_id,
+    )
+
+
+@router.get(
+    "/realtime/booking/{slug}/poll",
+    dependencies=[
+        Depends(
+            rate_limit(
+                "public_booking_realtime_poll",
+                max_requests=settings.PUBLIC_RATE_LIMIT_MAX_REQUESTS,
+                window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+            )
+        )
+    ],
+)
+def poll_booking_events(slug: str, after: int = 0):
+    events = _events_after(slug, max(0, after))
+    return {
+        "sequence": events[-1]["sequence"] if events else max(0, after),
+        "event": events[-1]["event"] if events else None,
+    }
+
+
+@router.get(
+    "/realtime/booking/{slug}",
+    dependencies=[
+        Depends(
+            rate_limit(
+                "public_booking_realtime_stream",
+                max_requests=settings.PUBLIC_RATE_LIMIT_MAX_REQUESTS,
+                window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+            )
+        )
+    ],
+)
+async def stream_booking_events(slug: str, request: Request):
+    async def event_stream():
+        sequence = _latest_sequence(slug)
+        last_heartbeat = time.monotonic()
+        while not await request.is_disconnected():
+            pending = _events_after(slug, sequence)
+            for item in pending:
+                sequence = item["sequence"]
+                event = item["event"]
+                yield (
+                    f"event: {event['type']}\n"
+                    f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                )
+            if not pending and time.monotonic() - last_heartbeat >= 15:
+                yield ": keep-alive\n\n"
+                last_heartbeat = time.monotonic()
+            await asyncio.sleep(1)
+        yield "event: close\ndata: {}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )

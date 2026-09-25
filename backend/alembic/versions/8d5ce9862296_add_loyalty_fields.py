@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '8d5ce9862296'
-down_revision: Union[str, None] = '7afda716e6ea'
+down_revision: Union[str, None] = 'c4d8e1f2a3b4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -29,8 +29,14 @@ def upgrade() -> None:
     #     batch_op.add_column(sa.Column('lifetime_spend', sa.Numeric(precision=12, scale=2), nullable=False))
     #     batch_op.add_column(sa.Column('current_tier', sa.String(length=50), nullable=False))
 
-    with op.batch_alter_table('services', schema=None) as batch_op:
-        batch_op.create_foreign_key('fk_services_category_id', 'service_categories', ['category_id'], ['id'])
+    existing_category_fks = {
+        foreign_key.get("name")
+        for foreign_key in sa.inspect(op.get_bind()).get_foreign_keys("services")
+        if foreign_key.get("referred_table") == "service_categories"
+    }
+    if not existing_category_fks:
+        with op.batch_alter_table('services', schema=None) as batch_op:
+            batch_op.create_foreign_key('fk_services_category_id', 'service_categories', ['category_id'], ['id'])
 
     # ### end Alembic commands ###
 

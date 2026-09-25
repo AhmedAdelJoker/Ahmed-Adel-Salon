@@ -20,9 +20,11 @@ from app.api.v1.endpoints.business_settings import router as business_settings_r
 from app.api.v1.endpoints.users_roles import router as users_roles_router
 from app.api.v1.endpoints.products import router as products_router
 from app.api.v1.endpoints.booking_public import router as booking_public_router
+from app.api.v1.endpoints.member_public import router as member_public_router
 from app.api.v1.endpoints.notifications import router as notifications_router
 from app.api.v1.endpoints.pos_shifts import router as pos_shifts_router
 from app.api.v1.endpoints.walk_in_queue import router as walk_in_queue_router
+from app.api.v1.endpoints.waitlist import router as waitlist_router
 from app.api.v1.endpoints.discount_approvals import router as discount_approvals_router
 from app.api.v1.endpoints.whatsapp_integration import router as whatsapp_integration_router
 from app.api.v1.endpoints.expenses import router as expenses_router
@@ -86,9 +88,11 @@ api_router.include_router(business_settings_router)
 api_router.include_router(users_roles_router)
 api_router.include_router(products_router)
 api_router.include_router(booking_public_router)
+api_router.include_router(member_public_router)
 api_router.include_router(notifications_router)
 api_router.include_router(pos_shifts_router)
 api_router.include_router(walk_in_queue_router)
+api_router.include_router(waitlist_router)
 api_router.include_router(discount_approvals_router)
 api_router.include_router(whatsapp_integration_router)
 api_router.include_router(expenses_router)

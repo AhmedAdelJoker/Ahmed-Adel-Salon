@@ -3,7 +3,7 @@
 block_cipher = None
 
 a = Analysis(
-    ['app/main.py'],
+    ['run_backend.py'],
     pathex=[],
     binaries=[],
     datas=[
@@ -82,6 +82,10 @@ a = Analysis(
         'python_jose.jwk',
         'python_jose.jwa',
         'python_jose.exceptions',
+        'jwt',
+        'jwt.exceptions',
+        'jwt.algorithms',
+        'pyotp',
         'passlib',
         'passlib.handlers',
         'passlib.handlers.bcrypt',

@@ -85,6 +85,15 @@ def create_refresh_token(
     )
 
 
+def create_member_access_token(customer_id: int, token_version: int) -> str:
+    return _encode_token(
+        f"member:{customer_id}",
+        "member_access",
+        settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+        {"scope": "member", "ver": int(token_version or 0)},
+    )
+
+
 def decode_token(token: str, expected_type: str = "access") -> dict[str, Any]:
     """Decode and validate a JWT. Raises on expired/invalid/wrong-type tokens."""
     payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])

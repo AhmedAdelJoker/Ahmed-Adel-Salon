@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const backendPython =
+  process.platform === 'win32'
+    ? '"../backend/.venv/Scripts/python.exe"'
+    : 'python';
+
 /**
  * Smoke E2E: built frontend (preview) + real backend (uvicorn + sqlite).
  * Proves the full stack boots and login works end to end.
@@ -29,8 +34,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command:
-        '"../backend/.venv/Scripts/python.exe" -u ../backend/e2e_server.py',
+      command: `${backendPython} -u e2e_server.py`,
       url: 'http://127.0.0.1:18001/',
       cwd: '../backend',
       reuseExistingServer: !process.env.CI,

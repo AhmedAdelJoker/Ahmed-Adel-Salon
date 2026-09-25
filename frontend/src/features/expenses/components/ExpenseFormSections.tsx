@@ -130,7 +130,19 @@ export function ExpenseFormSections({
       <div className="space-y-1.5">
         <label className="text-[10px] font-black text-muted uppercase tracking-widest">صورة الفاتورة</label>
         <input type="file" ref={invoiceInputRef as React.RefObject<HTMLInputElement>} onChange={onInvoiceUpload} className="hidden" accept="image/*" />
-        <div onClick={() => (!isEditing || isOwner) && invoiceInputRef.current?.click()} className={cn("flex items-center gap-3 rounded-xl border-2 border-dashed p-3", (!isEditing || isOwner) ? "cursor-pointer hover:bg-soft border-border" : "cursor-default border-border/50 bg-soft/50")}>
+         <div
+           role="button"
+           tabIndex={!isEditing || isOwner ? 0 : -1}
+           onClick={() => (!isEditing || isOwner) && invoiceInputRef.current?.click()}
+           onKeyDown={(event) => {
+             if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ") && (!isEditing || isOwner)) {
+               event.preventDefault();
+               invoiceInputRef.current?.click();
+             }
+           }}
+           className={cn("flex items-center gap-3 rounded-xl border-2 border-dashed p-3", (!isEditing || isOwner) ? "cursor-pointer hover:bg-soft border-border" : "cursor-default border-border/50 bg-soft/50")}
+         >
+
           {formData.invoice_image_url ? (
             <img src={formData.invoice_image_url.startsWith("http") ? formData.invoice_image_url : `${staticURL}${formData.invoice_image_url}`} alt="" className="h-16 w-16 rounded-xl object-cover border border-border" />
           ) : (

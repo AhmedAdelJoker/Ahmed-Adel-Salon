@@ -12,7 +12,6 @@ import {
   Zap,
   ArrowRight,
   ShoppingBag,
-  Edit3,
   Loader2,
   AlertTriangle,
 } from "lucide-react";
@@ -28,7 +27,6 @@ const SuccessOverlay = () => {
     completedCustomerName,
     completedBarberName,
     resetPOS,
-    setShowApprovalModal,
   } = usePOS();
   const { settings } = useSalon();
   const [printing, setPrinting] = useState(false);
@@ -180,10 +178,6 @@ const SuccessOverlay = () => {
     }
   };
 
-  const handleEdit = () => {
-    setShowApprovalModal(true);
-  };
-
   const handleNextCustomer = () => {
     setLastInvoice(null);
     resetPOS();
@@ -325,29 +319,18 @@ const SuccessOverlay = () => {
                   </>
                 )}
               </Button>
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant="outline"
-                  onClick={handleEdit}
-                  disabled={printing}
-                  className="h-14 rounded-[1.5rem] font-black border-slate-200 text-main flex items-center justify-center gap-2 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  <Edit3 size={18} />
-                  تعديل الفاتورة
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={handleNextCustomer}
-                  disabled={printing}
-                  className="h-14 rounded-[1.5rem] font-black text-muted hover:text-main hover:bg-slate-100 group disabled:opacity-50"
-                >
-                  العميل التالي
-                  <ArrowRight
-                    size={18}
-                    className="mr-2 group-hover:-translate-x-1 transition-transform rotate-180"
-                  />
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                onClick={handleNextCustomer}
+                disabled={printing}
+                className="h-14 rounded-[1.5rem] font-black text-muted hover:text-main hover:bg-slate-100 group disabled:opacity-50"
+              >
+                العميل التالي
+                <ArrowRight
+                  size={18}
+                  className="mr-2 group-hover:-translate-x-1 transition-transform rotate-180"
+                />
+              </Button>
             </div>
           </div>
         </motion.div>

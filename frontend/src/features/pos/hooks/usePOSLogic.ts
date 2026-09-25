@@ -239,102 +239,9 @@ export function usePOSLogic(): POSContextValue {
     [barbers],
   );
 
-  const isInvoiceEditable = useCallback(
-    (invoice: POSRecord | null | undefined): boolean => {
-    if (!invoice) return false;
-    const createdAt = invoice.created_at || invoice.createdAt;
-    if (!createdAt) return true; // Fallback for old data if any
-
-    const createdTime = new Date(createdAt).getTime();
-    const now = new Date().getTime();
-    const oneHourInMs = 60 * 60 * 1000;
-
-    return now - createdTime <= oneHourInMs;
-  }, []);
-
-  const editInvoice = useCallback(
-    (invoice: POSRecord | null | undefined) => {
-      if (!invoice) return;
-
-      if (!isInvoiceEditable(invoice)) {
-        toast.error(
-          "عفواً، انتهت الفترة المسموح بها لتعديل الفاتورة (ساعة واحدة)",
-        );
-        return;
-      }
-
-      const items =
-        invoice.items || invoice.invoice_items || invoice.invoiceItems || [];
-      const newCart = items.map((item) => {
-        const type =
-          item.item_type || (item.service_id ? "service" : "product");
-        const barber = barbers.find(
-          (b) => String(b.id) === String(item.employee_id || item.barber_id),
-        );
-
-        return {
-          id: item.service_id || item.product_id || item.offer_id || item.id,
-          uid: `${type}-${item.id}-${Date.now()}-${Math.random()}`,
-          name:
-            item.service_name ||
-            item.product_name ||
-            item.offer_name ||
-            item.name ||
-            "بند",
-          price: Number(item.unit_price || item.price || 0),
-          type: type,
-          barberId: barber?.id || null,
-          barberName:
-            barber?.display_name ||
-            barber?.displayName ||
-            barber?.full_name ||
-            barber?.fullName ||
-            "الخبير",
-        };
-      });
-
-      setCart(newCart);
-      setDiscount(Number(invoice.discount_amount || 0));
-      setPaymentMethod((invoice.payment_method || "CASH").toUpperCase());
-      setSelectedCustomerId(
-        invoice.customer_id ? String(invoice.customer_id) : "walk_in",
-      );
-      setActiveAppointmentId(invoice.appointment_id || null);
-      setActiveInvoiceId(invoice.id || invoice.invoice_id);
-      setIsReviewing(false);
-
-      toast.success("تم استعادة بيانات الفاتورة للتعديل");
-    },
-    [barbers, isInvoiceEditable],
-  );
-
   const removeFromCart = useCallback((uid: string) => {
     setCart((prev) => prev.filter((item) => item.uid !== uid));
   }, []);
-
-  const requestInvoiceAdjustment = useCallback(
-    async (
-      invoiceId: ID,
-      pin: string | null = null,
-      reason = "تعديل فاتورة",
-    ): Promise<unknown> => {
-      try {
-        const payload = {
-          request_type: "edit_reissue",
-          reason: reason,
-          manager_pin: pin,
-        };
-        const res = await api.post(
-          `/invoices/${invoiceId}/adjustment-requests`,
-          payload,
-        );
-        return res.data;
-      } catch (err) {
-        throw err;
-      }
-    },
-    [],
-  );
 
   const resetPOS = useCallback(() => {
     setCart([]);
@@ -613,9 +520,6 @@ export function usePOSLogic(): POSContextValue {
     resetPOS,
     updateCartItemBarber,
     assignBarberToAll,
-    isInvoiceEditable,
-    editInvoice,
-    requestInvoiceAdjustment,
   };
 
   return value;

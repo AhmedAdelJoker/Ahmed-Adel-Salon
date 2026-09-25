@@ -17,6 +17,7 @@ class ReviewRead(ReviewBase):
     is_public: bool
     is_verified_visit: bool
     created_at: datetime
+    employee_id: Optional[int] = None
     barber_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)

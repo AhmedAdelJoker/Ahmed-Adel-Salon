@@ -8,7 +8,9 @@
     "build": "tsc && vite build && node scripts/prerender.mjs",
     "build:vite": "vite build",
     "prerender": "node scripts/prerender.mjs",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test:contracts": "node --test scripts/contracts.test.mjs",
+    "lint": "eslint src",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -16,7 +18,7 @@
     "@fontsource/tajawal": "^5.3.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
-    "axios": "^1.6.0",
+    "axios": "^1.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^10.16.4",
@@ -24,16 +26,20 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
-    "react-router-dom": "^6.18.0",
+    "react-router-dom": "^7.18.4",
     "tailwind-merge": "^3.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.1",
     "vite": "^8.0.12"
   }
 }

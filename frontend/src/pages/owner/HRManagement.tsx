@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUI } from "@/context/UIContext";
 import { useHrData, useEmployeeDocuments, useEmployeeForm } from "@/features/hr";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import {
   User,
   Phone,
@@ -78,6 +79,10 @@ const HRManagement = () => {
     filteredEmployees,
     stats,
     fetchEmployees,
+    // Phase 2: pagination
+    page,
+    setPage,
+    totalCount,
   } = useHrData();
   const {
     employeeDocs,
@@ -299,6 +304,28 @@ const HRManagement = () => {
           />
         )}
       </AnimatePresence>
+
+      {/* Phase 2: unified pagination — reads X-Total-Count header */}
+      {totalCount > 0 && (() => {
+        const paginator = createPaginationState({
+          page,
+          size: 50,
+          total: totalCount,
+        });
+        return (
+          <div className="card-surface mt-4 rounded-2xl px-2 py-3">
+            <Pagination
+              paginator={paginator}
+              onPageChange={setPage}
+              showSizeChanger={false}
+              locale="ar"
+            />
+            <p className="text-center text-[10px] font-bold text-muted">
+              صفحة {page} • {totalCount} موظف إجمالي
+            </p>
+          </div>
+        );
+      })()}
 
       {/* ═══ EMPLOYEE WIZARD MODAL ═══ */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

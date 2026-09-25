@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from app.models.business_settings import BusinessSettings
 from app.models.cash_transaction import CashTransaction
+from app.models.invoice_payment import InvoicePayment
 from tests.helpers import auth_headers, make_user
 from tests.test_dashboard import _seed_customer
 from tests.test_invoice_create import _seed_barber, _seed_service
@@ -52,8 +53,11 @@ def test_split_invoice_creates_cash_leg(client, db_session):
         )
         .all()
     )
-    assert len(legs) == 1
-    assert float(legs[0].amount) == 120
+    assert len(legs) == 2
+    assert sorted(float(leg.amount) for leg in legs) == [80.0, 120.0]
+    payments = db_session.query(InvoicePayment).filter(InvoicePayment.invoice_id == body["id"]).all()
+    assert len(payments) == 2
+    assert sum(float(payment.amount) for payment in payments) == 200
 
 
 def test_loyalty_tier_discount_applied(client, db_session):

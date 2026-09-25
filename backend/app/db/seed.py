@@ -16,7 +16,6 @@ def seed_data():
     db = SessionLocal()
 
     try:
-        # ✅ Admin & Accountant
         # NOTE: admin credentials come from FIRST_SUPERUSER[_PASSWORD] env
         # (see backend/.env) — never hardcode them here.
         if not db.query(User).filter(User.username == app_settings.FIRST_SUPERUSER).first():
@@ -29,17 +28,6 @@ def seed_data():
             )
             db.add(admin)
             print("[seed] Admin/Owner created")
-
-        if not db.query(User).filter(User.username == "accountant").first():
-            accountant = User(
-                username="accountant",
-                hashed_password=get_password_hash("252525"),
-                full_name="المحاسب المالي (Financial Accountant)",
-                role="accountant",
-                is_active=True
-            )
-            db.add(accountant)
-            print("[seed] Accountant created")
 
         # ✅ Employees (replacing legacy Barbers)
         if not db.query(Employee).first():

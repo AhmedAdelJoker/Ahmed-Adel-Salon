@@ -16,6 +16,7 @@ from app.models.appointment import Appointment
 from app.models.appointment_service import AppointmentService
 from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
+from app.models.invoice_payment import InvoicePayment
 from app.models.business_settings import BusinessSettings
 from app.models.service_session import ServiceSession
 
@@ -33,7 +34,11 @@ from app.schemas.appointment import (
 )
 from app.schemas.invoice import IssueInvoiceResponse
 
-from app.api.deps import require_any_staff, require_cashier_manager_owner
+from app.api.deps import (
+    require_any_staff,
+    require_cashier_manager_owner,
+    require_manage_appointments,
+)
 from app.services.activity_service import log_activity
 from app.services.meta_whatsapp_service import (
     send_appointment_reminder_24h_template,
@@ -43,6 +48,8 @@ from app.services.meta_whatsapp_service import (
 )
 from app.services.pdf_service import generate_invoice_pdf
 from app.services.inventory_service import deduct_stock_for_invoice
+from app.services.loyalty_service import update_customer_loyalty
+from app.crud.core_business import create_cash_transaction
 from app.services.websocket import manager
 
 import json
@@ -445,7 +452,13 @@ def check_appointment_conflict(
     duration_minutes: int = 30,
     exclude_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_staff),
 ):
+    if current_user.role == "barber":
+        employee_id = current_user.barber_id or current_user.employee_id
+        if employee_id != barber_id:
+            raise HTTPException(status_code=403, detail="ليس لديك صلاحية لعرض هذا الجدول")
+
     if isinstance(time, str):
         try:
             time = time.fromisoformat(time[:5])
@@ -485,6 +498,7 @@ def check_customer_duplicate(
     date: date,
     exclude_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_staff),
 ):
     query = db.query(Appointment).filter(
         Appointment.customer_id == customer_id,
@@ -525,7 +539,10 @@ def manual_cleanup_cancelled(
     return {"message": f"تم تنظيف قاعدة البيانات بنجاح. تم حذف {deleted_count} حجز ملغى قديم (أكثر من 30 يوم)."}
 
 @router.post("/auto-cancel-expired")
-def auto_cancel_expired_appointments(db: Session = Depends(get_db)):
+def auto_cancel_expired_appointments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manage_appointments),
+):
     """Auto-cancel expired bookings:
     - Bookings from previous days with status pending/confirmed/waiting
     - Bookings today that are > 1 hour past scheduled time
@@ -1009,50 +1026,126 @@ def issue_invoice_from_appointment(appointment_id: int, payment_method: str = "c
     if not appointment_services:
         raise HTTPException(status_code=400, detail="لا توجد خدمات فعالة داخل هذا الحجز لإصدار الفاتورة")
     
-    allowed_payment_methods = {"cash", "card", "wallet", "transfer"}
+    allowed_payment_methods = {"cash", "card", "wallet", "bank_transfer", "transfer"}
     if payment_method not in allowed_payment_methods:
         raise HTTPException(status_code=400, detail="طريقة الدفع غير صحيحة")
-        
+    payment_method = "bank_transfer" if payment_method == "transfer" else payment_method
+
     invoice_no = _generate_invoice_no(db)
     total_amount = Decimal("0.00")
     for item in appointment_services:
-        qty = item.quantity or 1
+        qty = item.quantity or 0
+        if qty <= 0:
+            raise HTTPException(status_code=400, detail="كمية خدمة الموعد يجب أن تكون أكبر من صفر")
         unit_price = Decimal(str(item.price_snapshot or 0))
+        if unit_price < 0:
+            raise HTTPException(status_code=400, detail="سعر الخدمة في الموعد غير صالح")
         total_amount += unit_price * qty
-        
-    invoice = Invoice(invoice_no=invoice_no, appointment_id=appointment.id, customer_id=appointment.customer_id, barber_id=appointment.barber_id, payment_method=payment_method, total_amount=total_amount, created_by_user_id=getattr(current_user, "id", None))
+    total_amount = total_amount.quantize(Decimal("0.01"))
+
+    invoice = Invoice(
+        invoice_no=invoice_no,
+        appointment_id=appointment.id,
+        customer_id=appointment.customer_id,
+        barber_id=appointment.barber_id,
+        payment_method=payment_method,
+        subtotal_amount=total_amount,
+        discount_amount=Decimal("0.00"),
+        total_amount=total_amount,
+        created_by_user_id=getattr(current_user, "id", None),
+    )
     db.add(invoice)
     db.flush()
     
     invoice_items = []
     for item in appointment_services:
-        qty = item.quantity or 1
+        qty = item.quantity or 0
         unit_price = Decimal(str(item.price_snapshot or 0))
         line_total = unit_price * qty
-        invoice_items.append(InvoiceItem(invoice_id=invoice.id, service_id=item.service_id, service_name=item.service_name_snapshot, quantity=qty, unit_price=unit_price, total_price=line_total))
+        invoice_items.append(
+            InvoiceItem(
+                invoice_id=invoice.id,
+                service_id=item.service_id,
+                service_name=item.service_name_snapshot,
+                quantity=qty,
+                unit_price=unit_price,
+                total_price=line_total,
+            )
+        )
     db.add_all(invoice_items)
-    
+    db.flush()
+
     customer = db.query(Customer).filter(Customer.customer_id == appointment.customer_id).first()
     barber = db.query(Employee).filter(Employee.id == appointment.barber_id).first()
     settings_row = db.query(BusinessSettings).first()
-    
-    pdf_path = generate_invoice_pdf(invoice=invoice, items=invoice_items, customer=customer, barber=barber, shop_name=settings_row.salon_name if settings_row else "SalonPro", shop_phone=settings_row.shop_phone if settings_row else None)
+
+    pdf_path = generate_invoice_pdf(
+        invoice=invoice,
+        items=invoice_items,
+        customer=customer,
+        barber=barber,
+        shop_name=settings_row.salon_name if settings_row else "SalonPro",
+        shop_phone=settings_row.shop_phone if settings_row else None,
+    )
     invoice.pdf_path = pdf_path
-    
-    # Mark appointment as completed/done after invoice
+
     appointment.status = "done"
-    
+
     session = db.query(ServiceSession).filter(ServiceSession.appointment_id == appointment.id).first()
     if session:
         session.status = "completed"
         db.add(session)
-        
-    if customer and customer.phone:
-        customer_name = f"{customer.first_name or ''} {customer.last_name or ''}".strip() or "عميلنا"
-        upload_and_send_pdf(db, to_phone=customer.phone, pdf_path=pdf_path, filename=Path(pdf_path).name, caption=f"مرحبًا {customer_name}، مرفق فاتورتك رقم {invoice_no}", appointment_id=appointment.id, invoice_id=invoice.id, created_by_user_id=getattr(current_user, "id", None))
-    
+
+    update_customer_loyalty(db, appointment.customer_id, total_amount)
     deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=getattr(current_user, "id", None))
-    
+
+    if total_amount > 0:
+        db.add(
+            InvoicePayment(
+                invoice_id=invoice.id,
+                payment_method=payment_method,
+                amount=total_amount,
+                reference_no=invoice.invoice_no,
+                received_by_user_id=getattr(current_user, "id", None),
+            )
+        )
+        create_cash_transaction(
+            db,
+            direction="in",
+            amount=float(total_amount),
+            transaction_type="invoice_payment",
+            payment_method=payment_method,
+            notes=f"تحصيل فاتورة {invoice.invoice_no}",
+            user_id=getattr(current_user, "id", None),
+            reference_type="invoice",
+            reference_id=invoice.id,
+            reference_no=invoice.invoice_no,
+            customer_id=appointment.customer_id,
+            employee_id=appointment.barber_id,
+            commit=False,
+        )
+
     db.commit()
     db.refresh(invoice)
-    return IssueInvoiceResponse(message="تم إصدار الفاتورة بنجاح", invoice_id=invoice.id, invoice_no=invoice.invoice_no)
+
+    if customer and customer.phone and pdf_path:
+        customer_name = f"{customer.first_name or ''} {customer.last_name or ''}".strip() or "عميلنا"
+        try:
+            upload_and_send_pdf(
+                db,
+                to_phone=customer.phone,
+                pdf_path=pdf_path,
+                filename=Path(pdf_path).name,
+                caption=f"مرحبًا {customer_name}، مرفق فاتورتك رقم {invoice_no}",
+                appointment_id=appointment.id,
+                invoice_id=invoice.id,
+                created_by_user_id=getattr(current_user, "id", None),
+            )
+        except Exception as exc:
+            print(f"WhatsApp invoice send failed: {exc}")
+
+    return IssueInvoiceResponse(
+        message="تم إصدار الفاتورة بنجاح",
+        invoice_id=invoice.id,
+        invoice_no=invoice.invoice_no,
+    )

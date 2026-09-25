@@ -87,21 +87,20 @@ def find_existing_cash_transaction(
     reference_type: str | None,
     reference_id: int | None,
     transaction_type: str,
+    reference_no: str | None = None,
 ):
     if not reference_type or reference_id is None or not transaction_type:
         return None
 
-    return (
-        db.query(CashTransaction)
-        .filter(
-            CashTransaction.reference_type == reference_type,
-            CashTransaction.reference_id == reference_id,
-            CashTransaction.type == transaction_type,
-            CashTransaction.is_voided == 0,
-        )
-        .order_by(CashTransaction.id.desc())
-        .first()
+    query = db.query(CashTransaction).filter(
+        CashTransaction.reference_type == reference_type,
+        CashTransaction.reference_id == reference_id,
+        CashTransaction.type == transaction_type,
+        CashTransaction.is_voided == 0,
     )
+    if reference_no is not None:
+        query = query.filter(CashTransaction.reference_no == reference_no)
+    return query.order_by(CashTransaction.id.desc()).first()
 
 def create_cash_transaction(
     db: Session,
@@ -126,6 +125,7 @@ def create_cash_transaction(
             reference_type=reference_type,
             reference_id=reference_id,
             transaction_type=transaction_type,
+            reference_no=reference_no,
         )
         if existing_transaction is not None:
             return existing_transaction

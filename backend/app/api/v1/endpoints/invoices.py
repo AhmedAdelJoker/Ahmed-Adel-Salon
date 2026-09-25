@@ -1,28 +1,37 @@
 from __future__ import annotations
 from pathlib import Path
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from datetime import date, datetime
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from fastapi.responses import FileResponse
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.api.deps import require_cashier_manager_owner
 from app.models.user import User
 from app.models.invoice import Invoice
+from app.models.invoice_counter import InvoiceCounter
 from app.models.invoice_item import InvoiceItem
 from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.service import Service
 from app.models.product import Product
+from app.models.offer import Offer
+from app.models.invoice_payment import InvoicePayment
 from app.models.appointment import Appointment
-from app.schemas.invoice import InvoiceRead, InvoiceManualCreate
+from app.schemas.invoice import InvoiceItemManualCreate, InvoiceRead, InvoiceManualCreate
 from app.services.activity_service import log_activity
 from app.services.meta_whatsapp_service import upload_and_send_pdf
 from app.services.pdf_service import generate_invoice_pdf
 from app.services.inventory_service import deduct_stock_for_invoice
 from app.models.business_settings import BusinessSettings
 import asyncio
-from decimal import Decimal
+import hashlib
+import json
+from decimal import Decimal, InvalidOperation
 from app.services.loyalty_service import update_customer_loyalty, calculate_loyalty_discount
 from app.services.websocket import manager
 from app.crud.core_business import create_cash_transaction
@@ -31,9 +40,148 @@ router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
 
 def _generate_invoice_no(db: Session) -> str:
-    today_prefix = datetime.now().strftime("INV-%Y%m%d")
-    count_today = db.query(Invoice).filter(Invoice.invoice_no.like(f"{today_prefix}%")).count()
-    return f"{today_prefix}-{count_today + 1:04d}"
+    counter_date = datetime.now().date()
+    today_prefix = f"INV-{counter_date:%Y%m%d}"
+    existing_numbers = db.query(Invoice.invoice_no).filter(
+        Invoice.invoice_no.like(f"{today_prefix}-%")
+    ).all()
+    last_existing = 0
+    for (invoice_no,) in existing_numbers:
+        try:
+            last_existing = max(last_existing, int(str(invoice_no).rsplit("-", 1)[1]))
+        except (TypeError, ValueError):
+            continue
+
+    dialect_name = db.get_bind().dialect.name
+    if dialect_name == "sqlite":
+        statement = sqlite_insert(InvoiceCounter).values(
+            counter_date=counter_date,
+            last_number=last_existing + 1,
+        )
+        statement = statement.on_conflict_do_update(
+            index_elements=["counter_date"],
+            set_={
+                "last_number": func.max(
+                    InvoiceCounter.__table__.c.last_number,
+                    last_existing,
+                )
+                + 1
+            },
+        )
+        db.execute(statement)
+    elif dialect_name == "postgresql":
+        statement = postgresql_insert(InvoiceCounter).values(
+            counter_date=counter_date,
+            last_number=last_existing + 1,
+        )
+        statement = statement.on_conflict_do_update(
+            index_elements=["counter_date"],
+            set_={
+                "last_number": func.greatest(
+                    InvoiceCounter.__table__.c.last_number,
+                    last_existing,
+                )
+                + 1
+            },
+        )
+        db.execute(statement)
+    else:
+        counter = (
+            db.query(InvoiceCounter)
+            .filter(InvoiceCounter.counter_date == counter_date)
+            .with_for_update()
+            .first()
+        )
+        if counter is None:
+            counter = InvoiceCounter(
+                counter_date=counter_date,
+                last_number=last_existing,
+            )
+            db.add(counter)
+        counter.last_number = max(counter.last_number, last_existing) + 1
+        db.add(counter)
+
+    db.flush()
+    counter = (
+        db.query(InvoiceCounter)
+        .filter(InvoiceCounter.counter_date == counter_date)
+        .first()
+    )
+    return f"{today_prefix}-{counter.last_number:04d}"
+
+
+def _normalize_money(value: Decimal | int | float | str) -> Decimal:
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="قيمة البند غير صالحة")
+    if not amount.is_finite() or amount < 0:
+        raise HTTPException(status_code=400, detail="قيمة البند يجب أن تكون صفرًا أو أكبر")
+    return amount.quantize(Decimal("0.01"))
+
+
+def _invoice_request_hash(payload: InvoiceManualCreate) -> str:
+    serialized = json.dumps(
+        payload.model_dump(mode="json"),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(serialized).hexdigest()
+
+
+def _validate_idempotency_key(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized or len(normalized) > 128:
+        raise HTTPException(status_code=400, detail="مفتاح Idempotency غير صالح")
+    if any(not (character.isalnum() or character in "-_:.") for character in normalized):
+        raise HTTPException(status_code=400, detail="مفتاح Idempotency يحتوي على محارف غير مسموحة")
+    return normalized
+
+
+def _resolve_invoice_item(
+    db: Session, item_data: InvoiceItemManualCreate
+) -> tuple[int | None, int | None, int | None, str, Decimal]:
+    if item_data.item_type == "service":
+        service = (
+            db.query(Service)
+            .filter(Service.id == item_data.service_id, Service.is_active.is_(True))
+            .first()
+        )
+        if service is None:
+            raise HTTPException(status_code=400, detail="الخدمة غير موجودة أو غير نشطة")
+        return service.id, None, None, service.name_ar or service.name, _normalize_money(service.price)
+
+    if item_data.item_type == "product":
+        product = (
+            db.query(Product)
+            .filter(
+                Product.id == item_data.product_id,
+                Product.is_active.is_(True),
+                Product.is_archived.is_(False),
+            )
+            .first()
+        )
+        if product is None:
+            raise HTTPException(status_code=400, detail="المنتج غير موجود أو غير نشط")
+        if product.sell_price is None:
+            raise HTTPException(status_code=400, detail="سعر المنتج غير محدد")
+        return None, product.id, None, product.name, _normalize_money(product.sell_price)
+
+    offer = (
+        db.query(Offer)
+        .filter(Offer.id == item_data.offer_id, Offer.is_active.is_(True))
+        .first()
+    )
+    if offer is None:
+        raise HTTPException(status_code=400, detail="العرض غير موجود أو غير نشط")
+    today = date.today()
+    if offer.start_date and offer.start_date > today:
+        raise HTTPException(status_code=400, detail="العرض لم يبدأ بعد")
+    if offer.end_date and offer.end_date < today:
+        raise HTTPException(status_code=400, detail="انتهى العرض")
+    return None, None, offer.id, offer.name_ar or offer.name, _normalize_money(offer.offer_price)
 
 
 def _ensure_invoice_pdf_path(db: Session, invoice: Invoice) -> Path | None:
@@ -80,6 +228,7 @@ def create_manual_invoice(
     payload: InvoiceManualCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     # Enforce shift requirement if enabled (warn-only for now to keep tests passing)
     try:
@@ -99,6 +248,28 @@ def create_manual_invoice(
         raise
     except Exception:
         pass
+    idempotency_key = _validate_idempotency_key(idempotency_key)
+    request_hash = _invoice_request_hash(payload) if idempotency_key else None
+    if idempotency_key:
+        existing_invoice = (
+            db.query(Invoice)
+            .filter(
+                Invoice.created_by_user_id == current_user.id,
+                Invoice.idempotency_key == idempotency_key,
+            )
+            .first()
+        )
+        if existing_invoice is not None:
+            if existing_invoice.request_hash != request_hash:
+                raise HTTPException(status_code=409, detail="مفتاح Idempotency مستخدم بطلب مختلف")
+            existing_customer = db.query(Customer).filter(
+                Customer.customer_id == existing_invoice.customer_id
+            ).first()
+            existing_barber = db.query(Employee).filter(
+                Employee.id == existing_invoice.barber_id
+            ).first()
+            return _serialize_invoice(existing_invoice, existing_customer, existing_barber)
+
     # 1. Handle Customer
     customer_id = payload.customer_id
     
@@ -144,49 +315,47 @@ def create_manual_invoice(
     # 2. Calculate Total and Prepare Items
     total_amount = Decimal("0.00")
     invoice_items_to_add = []
-    
-    # We use the first item's barber as the main barber for the invoice header
     main_barber_id = None
-    
+
     for item_data in payload.items:
-        qty = item_data.quantity or 1
-        price = item_data.unit_price
+        service_id, product_id, offer_id, item_name, price = _resolve_invoice_item(
+            db, item_data
+        )
+        qty = item_data.quantity
         line_total = price * qty
         total_amount += line_total
-        
-        service_name = "عنصر"
-        if item_data.item_type == "service" and item_data.service_id:
-            service = db.query(Service).filter(Service.id == item_data.service_id).first()
-            if service:
-                service_name = service.name
-        elif item_data.item_type == "product" and item_data.product_id:
-            product = db.query(Product).filter(Product.id == item_data.product_id).first()
-            if product:
-                service_name = product.name
-        
+
         if not main_barber_id and item_data.employee_id:
             main_barber_id = item_data.employee_id
-            
+
         invoice_items_to_add.append(
             InvoiceItem(
-                service_id=item_data.service_id,
-                product_id=item_data.product_id,
-                service_name=service_name,
+                service_id=service_id,
+                product_id=product_id,
+                offer_id=offer_id,
+                service_name=item_name,
                 quantity=qty,
                 unit_price=price,
                 total_price=line_total,
             )
         )
 
-    # 3. Apply Discount
-    # A. Loyalty Discount (Automatic based on Tier)
+    total_amount = total_amount.quantize(Decimal("0.01"))
+
     loyalty_discount = calculate_loyalty_discount(db, customer_id, total_amount)
-    
-    # B. Manual Discount
-    total_manual_discount = payload.discount_amount + loyalty_discount
-    final_amount = total_amount - total_manual_discount
-    if final_amount < 0:
-        final_amount = Decimal("0.00")
+    loyalty_discount = _normalize_money(loyalty_discount)
+    total_manual_discount = _normalize_money(payload.discount_amount) + loyalty_discount
+    if total_manual_discount > total_amount:
+        raise HTTPException(status_code=400, detail="الخصم لا يمكن أن يتجاوز إجمالي الفاتورة")
+    final_amount = (total_amount - total_manual_discount).quantize(Decimal("0.01"))
+
+    if payload.payment_method == "split":
+        split_total = sum(
+            (sp.amount for sp in payload.split_payments or []),
+            Decimal("0.00"),
+        ).quantize(Decimal("0.01"))
+        if split_total != final_amount:
+            raise HTTPException(status_code=400, detail="مجموع قسمة الدفع لا يطابق إجمالي الفاتورة")
 
     # 4. Create Invoice
     invoice = Invoice(
@@ -199,6 +368,8 @@ def create_manual_invoice(
         discount_amount=total_manual_discount,
         total_amount=final_amount,
         created_by_user_id=current_user.id,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
     )
     db.add(invoice)
     db.flush()
@@ -218,31 +389,54 @@ def create_manual_invoice(
     # 7. Deduct stock for the invoice
     deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=current_user.id)
 
-    # 7b. Auto-create cashbox transactions — كل طرق الدفع تسمع في الخزنة المركزية (كاش + غير كاش)
-    try:
-        pm = str(payload.payment_method or "").strip().lower()
-        svc_label = service_name if 'service_name' in locals() else 'خدمات'
-        def _inv_pm_label(m: str) -> str:
-            return {"cash": "نقدي", "card": "شبكة", "bank_transfer": "تحويل", "wallet": "محفظة"}.get(m, m)
-        if pm == "cash":
-            create_cash_transaction(db, direction="in", amount=float(final_amount), transaction_type="invoice_payment", payment_method="cash", notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({_inv_pm_label('cash')})", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
-        elif pm == "card":
-            create_cash_transaction(db, direction="in", amount=float(final_amount), transaction_type="invoice_payment", payment_method="card", notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({_inv_pm_label('card')})", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
-        elif pm == "bank_transfer":
-            create_cash_transaction(db, direction="in", amount=float(final_amount), transaction_type="invoice_payment", payment_method="bank_transfer", notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({_inv_pm_label('bank_transfer')})", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
-        elif pm == "wallet":
-            create_cash_transaction(db, direction="in", amount=float(final_amount), transaction_type="invoice_payment", payment_method="wallet", notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({_inv_pm_label('wallet')})", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
-        elif pm == "split" and payload.split_payments:
-            for sp in payload.split_payments:
-                sp_pm = str(sp.payment_method or "").strip().lower() or "cash"
-                sp_amt = Decimal(str(sp.amount or 0))
-                if sp_amt > 0:
-                    create_cash_transaction(db, direction="in", amount=float(sp_amt), transaction_type="invoice_payment", payment_method=sp_pm, notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({_inv_pm_label(sp_pm)} - تقسيط)", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
-        elif final_amount and float(final_amount) > 0:
-            # fallback: أي طريقة دفع غير معروفة
-            create_cash_transaction(db, direction="in", amount=float(final_amount), transaction_type="invoice_payment", payment_method=pm or "cash", notes=f"تحصيل فاتورة {invoice.invoice_no} - {svc_label} ({pm})", user_id=current_user.id, reference_type="invoice", reference_id=invoice.id, reference_no=invoice.invoice_no, customer_id=customer_id, employee_id=main_barber_id, commit=False)
-    except Exception as _cash_err:
-        print(f"[Cashbox] auto-deposit failed for invoice {invoice.invoice_no}: {_cash_err}")
+    payment_label = {
+        "cash": "نقدي",
+        "card": "شبكة",
+        "bank_transfer": "تحويل",
+        "wallet": "محفظة",
+    }
+
+    def record_invoice_payment(payment_method: str, amount: Decimal, reference_no: str):
+        if amount <= 0:
+            return
+        db.add(
+            InvoicePayment(
+                invoice_id=invoice.id,
+                payment_method=payment_method,
+                amount=amount,
+                reference_no=reference_no,
+                received_by_user_id=current_user.id,
+            )
+        )
+        create_cash_transaction(
+            db,
+            direction="in",
+            amount=float(amount),
+            transaction_type="invoice_payment",
+            payment_method=payment_method,
+            notes=(
+                f"تحصيل فاتورة {invoice.invoice_no} - "
+                f"{invoice_items_to_add[0].service_name if invoice_items_to_add else 'خدمات'} "
+                f"({payment_label.get(payment_method, payment_method)})"
+            ),
+            user_id=current_user.id,
+            reference_type="invoice",
+            reference_id=invoice.id,
+            reference_no=reference_no,
+            customer_id=customer_id,
+            employee_id=main_barber_id,
+            commit=False,
+        )
+
+    if payload.payment_method == "split":
+        for index, split_payment in enumerate(payload.split_payments or [], start=1):
+            record_invoice_payment(
+                split_payment.payment_method,
+                split_payment.amount,
+                f"{invoice.invoice_no}-split-{index}",
+            )
+    else:
+        record_invoice_payment(payload.payment_method, final_amount, invoice.invoice_no)
 
     # 8. Update Appointment Status if linked
     if payload.appointment_id:
@@ -268,7 +462,29 @@ def create_manual_invoice(
     except Exception as e:
         print(f"Error generating PDF: {e}")
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if not idempotency_key:
+            raise
+        replayed_invoice = (
+            db.query(Invoice)
+            .filter(
+                Invoice.created_by_user_id == current_user.id,
+                Invoice.idempotency_key == idempotency_key,
+            )
+            .first()
+        )
+        if replayed_invoice is None or replayed_invoice.request_hash != request_hash:
+            raise
+        replayed_customer = db.query(Customer).filter(
+            Customer.customer_id == replayed_invoice.customer_id
+        ).first()
+        replayed_barber = db.query(Employee).filter(
+            Employee.id == replayed_invoice.barber_id
+        ).first()
+        return _serialize_invoice(replayed_invoice, replayed_customer, replayed_barber)
     db.refresh(invoice)
     
     # 10. Broadcast WebSocket event to update POS ready-for-payment list
@@ -315,6 +531,9 @@ def _serialize_invoice(invoice: Invoice, customer: Customer | None, barber: Empl
         "items": [
             {
                 "id": item.id,
+                "service_id": item.service_id,
+                "product_id": item.product_id,
+                "offer_id": item.offer_id,
                 "service_name": item.service_name,
                 "quantity": item.quantity,
                 "unit_price": float(item.unit_price or 0),
@@ -733,6 +952,9 @@ def update_draft_invoice(
     if not draft:
         raise HTTPException(status_code=404, detail="المسودة غير موجودة")
     
+    if payload.payment_method == "split":
+        raise HTTPException(status_code=400, detail="الدفع المقسوم غير متاح في المسودات")
+
     draft.customer_id = payload.customer_id or draft.customer_id
     # NOTE: InvoiceManualCreate has no barber_id field; barber comes from
     # the first item's employee_id (same as manual create).
@@ -749,36 +971,38 @@ def update_draft_invoice(
         for item in draft.items:
             db.delete(item)
         db.flush()
-        
-        total = Decimal("0")
+
+        total = Decimal("0.00")
         for item_data in payload.items:
-            qty = item_data.quantity or 1
-            price = item_data.unit_price
+            service_id, product_id, offer_id, item_name, price = _resolve_invoice_item(
+                db, item_data
+            )
+            qty = item_data.quantity
             line_total = price * qty
             total += line_total
-            # NOTE: InvoiceManualCreate has no service_name field; resolve
-            # from the catalog like manual create does.
-            resolved_name = "��"
-            if item_data.item_type == "service" and item_data.service_id:
-                svc = db.query(Service).filter(Service.id == item_data.service_id).first()
-                if svc:
-                    resolved_name = svc.name
-            elif item_data.item_type == "product" and item_data.product_id:
-                prod = db.query(Product).filter(Product.id == item_data.product_id).first()
-                if prod:
-                    resolved_name = prod.name
             item = InvoiceItem(
                 invoice_id=draft.id,
-                service_id=item_data.service_id,
-                product_id=item_data.product_id,
-                service_name=resolved_name,
+                service_id=service_id,
+                product_id=product_id,
+                offer_id=offer_id,
+                service_name=item_name,
                 quantity=qty,
                 unit_price=price,
                 total_price=line_total,
             )
             db.add(item)
+
+        total = total.quantize(Decimal("0.01"))
+        loyalty_discount = _normalize_money(
+            calculate_loyalty_discount(db, draft.customer_id, total)
+        )
+        total_discount = _normalize_money(payload.discount_amount) + loyalty_discount
+        if total_discount > total:
+            raise HTTPException(status_code=400, detail="الخصم لا يمكن أن يتجاوز إجمالي الفاتورة")
         draft.subtotal_amount = total
-        draft.total_amount = total
+        draft.discount_amount = total_discount
+        draft.total_amount = (total - total_discount).quantize(Decimal("0.01"))
+
     
     db.commit()
     db.refresh(draft)
@@ -814,29 +1038,33 @@ def finalize_draft(
     
     deduct_stock_for_invoice(db, invoice_id=draft.id, created_by_user_id=getattr(current_user, "id", None))
 
-    # Auto-deposit for draft finalize — كل طرق الدفع تسمع في الخزنة المركزية
-    try:
-        pm_draft = str(draft.payment_method or "").strip().lower() or "cash"
-        if draft.total_amount and float(draft.total_amount) > 0:
-            pm_label = {"cash": "نقدي", "card": "شبكة", "bank_transfer": "تحويل", "wallet": "محفظة"}.get(pm_draft, pm_draft)
-            create_cash_transaction(
-                db,
-                direction="in",
-                amount=float(draft.total_amount),
-                transaction_type="invoice_payment",
-                payment_method=pm_draft,
-                notes=f"تحصيل فاتورة {draft.invoice_no} ({pm_label})",
-                user_id=getattr(current_user, "id", None),
-                reference_type="invoice",
-                reference_id=draft.id,
+    if draft.total_amount and float(draft.total_amount) > 0:
+        payment_method = str(draft.payment_method or "cash").lower()
+        db.add(
+            InvoicePayment(
+                invoice_id=draft.id,
+                payment_method=payment_method,
+                amount=Decimal(str(draft.total_amount)),
                 reference_no=draft.invoice_no,
-                customer_id=draft.customer_id,
-                employee_id=draft.barber_id,
-                commit=False,
+                received_by_user_id=getattr(current_user, "id", None),
             )
-    except Exception as _cash_err2:
-        print(f"[Cashbox] auto-deposit failed for draft {draft.invoice_no}: {_cash_err2}")
-    
+        )
+        create_cash_transaction(
+            db,
+            direction="in",
+            amount=float(draft.total_amount),
+            transaction_type="invoice_payment",
+            payment_method=payment_method,
+            notes=f"تحصيل فاتورة {draft.invoice_no}",
+            user_id=getattr(current_user, "id", None),
+            reference_type="invoice",
+            reference_id=draft.id,
+            reference_no=draft.invoice_no,
+            customer_id=draft.customer_id,
+            employee_id=draft.barber_id,
+            commit=False,
+        )
+
     try:
         barber = db.query(Employee).filter(Employee.id == draft.barber_id).first()
         settings_row = db.query(BusinessSettings).first()

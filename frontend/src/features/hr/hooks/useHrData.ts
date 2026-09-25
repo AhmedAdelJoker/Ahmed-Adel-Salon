@@ -17,24 +17,39 @@ export function useHrData() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeView, setActiveView] = useState<HrViewMode>("cards");
+  // Phase 2: server-side pagination
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
 
   const fetchEmployees = useCallback(async () => {
     try {
       setLoading(true);
       const [empRes, servRes] = await Promise.all([
-        api.get("/employees"),
+        api.get("/employees", { params: { page, page_size: size } }),
         api.get("/services", { params: { limit: 1000 } }),
       ]);
       setEmployees(
         normalizeListResponse(empRes).items.map(normalizeEmployeeRecord),
       );
       setAllServices(servRes.data || []);
+
+      // Phase 2: read X-Total-Count header
+      const headers = (empRes as { headers?: Record<string, unknown> }).headers ?? {};
+      const headerTotal = headers["x-total-count"] ?? headers["X-Total-Count"];
+      const n = Number(headerTotal);
+      if (Number.isFinite(n) && n >= 0) {
+        setTotalCount(n);
+      } else {
+        const items = normalizeListResponse(empRes).items;
+        setTotalCount(items.length < size && page === 1 ? items.length : items.length + (page - 1) * size);
+      }
     } catch (_error) {
       toast.error("فشل تحميل بيانات الموظفين");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, size]);
 
   useEffect(() => {
     fetchEmployees();
@@ -78,5 +93,10 @@ export function useHrData() {
     filteredEmployees,
     stats,
     fetchEmployees,
+    // Phase 2: pagination
+    page,
+    setPage,
+    size,
+    totalCount,
   };
 }

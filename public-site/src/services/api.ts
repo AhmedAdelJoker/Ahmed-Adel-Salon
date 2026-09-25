@@ -54,7 +54,7 @@ export function setAuthToken(token: string | null | undefined): void {
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem("token");
-    if (token) {
+    if (token && !config.headers?.Authorization && !config.headers?.authorization) {
       config.headers = config.headers ?? ({} as InternalAxiosRequestConfig["headers"]);
       config.headers.Authorization = `Bearer ${token}`;
     }

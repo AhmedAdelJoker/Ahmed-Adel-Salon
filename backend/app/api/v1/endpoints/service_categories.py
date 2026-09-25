@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_any_staff
+from app.api.deps import require_any_staff, require_manage_catalog
 from app.db.session import get_db
 from app.models.service import Service
 from app.models.service_category import ServiceCategory
@@ -43,7 +43,7 @@ def get_service_category(
 def create_service_category(
     payload: ServiceCategoryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     category = ServiceCategory(**payload.model_dump())
     db.add(category)
@@ -57,7 +57,7 @@ def update_service_category(
     category_id: int,
     payload: ServiceCategoryUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     category = db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
     if not category:
@@ -76,7 +76,7 @@ def update_service_category(
 def toggle_service_category(
     category_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     category = db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
     if not category:
@@ -99,7 +99,7 @@ def toggle_service_category(
 def delete_service_category(
     category_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     category = db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
     if not category:

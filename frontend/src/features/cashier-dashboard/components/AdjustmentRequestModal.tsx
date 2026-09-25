@@ -105,20 +105,6 @@ export function AdjustmentRequestModal({
               />
             </div>
           )}
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-              كود المدير (اعتماد فوري)
-            </label>
-            <Input
-              type="password"
-              value={adjForm.managerPin}
-              onChange={(e) =>
-                setAdjForm((p) => ({ ...p, managerPin: e.target.value }))
-              }
-              className="text-center tracking-[1em] font-black h-11"
-              placeholder="••••"
-            />
-          </div>
         </div>
         <DialogFooter className="gap-2 pt-6">
           <Button

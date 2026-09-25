@@ -16,7 +16,7 @@ from app.schemas.waitlist_entry import (
     WaitlistEntryRead,
     WaitlistEntryUpdate,
 )
-from app.api.deps import require_any_staff
+from app.api.deps import require_cashier_manager_owner
 
 router = APIRouter(prefix="/waitlist", tags=["Waitlist"])
 
@@ -49,7 +49,7 @@ def _waitlist_to_read(db: Session, entry: WaitlistEntry) -> WaitlistEntryRead:
 
 @router.get("", response_model=List[WaitlistEntryRead])
 def list_waitlist_entries(
-    response: Response = None,
+    response: Response,
     target_date: Optional[date] = None,
     status_filter: Optional[str] = None,
     limit: int = Query(100, ge=1, le=500),
@@ -59,7 +59,7 @@ def list_waitlist_entries(
     page_size: Optional[int] = Query(None, ge=1, le=500),
     sort: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_cashier_manager_owner),
 ):
     # Phase 2: was returning ALL entries unbounded
     query = db.query(WaitlistEntry)
@@ -105,7 +105,7 @@ def list_waitlist_entries(
 def create_waitlist_entry(
     payload: WaitlistEntryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_cashier_manager_owner),
 ):
     # Validate customer exists
     customer = db.query(Customer).filter(Customer.customer_id == payload.customer_id).first()
@@ -148,7 +148,7 @@ def create_waitlist_entry(
 def get_waitlist_entry(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_cashier_manager_owner),
 ):
     entry = db.query(WaitlistEntry).filter(WaitlistEntry.id == entry_id).first()
     if not entry:
@@ -161,7 +161,7 @@ def update_waitlist_entry(
     entry_id: int,
     payload: WaitlistEntryUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_cashier_manager_owner),
 ):
     entry = db.query(WaitlistEntry).filter(WaitlistEntry.id == entry_id).first()
     if not entry:
@@ -186,7 +186,7 @@ def update_waitlist_entry(
 def delete_waitlist_entry(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_cashier_manager_owner),
 ):
     entry = db.query(WaitlistEntry).filter(WaitlistEntry.id == entry_id).first()
     if not entry:
@@ -207,7 +207,7 @@ def convert_waitlist_to_appointment(
     entry_id: int,
     payload: ConvertToAppointmentPayload,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_cashier_manager_owner),
 ):
     """Convert a waitlist entry to an actual appointment."""
     entry = db.query(WaitlistEntry).filter(WaitlistEntry.id == entry_id).first()

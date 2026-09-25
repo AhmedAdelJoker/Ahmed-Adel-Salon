@@ -1,340 +1,354 @@
 from __future__ import annotations
-from fastapi.middleware.cors import CORSMiddleware
 
-import json
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from pydantic import AliasChoices, BaseModel, Field
+from sqlalchemy.orm import Session, joinedload
 
-try:
-    from app.db.session import get_db  # type: ignore
-except Exception:
-    try:
-        from app.database import get_db  # type: ignore
-    except Exception:
-        try:
-            from app.core.database import get_db  # type: ignore
-        except Exception as exc:
-            raise ImportError(
-                "Cannot import get_db. Please update invoice_adjustment_requests.py to use your project's DB dependency."
-            ) from exc
+from app.api.deps import require_cashier_manager_owner, require_roles
+from app.crud.core_business import create_audit_log
+from app.db.session import get_db
+from app.models.invoice import Invoice
+from app.models.invoice_adjustment_request import InvoiceAdjustmentRequest
+from app.models.notification import Notification
+from app.models.user import User
 
 router = APIRouter()
 
+AdjustmentRequestType = Literal["discount", "payment_method", "void"]
+RequestStatus = Literal["pending", "approved", "rejected", "all"]
+ALLOWED_PAYMENT_METHODS = {"cash", "card", "bank_transfer", "wallet"}
+require_adjustment_reviewer = require_roles("owner", "admin", "manager")
+
 
 class AdjustmentRequestCreate(BaseModel):
-    request_type: str = "discount"
-    reason: str = ""
-    notes: Optional[str] = None
-    old_values: Optional[Dict[str, Any]] = None
-    requested_values: Optional[Dict[str, Any]] = None
-    manager_pin: Optional[str] = None
+    request_type: AdjustmentRequestType
+    reason: str = Field(min_length=3, max_length=1000)
+    notes: str | None = Field(default=None, max_length=2000)
+    requested_values: dict[str, Any] = Field(default_factory=dict)
 
 
 class AdjustmentDecision(BaseModel):
-    manager_note: Optional[str] = None
-    managerNote: Optional[str] = None
-    manager_pin: Optional[str] = None
+    manager_note: str | None = Field(
+        default=None,
+        max_length=2000,
+        validation_alias=AliasChoices("manager_note", "managerNote"),
+    )
 
 
-def _now() -> datetime:
-    return datetime.utcnow()
+def _serialize_request(row: InvoiceAdjustmentRequest) -> dict[str, Any]:
+    requester = row.requested_by
+    approver = row.approved_by
+    return {
+        "id": row.id,
+        "invoice_id": row.invoice_id,
+        "invoice_no": row.invoice.invoice_no if row.invoice else None,
+        "request_type": row.request_type,
+        "reason": row.reason,
+        "notes": row.notes,
+        "old_values": row.old_values or {},
+        "requested_values": row.requested_values or {},
+        "status": row.status,
+        "requested_by_user_id": row.requested_by_user_id,
+        "requested_by_name": (
+            (requester.full_name or requester.username) if requester else None
+        ),
+        "approved_by_user_id": row.approved_by_user_id,
+        "approved_by_name": (
+            (approver.full_name or approver.username) if approver else None
+        ),
+        "decision_note": row.decision_note,
+        "manager_note": row.decision_note,
+        "created_at": row.created_at,
+        "reviewed_at": row.reviewed_at,
+    }
 
 
-def _dialect(db: Session) -> str:
+def _parse_nonnegative_decimal(value: Any) -> Decimal:
     try:
-        return str(db.bind.dialect.name).lower()
-    except Exception:
-        return ""
+        parsed = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="القيمة الرقمية المطلوبة غير صالحة")
+    if not parsed.is_finite() or parsed < 0:
+        raise HTTPException(status_code=400, detail="القيمة الرقمية يجب أن تكون صفرًا أو أكبر")
+    return parsed.quantize(Decimal("0.01"))
 
 
-def _get_manager_pin(db: Session) -> str:
-    try:
-        # Try to get pin from BusinessSettings
-        from app.models.business_settings import BusinessSettings
-        settings = db.query(BusinessSettings).first()
-        if settings and hasattr(settings, "manager_approval_pin"):
-            return str(settings.manager_approval_pin or "1234")
-    except Exception:
-        pass
-    return "1234"
+def _validate_requested_change(
+    invoice: Invoice,
+    request_type: AdjustmentRequestType,
+    requested_values: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if request_type == "discount":
+        raw_value = requested_values.get("new_value", requested_values.get("amount"))
+        if raw_value is None:
+            raise HTTPException(status_code=400, detail="قيمة الخصم الجديدة مطلوبة")
+        new_discount = _parse_nonnegative_decimal(raw_value)
+        subtotal = Decimal(str(invoice.subtotal_amount or 0))
+        if new_discount > subtotal:
+            raise HTTPException(status_code=400, detail="الخصم لا يمكن أن يتجاوز إجمالي الفاتورة")
+        return (
+            {"discount_amount": str(new_discount)},
+            {"discount_amount": str(Decimal(str(invoice.discount_amount or 0)))},
+        )
+
+    if request_type == "payment_method":
+        payment_method = str(requested_values.get("new_value", "")).strip().lower()
+        if payment_method not in ALLOWED_PAYMENT_METHODS:
+            raise HTTPException(status_code=400, detail="طريقة الدفع غير مدعومة")
+        return (
+            {"payment_method": payment_method},
+            {"payment_method": invoice.payment_method},
+        )
+
+    if invoice.is_closed:
+        raise HTTPException(status_code=400, detail="الفاتورة مغلقة بالفعل")
+    return ({"void": True}, {"is_closed": invoice.is_closed})
 
 
-def _apply_adjustment_to_invoice(db: Session, invoice_id: int, req_type: str, requested_values: Dict[str, Any]):
-    from app.models.invoice import Invoice
-    from decimal import Decimal
-    
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not invoice:
-        return
+def _apply_approved_request(
+    db: Session,
+    row: InvoiceAdjustmentRequest,
+    reviewer: User,
+) -> None:
+    invoice = row.invoice
+    request_type = row.request_type
+    values = row.requested_values or {}
 
-    req_type = req_type.lower()
-    if req_type == "void":
-        invoice.status = "cancelled"
-    elif req_type == "payment_method":
-        new_pm = requested_values.get("new_value")
-        if new_pm:
-            invoice.payment_method = new_pm.lower()
-    elif req_type == "discount":
-        new_discount = requested_values.get("new_value")
-        if new_discount is not None:
-            try:
-                val = Decimal(str(new_discount))
-                invoice.discount_amount = val
-                invoice.total_amount = (invoice.subtotal_amount or 0) - val
-                invoice.final_amount = invoice.total_amount
-            except Exception:
-                pass
+    if request_type == "discount":
+        new_discount = _parse_nonnegative_decimal(
+            values.get("new_value", values.get("discount_amount"))
+        )
+        subtotal = Decimal(str(invoice.subtotal_amount or 0))
+        if new_discount > subtotal:
+            raise HTTPException(status_code=400, detail="الخصم لا يمكن أن يتجاوز إجمالي الفاتورة")
+        invoice.discount_amount = new_discount
+        invoice.total_amount = subtotal - new_discount
+    elif request_type == "payment_method":
+        payment_method = str(
+            values.get("new_value", values.get("payment_method", ""))
+        ).strip().lower()
+        if payment_method not in ALLOWED_PAYMENT_METHODS:
+            raise HTTPException(status_code=400, detail="طريقة الدفع غير مدعومة")
+        invoice.payment_method = payment_method
+    elif request_type == "void":
+        invoice.is_closed = True
+        invoice.closed_at = datetime.now(timezone.utc)
+        invoice.closed_by_user_id = reviewer.id
+    else:
+        raise HTTPException(status_code=400, detail="نوع التعديل غير مدعوم")
+
     db.add(invoice)
 
 
-def _ensure_table(db: Session) -> None:
-    dialect = _dialect(db)
-    if dialect in {"mssql", "pyodbc", "sqlserver"}:
-        ddl = """
-        IF OBJECT_ID('invoice_adjustment_requests', 'U') IS NULL
-        CREATE TABLE invoice_adjustment_requests (
-            id INT IDENTITY(1,1) PRIMARY KEY,
-            invoice_id INT NULL,
-            request_type NVARCHAR(80) NOT NULL DEFAULT 'discount',
-            reason NVARCHAR(MAX) NULL,
-            notes NVARCHAR(MAX) NULL,
-            old_values NVARCHAR(MAX) NULL,
-            requested_values NVARCHAR(MAX) NULL,
-            status NVARCHAR(40) NOT NULL DEFAULT 'pending',
-            manager_note NVARCHAR(MAX) NULL,
-            created_by_id INT NULL,
-            created_by_name NVARCHAR(255) NULL,
-            decided_by_id INT NULL,
-            decided_by_name NVARCHAR(255) NULL,
-            created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-            updated_at DATETIME2 NULL,
-            decided_at DATETIME2 NULL
-        )
-        """
-    else:
-        # SQLite: Add column if missing
-        db.execute(text("""
-        CREATE TABLE IF NOT EXISTS invoice_adjustment_requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            invoice_id INTEGER NULL,
-            request_type VARCHAR(80) NOT NULL DEFAULT 'discount',
-            reason TEXT NULL,
-            notes TEXT NULL,
-            old_values TEXT NULL,
-            requested_values TEXT NULL,
-            status VARCHAR(40) NOT NULL DEFAULT 'pending',
-            manager_note TEXT NULL,
-            created_by_id INTEGER NULL,
-            created_by_name VARCHAR(255) NULL,
-            decided_by_id INTEGER NULL,
-            decided_by_name VARCHAR(255) NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NULL,
-            decided_at DATETIME NULL
-        )
-        """))
-        try:
-            db.execute(text("ALTER TABLE invoice_adjustment_requests ADD COLUMN requested_values TEXT"))
-        except Exception:
-            pass
-    db.commit()
-
-
-def _row_to_dict(row: Any) -> Dict[str, Any]:
-    data = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
-    
-    for key in ["old_values", "requested_values"]:
-        raw = data.get(key)
-        if isinstance(raw, str) and raw:
-            try:
-                data[key] = json.loads(raw)
-            except Exception:
-                data[key] = {"raw": raw}
-        elif raw is None:
-            data[key] = {}
-            
-    return data
-
-
-def _get_request_or_404(db: Session, request_id: int) -> Dict[str, Any]:
-    _ensure_table(db)
-    row = db.execute(
-        text("SELECT * FROM invoice_adjustment_requests WHERE id = :id"),
-        {"id": request_id},
-    ).first()
-    if not row:
-        raise HTTPException(status_code=404, detail="طلب تعديل الفاتورة غير موجود")
-    return _row_to_dict(row)
+def _request_is_within_edit_window(invoice: Invoice) -> bool:
+    if invoice.created_at is None:
+        return True
+    now = datetime.now(invoice.created_at.tzinfo) if invoice.created_at.tzinfo else datetime.now()
+    return now <= invoice.created_at + timedelta(hours=1)
 
 
 @router.get("/invoice-adjustment-requests")
-def list_invoice_adjustment_requests(status: Optional[str] = None, db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
-    _ensure_table(db)
-    params: Dict[str, Any] = {}
-    where = ""
-    if status and status != "all":
-        where = "WHERE LOWER(status) = LOWER(:status)"
-        params["status"] = status
-    rows = db.execute(
-        text(f"SELECT * FROM invoice_adjustment_requests {where} ORDER BY created_at DESC, id DESC"),
-        params,
-    ).fetchall()
-    return [_row_to_dict(row) for row in rows]
+def list_invoice_adjustment_requests(
+    response: Response,
+    request_status: RequestStatus | None = Query(default=None, alias="status"),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+):
+    query = db.query(InvoiceAdjustmentRequest).options(
+        joinedload(InvoiceAdjustmentRequest.invoice),
+        joinedload(InvoiceAdjustmentRequest.requested_by),
+        joinedload(InvoiceAdjustmentRequest.approved_by),
+    )
+    if current_user.role == "cashier":
+        query = query.filter(
+            InvoiceAdjustmentRequest.requested_by_user_id == current_user.id
+        )
+    if request_status and request_status != "all":
+        query = query.filter(InvoiceAdjustmentRequest.status == request_status)
+
+    total = query.count()
+    rows = query.order_by(InvoiceAdjustmentRequest.id.desc()).offset(offset).limit(limit).all()
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Page-Size"] = str(limit)
+    response.headers["X-Offset"] = str(offset)
+    return [_serialize_request(row) for row in rows]
 
 
-@router.post("/invoices/{invoice_id}/adjustment-requests")
-async def create_invoice_adjustment_request(invoice_id: int, payload: AdjustmentRequestCreate, db: Session = Depends(get_db)) -> Dict[str, Any]:
-    _ensure_table(db)
-    
-    # Check invoice creation time
-    from app.models.invoice import Invoice
-    from datetime import timedelta
-    
+@router.post(
+    "/invoices/{invoice_id}/adjustment-requests",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_invoice_adjustment_request(
+    invoice_id: int,
+    payload: AdjustmentRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+):
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not invoice:
+    if invoice is None:
         raise HTTPException(status_code=404, detail="الفاتورة غير موجودة")
-        
-    invoice_time = invoice.created_at
-    if not invoice_time:
-         # Fallback if created_at is missing (shouldn't happen)
-         pass
-    else:
-        # Check if more than 1 hour passed
-        now = datetime.utcnow()
-        # Handle timezone-aware vs naive
-        if invoice_time.tzinfo:
-            now = datetime.now(invoice_time.tzinfo)
-            
-        if now > (invoice_time + timedelta(hours=1)):
-            raise HTTPException(
-                status_code=400, 
-                detail="لا يمكن تعديل الفاتورة بعد مرور أكثر من ساعة على إصدارها"
+    if not _request_is_within_edit_window(invoice):
+        raise HTTPException(
+            status_code=400,
+            detail="لا يمكن تعديل الفاتورة بعد مرور أكثر من ساعة على إصدارها",
+        )
+
+    pending = (
+        db.query(InvoiceAdjustmentRequest)
+        .filter(
+            InvoiceAdjustmentRequest.invoice_id == invoice.id,
+            InvoiceAdjustmentRequest.status == "pending",
+        )
+        .first()
+    )
+    if pending is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="يوجد طلب تعديل قيد المراجعة لهذه الفاتورة",
+        )
+
+    normalized_values, old_values = _validate_requested_change(
+        invoice,
+        payload.request_type,
+        payload.requested_values,
+    )
+    row = InvoiceAdjustmentRequest(
+        invoice_id=invoice.id,
+        requested_by_user_id=current_user.id,
+        request_type=payload.request_type,
+        reason=payload.reason.strip(),
+        notes=payload.notes.strip() if payload.notes else None,
+        old_values=old_values,
+        requested_values=normalized_values,
+        status="pending",
+    )
+    db.add(row)
+    db.flush()
+
+    recipients = db.query(User).filter(User.role.in_(["owner", "admin", "manager"])).all()
+    for recipient in recipients:
+        db.add(
+            Notification(
+                user_id=recipient.id,
+                user_role=recipient.role,
+                title="طلب تعديل فاتورة",
+                message=f"فاتورة {invoice.invoice_no} تنتظر مراجعة التعديل",
             )
+        )
 
-    old_values_json = json.dumps(payload.old_values or {}, ensure_ascii=False)
-    requested_values_json = json.dumps(payload.requested_values or {}, ensure_ascii=False)
-    
-    status = "pending"
-    manager_note = None
-    decided_at_clause = "NULL"
-    
-    if payload.manager_pin:
-        if payload.manager_pin == _get_manager_pin(db):
-            status = "approved"
-            manager_note = "تم الاعتماد الفوري بواسطة كود المدير"
-            decided_at_clause = "SYSUTCDATETIME()" if _dialect(db) in {"mssql", "pyodbc", "sqlserver"} else "CURRENT_TIMESTAMP"
-        else:
-            raise HTTPException(status_code=403, detail="كود الاعتماد غير صحيح")
-
-    dialect = _dialect(db)
-    if dialect in {"mssql", "pyodbc", "sqlserver"}:
-        insert_sql = text(f"""
-            INSERT INTO invoice_adjustment_requests
-                (invoice_id, request_type, reason, notes, old_values, requested_values, status, manager_note, created_at, decided_at)
-            OUTPUT INSERTED.id
-            VALUES (:invoice_id, :request_type, :reason, :notes, :old_values, :requested_values, :status, :manager_note, SYSUTCDATETIME(), {decided_at_clause})
-        """)
-        new_id = db.execute(insert_sql, {
-            "invoice_id": invoice_id,
-            "request_type": payload.request_type,
-            "reason": payload.reason,
-            "notes": payload.notes,
-            "old_values": old_values_json,
-            "requested_values": requested_values_json,
-            "status": status,
-            "manager_note": manager_note
-        }).scalar()
-    else:
-        db.execute(text(f"""
-            INSERT INTO invoice_adjustment_requests
-                (invoice_id, request_type, reason, notes, old_values, requested_values, status, manager_note, created_at, decided_at)
-            VALUES (:invoice_id, :request_type, :reason, :notes, :old_values, :requested_values, :status, :manager_note, CURRENT_TIMESTAMP, {decided_at_clause})
-        """), {
-            "invoice_id": invoice_id,
-            "request_type": payload.request_type,
-            "reason": payload.reason,
-            "notes": payload.notes,
-            "old_values": old_values_json,
-            "requested_values": requested_values_json,
-            "status": status,
-            "manager_note": manager_note
-        })
-        new_id = db.execute(text("SELECT last_insert_rowid() AS id")).scalar() if dialect == "sqlite" else None
-    
-    if status == "approved":
-        _apply_adjustment_to_invoice(db, invoice_id, payload.request_type, payload.requested_values or {})
-
+    create_audit_log(
+        db,
+        action="INVOICE_ADJUSTMENT_REQUESTED",
+        entity_name="invoice_adjustment_request",
+        entity_id=str(row.id),
+        user_id=current_user.id,
+        user_name=current_user.full_name or current_user.username,
+        old_values=old_values,
+        new_values=normalized_values,
+        commit=False,
+    )
     db.commit()
-
-    # Notify Manager via WebSocket
-    try:
-        from app.services.notification_service import notification_service
-        payload_notif = {
-            "invoice_id": invoice_id,
-            "request_type": payload.request_type,
-            "status": status,
-            "request_id": int(new_id) if new_id else None
-        }
-        event_name = "invoice_adjustment_approved" if status == "approved" else "invoice_adjustment_requested"
-        msg_text = f"تم تنفيذ تعديل فوري للفاتورة #{invoice_id}" if status == "approved" else f"طلب تعديل جديد للفاتورة #{invoice_id}"
-        
-        await notification_service.broadcast_event(event_name, payload_notif)
-        await notification_service.notify_role(db, "manager", event_name, msg_text, payload_notif)
-        await notification_service.notify_role(db, "owner", event_name, msg_text, payload_notif)
-    except Exception:
-        pass
-
-    if new_id:
-        return _get_request_or_404(db, int(new_id))
-    return {"message": "تمت العملية بنجاح", "invoice_id": invoice_id, "status": status}
+    db.refresh(row)
+    return _serialize_request(row)
 
 
-def _decide_request(request_id: int, status: str, payload: AdjustmentDecision, db: Session) -> Dict[str, Any]:
-    current = _get_request_or_404(db, request_id)
-    if str(current.get("status", "pending")).lower() != "pending":
-        raise HTTPException(status_code=400, detail="لا يمكن تعديل قرار طلب سبق اعتماده أو رفضه")
-    
-    if status == "approved":
-        expected_pin = _get_manager_pin(db)
-        if payload.manager_pin != expected_pin:
-            raise HTTPException(status_code=403, detail="كود الاعتماد غير صحيح")
+def _decide_request(
+    request_id: int,
+    decision: AdjustmentDecision,
+    reviewer: User,
+    db: Session,
+    approved: bool,
+) -> dict[str, Any]:
+    row = (
+        db.query(InvoiceAdjustmentRequest)
+        .options(
+            joinedload(InvoiceAdjustmentRequest.invoice),
+            joinedload(InvoiceAdjustmentRequest.requested_by),
+            joinedload(InvoiceAdjustmentRequest.approved_by),
+        )
+        .filter(InvoiceAdjustmentRequest.id == request_id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="طلب تعديل الفاتورة غير موجود")
+    if row.status != "pending":
+        raise HTTPException(status_code=409, detail="تمت مراجعة الطلب مسبقًا")
+    if row.requested_by_user_id == reviewer.id:
+        raise HTTPException(status_code=403, detail="لا يمكن مراجعة الطلب الذي أنشأه المستخدم نفسه")
 
-    manager_note = payload.manager_note if payload.manager_note is not None else payload.managerNote
-    dialect = _dialect(db)
-    now_sql = "SYSUTCDATETIME()" if dialect in {"mssql", "pyodbc", "sqlserver"} else "CURRENT_TIMESTAMP"
-    db.execute(text(f"""
-        UPDATE invoice_adjustment_requests
-        SET status = :status,
-            manager_note = :manager_note,
-            updated_at = {now_sql},
-            decided_at = {now_sql}
-        WHERE id = :id
-    """), {"status": status, "manager_note": manager_note, "id": request_id})
-    
-    # Auto-execute changes on approval
-    if status == "approved":
-        invoice_id = current.get("invoice_id")
-        req_type = str(current.get("request_type", ""))
-        requested_values = current.get("requested_values", {})
-        _apply_adjustment_to_invoice(db, invoice_id, req_type, requested_values)
+    claimed = (
+        db.query(InvoiceAdjustmentRequest)
+        .filter(
+            InvoiceAdjustmentRequest.id == request_id,
+            InvoiceAdjustmentRequest.status == "pending",
+        )
+        .update(
+            {InvoiceAdjustmentRequest.status: "processing"},
+            synchronize_session=False,
+        )
+    )
+    if claimed != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="تمت مراجعة الطلب مسبقًا")
+    row.status = "processing"
 
+    if approved:
+        _apply_approved_request(db, row, reviewer)
+
+    row.status = "approved" if approved else "rejected"
+    row.approved_by_user_id = reviewer.id
+    row.reviewed_at = datetime.now(timezone.utc)
+    row.decision_note = decision.manager_note.strip() if decision.manager_note else None
+    db.add(row)
+
+    db.add(
+        Notification(
+            user_id=row.requested_by_user_id,
+            user_role=row.requested_by.role if row.requested_by else None,
+            title="تمت مراجعة طلب تعديل الفاتورة",
+            message=f"طلب تعديل الفاتورة {row.invoice.invoice_no if row.invoice else row.invoice_id} تم {row.status}",
+        )
+    )
+    create_audit_log(
+        db,
+        action=(
+            "INVOICE_ADJUSTMENT_APPROVED"
+            if approved
+            else "INVOICE_ADJUSTMENT_REJECTED"
+        ),
+        entity_name="invoice_adjustment_request",
+        entity_id=str(row.id),
+        user_id=reviewer.id,
+        user_name=reviewer.full_name or reviewer.username,
+        new_values={"status": row.status, "decision_note": row.decision_note},
+        commit=False,
+    )
     db.commit()
-    return _get_request_or_404(db, request_id)
+    db.refresh(row)
+    return _serialize_request(row)
 
 
 @router.post("/invoice-adjustment-requests/{request_id}/approve")
-def approve_invoice_adjustment_request(request_id: int, payload: AdjustmentDecision, db: Session = Depends(get_db)) -> Dict[str, Any]:
-    return _decide_request(request_id, "approved", payload, db)
+def approve_invoice_adjustment_request(
+    request_id: int,
+    payload: AdjustmentDecision,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_adjustment_reviewer),
+):
+    return _decide_request(request_id, payload, current_user, db, approved=True)
 
 
 @router.post("/invoice-adjustment-requests/{request_id}/reject")
-def reject_invoice_adjustment_request(request_id: int, payload: AdjustmentDecision, db: Session = Depends(get_db)) -> Dict[str, Any]:
-    return _decide_request(request_id, "rejected", payload, db)
-
-
-
+def reject_invoice_adjustment_request(
+    request_id: int,
+    payload: AdjustmentDecision,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_adjustment_reviewer),
+):
+    return _decide_request(request_id, payload, current_user, db, approved=False)

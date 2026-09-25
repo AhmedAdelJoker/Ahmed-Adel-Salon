@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { baseURL } from "../services/api";
 
 /**
  * useRealtimeBooking — Subscribe to real-time booking updates.
@@ -88,7 +89,7 @@ export function useRealtimeBooking({
         }
         try {
           const res = await fetch(
-            `/api/v1/public/realtime/booking/${encodeURIComponent(salonSlug)}/poll`,
+            `${baseURL}/public/realtime/booking/${encodeURIComponent(salonSlug)}/poll`,
           );
           if (!res.ok) {
             // 404 or 5xx — give up silently
@@ -114,7 +115,7 @@ export function useRealtimeBooking({
     };
 
     setStatus("connecting");
-    const url = `/api/v1/public/realtime/booking/${encodeURIComponent(salonSlug)}`;
+    const url = `${baseURL}/public/realtime/booking/${encodeURIComponent(salonSlug)}`;
 
     if (typeof EventSource !== "undefined") {
       try {

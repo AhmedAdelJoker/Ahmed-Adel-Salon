@@ -147,7 +147,9 @@ export default function PublicLayout() {
       </nav>
 
       {/* Mobile Menu Overlay */}
-      <div
+      <button
+        type="button"
+        aria-label="إغلاق القائمة"
         className={cn(
           "fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden transition-opacity duration-300",
           mobileMenuOpen

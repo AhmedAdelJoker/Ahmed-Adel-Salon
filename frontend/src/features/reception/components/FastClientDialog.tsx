@@ -191,10 +191,19 @@ export default function FastClientDialog({
                       srv.id,
                     );
                     return (
-                      <div
-                        key={srv.id}
-                        onClick={() => toggleService(srv.id)}
-                        className={cn(
+                       <div
+                         key={srv.id}
+                         role="button"
+                         tabIndex={0}
+                         onClick={() => toggleService(srv.id)}
+                         onKeyDown={(event) => {
+                           if (event.key === "Enter" || event.key === " ") {
+                             event.preventDefault();
+                             toggleService(srv.id);
+                           }
+                         }}
+                         className={cn(
+
                           "p-4 rounded-2xl border-2 cursor-pointer transition-all duration-300 relative group overflow-hidden",
                           isSelected
                             ? "bg-accent/5 border-accent shadow-sm"

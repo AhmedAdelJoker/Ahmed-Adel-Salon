@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from app.db.session import get_db
-from app.api.deps import require_any_staff
+from app.api.deps import require_any_staff, require_manage_catalog
 from app.models.user import User
 from app.models.product import Product
 from app.models.service import Service
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/services", tags=["Services"])
 @router.post("/upload-image")
 async def upload_service_image(
     file: UploadFile = File(...),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     """
     Uploads a service image and returns the URL.
@@ -178,7 +178,7 @@ def get_service(
 def create_service(
     payload: ServiceCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     category_id, category_name = _resolve_category(db, payload)
     service = Service(
@@ -216,7 +216,7 @@ def update_service(
     service_id: int,
     payload: ServiceUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     service = db.query(Service).filter(Service.id == service_id).first()
     if not service:
@@ -255,7 +255,7 @@ def update_service(
 def delete_service(
     service_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     service = db.query(Service).filter(Service.id == service_id).first()
     if not service:

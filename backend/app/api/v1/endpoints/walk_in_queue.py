@@ -1,6 +1,6 @@
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 
@@ -31,8 +31,12 @@ def _serialize_queue_item(db: Session, row: WalkInQueue):
         "customer_name": cust_name,
         "ticket_no": row.ticket_no,
         "service_name": row.service.name if row.service else None,
-        "requested_barber_name": row.requested_barber.display_name if row.requested_barber else None,
-        "assigned_barber_name": row.assigned_barber.display_name if row.assigned_barber else None,
+        "requested_barber_name": (
+            row.requested_employee.display_name if row.requested_employee else None
+        ),
+        "assigned_barber_name": (
+            row.assigned_employee.display_name if row.assigned_employee else None
+        ),
         "status": row.status,
         "estimated_wait_minutes": row.estimated_wait_minutes,
         "arrived_at": row.arrived_at,
@@ -84,7 +88,7 @@ def _ensure_queue_customer(db: Session, payload: WalkInQueueCreate) -> Customer:
 
 @router.get("")
 def list_queue(
-    response: Response = None,
+    response: Response,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     skip: int = Query(0, ge=0),
@@ -141,8 +145,8 @@ def add_to_queue(
     row = WalkInQueue(
         customer_id=customer.customer_id,
         service_id=payload.service_id,
-        requested_barber_id=payload.requested_barber_id,
-        assigned_barber_id=payload.assigned_barber_id,
+        requested_employee_id=payload.requested_barber_id,
+        assigned_employee_id=payload.assigned_barber_id,
         ticket_no=ticket_no,
         status="waiting",
         queue_note=payload.queue_note,
@@ -225,7 +229,7 @@ def assign_queue_ticket(
     if row.status in {"converted", "cancelled"}:
         raise HTTPException(status_code=400, detail="لا يمكن تعديل تذكرة مؤرشفة أو ملغاة")
 
-    row.assigned_barber_id = payload.assigned_barber_id
+    row.assigned_employee_id = payload.assigned_barber_id
     db.add(row)
     db.commit()
     db.refresh(row)

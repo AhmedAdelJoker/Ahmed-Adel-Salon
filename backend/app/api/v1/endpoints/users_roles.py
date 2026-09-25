@@ -115,11 +115,14 @@ def update_user(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)
         
     user.full_name = payload.full_name
     user.email = payload.email
-    user.role = normalized_role
+    if normalized_role != user.role:
+        user.role = normalized_role
+        user.token_version = int(user.token_version or 0) + 1
     user.is_active = payload.is_active
     
-    if payload.password: # If password provided, update it
+    if payload.password:
         user.hashed_password = get_password_hash(payload.password)
+        user.token_version = int(user.token_version or 0) + 1
         
     db.commit()
     db.refresh(user)
@@ -139,7 +142,9 @@ def update_user_role(user_id: int, payload: UserRoleUpdate, db: Session = Depend
         raise HTTPException(status_code=403, detail="لا يمكنك تعديل مستخدم بدور أعلى من دورك")
     if normalized_role != UserRole.BARBER.value:
         user.barber_id = None
-    user.role = normalized_role
+    if normalized_role != user.role:
+        user.role = normalized_role
+        user.token_version = int(user.token_version or 0) + 1
     db.commit()
     db.refresh(user)
     return user

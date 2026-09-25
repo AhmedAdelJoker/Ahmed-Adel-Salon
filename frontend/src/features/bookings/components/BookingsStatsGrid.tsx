@@ -21,9 +21,18 @@ export default function BookingsStatsGrid({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => {
           setActiveTab("الكل");
           setQuickFilter("all");
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setActiveTab("الكل");
+            setQuickFilter("all");
+          }
         }}
         className="cursor-pointer transition-transform hover:scale-[1.02]"
       >
@@ -38,9 +47,18 @@ export default function BookingsStatsGrid({
       </div>
 
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => {
           setActiveTab("أونلاين");
           setQuickFilter("all");
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setActiveTab("أونلاين");
+            setQuickFilter("all");
+          }
         }}
         className="cursor-pointer transition-transform hover:scale-[1.02]"
       >
@@ -55,9 +73,18 @@ export default function BookingsStatsGrid({
       </div>
 
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => {
           setActiveTab("بانتظار الخدمة");
           setQuickFilter("all");
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setActiveTab("بانتظار الخدمة");
+            setQuickFilter("all");
+          }
         }}
         className="cursor-pointer transition-transform hover:scale-[1.02]"
       >
@@ -72,9 +99,18 @@ export default function BookingsStatsGrid({
       </div>
 
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => {
           setActiveTab("عند الاستقبال");
           setQuickFilter("all");
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setActiveTab("عند الاستقبال");
+            setQuickFilter("all");
+          }
         }}
         className="cursor-pointer transition-transform hover:scale-[1.02]"
       >
@@ -89,9 +125,18 @@ export default function BookingsStatsGrid({
       </div>
 
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => {
           setActiveTab("الملغاة");
           setQuickFilter("all");
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setActiveTab("الملغاة");
+            setQuickFilter("all");
+          }
         }}
         className="cursor-pointer transition-transform hover:scale-[1.02]"
       >

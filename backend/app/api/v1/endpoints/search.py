@@ -76,7 +76,7 @@ def universal_search(
             results.append({
                 "id": i.id,
                 "label": i.invoice_no,
-                "sub": f"قيمة: {i.final_amount} ج.م",
+                "sub": f"قيمة: {i.total_amount} ج.م",
                 "type": "invoice",
                 "category": "فواتير",
                 "to": f"/invoices?id={i.id}"
@@ -108,7 +108,7 @@ def universal_search(
         results.append({
             "id": p.id,
             "label": p.name,
-            "sub": f"منتج - {p.price} ج.م",
+            "sub": f"منتج - {p.sell_price or 0} ج.م",
             "type": "product",
             "category": "منتجات",
             "to": f"/inventory?id={p.id}"

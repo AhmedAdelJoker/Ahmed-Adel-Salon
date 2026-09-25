@@ -13,6 +13,8 @@ class Customer(Base):
     last_name = Column(String(100), nullable=False)
     phone = Column(String(30), nullable=False, index=True)
     email = Column(String(255), nullable=True)
+    member_password_hash = Column(String(255), nullable=True)
+    member_token_version = Column(Integer, nullable=False, default=0, server_default="0")
     notes = Column(String(1000), nullable=True)
     
     # Loyalty Fields

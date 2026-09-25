@@ -38,5 +38,4 @@ export interface AdjustmentFormState {
   type: string;
   reason: string;
   newValue: string;
-  managerPin: string;
 }

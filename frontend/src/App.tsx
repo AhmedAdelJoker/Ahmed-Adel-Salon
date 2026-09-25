@@ -22,9 +22,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <PreferencesProvider>
-          <SalonProvider>
-            <SocketProvider>
+        <SocketProvider>
+          <PreferencesProvider>
+            <SalonProvider>
               <UIProvider>
                 <TooltipProvider delayDuration={400}>
                   <AppRouter />
@@ -61,9 +61,9 @@ export default function App() {
                   />
                 </TooltipProvider>
               </UIProvider>
-            </SocketProvider>
-          </SalonProvider>
-        </PreferencesProvider>
+            </SalonProvider>
+          </PreferencesProvider>
+        </SocketProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

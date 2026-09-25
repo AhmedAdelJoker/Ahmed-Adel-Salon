@@ -95,7 +95,6 @@ export default function InvoiceAdjustmentRequests() {
     request: null,
   });
   const [managerNote, setManagerNote] = useState("");
-  const [managerPin, setManagerPin] = useState("");
 
   async function fetchRequests() {
     try {
@@ -160,7 +159,6 @@ export default function InvoiceAdjustmentRequests() {
   function openDecision(request, action) {
     setDecisionDialog({ open: true, action, request });
     setManagerNote("");
-    setManagerPin("");
   }
 
   async function submitDecision() {
@@ -168,11 +166,6 @@ export default function InvoiceAdjustmentRequests() {
     const requestId = getRequestId(request);
     if (!requestId) {
       toast.error("لا يمكن تحديد رقم طلب التعديل");
-      return;
-    }
-
-    if (decisionDialog.action === "approve" && !managerPin) {
-      toast.error("يرجى إدخال كود الاعتماد السري");
       return;
     }
 
@@ -184,8 +177,6 @@ export default function InvoiceAdjustmentRequests() {
         `/invoice-adjustment-requests/${requestId}/${actionPath}`,
         {
           manager_note: managerNote,
-          managerNote,
-          manager_pin: managerPin,
         },
       );
       toast.success(
@@ -195,8 +186,7 @@ export default function InvoiceAdjustmentRequests() {
       );
       setDecisionDialog({ open: false, action: "approve", request: null });
       setManagerNote("");
-      setManagerPin("");
-      fetchRequests();
+        fetchRequests();
     } catch (error) {
       console.error(
         "Submit adjustment decision error:",
@@ -490,21 +480,6 @@ export default function InvoiceAdjustmentRequests() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {decisionDialog.action === "approve" && (
-              <div className="space-y-2">
-                <label className="text-xs font-black text-gray-500">
-                  كود الاعتماد السري
-                </label>
-                <Input
-                  type="password"
-                  placeholder="أدخل كود المدير السري"
-                  className="h-12 rounded-2xl"
-                  value={managerPin}
-                  onChange={(e) => setManagerPin(e.target.value)}
-                />
-              </div>
-            )}
-
             <div className="space-y-2">
               <label className="text-xs font-black text-gray-500">
                 ملاحظة القرار

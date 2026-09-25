@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import require_any_staff
+from app.api.deps import require_any_staff, require_manage_catalog
 from app.db.session import get_db
 from app.models.offer import Offer
 from app.models.offer_service import OfferService
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/offers", tags=["Offers"])
 @router.post("/upload-image")
 async def upload_offer_image(
     file: UploadFile = File(...),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     # Phase 3: validate MIME/size/filename before processing
     content = await validate_image(file, max_size=5 * 1024 * 1024)
@@ -210,7 +210,7 @@ def get_offer(
 def create_offer(
     payload: OfferCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     original_price, discount_percentage = _prepare_offer_prices(db, payload)
     offer = Offer(
@@ -252,7 +252,7 @@ def update_offer(
     offer_id: int,
     payload: OfferUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     offer = db.query(Offer).filter(Offer.id == offer_id).first()
     if not offer:
@@ -296,7 +296,7 @@ def update_offer(
 def toggle_offer(
     offer_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     offer = db.query(Offer).filter(Offer.id == offer_id).first()
     if not offer:
@@ -321,7 +321,7 @@ def toggle_offer(
 def delete_offer(
     offer_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_manage_catalog),
 ):
     offer = db.query(Offer).filter(Offer.id == offer_id).first()
     if not offer:

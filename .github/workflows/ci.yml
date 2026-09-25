@@ -7,6 +7,18 @@ on:
     branches: [main]
 
 jobs:
+  root-dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+
   backend-tests:
     runs-on: ubuntu-latest
     steps:
@@ -32,6 +44,13 @@ jobs:
           cd backend
           pytest -v
 
+      - name: Verify clean-room migrations
+        run: |
+          cd backend
+          rm -f salon_pro.db
+          alembic upgrade head
+          python -c "from sqlalchemy import create_engine, text; engine=create_engine('sqlite:///salon_pro.db'); connection=engine.connect(); assert connection.execute(text(\"SELECT version_num FROM alembic_version\")).scalar() == 'd6e7f8a9b0c1'; assert not connection.execute(text('PRAGMA foreign_key_check')).fetchall(); connection.close()"
+
   frontend-lint:
     runs-on: ubuntu-latest
     steps:
@@ -48,6 +67,11 @@ jobs:
         run: |
           cd frontend
           npm ci
+
+      - name: Audit production dependencies
+        run: |
+          cd frontend
+          npm audit --omit=dev --audit-level=high
 
       - name: Run lint
         run: |
@@ -68,6 +92,42 @@ jobs:
         run: |
           cd frontend
           npm run build
+
+  public-site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: public-site/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: public-site
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: public-site
+
+      - name: Lint
+        run: npm run lint
+        working-directory: public-site
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: public-site
+
+      - name: Build
+        run: npm run build
+        working-directory: public-site
+
+      - name: Verify deployment contracts
+        run: npm run test:contracts
+        working-directory: public-site
 
   e2e-smoke:
     runs-on: ubuntu-latest
@@ -115,7 +175,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-lint, e2e-smoke]
+    needs: [root-dependency-audit, backend-tests, frontend-lint, public-site, e2e-smoke]
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4

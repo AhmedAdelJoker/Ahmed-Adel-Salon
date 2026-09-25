@@ -315,10 +315,19 @@ function AppointmentsTab({ appointments, loading, expandedId, onToggle }: any) {
               key={apt.id}
               className="rounded-xl border border-border/30 overflow-hidden transition-all hover:border-accent/20"
             >
-              <div
-                className="flex items-center justify-between p-3 cursor-pointer bg-soft/40 hover:bg-soft/60 transition-colors"
-                onClick={() => onToggle(isExpanded ? null : apt.id)}
-              >
+               <div
+                 role="button"
+                 tabIndex={0}
+                 className="flex items-center justify-between p-3 cursor-pointer bg-soft/40 hover:bg-soft/60 transition-colors"
+                 onClick={() => onToggle(isExpanded ? null : apt.id)}
+                 onKeyDown={(event) => {
+                   if (event.key === "Enter" || event.key === " ") {
+                     event.preventDefault();
+                     onToggle(isExpanded ? null : apt.id);
+                   }
+                 }}
+               >
+
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 shrink-0 rounded-xl bg-accent/10 flex items-center justify-center">
                     <CalendarDays size={15} className="text-accent" />

@@ -24,6 +24,7 @@ class InvoiceAdjustmentRequest(Base):
     requested_values = Column(JSON, nullable=True)
     
     status = Column(String(20), nullable=False, default="pending")  # pending, approved, rejected
+    decision_note = Column(Text, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)

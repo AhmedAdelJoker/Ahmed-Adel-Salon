@@ -110,7 +110,15 @@ export function MemberAuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    const token = localStorage.getItem(TOKEN_KEY);
     setAuth(null, null);
+    if (token) {
+      void api.post(
+        "/public/member/logout",
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      ).catch(() => undefined);
+    }
   }, [setAuth]);
 
   const value = useMemo<MemberAuthContextValue>(

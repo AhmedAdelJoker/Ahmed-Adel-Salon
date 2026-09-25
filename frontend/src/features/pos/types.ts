@@ -87,11 +87,4 @@ export interface POSContextValue {
   resetPOS: () => void;
   updateCartItemBarber: (uid: string, newBarberId: ID) => void;
   assignBarberToAll: (barberId: ID) => void;
-  isInvoiceEditable: (invoice: POSRecord | null | undefined) => boolean;
-  editInvoice: (invoice: POSRecord | null | undefined) => void;
-  requestInvoiceAdjustment: (
-    invoiceId: ID,
-    pin?: string | null,
-    reason?: string,
-  ) => Promise<unknown>;
 }

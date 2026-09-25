@@ -14,13 +14,16 @@ declare global {
 
 const isElectron: boolean = !!(
   window.electronAPI ||
+  window.location.protocol === "file:" ||
   navigator.userAgent.includes("Electron") ||
   (window.process as unknown as { versions?: { electron?: string } } | undefined)
     ?.versions?.electron
 );
+// ملاحظة: على file:// يكون hostname فارغاً، لذلك أي بروتوكول file يعني Electron
+// ونثبّت عنوان الباك إند المحلي بدل بناء URL معطوب مثل file://:8000/...
 const DEFAULT_API_URL: string = isElectron
   ? "http://127.0.0.1:8000/api/v1"
-  : `${window.location.protocol}//${window.location.hostname}:8000/api/v1`;
+  : `${window.location.protocol}//${window.location.hostname || "127.0.0.1"}:8000/api/v1`;
 export const baseURL: string = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 export const staticURL: string = baseURL.replace("/api/v1", "");
 

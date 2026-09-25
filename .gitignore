@@ -27,3 +27,15 @@ test-results/
 playwright-report/
 *.bak
 *.backup
+# External runnable program - بره المشروع
+SalonPro_External/
+SalonPro_External_Data/
+SalonProData/
+backend/dist/
+backend/build/
+frontend/dist/
+frontend/dist-electron/
+release/
+frontend/release/
+*.private.pem
+*.key

@@ -4,6 +4,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 import unusedImports from "eslint-plugin-unused-imports";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 
 export default [
   {
@@ -92,6 +93,7 @@ export default [
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
       "unused-imports": unusedImports,
+      "jsx-a11y": jsxA11y,
     },
     settings: {
       react: {

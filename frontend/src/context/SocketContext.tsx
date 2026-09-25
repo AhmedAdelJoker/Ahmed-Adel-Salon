@@ -24,11 +24,6 @@ export interface SocketContextValue {
   notifications: NotificationItem[];
   setNotifications: React.Dispatch<React.SetStateAction<NotificationItem[]>>;
   clearNotifications: () => void;
-  sendNotification: (
-    targetId: ID,
-    message: string,
-    extra?: Record<string, unknown>,
-  ) => boolean;
   connected: boolean;
   socket: WebSocket | null;
 }
@@ -40,7 +35,8 @@ function getUserId(user: AuthUser | null | undefined): ID | null {
 
 function buildSocketUrl(userId: ID): string {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const host = window.location.hostname;
+  // على file:// (تطبيق Electron) يكون hostname فارغاً — نرجع للمحلي
+  const host = window.location.hostname || "127.0.0.1";
   const port = import.meta?.env?.VITE_WS_PORT || "8000";
   const basePath =
     import.meta?.env?.VITE_WS_NOTIFICATIONS_PATH || "/api/v1/notifications/ws";
@@ -105,7 +101,24 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const wsUrl = buildSocketUrl(userId);
-      const socket = new WebSocket(wsUrl);
+      const accessToken = localStorage.getItem("token");
+      if (!accessToken) {
+        wsEnabledRef.current = false;
+        pollIntervalRef.current = setInterval(pollNotifications, 30000);
+        pollNotifications();
+        return;
+      }
+      let socket: WebSocket;
+      try {
+        socket = new WebSocket(wsUrl, ["access-token", accessToken]);
+      } catch {
+        // عنوان WS معطوب (مثلاً file://) — نتحول للـ polling بدل كسر الريندر
+        wsEnabledRef.current = false;
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = setInterval(pollNotifications, 30000);
+        pollNotifications();
+        return;
+      }
       socketRef.current = socket;
 
       socket.onopen = () => {
@@ -185,24 +198,6 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [isAuthenticated, userId, pollNotifications]);
 
-  const sendNotification = useCallback(
-    (
-      targetId: ID,
-      message: string,
-      extra: Record<string, unknown> = {},
-    ): boolean => {
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(
-        JSON.stringify({
-          targetId,
-          message,
-          ...extra,
-        }),
-      );
-      return true;
-    }
-    return false;
-  }, []);
 
   const clearNotifications = useCallback(() => setNotifications([]), []);
 
@@ -211,11 +206,10 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
       notifications,
       setNotifications,
       clearNotifications,
-      sendNotification,
       connected,
       socket: socketRef.current,
     }),
-    [notifications, clearNotifications, sendNotification, connected],
+    [notifications, clearNotifications, connected],
   );
 
   return (

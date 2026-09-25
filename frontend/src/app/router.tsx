@@ -7,12 +7,29 @@ import {
 } from "react";
 import {
   BrowserRouter,
+  HashRouter,
   Navigate,
   Outlet,
   Route,
   Routes,
   useLocation,
 } from "react-router-dom";
+
+// Electron يشغّل الواجهة عبر file:// — BrowserRouter يعتمد على history API
+// الخاص بالسيرفر ويفشل هناك، لذلك نستخدم HashRouter داخل تطبيق الويندوز.
+function isElectronEnv(): boolean {
+  try {
+    if (typeof window === "undefined") return false;
+    if ((window as unknown as { electronAPI?: unknown }).electronAPI) return true;
+    if (typeof navigator !== "undefined" && navigator.userAgent.includes("Electron")) return true;
+    if (window.location.protocol === "file:") return true;
+    const proc = (window as unknown as { process?: { versions?: { electron?: string } } }).process;
+    if (proc?.versions?.electron) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
 import { motion } from "framer-motion";
 import { getHomePath, getProfilePath, hasRoleAccess } from "@/lib/access/roles";
 import { useAuth } from "@/context/AuthContext";
@@ -389,10 +406,9 @@ function MainLayout() {
 }
 
 export default function AppRouter() {
+  const Router = isElectronEnv() ? HashRouter : BrowserRouter;
   return (
-    <BrowserRouter
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-    >
+    <Router>
       <TitleUpdater />
       <Suspense fallback={<RouteLoader />}>
         <Routes>
@@ -653,6 +669,6 @@ export default function AppRouter() {
           <Route path="*" element={<HomeRedirect />} />
         </Routes>
       </Suspense>
-    </BrowserRouter>
+    </Router>
   );
 }

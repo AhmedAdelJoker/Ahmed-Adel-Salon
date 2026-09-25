@@ -5,7 +5,6 @@ import SessionsQueue from "@/pages/cashier/POS/components/SessionsQueue";
 import ItemSelection from "@/pages/cashier/POS/components/ItemSelection";
 import CheckoutBar from "@/pages/cashier/POS/components/CheckoutBar";
 import SuccessOverlay from "@/pages/cashier/POS/components/SuccessOverlay";
-import ManagerApprovalModal from "@/pages/cashier/POS/components/ManagerApprovalModal";
 import POSBottomNav from "@/pages/cashier/POS/components/POSBottomNav";
 import { Grid, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/core/utils";
@@ -66,7 +65,6 @@ const POSLayout = () => {
     >
       {/* Success Overlay & Modals */}
       <SuccessOverlay />
-      <ManagerApprovalModal />
 
       {/* Edit Mode Badge - Fixed at top */}
       {activeInvoiceId && (

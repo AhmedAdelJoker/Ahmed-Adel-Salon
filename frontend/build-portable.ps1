@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$projectDir = "C:\Users\Ahmed\Downloads\Salon-Management-Pro\frontend"
+$projectDir = $PSScriptRoot
 $outputDir = "$projectDir\dist-electron\Salon Management Pro-win32-x64"
 $electronVersion = "44.0.0"
 $electronUrl = "https://github.com/electron/electron/releases/download/v$electronVersion/electron-v$electronVersion-win32-x64.zip"
@@ -59,12 +59,12 @@ $packageJson.main = "electron-main.cjs"
 $packageJson | ConvertTo-Json -Depth 10 | Set-Content "$resourcesDir\app\package.json" -Encoding UTF8
 
 # Copy backend (Python source for now - will need PyInstaller build separately)
-$backendSource = "C:\Users\Ahmed\Downloads\Salon-Management-Pro\backend"
+$backendSource = Join-Path $projectDir "..\backend"
 $backendDest = "$resourcesDir\app\backend"
 if (Test-Path $backendSource) {
     Copy-Item -Path $backendSource -Destination $backendDest -Recurse -Force
     # Remove unnecessary files
-    Get-ChildItem -Path $backendDest -Recurse -Include "__pycache__", "*.pyc", "*.pyo", ".pytest_cache", "*.db", "*.db-*", "*.log" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $backendDest -Recurse -Force -Include ".env", ".env.*", "__pycache__", "*.pyc", "*.pyo", ".pytest_cache", ".venv", "uploads", "logs", "*.db", "*.db-*", "*.sqlite", "*.sqlite3", "*.log" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # Create a simple launcher batch file

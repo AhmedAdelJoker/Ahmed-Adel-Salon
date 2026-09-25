@@ -62,27 +62,38 @@ def test_approve_expense(client, db_session):
 
 
 def test_create_offer_with_service(client, db_session):
-    make_user(db_session)
+    make_user(db_session, username="manager1", role="manager")
+    headers = auth_headers(client, username="manager1")
     service = _seed_service(db_session)
     resp = client.post(
         "/api/v1/offers",
         json={"name": "Summer Deal", "offer_price": "80", "service_ids": [service.id]},
-        headers=auth_headers(client),
+        headers=headers,
     )
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["name"] == "Summer Deal"
 
-    listed = client.get("/api/v1/offers", headers=auth_headers(client))
+    listed = client.get("/api/v1/offers", headers=headers)
     assert listed.status_code == 200, listed.text
     assert any(o["name"] == "Summer Deal" for o in listed.json())
 
 
+def test_cashier_cannot_create_offer(client, db_session):
+    make_user(db_session, role="cashier")
+    response = client.post(
+        "/api/v1/offers",
+        json={"name": "Blocked Deal", "offer_price": "80"},
+        headers=auth_headers(client),
+    )
+    assert response.status_code == 403
+
+
 def test_create_offer_validation(client, db_session):
-    make_user(db_session)
+    make_user(db_session, username="manager1", role="manager")
     resp = client.post(
         "/api/v1/offers",
         json={"name": "", "offer_price": "80"},
-        headers=auth_headers(client),
+        headers=auth_headers(client, username="manager1"),
     )
     assert resp.status_code == 422

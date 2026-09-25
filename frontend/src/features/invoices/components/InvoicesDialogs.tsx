@@ -49,7 +49,6 @@ export interface AdjustmentDialogState {
   reason: string;
   new_value: string;
   notes: string;
-  manager_pin: string;
 }
 
 export interface InvoiceDetailsDialogProps {
@@ -289,23 +288,6 @@ export function AdjustmentRequestDialog({
             </div>
           )}
 
-          <div className="space-y-1.5 sm:space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-muted">
-              كود المدير (للاعتماد)
-            </label>
-            <Input
-              type="password"
-              value={adjustmentDialog.manager_pin}
-              onChange={(e) =>
-                onAdjustmentDialogChange((p) => ({
-                  ...p,
-                  manager_pin: e.target.value,
-                }))
-              }
-              className="h-10 text-center font-black tracking-[1em] sm:h-11"
-              placeholder="••••"
-            />
-          </div>
         </div>
 
         <DialogFooter className="gap-2 pt-4 sm:pt-6">

@@ -19,23 +19,11 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-
-
-
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import {
-  cn,
-  formatCurrency,
-  getInitials,
-} from "@/lib/core/utils";
-
+import { cn, formatCurrency, getInitials } from "@/lib/core/utils";
 
 import {
   useCustomerDetailPage,
@@ -47,11 +35,6 @@ import {
 } from "@/features/customers";
 import { PageHeader } from "@/components/shared/PremiumUI";
 import { Badge } from "@/components/ui/badge";
-
-
-
-
-
 
 function CustomerDetailPage() {
   const { id } = useParams();
@@ -89,9 +72,6 @@ function CustomerDetailPage() {
 
   const [activeTab, setActiveTab] = useState("overview");
 
-
-
-
   if (customerLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -124,7 +104,8 @@ function CustomerDetailPage() {
   return (
     <div className="min-h-screen pb-12">
       <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
-        <PageHeader className={undefined}
+        <PageHeader
+          className={undefined}
           title={`${customer.first_name} ${customer.last_name || ""}`}
           subtitle={`ملف العميل الكامل • رقم #${customer.customer_id}`}
           badge={tierInfo.label}
@@ -328,20 +309,23 @@ function CustomerDetailPage() {
             invoicesLoading={invoicesLoading}
           />
 
-          <CustomerAppointmentsTab appointments={appointments} loading={appointmentsLoading} />
+          <CustomerAppointmentsTab
+            appointments={appointments}
+            loading={appointmentsLoading}
+          />
 
           <CustomerInvoicesTab invoices={invoices} loading={invoicesLoading} />
         </Tabs>
 
         {/* Edit Dialog */}
-      <CustomerEditDialog
-        open={isEditOpen}
-        onOpenChange={setIsEditOpen}
-        form={editForm}
-        setForm={setEditForm}
-        isSaving={isSaving}
-        onSave={handleSaveEdit}
-      />
+        <CustomerEditDialog
+          open={isEditOpen}
+          onOpenChange={setIsEditOpen}
+          form={editForm}
+          setForm={setEditForm}
+          isSaving={isSaving}
+          onSave={handleSaveEdit}
+        />
 
         {/* Booking Modal */}
         <BookingModal
@@ -369,7 +353,6 @@ function CustomerDetailPage() {
     </div>
   );
 }
-
 
 export default function CustomerDetail() {
   return (
