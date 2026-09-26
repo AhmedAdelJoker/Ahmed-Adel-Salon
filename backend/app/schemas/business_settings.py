@@ -1,8 +1,10 @@
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
+
+from app.core.working_hours import WorkingHoursError, validate_working_hours
 
 
 class BusinessSettingsBase(BaseModel):
@@ -97,6 +99,18 @@ class BusinessSettingsUpdate(BaseModel):
 
     # Snapshot
     public_site_snapshot: Optional[dict[str, Any]] = None
+    # Optimistic concurrency: the version the client last read.
+    expected_version: Optional[int] = Field(default=None, ge=1)
+
+    @field_validator("working_hours")
+    @classmethod
+    def _check_working_hours(cls, value: Optional[dict[str, Any]]):
+        if value is None:
+            return None
+        try:
+            return validate_working_hours(value)
+        except WorkingHoursError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 class BusinessSettingsRead(BaseModel):
@@ -181,6 +195,11 @@ class BusinessSettingsRead(BaseModel):
     # Snapshot
     public_site_snapshot: Optional[dict[str, Any]] = None
     public_site_published_at: Optional[datetime] = None
+
+    # Concurrency + publish state
+    version: int = 1
+    public_site_published_version: Optional[int] = None
+    public_site_stale: bool = False
 
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

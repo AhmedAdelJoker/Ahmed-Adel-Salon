@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Store,
@@ -42,6 +42,7 @@ import {
   ContentPanel,
   SkeletonCard,
 } from "@/components/shared/PremiumUI";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 
 // New Panel Components
 import WorkingHoursPanel from "@/pages/owner/WorkingHoursPanel";
@@ -116,6 +117,9 @@ const Settings = () => {
   const [logoUploading, setLogoUploading] = useState(false);
   const [shopInitial, setShopInitial] = useState<Record<string, string> | null>(null);
   const [hoursDirty, setHoursDirty] = useState(false);
+  const [shopFetchStarted, setShopFetchStarted] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const tabListRef = useRef<HTMLDivElement>(null);
 
   const [shopSettings, setShopSettings] = useState({
     salon_name: "",
@@ -197,8 +201,10 @@ const Settings = () => {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (activeTab !== "shop" || settingsReady || shopFetchStarted) return;
+    setShopFetchStarted(true);
+    void fetchData();
+  }, [activeTab, settingsReady, shopFetchStarted, fetchData]);
 
   const shopIsDirty = useMemo(() => {
     if (!shopInitial) return false;
@@ -225,15 +231,77 @@ const Settings = () => {
     return { done, total: checks.length };
   }, [shopSettings]);
 
-  const setActiveTab = (tab: string) => {
-    const leavingShop = shopIsDirty && activeTab === "shop" && tab !== "shop";
-    const leavingHours = hoursDirty && activeTab === "hours" && tab !== "hours";
-    if (leavingShop || leavingHours) {
-      const label = leavingShop ? "بيانات المنشأة" : "ساعات العمل";
-      const ok = window.confirm(`لديك تغييرات غير محفوظة في ${label}. هل تريد المتابعة بدون حفظ؟`);
-      if (!ok) return;
+  const dirtyLabel = useMemo(() => {
+    if (activeTab === "shop" && shopIsDirty) return "بيانات المنشأة";
+    if (activeTab === "hours" && hoursDirty) return "ساعات العمل";
+    return null;
+  }, [activeTab, shopIsDirty, hoursDirty]);
+
+  const commitTab = useCallback(
+    (tab: string) => {
+      setSearchParams({ tab });
+      setPendingTab(null);
+    },
+    [setSearchParams],
+  );
+
+  const requestTab = useCallback(
+    (tab: string) => {
+      if (tab === activeTab) return;
+      if (dirtyLabel) {
+        setPendingTab(tab);
+        return;
+      }
+      commitTab(tab);
+    },
+    [activeTab, dirtyLabel, commitTab],
+  );
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const requested = new URLSearchParams(window.location.search).get("tab");
+      const target =
+        requested && visibleTabs.some((t) => t.id === requested)
+          ? requested
+          : isOwnerLike
+            ? "shop"
+            : "hours";
+      if (target === activeTab) return;
+
+      if (dirtyLabel) {
+        window.history.pushState(null, "", `${window.location.pathname}?tab=${activeTab}`);
+        const proceed = window.confirm(
+          `لديك تغييرات غير محفوظة في ${dirtyLabel}. هل تريد المتابعة بدون حفظ؟`,
+        );
+        if (proceed) setSearchParams({ tab: target }, { replace: true });
+        return;
+      }
+      setSearchParams({ tab: target }, { replace: true });
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [activeTab, dirtyLabel, isOwnerLike, setSearchParams, visibleTabs]);
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const keys = ["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const index = visibleTabs.findIndex((t) => t.id === activeTab);
+    let nextIndex = index;
+    if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = visibleTabs.length - 1;
+    else if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+      nextIndex = (index + 1) % visibleTabs.length;
+    } else {
+      nextIndex = (index - 1 + visibleTabs.length) % visibleTabs.length;
     }
-    setSearchParams({ tab });
+    const nextTab = visibleTabs[nextIndex];
+    requestTab(nextTab.id);
+    const node = tabListRef.current?.querySelector<HTMLButtonElement>(
+      `#settings-tab-${nextTab.id}`,
+    );
+    node?.focus();
   };
 
   const validateShopFields = useCallback(() => {
@@ -315,7 +383,7 @@ const Settings = () => {
     }
   };
 
-  if (initialLoading)
+  if (activeTab === "shop" && initialLoading)
     return (
       <div className="erp-page-container space-y-6 pb-24">
         <PageHeader
@@ -334,7 +402,7 @@ const Settings = () => {
       </div>
     );
 
-  if (loadError)
+  if (activeTab === "shop" && loadError)
     return (
       <div className="erp-page-container space-y-6 pb-24">
         <PageHeader
@@ -390,8 +458,10 @@ const Settings = () => {
         {/* Advanced Settings Navigation Sidebar */}
         <aside className="w-full lg:w-[320px] shrink-0">
           <div
+            ref={tabListRef}
             role="tablist"
             aria-label="أقسام الإعدادات"
+            aria-orientation="vertical"
             className="sticky top-24 space-y-2 flex lg:flex-col overflow-x-auto pb-4 lg:pb-0 no-scrollbar snap-x snap-mandatory bg-card/40 lg:bg-transparent p-2 rounded-2xl border border-border/40 lg:border-none lg:p-0"
           >
             {visibleTabs.map((tab) => {
@@ -400,11 +470,17 @@ const Settings = () => {
               return (
                 <button
                   key={tab.id}
+                  id={`settings-tab-${tab.id}`}
                   role="tab"
+                  type="button"
                   aria-selected={isActive}
-                  onClick={() => setActiveTab(tab.id)}
+                  aria-controls={`settings-panel-${tab.id}`}
+                  tabIndex={isActive ? 0 : -1}
+                  onKeyDown={handleTabKeyDown}
+                  onClick={() => requestTab(tab.id)}
                   className={cn(
                     "relative flex items-center justify-between min-w-[180px] lg:min-w-full px-5 py-4 rounded-2xl transition-all duration-300 group snap-start",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     isActive
                       ? "bg-primary text-white shadow-premium scale-[1.02] z-10"
                       : "bg-card text-muted hover:bg-soft hover:text-primary border border-border/40 lg:border-transparent",
@@ -462,7 +538,13 @@ const Settings = () => {
         </aside>
 
         {/* Dynamic Content Workspace */}
-        <main className="flex-1 min-w-0">
+        <main
+          role="tabpanel"
+          id={`settings-panel-${activeTab}`}
+          aria-labelledby={`settings-tab-${activeTab}`}
+          tabIndex={-1}
+          className="flex-1 min-w-0 focus-visible:outline-none"
+        >
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -828,6 +910,17 @@ const Settings = () => {
           </AnimatePresence>
         </main>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingTab)}
+        onOpenChange={(open) => !open && setPendingTab(null)}
+        title="لديك تغييرات غير محفوظة"
+        description={`التعديلات في ${dirtyLabel ?? "هذا القسم"} ستُفقد إذا تابعت. يمكنك العودة والإكمال أولاً.`}
+        confirmText="متابعة بدون حفظ"
+        cancelText="العودة والإكمال"
+        variant="danger"
+        onConfirm={() => pendingTab && commitTab(pendingTab)}
+      />
     </div>
   );
 };
