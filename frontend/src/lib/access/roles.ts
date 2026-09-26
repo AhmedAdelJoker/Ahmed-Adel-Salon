@@ -1,3 +1,5 @@
+import { permissionKeyForPath } from "@/app/route-registry";
+
 const ROLE_HOME_PATHS: Record<string, string> = {
   OWNER: "/owner",
   ADMIN: "/owner",
@@ -31,9 +33,21 @@ export function hasRoleAccess(user: any, allowedRoles: any[] = [], pagePath: str
   const role = isObject ? user.role : user;
   const permissions = isObject ? user.permissions || {} : {};
 
-  // 1. If there's an explicit permission for this pagePath, it takes precedence
-  if (pagePath && permissions[pagePath] !== undefined) {
-    return permissions[pagePath] === true;
+  // 1. If there's an explicit permission for this page, it takes precedence.
+  //    The key is resolved through the route registry so a param route looks up
+  //    its pattern ("/customers/:id") instead of the live path
+  //    ("/customers/42"). Without this, per-user revocations on any detail page
+  //    were stored but never applied.
+  if (pagePath) {
+    const key = permissionKeyForPath(pagePath);
+    if (permissions[key] !== undefined) {
+      return permissions[key] === true;
+    }
+    // Fall back to the raw key for server-defined permissions that predate the
+    // registry, and to the pattern when the live path is a known route.
+    if (key !== pagePath && permissions[pagePath] !== undefined) {
+      return permissions[pagePath] === true;
+    }
   }
 
   const normalizedRole = normalizeRole(role);
@@ -43,13 +57,6 @@ export function hasRoleAccess(user: any, allowedRoles: any[] = [], pagePath: str
   }
 
   return allowedRoles.some((item) => normalizeRole(item) === normalizedRole);
-}
-
-export function filterByRole(items: any[] = [], user: any): any[] {
-  if (!user) return [];
-  return Array.isArray(items)
-    ? items.filter((item) => hasRoleAccess(user, item.roles, item.to))
-    : [];
 }
 
 export function getHomePath(role: unknown): string {
