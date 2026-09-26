@@ -23,6 +23,11 @@ os.environ["BACKEND_CORS_ORIGINS"] = (
     "http://127.0.0.1:5174,http://localhost:5174,"
     "http://127.0.0.1:5173,http://localhost:5173"
 )
+# The suite logs in once per test, so a full run exceeds the production login
+# budget (5 per 60s per IP) and later tests get 429'd on `waitForURL`. Relax the
+# limiter for this launcher only; app defaults keep the real protection.
+os.environ["LOGIN_RATE_LIMIT_MAX_ATTEMPTS"] = "500"
+os.environ["PUBLIC_RATE_LIMIT_MAX_REQUESTS"] = "20000"
 
 import uvicorn
 
