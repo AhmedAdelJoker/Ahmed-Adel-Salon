@@ -23,6 +23,12 @@ from app.core.security import (
 from app.core.rate_limit import rate_limit
 from app.core.account_lockout import get_lockout
 from app.core.audit import audit_log
+from app.core.totp_crypto import (
+    TotpSecretUnavailable,
+    decrypt_totp_secret,
+    encrypt_totp_secret,
+    is_legacy_plaintext,
+)
 from app.models.user import User
 
 from app.api.deps_auth import get_current_active_user, oauth2_scheme
@@ -245,6 +251,22 @@ class TwoFactorDisable(BaseModel):
     password: str
 
 
+def _resolve_totp_secret(user: User) -> str | None:
+    """Return the plaintext TOTP seed, migrating legacy rows in place.
+
+    Rows written before encryption existed hold a raw base32 seed. They keep
+    verifying, and the value on the user object is upgraded to ciphertext so
+    the caller's existing commit persists the migration.
+    """
+    stored = getattr(user, "totp_secret", None)
+    if not stored:
+        return None
+    if is_legacy_plaintext(stored):
+        user.totp_secret = encrypt_totp_secret(stored)
+        return stored
+    return decrypt_totp_secret(stored)
+
+
 @router.post("/2fa/setup")
 def setup_two_factor(
     request: Request,
@@ -255,7 +277,9 @@ def setup_two_factor(
     if getattr(current_user, "totp_enabled", False):
         raise HTTPException(status_code=400, detail="المصادقة الثنائية مفعّلة بالفعل")
     secret = pyotp.random_base32()
-    current_user.totp_secret = secret
+    # Stored encrypted: a plaintext seed would let anyone with database read
+    # access generate valid codes and skip 2FA entirely.
+    current_user.totp_secret = encrypt_totp_secret(secret)
     current_user.totp_enabled = False
     db.add(current_user)
     db.commit()
@@ -286,8 +310,10 @@ def enable_two_factor(
     if not current_user.totp_secret:
         raise HTTPException(status_code=400, detail="ابدأ الإعداد أولاً عبر /2fa/setup")
     try:
+        pending_secret = _resolve_totp_secret(current_user)
         ok = bool(
-            pyotp.TOTP(current_user.totp_secret).verify(payload.code.strip(), valid_window=1)
+            pending_secret
+            and pyotp.TOTP(pending_secret).verify(payload.code.strip(), valid_window=1)
         )
     except Exception:
         ok = False
@@ -460,9 +486,21 @@ def login(
                 headers={"X-2FA-Required": "totp"},
             )
         try:
+            secret = _resolve_totp_secret(user)
+        except TotpSecretUnavailable:
+            # SECRET_KEY was rotated: the stored seed is unreadable. Fail closed
+            # but log it separately so this is not mistaken for a wrong code.
+            audit_log(
+                db, request, user,
+                action="login_failed",
+                entity_type="auth",
+                description={"username": form_data.username, "reason": "totp_secret_undecryptable"},
+            )
+            secret = None
+        try:
             totp_ok = bool(
-                user.totp_secret
-                and pyotp.TOTP(user.totp_secret).verify(totp_code.strip(), valid_window=1)
+                secret
+                and pyotp.TOTP(secret).verify(totp_code.strip(), valid_window=1)
             )
         except Exception:
             totp_ok = False

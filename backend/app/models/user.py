@@ -29,7 +29,9 @@ class User(Base):
 
     # TOTP two-factor auth (Phase 3). ``totp_secret`` is set at setup time but
     # only enforced once ``totp_enabled`` flips on after code verification.
-    totp_secret = Column(String(64), nullable=True)
+    # Encrypted at rest (see app/core/totp_crypto.py) — a Fernet token is ~100
+    # chars, so 64 was too narrow once encryption landed.
+    totp_secret = Column(String(255), nullable=True)
     totp_enabled = Column(Boolean, nullable=False, default=False, server_default="0")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
