@@ -23,6 +23,7 @@ from app.schemas.pos_shift import (
     DailySummaryUserRead,
 )
 from app.services.pos_shift_service import auto_close_expired_shifts, is_within_working_hours
+from app.core.clock import salon_now
 
 router = APIRouter(prefix="/pos-shifts", tags=["POS Shifts"])
 
@@ -173,7 +174,7 @@ def close_shift(
     )
     
     shift.status = "closed"
-    shift.closed_at = datetime.now()
+    shift.closed_at = salon_now()
     shift.actual_closing_cash = Decimal(str(payload.get("countedCash") or payload.get("closing_cash") or 0))
     shift.expected_closing_cash = shift.opening_cash + cash_sales - cash_expenses
     shift.total_sales = total_sales
@@ -210,7 +211,7 @@ def get_daily_summary(
         except ValueError:
             raise HTTPException(status_code=400, detail="صيغة التاريخ غير صحيحة. استخدم YYYY-MM-DD")
     else:
-        target_date = datetime.now().date()
+        target_date = salon_now().date()
         
     start_of_day = datetime.combine(target_date, time.min)
     end_of_day = datetime.combine(target_date, time.max)

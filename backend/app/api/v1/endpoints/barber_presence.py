@@ -20,6 +20,7 @@ from app.models.employee_presence_log import EmployeePresenceLog, AttendanceArch
 from app.models.leave_request import LeaveRequest
 from app.models.business_settings import BusinessSettings
 from app.core.upload_security import validate_data_sheet
+from app.core.clock import salon_now, utc_now
 from app.core.working_hours import (
     WorkingHoursError,
     day_key,
@@ -83,7 +84,7 @@ def _is_late_for_shift(db: Session, dt: datetime) -> tuple:
 
 def _get_employee_status(db: Session, employee_id: int) -> dict:
     """Get current employee status based on today's logs."""
-    today = date.today()
+    today = salon_now().date()
     logs = (
         db.query(EmployeePresenceLog)
         .filter(EmployeePresenceLog.employee_id == employee_id)
@@ -184,7 +185,7 @@ def get_employee_details(employee_id: int, db: Session = Depends(get_db), curren
     remaining_shift = None
     settings = db.query(BusinessSettings).first()
     if settings and settings.working_hours:
-        now = datetime.now()
+        now = salon_now()
         hours = normalize_working_hours(settings.working_hours)
         window = resolve_window(hours, now.date())
         if window and window_contains(now, window[0]):
@@ -231,7 +232,7 @@ async def manual_register(
         except ValueError:
             raise HTTPException(status_code=400, detail="تنسيق الوقت غير صحيح")
     else:
-        dt = datetime.now()
+        dt = salon_now()
     
     # Check current status
     emp_status = _get_employee_status(db, employee_id)
@@ -338,9 +339,9 @@ async def import_biometric(
                     try:
                         dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
                     except ValueError:
-                        dt = datetime.now()
+                        dt = salon_now()
             else:
-                dt = datetime.now()
+                dt = salon_now()
             
             # Normalize status
             status_lower = str(status).lower().strip()
@@ -396,7 +397,7 @@ def get_analytics(
     from 101 queries to 1.
     """
     if not year_month:
-        year_month = datetime.now().strftime("%Y-%m")
+        year_month = salon_now().strftime("%Y-%m")
 
     year, month = map(int, year_month.split("-"))
 

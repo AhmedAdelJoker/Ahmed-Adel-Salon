@@ -18,6 +18,7 @@ from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
 from app.models.invoice_payment import InvoicePayment
 from app.models.business_settings import BusinessSettings
+from app.core.clock import salon_now
 from app.core.working_hours import resolve_window
 from app.models.service_session import ServiceSession
 
@@ -173,8 +174,8 @@ def _validate_future_datetime(appt_date: date, appt_time: time):
         except Exception:
             pass
             
-    now = datetime.now()
-    today = date.today()
+    now = salon_now()
+    today = salon_now().date()
     
     # 1. Block past dates
     if appt_date < today:
@@ -274,7 +275,7 @@ def _ensure_existing_barber(db: Session, barber_id: int | None):
     return barber
 
 def _generate_invoice_no(db: Session) -> str:
-    today_prefix = datetime.now().strftime("INV-%Y%m%d")
+    today_prefix = salon_now().strftime("INV-%Y%m%d")
     count_today = db.query(Invoice).filter(Invoice.invoice_no.like(f"{today_prefix}%")).count()
     return f"{today_prefix}-{count_today + 1:04d}"
 
@@ -307,7 +308,7 @@ def list_appointments(
         query = query.order_by(Appointment.id.desc())
 
     if date_filter == "today":
-        query = query.filter(Appointment.appointment_date == date.today())
+        query = query.filter(Appointment.appointment_date == salon_now().date())
     elif date_filter == "custom" and start_date and end_date:
         query = query.filter(Appointment.appointment_date >= start_date, Appointment.appointment_date <= end_date)
 
@@ -332,7 +333,7 @@ def list_upcoming_appointments(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    today = date.today()
+    today = salon_now().date()
     query = db.query(Appointment).options(joinedload(Appointment.services)).filter(
         Appointment.appointment_date >= today,
         Appointment.status.in_(["pending", "confirmed", "waiting"])
@@ -372,7 +373,7 @@ def get_appointments_by_barber(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    query_date = target_date or date.today()
+    query_date = target_date or salon_now().date()
     barbers = db.query(Employee).filter(
         Employee.is_active == True,
         Employee.job_title.ilike("%barber%")
@@ -548,8 +549,8 @@ def auto_cancel_expired_appointments(
     """
     from datetime import datetime, timedelta
     
-    today = date.today()
-    now = datetime.now()
+    today = salon_now().date()
+    now = salon_now()
     one_hour_ago = now - timedelta(hours=1)
     
     # Cancel previous days' bookings
@@ -689,18 +690,18 @@ def create_fast_walkin(payload: AppointmentFastWalkinCreate, db: Session = Depen
         try:
             appt_date = datetime.strptime(payload.appointment_date, "%Y-%m-%d").date()
         except ValueError:
-            appt_date = date.today()
+            appt_date = salon_now().date()
     else:
-        appt_date = date.today()
+        appt_date = salon_now().date()
     
     if payload.appointment_time:
         try:
             time_parts = payload.appointment_time.split(":")
             appt_time = time(int(time_parts[0]), int(time_parts[1]))
         except (ValueError, IndexError):
-            appt_time = datetime.now().time()
+            appt_time = salon_now().time()
     else:
-        appt_time = datetime.now().time()
+        appt_time = salon_now().time()
     
     # For fast walk-in, we still check availability if a barber is selected
     total_duration = 0
