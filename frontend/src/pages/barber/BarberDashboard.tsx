@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Zap, Scissors, BarChart3, CalendarDays, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ErrorState } from "@/components/shared/AsyncState";
 
 const BarberDashboard = () => {
   const {
@@ -26,7 +27,23 @@ const BarberDashboard = () => {
     completedCount,
     totalRevenue,
     totalServices,
+    loading,
+    loadError,
   } = useBarberDashboard();
+
+  // A failed load used to render an empty queue, which the barber reads as
+  // "no customers waiting" rather than "the request failed".
+  if (loadError && !loading) {
+    return (
+      <div className="mx-auto max-w-7xl px-3 pt-4 sm:px-4 lg:px-6">
+        <ErrorState
+          title="تعذر تحميل لوحة الحلاق"
+          message={loadError}
+          onRetry={fetchDashboardData}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-12">

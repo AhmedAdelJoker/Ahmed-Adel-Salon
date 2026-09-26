@@ -10,6 +10,7 @@ import type {
 
 import { useNavigate } from "react-router-dom";
 import { useAttendanceData } from "@/features/attendance/hooks/useAttendanceData";
+import InlineNotice from "@/components/shared/InlineNotice";
 import {
   X,
 } from "lucide-react";
@@ -66,6 +67,7 @@ const AttendanceManagement = () => {
     processedData,
     archiveRecords,
     lateEmployees,
+    secondaryError,
   } = useAttendanceData();
   const [activeViewMode, setActiveViewMode] =
     useState<AttendanceViewMode>("dashboard");
@@ -320,6 +322,10 @@ const AttendanceManagement = () => {
           onExportPDF={handleExportPDF}
           onRefresh={fetchAttendance}
         />
+
+        {secondaryError && (
+          <InlineNotice tone="warning">{secondaryError}</InlineNotice>
+        )}
 
         {/* Stats Cards */}
         <AttendanceStatsCards

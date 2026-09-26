@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { adaptObject } from "@/services/apiAdapter";
 import { useAuth } from "@/context/AuthContext";
+import { loadErrorMessage } from "@/lib/core/asyncError";
 import {
   DEFAULT_STATS,
   DEMO_STATS,
@@ -39,10 +39,15 @@ export function useReportsDashboard() {
   const [period, setPeriod] = useState("week");
   const [chartType, setChartType] = useState("area");
   const [isDemo, setIsDemo] = useState(false);
+  // Kept separate from isDemo: "the request failed" and "the period genuinely
+  // has no numbers" are different facts, and only one of them justifies
+  // showing illustrative figures.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const res = await api.get("/owner/dashboard-stats", {
         params: { scope: reportScope, employee_id: employeeId, period },
       });
@@ -73,13 +78,13 @@ export function useReportsDashboard() {
       } else {
         setServiceDistribution(FALLBACK_SERVICES);
       }
-    } catch (_err) {
-      console.error("Dashboard load error:", _err);
-      setStats(DEMO_STATS);
-      setWeeklyData(FALLBACK_WEEKLY);
-      setServiceDistribution(FALLBACK_SERVICES);
-      setIsDemo(true);
-      toast.error("تعذر تحميل البيانات - يتم عرض بيانات توضيحية");
+    } catch (err) {
+      // Previously this fell back to DEMO_STATS and told the owner "no real
+      // data for this period", which reads as a silent zero-sales day when the
+      // truth is the request failed. Keep the numbers off the screen instead.
+      console.error("Dashboard load error:", err);
+      setLoadError(loadErrorMessage(err, "بيانات لوحة التقارير"));
+      setIsDemo(false);
     } finally {
       setLoading(false);
     }
@@ -107,6 +112,7 @@ export function useReportsDashboard() {
     period,
     chartType,
     isDemo,
+    loadError,
     reportScope,
     employeeId,
     employeeName,

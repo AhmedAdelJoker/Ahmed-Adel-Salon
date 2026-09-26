@@ -5,6 +5,7 @@ import { barberService } from "@/services/barberService";
 import api from "@/services/api";
 import { formatCurrency } from "@/lib/core/utils";
 import { toast } from "react-hot-toast";
+import { loadErrorMessage } from "@/lib/core/asyncError";
 
 export const formatTime = (seconds: number) => {
   const h = Math.floor(seconds / 3600)
@@ -34,6 +35,7 @@ export const useBarberWorkStation = () => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [tipAmount, setTipAmount] = useState("");
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const timerRef = useRef<any>(null);
 
@@ -59,13 +61,17 @@ export const useBarberWorkStation = () => {
 
   const fetchAppointments = useCallback(async () => {
     try {
+      setLoadError(null);
       const res = await barberService.getQueue();
       const data: any = (res as any).data || {};
       const waiting = Array.isArray(data.waiting) ? data.waiting : [];
       const inService = Array.isArray(data.inService) ? data.inService : [];
       setAppointments([...waiting, ...inService]);
     } catch (err) {
+      // The queue the barber picks the next customer from failed to load, and
+      // an empty list is indistinguishable from a cleared queue.
       console.error("Failed to fetch appointments:", err);
+      setLoadError(loadErrorMessage(err, "قائمة الانتظار"));
     } finally {
       setLoading(false);
     }
@@ -157,6 +163,7 @@ export const useBarberWorkStation = () => {
     setAppointment,
     appointments,
     loading,
+    loadError,
     timerRunning,
     setTimerRunning,
     elapsedTime,

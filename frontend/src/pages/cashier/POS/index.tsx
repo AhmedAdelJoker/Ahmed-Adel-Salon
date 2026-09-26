@@ -12,6 +12,8 @@ import { toast } from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Clock, RefreshCw } from "lucide-react";
+import { ErrorState } from "@/components/shared/AsyncState";
+import InlineNotice from "@/components/shared/InlineNotice";
 
 const POSLayout = () => {
   const {
@@ -20,6 +22,9 @@ const POSLayout = () => {
     activeInvoiceId,
     activeAppointmentId,
     cart,
+    shiftError,
+    readyAppointmentsError,
+    catalogError,
   } = usePOS();
   const [activeTab, setActiveTab] = useState("sessions"); // "sessions" or "items"
   const [mobileView, setMobileView] = useState("ops"); // "ops" (Shift/Sessions), "items", "cart"
@@ -59,12 +64,35 @@ const POSLayout = () => {
     );
   }
 
+  // A dead catalogue means the till has nothing to sell, so block rather than
+  // present an empty grid the cashier could mistake for a stocked-but-quiet day.
+  if (catalogError) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-4">
+        <ErrorState
+          title="تعذر تحميل محطة نقطة البيع"
+          message={catalogError}
+          onRetry={() => window.location.reload()}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex h-full max-h-[calc(100vh-80px)] flex-col gap-4 relative overflow-hidden"
     >
       {/* Success Overlay & Modals */}
       <SuccessOverlay />
+
+      {/* Load failures that must not be mistaken for "nothing to do". */}
+      {(shiftError || readyAppointmentsError) && (
+        <div className="px-2 lg:px-0">
+          <InlineNotice tone="error">
+            {shiftError ?? readyAppointmentsError}
+          </InlineNotice>
+        </div>
+      )}
 
       {/* Edit Mode Badge - Fixed at top */}
       {activeInvoiceId && (

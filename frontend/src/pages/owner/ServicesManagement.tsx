@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { SkeletonCard } from "@/components/shared/PremiumUI";
+import InlineNotice from "@/components/shared/InlineNotice";
 
 
 import {
@@ -32,6 +33,7 @@ const ServicesManagement = ({ hideHeader = false }: { hideHeader?: boolean }) =>
     filteredOfferRows,
     serviceSummary,
     pricing,
+    loadError,
   } = useCatalogData(searchTerm);
   const {
     formData,
@@ -111,6 +113,12 @@ const ServicesManagement = ({ hideHeader = false }: { hideHeader?: boolean }) =>
         onRefresh={() => refreshAllData()}
         onCreate={openCreateDialog}
       />
+
+      {/* Categories and offers used to fail silently, so an empty tab looked
+          identical to "nothing configured yet". */}
+      {loadError && !hideHeader && (
+        <InlineNotice tone="warning">{loadError}</InlineNotice>
+      )}
 
       {isTabLoading ? (
         <SkeletonCard variant="content" height={320} />

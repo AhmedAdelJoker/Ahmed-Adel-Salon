@@ -86,6 +86,7 @@ export function useBookingsData() {
   const [selectedServiceCategory, setSelectedServiceCategory] = useState("all");
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const [availableSlots, setAvailableSlots] = useState<any[]>([]);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (dateFilter !== "today") return;
@@ -342,7 +343,12 @@ export function useBookingsData() {
         if (res.data.has_conflict) setConflictMsg(res.data.message);
         else setConflictMsg("");
       } catch (e) {
+        // A failed conflict check used to pass silently, so the booking was
+        // saved with no double-booking warning at all.
         console.error(e);
+        setConflictMsg(
+          "تعذر التحقق من تعارض المواعيد. راجع المواعيد يدوياً قبل الحفظ.",
+        );
       }
     },
     [formData.services, services, editingBooking?.id],
@@ -371,12 +377,20 @@ export function useBookingsData() {
     async (barberId: string | number, date: string) => {
       if (!barberId || !date) return;
       try {
+        setSlotsError(null);
         const res = await api.get("/appointments/available-slots", {
           params: { barber_id: barberId, date: date },
         });
         setAvailableSlots(res.data);
       } catch (e) {
+        // Previously the previous slot list was left in place, so a failed
+        // refresh meant the barber could still pick a time that had just been
+        // taken. Clear it and say so instead.
         console.error("Error fetching slots:", e);
+        setAvailableSlots([]);
+        setSlotsError(
+          "تعذر تحميل الأوقات المتاحة. أعد المحاولة قبل اختيار الموعد.",
+        );
       }
     },
     [],
@@ -787,6 +801,7 @@ export function useBookingsData() {
     customerSuggestions,
     setCustomerSuggestions,
     availableSlots,
+    slotsError,
     setAvailableSlots,
     groupedServices,
     handleTransferToPOS,

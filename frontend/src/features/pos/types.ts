@@ -29,6 +29,12 @@ export interface POSContextValue {
   loading: boolean;
   readyAppointmentsLoading: boolean;
   shiftLoading: boolean;
+  /** Set when the shift check itself failed, as opposed to no shift being open. */
+  shiftError: string | null;
+  /** Set when the ready-to-pay queue could not be fetched. */
+  readyAppointmentsError: string | null;
+  /** Set when the sellable catalogue could not be loaded. */
+  catalogError: string | null;
   showApprovalModal: boolean;
   setShowApprovalModal: Dispatch<SetStateAction<boolean>>;
   isSubmitting: boolean;

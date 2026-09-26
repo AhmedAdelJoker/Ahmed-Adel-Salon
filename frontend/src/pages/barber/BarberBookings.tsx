@@ -7,6 +7,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/PremiumUI";
+import InlineNotice from "@/components/shared/InlineNotice";
 import i18n from "@/i18n";
 import { useBarberBookings } from "@/features/barber-bookings/hooks/useBarberBookings";
 import { QuickStats } from "@/features/barber-bookings/components/QuickStats";
@@ -35,11 +36,15 @@ const BarberBookings = () => {
     getCalendarDays,
     statusLabels,
     statusColors,
+    loadError,
   } = useBarberBookings();
 
   return (
     <div className="min-h-screen pb-12" dir={i18n.dir() as "rtl" | "ltr"}>
       <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+        {loadError && !loading && (
+          <InlineNotice tone="error">{loadError}</InlineNotice>
+        )}
         <PageHeader
           title="حجوزاتي"
           subtitle="إدارة مواعيدك ومتابعة حجوزاتك"

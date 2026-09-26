@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/shared/AsyncState";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -57,6 +58,7 @@ const BarberWorkStation = () => {
     handleAddProduct,
     totalProducts,
     formatCurrency,
+    loadError,
   } = useBarberWorkStation();
 
   if (loading) {
@@ -68,6 +70,20 @@ const BarberWorkStation = () => {
           </div>
           <p className="text-muted font-bold">جاري تحميل محطة العمل...</p>
         </div>
+      </div>
+    );
+  }
+
+  // The picker queue failed to load, so the barber would otherwise see a blank
+  // list and could conclude there is no work waiting.
+  if (loadError && !appointment) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <ErrorState
+          title="تعذر تحميل قائمة الانتظار"
+          message={loadError}
+          onRetry={fetchAppointments}
+        />
       </div>
     );
   }

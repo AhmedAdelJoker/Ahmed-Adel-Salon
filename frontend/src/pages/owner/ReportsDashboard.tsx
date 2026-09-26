@@ -1,4 +1,4 @@
-import { Activity, LayoutDashboard, Loader2, ShieldCheck, TrendingUp, Users, Wallet } from "lucide-react";
+import { Activity, AlertTriangle, LayoutDashboard, Loader2, RefreshCw, ShieldCheck, TrendingUp, Users, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import i18n from "@/i18n";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ export default function ReportsDashboard() {
     period,
     chartType,
     isDemo,
+    loadError,
     employeeId,
     employeeName,
     displayName,
@@ -118,6 +119,19 @@ export default function ReportsDashboard() {
         }
         className={undefined}
       />
+
+      {/* Load failure. The demo banner used to cover this case and claimed
+          "no real data for this period", which reads as a zero-sales day. */}
+      {loadError && !loading && (
+        <div className="rounded-2xl border border-danger/20 bg-danger-soft px-4 py-3 flex flex-wrap items-center gap-3 text-danger">
+          <AlertTriangle size={18} className="shrink-0" />
+          <p className="text-xs font-bold flex-1 min-w-[200px]">{loadError}</p>
+          <Button variant="outline" size="sm" onClick={loadData} className="shrink-0">
+            <RefreshCw size={14} className="ml-1.5" />
+            إعادة المحاولة
+          </Button>
+        </div>
+      )}
 
       {/* Demo Banner — توكنز الثيم */}
       {isDemo && !loading && (

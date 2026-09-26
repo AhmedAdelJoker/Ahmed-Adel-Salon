@@ -17,6 +17,7 @@ import { printThermalReceipt } from "@/lib/print/receipt";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/core/utils";
 import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";
+import InlineNotice from "@/components/shared/InlineNotice";
 import {
   useInvoicesData,
   formatCurrency,
@@ -77,6 +78,7 @@ export default function Invoices() {
     pendingAdjustments,
     openInvoicePdf,
     submitAdjustmentRequest,
+    adjustmentsError,
   } = useInvoicesData();
 
   return (
@@ -195,6 +197,10 @@ export default function Invoices() {
             </div>
           </PremiumCard>
         </div>
+
+        {adjustmentsError && !loading && (
+          <InlineNotice tone="warning">{adjustmentsError}</InlineNotice>
+        )}
 
         <InvoicesToolbar
           query={query}
