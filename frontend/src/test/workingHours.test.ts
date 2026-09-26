@@ -3,11 +3,13 @@ import {
   DAYS_AR,
   PRESETS,
   WORKING_HOURS_DAYS,
+  buildTimeline,
   buildWorkingHours,
   cloneWorkingHours,
   crossesMidnight,
   dayKeyFor,
   durationLabel,
+  findTimelineGaps,
   formatDuration,
   formatRange,
   makeDay,
@@ -15,6 +17,7 @@ import {
   parseMins,
   sameWorkingHours,
   summarizeWorkingHours,
+  timelineCoverage,
   todayStatusLabel,
   validateDay,
   weekBarPercent,
@@ -292,5 +295,83 @@ describe("presets", () => {
     const built = PRESETS.find((p) => p.id === "friday-closed")!.build();
     expect(built.friday.is_open).toBe(false);
     expect(built.monday.is_open).toBe(true);
+  });
+});
+
+describe("weekly timeline", () => {
+  it("emits one block per day", () => {
+    const blocks = buildTimeline(normalizeWorkingHours({}));
+    expect(blocks).toHaveLength(7);
+    blocks.forEach((block, index) => {
+      expect(block.start).toBeCloseTo((index * 100) / 7, 5);
+    });
+  });
+
+  it("positions an open block inside its own day", () => {
+    // saturday is index 0 -> 0% .. 14.29%
+    const blocks = buildTimeline(normalizeWorkingHours({ saturday: open("12:00", "18:00") }));
+    const saturday = blocks[0];
+    expect(saturday.kind).toBe("open");
+    expect(saturday.start).toBeCloseTo((12 / 24) * (100 / 7), 4);
+    expect(saturday.width).toBeCloseTo((6 / 24) * (100 / 7), 4);
+  });
+
+  it("spans midnight into the following day", () => {
+    const blocks = buildTimeline(normalizeWorkingHours({ saturday: open("22:00", "02:00") }));
+    const saturday = blocks[0];
+    expect(saturday.overnight).toBe(true);
+    // 4h window starting at 22:00 on a 14.29%-wide day
+    expect(saturday.width).toBeCloseTo((4 / 24) * (100 / 7), 4);
+    expect(saturday.start + saturday.width).toBeGreaterThan((100 / 7) * 0.95);
+  });
+
+  it("reports coverage as a percentage of the week", () => {
+    const hours = buildWorkingHours((day) =>
+      day === "friday" ? closed() : open("10:00", "22:00"),
+    );
+    // 6 days * 12h = 72h of 168h
+    expect(timelineCoverage(hours)).toBe(43);
+  });
+
+  it("reports zero coverage for a fully closed week", () => {
+    expect(timelineCoverage(normalizeWorkingHours())).toBe(0);
+  });
+
+  it("finds the hole left by a closed Friday", () => {
+    const hours = buildWorkingHours((day) =>
+      day === "friday" ? closed() : open("10:00", "22:00"),
+    );
+    const gaps = findTimelineGaps(hours);
+    const longest = gaps[0];
+    // Friday is the last day of the week, so the run is Thursday's 22:00 close
+    // plus all 24 hours of Friday.
+    expect(longest.hours).toBe(26);
+    expect(longest.label).toContain("يوم مغلق");
+  });
+
+  it("finds the overnight hole between close and open", () => {
+    const hours = buildWorkingHours(() => open("22:00", "02:00"));
+    const gaps = findTimelineGaps(hours);
+    // 02:00 -> 22:00 is 20h, except on the first day of the week where nothing
+    // spills in from the previous week, so it reads 22h.
+    expect(gaps.filter((g) => g.hours === 20).length).toBe(6);
+    expect(gaps[0].hours).toBe(22);
+  });
+
+  it("reports no gaps for a round-the-clock week", () => {
+    const hours = buildWorkingHours(() => open("00:00", "23:59"));
+    const gaps = findTimelineGaps(hours);
+    expect(gaps).toHaveLength(0);
+  });
+
+  it("sorts gaps longest first", () => {
+    const hours = buildWorkingHours((day) => {
+      if (day === "friday") return closed();
+      if (day === "saturday") return open("10:00", "12:00");
+      return open("10:00", "22:00");
+    });
+    const gaps = findTimelineGaps(hours);
+    const hoursList = gaps.map((g) => g.hours);
+    expect([...hoursList].sort((a, b) => b - a)).toEqual(hoursList);
   });
 });

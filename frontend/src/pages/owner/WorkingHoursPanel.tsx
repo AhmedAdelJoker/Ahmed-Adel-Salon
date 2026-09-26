@@ -31,21 +31,31 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/core/utils";
 import {
+  errorHeadline,
+  isConflict,
+  toErrorLines,
+  type ApiErrorLine,
+} from "@/lib/core/apiErrors";
+import {
   DAYS_AR,
+  DAYS_SHORT_AR,
   PRESETS,
   WORKING_HOURS_DAYS,
+  buildTimeline,
   buildWorkingHours,
   cloneWorkingHours,
   crossesMidnight,
   dayKeyFor,
   durationLabel,
   emptyDay,
+  findTimelineGaps,
   formatDuration,
   formatRange,
   makeDay,
   normalizeWorkingHours,
   sameWorkingHours,
   summarizeWorkingHours,
+  timelineCoverage,
   todayStatusLabel,
   validateDay,
   weekBarPercent,
@@ -56,6 +66,7 @@ import {
 
 type WorkingHoursPanelProps = {
   onDirtyChange?: (dirty: boolean) => void;
+  onVersionChange?: (version: number | undefined) => void;
 };
 
 type PendingAction =
@@ -63,7 +74,7 @@ type PendingAction =
   | { kind: "preset"; presetId: string }
   | { kind: "discard" };
 
-const WorkingHoursPanel = ({ onDirtyChange }: WorkingHoursPanelProps) => {
+const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanelProps) => {
   const emptyHours = useMemo(() => normalizeWorkingHours(), []);
   const [hours, setHours] = useState<WorkingHoursMap>(() => cloneWorkingHours(emptyHours));
   const [initialHours, setInitialHours] = useState<WorkingHoursMap>(() =>
@@ -74,6 +85,14 @@ const WorkingHoursPanel = ({ onDirtyChange }: WorkingHoursPanelProps) => {
   const [applySource, setApplySource] = useState<DayKey>("saturday");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
+  const [saveErrors, setSaveErrors] = useState<ApiErrorLine[]>([]);
+  const [conflict, setConflict] = useState<string | null>(null);
+  const [settingsVersion, setSettingsVersion] = useState<number | undefined>(undefined);
+
+  const handleVersion = useCallback((version: number | undefined) => {
+    setSettingsVersion(version);
+    onVersionChange?.(version);
+  }, [onVersionChange]);
 
   const todayKey = useMemo(() => dayKeyFor(), []);
 
@@ -81,19 +100,22 @@ const WorkingHoursPanel = ({ onDirtyChange }: WorkingHoursPanelProps) => {
     try {
       setLoading(true);
       setLoadError(null);
+      setSaveErrors([]);
+      setConflict(null);
       const settings = await businessSettingsService.get();
       const normalized = normalizeWorkingHours(
         (settings?.working_hours || settings?.workingHours || {}) as Record<string, unknown>,
       );
       setHours(normalized);
       setInitialHours(cloneWorkingHours(normalized));
+      handleVersion(Number((settings as Record<string, unknown> | undefined)?.version ?? 0) || undefined);
     } catch {
       setLoadError("تعذر تحميل ساعات العمل. تحقق من الاتصال ثم أعد المحاولة.");
       toast.error("فشل تحميل ساعات العمل");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [handleVersion]);
 
   useEffect(() => {
     void fetchHours();
@@ -177,27 +199,33 @@ const WorkingHoursPanel = ({ onDirtyChange }: WorkingHoursPanelProps) => {
       return;
     }
     setSaving(true);
+    setSaveErrors([]);
+    setConflict(null);
     try {
-      const saved = await businessSettingsService.update({ working_hours: hours });
+      const payload: Record<string, unknown> = { working_hours: hours };
+      if (settingsVersion) payload.expectedVersion = settingsVersion;
+      const saved = await businessSettingsService.update(payload);
+      const raw = (saved ?? {}) as Record<string, unknown>;
       const persisted = saved
         ? normalizeWorkingHours(
-            ((saved as Record<string, unknown>).working_hours ??
-              (saved as Record<string, unknown>).workingHours ??
-              {}) as Record<string, unknown>,
+            ((raw.working_hours ?? raw.workingHours ?? {}) as Record<string, unknown>),
           )
         : hours;
       setHours(persisted);
       setInitialHours(cloneWorkingHours(persisted));
+      const nextVersion = Number(raw.version ?? 0) || undefined;
+      if (nextVersion) handleVersion(nextVersion);
       toast.success("تم حفظ ساعات العمل بنجاح");
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-      const message =
-        typeof detail === "string"
-          ? detail
-          : Array.isArray(detail) && detail[0]?.msg
-            ? String((detail[0] as { msg: string }).msg)
-            : "فشل الحفظ";
-      toast.error(message);
+      if (isConflict(err)) {
+        const [line] = toErrorLines(err, "تم تعديل الإعدادات من مستخدم آخر");
+        setConflict(line?.message ?? "تم تعديل الإعدادات من مستخدم آخر");
+        toast.error("تعارض في الحفظ — الإعدادات تغيّرت من مستخدم آخر");
+        return;
+      }
+      const lines = toErrorLines(err, "فشل الحفظ");
+      setSaveErrors(lines);
+      toast.error(errorHeadline(lines, "فشل الحفظ"));
     } finally {
       setSaving(false);
     }
@@ -314,7 +342,56 @@ const WorkingHoursPanel = ({ onDirtyChange }: WorkingHoursPanelProps) => {
                 غير محفوظ
               </Badge>
             )}
-            {hasErrors && (
+        {conflict && (
+          <div
+            role="alert"
+            className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30"
+          >
+            <div className="flex items-center gap-2 text-[11px] font-black text-amber-800 dark:text-amber-200">
+              <AlertTriangle size={16} className="shrink-0" />
+              {conflict}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchHours}
+                className="h-8 rounded-xl border-amber-300 px-3 text-[11px] font-black text-amber-800 dark:border-amber-700 dark:text-amber-200"
+              >
+                <RotateCcw size={13} className="ml-1" /> جلب أحدث نسخة
+              </Button>
+              <span className="text-[10px] font-bold text-amber-700/80 dark:text-amber-300/80">
+                تعديلاتك هتتمسح من الشاشة — انسخها لو محتاج تحتفظ بيها.              </span>
+            </div>
+          </div>
+        )}
+
+        {saveErrors.length > 0 && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-900 dark:bg-rose-950/30"
+          >
+            <div className="flex items-center gap-2 text-[11px] font-black text-rose-700 dark:text-rose-300">
+              <AlertTriangle size={16} className="shrink-0" />
+              {saveErrors.length === 1
+                ? "تعذر الحفظ"
+                : `تعذر الحفظ — ${saveErrors.length} أخطاء من الخادم`}
+            </div>
+            <ul className="mt-2 space-y-1 pr-4">
+              {saveErrors.map((line, index) => (
+                <li
+                  key={`${line.field ?? "err"}-${index}`}
+                  className="text-[11px] font-bold text-rose-700/90 dark:text-rose-300/90"
+                >
+                  {line.field ? <span className="font-black">{line.field}: </span> : null}
+                  {line.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {hasErrors && (
               <Badge variant="danger" className="rounded-full px-3 py-1 text-[10px] font-black">
                 راجع الأخطاء
               </Badge>
@@ -355,7 +432,7 @@ const WorkingHoursPanel = ({ onDirtyChange }: WorkingHoursPanelProps) => {
           className="overflow-hidden border-border/60 mb-6"
         >
           <div className="p-4 sm:p-5">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
               <h4 className="text-[11px] font-black uppercase tracking-widest text-muted flex items-center gap-2">
                 <Sparkles size={14} className="text-primary" /> معاينة الأسبوع
               </h4>
@@ -430,6 +507,8 @@ const WorkingHoursPanel = ({ onDirtyChange }: WorkingHoursPanelProps) => {
             </div>
           </div>
         </PremiumCard>
+
+        <WeekTimeline hours={hours} />
 
         <PremiumCard
           noPadding
@@ -751,6 +830,110 @@ const WorkingHoursPanel = ({ onDirtyChange }: WorkingHoursPanelProps) => {
         {isDirty ? "لديك تعديلات غير محفوظة على ساعات العمل" : "ساعات العمل محفوظة"}
       </span>
     </div>
+  );
+};
+
+type WeekTimelineProps = { hours: WorkingHoursMap };
+
+const WeekTimeline = ({ hours }: WeekTimelineProps) => {
+  const blocks = useMemo(() => buildTimeline(hours), [hours]);
+  const gaps = useMemo(() => findTimelineGaps(hours), [hours]);
+  const coverage = useMemo(() => timelineCoverage(hours), [hours]);
+  const todayKey = useMemo(() => dayKeyFor(), []);
+  const todayIndex = WORKING_HOURS_DAYS.indexOf(todayKey);
+  const nowPosition = useMemo(() => {
+    const minuteOfDay = new Date().getHours() * 60 + new Date().getMinutes();
+    return ((todayIndex * 24 * 60 + minuteOfDay) / (7 * 24 * 60)) * 100;
+  }, [todayIndex]);
+
+  return (
+    <PremiumCard
+      noPadding
+      hoverable={false}
+      animate={false}
+      className="overflow-hidden border-border/60 mb-6"
+    >
+      <div className="p-4 sm:p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h4 className="text-[11px] font-black uppercase tracking-widest text-muted flex items-center gap-2">
+            <CalendarRange size={14} className="text-primary" /> الجدول الزمني للأسبوع
+          </h4>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[9px] font-black tabular-nums">
+              تغطية {coverage}%
+            </Badge>
+            {gaps.slice(0, 2).map((gap) => (
+              <Badge
+                key={gap.label}
+                variant="warning"
+                className="rounded-full px-2.5 py-1 text-[9px] font-black"
+              >
+                {gap.label}
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        <div className="relative">
+          <div
+            className="relative h-11 w-full overflow-hidden rounded-xl border border-border bg-soft/40"
+            role="img"
+            aria-label={`تغطية الدوام الأسبوعي ${coverage} بالمئة`}
+          >
+            {blocks.map((block) => (
+              <div
+                key={`${block.day}-${block.start}`}
+                className={cn(
+                  "absolute top-0 flex h-full items-center justify-center overflow-hidden border-x border-white/40 text-[8px] font-black transition-all",
+                  block.kind === "open"
+                    ? block.overnight
+                      ? "bg-indigo-500/90 text-white"
+                      : "bg-primary/90 text-white"
+                    : "bg-border/50",
+                )}
+                style={{
+                  left: `${block.start}%`,
+                  width: `${block.width}%`,
+                }}
+                title={
+                  block.kind === "open"
+                    ? `${block.label} — ${block.detail}`
+                    : `${block.label}: مغلق`
+                }
+              >
+                {block.width > 7 ? (
+                  <span className="truncate px-1">
+                    {block.overnight ? "🌙 " : ""}
+                    {block.detail.split(" •")[0]}
+                  </span>
+                ) : null}
+              </div>
+            ))}
+
+            {nowPosition >= 0 && nowPosition <= 100 && (
+              <div
+                className="pointer-events-none absolute top-0 h-full w-0.5 bg-rose-500"
+                style={{ left: `${nowPosition}%` }}
+                aria-hidden="true"
+              />
+            )}
+          </div>
+
+          <div className="mt-1.5 grid grid-cols-7 text-center text-[8px] font-black text-muted">
+            {WORKING_HOURS_DAYS.map((day) => (
+              <span key={day} className={cn(day === todayKey && "text-primary")}>
+                {DAYS_SHORT_AR[day]}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-[10px] font-bold text-muted leading-relaxed">
+          الخط الأحمر يحدد اللحظة الحالية. الفجوات المغلقة بالأ badges أعلاه هي الفترات التي لا
+          يمكن فيها استقبال حجز — والدوام الذي يتخطى منتصف الليل يظهر بنفس اللون مثل البندوت.
+        </p>
+      </div>
+    </PremiumCard>
   );
 };
 

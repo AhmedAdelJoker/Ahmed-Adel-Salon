@@ -28,6 +28,12 @@ import { adaptObject } from "@/services/apiAdapter";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/core/utils";
+import {
+  errorHeadline,
+  isConflict,
+  toErrorLines,
+  type ApiErrorLine,
+} from "@/lib/core/apiErrors";
 import { motion } from "framer-motion";
 import {
   Select,
@@ -119,6 +125,11 @@ const Settings = () => {
   const [hoursDirty, setHoursDirty] = useState(false);
   const [shopFetchStarted, setShopFetchStarted] = useState(false);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [settingsVersion, setSettingsVersion] = useState<number | undefined>(undefined);
+  const [publicSiteStale, setPublicSiteStale] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [shopSaveErrors, setShopSaveErrors] = useState<ApiErrorLine[]>([]);
+  const [shopConflict, setShopConflict] = useState<string | null>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
 
   const [shopSettings, setShopSettings] = useState({
@@ -183,11 +194,13 @@ const Settings = () => {
     setLoadError(null);
     try {
       const res = await api.get("/business-settings");
-      const settingsData = adaptObject(res, {}) || {};
+      const settingsData = (adaptObject(res, {}) || {}) as Record<string, unknown>;
       if (settingsData && Object.keys(settingsData).length) {
         const normalized = normalizeShopSettings(settingsData, {});
         setShopSettings((prev) => ({ ...prev, ...normalized }));
         setShopInitial({ ...normalized } as Record<string, string>);
+        setSettingsVersion(Number(settingsData.version) || undefined);
+        setPublicSiteStale(Boolean(settingsData.publicSiteStale));
         setSettingsReady(true);
       } else {
         setLoadError("تعذر تحميل بيانات المنشأة. تحقق من الاتصال ثم أعد المحاولة.");
@@ -331,6 +344,8 @@ const Settings = () => {
       return;
     }
     setLoading(true);
+    setShopSaveErrors([]);
+    setShopConflict(null);
 
     try {
       const payload: Record<string, unknown> = {
@@ -343,26 +358,44 @@ const Settings = () => {
         receiptFooter: shopSettings.receipt_footer.trim() || null,
         currency: shopSettings.currency.trim() || "EGP",
       };
+      if (settingsVersion) payload.expectedVersion = settingsVersion;
 
       const res = await api.put("/business-settings", payload);
-      const updated = adaptObject(res, {}) || {};
+      const updated = (adaptObject(res, {}) || {}) as Record<string, unknown>;
       const normalized = normalizeShopSettings(updated, {}) as Record<string, string>;
       setShopSettings((prev) => ({ ...prev, ...normalized }));
       setShopInitial({ ...normalized });
+      setSettingsVersion(Number(updated.version) || settingsVersion);
+      setPublicSiteStale(Boolean(updated.publicSiteStale));
 
       toast.success("تم حفظ بيانات المنشأة بنجاح");
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      if (Array.isArray(detail)) {
-        const msg = detail.map((d: any) => d.msg || d.message).filter(Boolean).join(" • ");
-        toast.error(msg || "فشل حفظ بيانات المنشأة");
-      } else if (typeof detail === "string" && detail) {
-        toast.error(detail);
-      } else {
-        toast.error("فشل حفظ بيانات المنشأة");
+    } catch (err: unknown) {
+      if (isConflict(err)) {
+        const [line] = toErrorLines(err, "تم تعديل الإعدادات من مستخدم آخر");
+        setShopConflict(line?.message ?? "تم تعديل الإعدادات من مستخدم آخر");
+        toast.error("تعارض في الحفظ — الإعدادات تغيّرت من مستخدم آخر");
+        return;
       }
+      const lines = toErrorLines(err, "فشل حفظ بيانات المنشأة");
+      setShopSaveErrors(lines);
+      toast.error(errorHeadline(lines, "فشل حفظ بيانات المنشأة"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    setPublishing(true);
+    try {
+      const res = await api.post("/business-settings/publish-site");
+      const updated = (adaptObject(res, {}) || {}) as Record<string, unknown>;
+      setPublicSiteStale(Boolean(updated.publicSiteStale));
+      setSettingsVersion(Number(updated.version) || settingsVersion);
+      toast.success("تم نشر الموقع العام بنجاح");
+    } catch {
+      toast.error("فشل نشر الموقع العام");
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -451,6 +484,28 @@ const Settings = () => {
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3 text-[11px] font-black text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
           <Clock size={16} className="shrink-0" />
           أنت تدخل كمدير — يمكنك تعديل ساعات العمل فقط. باقي الإعدادات متاحة للمالك.
+        </div>
+      )}
+
+      {isOwnerLike && publicSiteStale && (
+        <div
+          role="status"
+          className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-900 dark:bg-sky-950/30"
+        >
+          <Globe size={16} className="shrink-0 text-sky-700 dark:text-sky-300" />
+          <p className="flex-1 text-[11px] font-black leading-relaxed text-sky-900 dark:text-sky-200">
+            عدّلت الإعدادات بعد آخر نشر — الموقع العام لازم ينشر تاني عشان يشوف التعديلات دي
+            (وقت الدوام، الاسم، الشعار).
+          </p>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handlePublish}
+            loading={publishing}
+            className="h-8 shrink-0 rounded-xl px-4 text-[11px] font-black"
+          >
+            <Upload size={13} className="ml-1" /> انشر الآن
+          </Button>
         </div>
       )}
 
@@ -583,6 +638,53 @@ const Settings = () => {
                     }
                     className="overflow-hidden"
                   >
+                    {shopConflict && (
+                      <div
+                        role="alert"
+                        className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30"
+                      >
+                        <div className="flex items-center gap-2 text-[11px] font-black text-amber-800 dark:text-amber-200">
+                          <ShieldCheck size={16} className="shrink-0" />
+                          {shopConflict}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={fetchData}
+                          className="h-8 self-start rounded-xl border-amber-300 px-3 text-[11px] font-black text-amber-800 dark:border-amber-700 dark:text-amber-200"
+                        >
+                          <Activity size={13} className="ml-1" /> جلب أحدث نسخة
+                        </Button>
+                      </div>
+                    )}
+
+                    {shopSaveErrors.length > 0 && (
+                      <div
+                        role="alert"
+                        className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-900 dark:bg-rose-950/30"
+                      >
+                        <p className="flex items-center gap-2 text-[11px] font-black text-rose-700 dark:text-rose-300">
+                          <ShieldCheck size={16} className="shrink-0" />
+                          {shopSaveErrors.length === 1
+                            ? "تعذر الحفظ"
+                            : `تعذر الحفظ — ${shopSaveErrors.length} أخطاء من الخادم`}
+                        </p>
+                        <ul className="mt-2 space-y-1 pr-4">
+                          {shopSaveErrors.map((line, index) => (
+                            <li
+                              key={`${line.field ?? "err"}-${index}`}
+                              className="text-[11px] font-bold text-rose-700/90 dark:text-rose-300/90"
+                            >
+                              {line.field ? (
+                                <span className="font-black">{line.field}: </span>
+                              ) : null}
+                              {line.message}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
                       {/* Logo + receipt preview */}
                       <div className="space-y-4">
@@ -874,7 +976,12 @@ const Settings = () => {
                 </div>
               )}
 
-              {activeTab === "hours" && <WorkingHoursPanel onDirtyChange={setHoursDirty} />}
+              {activeTab === "hours" && (
+        <WorkingHoursPanel
+          onDirtyChange={setHoursDirty}
+          onVersionChange={setSettingsVersion}
+        />
+      )}
               {activeTab === "services" && <ServicesManagement hideHeader />}
               {activeTab === "website" && <BusinessSettingsPage />}
               {activeTab === "loyalty" && <LoyaltySettingsPanel />}

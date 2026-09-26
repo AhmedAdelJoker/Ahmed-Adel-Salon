@@ -253,6 +253,125 @@ export const todayStatusLabel = (
   };
 };
 
+export type TimelineBlock = {
+  day: DayKey;
+  kind: "open" | "closed";
+  /** Percentage offset into the week where the block starts. */
+  start: number;
+  /** Percentage width of the block. */
+  width: number;
+  label: string;
+  detail: string;
+  overnight: boolean;
+};
+
+export type TimelineGap = {
+  /** Hours of continuous closure before this open block. */
+  hours: number;
+  label: string;
+};
+
+const HOURS_PER_DAY = 24;
+
+/**
+ * Projects the week onto a single 0–100% timeline.
+ *
+ * A bar chart of seven columns hides the only thing that matters when a day
+ * closes before it opens: whether the salon is actually reachable. Consecutive
+ * open days fuse into one block, and the dead air between blocks is reported so
+ * a Friday closure reads as a 24h hole rather than an empty column.
+ */
+export const buildTimeline = (hours: WorkingHoursMap): TimelineBlock[] => {
+  const blocks: TimelineBlock[] = [];
+
+  WORKING_HOURS_DAYS.forEach((day, index) => {
+    const config = hours[day];
+    const dayStart = (index * 100) / 7;
+    const dayWidth = 100 / 7;
+
+    if (!config?.is_open) {
+      blocks.push({
+        day,
+        kind: "closed",
+        start: dayStart,
+        width: dayWidth,
+        label: DAYS_AR[day],
+        detail: "مغلق",
+        overnight: false,
+      });
+      return;
+    }
+
+    const open = parseMins(config.open_time) ?? 0;
+    const close = parseMins(config.close_time) ?? 0;
+    const overnight = crossesMidnight(config);
+    const spanMinutes = overnight ? close + HOURS_PER_DAY * 60 - open : close - open;
+
+    blocks.push({
+      day,
+      kind: "open",
+      start: dayStart + (open / (HOURS_PER_DAY * 60)) * dayWidth,
+      width: (spanMinutes / (HOURS_PER_DAY * 60)) * dayWidth,
+      label: `${DAYS_AR[day]} ${config.open_time} – ${config.close_time}`,
+      detail: overnight
+        ? `${formatDuration(windowMinutes(config))} • ينتهي اليوم التالي`
+        : formatDuration(windowMinutes(config)),
+      overnight,
+    });
+  });
+
+  return blocks;
+};
+
+/** Continuous closed stretches in the week, longest first. */
+export const findTimelineGaps = (hours: WorkingHoursMap): TimelineGap[] => {
+  const SLOTS = 7 * HOURS_PER_DAY; // one slot per hour across the week
+  const open = new Array<boolean>(SLOTS).fill(false);
+
+  WORKING_HOURS_DAYS.forEach((day, dayIndex) => {
+    const config = hours[day];
+    if (!config?.is_open) return;
+    const from = parseMins(config.open_time);
+    const to = parseMins(config.close_time);
+    if (from === null || to === null) return;
+    // a window keyed by its opening day may run into the next day
+    const lastMinute = to <= from ? to + HOURS_PER_DAY * 60 : to;
+    for (let minute = from; minute < lastMinute; minute += 1) {
+      const absolute = dayIndex * HOURS_PER_DAY * 60 + minute;
+      const slot = Math.floor(absolute / 60);
+      if (slot >= 0 && slot < SLOTS) open[slot] = true;
+    }
+  });
+
+  const gaps: TimelineGap[] = [];
+  let run = 0;
+  for (let i = 0; i <= SLOTS; i += 1) {
+    if (i < SLOTS && !open[i]) {
+      run += 1;
+      continue;
+    }
+    if (run >= 1) {
+      gaps.push({
+        hours: run,
+        label:
+          run >= 24
+            ? `${Math.round((run / 24) * 10) / 10} يوم مغلق`
+            : `${run} ساعة مغلقة`,
+      });
+    }
+    run = 0;
+  }
+  return gaps.sort((a, b) => b.hours - a.hours);
+};
+
+export const timelineCoverage = (hours: WorkingHoursMap): number => {
+  const blocks = buildTimeline(hours);
+  const openMinutes = blocks
+    .filter((b) => b.kind === "open")
+    .reduce((sum, b) => sum + (b.width / 100) * (7 * HOURS_PER_DAY), 0);
+  return Math.round((openMinutes / (7 * HOURS_PER_DAY)) * 100);
+};
+
 export const PRESETS: Array<{
   id: string;
   label: string;
