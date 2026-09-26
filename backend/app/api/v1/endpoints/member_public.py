@@ -21,6 +21,7 @@ from app.core.security import (
 )
 from app.models.appointment import Appointment
 from app.models.customer import Customer
+from app.models.member_account import MemberAccount
 from app.schemas.member import (
     MemberAuthResponse,
     MemberBookingRead,
@@ -87,15 +88,17 @@ def _member_from_credentials(
 
     customer = (
         db.query(Customer)
+        .options(joinedload(Customer.member_account))
         .filter(Customer.customer_id == customer_id)
         .first()
     )
-    if customer is None or customer.is_deleted or not customer.member_password_hash:
+    account = customer.member_account if customer else None
+    if customer is None or customer.is_deleted or account is None or not account.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="حساب العميل غير متاح",
         )
-    if int(payload.get("ver", -1)) != token_version_of(customer):
+    if int(payload.get("ver", -1)) != token_version_of(account):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="انتهت صلاحية جلسة العميل",
@@ -199,15 +202,22 @@ def register_member(
         email=email,
     )
 
-    customer.member_password_hash = get_password_hash(payload.password)
-    customer.member_token_version = token_version_of(customer) + 1
     db.add(customer)
+    db.flush()
+    account = MemberAccount(
+        customer_id=customer.customer_id,
+        password_hash=get_password_hash(payload.password),
+        token_version=0,
+        is_active=True,
+    )
+    db.add(account)
     db.commit()
     db.refresh(customer)
+    db.refresh(account)
 
     token = create_member_access_token(
         customer.customer_id,
-        token_version_of(customer),
+        token_version_of(account),
     )
     return MemberAuthResponse(
         token=token,
@@ -225,30 +235,32 @@ def login_member(
     db: Session = Depends(get_db),
 ) -> MemberAuthResponse:
     email = _normalize_email(payload.email)
-    customer = (
+    row = (
         db.query(Customer)
+        .options(joinedload(Customer.member_account))
         .filter(func.lower(Customer.email) == email)
         .order_by(Customer.customer_id.asc())
         .first()
     )
-    password_hash = customer.member_password_hash if customer else DUMMY_PASSWORD_HASH
+    account = row.member_account if row else None
+    password_hash = account.password_hash if account else DUMMY_PASSWORD_HASH
     try:
         valid = verify_password(payload.password, password_hash)
     except Exception:
         valid = False
-    if not customer or not valid or customer.is_deleted or not customer.member_password_hash:
+    if not row or not valid or row.is_deleted or account is None or not account.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="البريد الإلكتروني أو كلمة المرور غير صحيحة",
         )
 
     token = create_member_access_token(
-        customer.customer_id,
-        token_version_of(customer),
+        row.customer_id,
+        token_version_of(account),
     )
     return MemberAuthResponse(
         token=token,
-        user=_member_user(customer, db),
+        user=_member_user(row, db),
     )
 
 

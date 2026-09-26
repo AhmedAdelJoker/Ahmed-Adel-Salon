@@ -90,7 +90,11 @@ def list_customers(
         return list(result.items)
 
     # Legacy path — preserve original behavior
-    total = query.count()
+    # `Query.count()` compiles to `SELECT count(*) FROM (SELECT <every mapped
+    # column> ...) AS anon_1`, so it drags the whole row through a derived table
+    # on every request. Replacing the projection with a bare count and dropping
+    # the ORDER BY keeps the same filters without the subquery.
+    total = query.with_entities(func.count()).order_by(None).scalar() or 0
     eff_offset = skip if skip is not None else max(offset, 0)
     eff_limit = max(1, min(limit, 1000))
     customers = (
