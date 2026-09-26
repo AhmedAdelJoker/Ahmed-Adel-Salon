@@ -7,11 +7,7 @@ from app.models.expense import Expense
 from app.models.business_settings import BusinessSettings
 from app.models.user import User
 from app.core.clock import coerce_naive, salon_now
-from app.core.working_hours import (
-    normalize_working_hours,
-    resolve_window,
-    window_contains,
-)
+from app.core.working_hours import current_window
 from app.services.activity_log_service import log_activity
 from app.services.notification_service import create_notification
 
@@ -24,11 +20,7 @@ def is_within_working_hours(db: Session) -> bool:
         return True # Default to open if no settings
 
     now = salon_now()
-    window = resolve_window(settings.working_hours, now.date())
-    if window is None:
-        return False
-
-    return window_contains(now, window[0])
+    return current_window(settings.working_hours, now) is not None
 
 
 def next_closing_moment(db: Session):
@@ -37,8 +29,8 @@ def next_closing_moment(db: Session):
     if not settings or not settings.working_hours:
         return None
     now = salon_now()
-    window = resolve_window(settings.working_hours, now.date())
-    if window is None or not window_contains(now, window[0]):
+    window = current_window(settings.working_hours, now)
+    if window is None:
         return None
     return window[2]
 
@@ -134,7 +126,7 @@ def auto_close_expired_shifts(db: Session):
 
     grace = _grace_period(settings)
     now = salon_now()
-    window = resolve_window(settings.working_hours, now.date())
+    window = current_window(settings.working_hours, now)
 
     if window is not None and now <= (window[2] + timedelta(minutes=grace)):
         return 0

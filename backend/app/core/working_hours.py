@@ -130,11 +130,7 @@ def opening_datetime(day: date_cls, day_config: Mapping[str, Any]) -> datetime |
 
 
 def is_open_at(moment: datetime, day_config: Mapping[str, Any] | None) -> bool:
-    """Whether ``moment`` falls inside the window described by ``day_config``.
-
-    A midnight-crossing window also covers the small hours that belong to the
-    *previous* day's key, so both the current and the previous key are consulted.
-    """
+    """Whether ``moment`` falls inside the window described by ``day_config``."""
     if not day_config or not day_config.get("is_open"):
         return False
     return window_contains(moment, day_config)
@@ -267,21 +263,18 @@ def validate_working_hours(raw: Any) -> dict[str, dict[str, Any]]:
 def resolve_window(
     raw: Any, target: date_cls
 ) -> tuple[dict[str, Any], datetime, datetime] | None:
-    """Resolve the absolute open/close window that governs ``target``.
+    """Resolve the open/close window that governs bookings on ``target``.
 
-    Returns ``None`` when the salon is closed that day. A midnight-crossing
-    window opened on the previous day takes precedence over a same-day window
-    that has not opened yet.
+    The window is keyed by its **opening** day, so a ``22:00 → 02:00`` Saturday is
+    bookable as 22:00 Saturday through 02:00 Sunday. A target date therefore only
+    ever looks at its own key — carrying the previous day's window over would make
+    00:30 bookable on Saturday *and* on Sunday, double-counting the tail.
+
+    For "is the salon open right now" use :func:`current_window`, which does
+    account for a window that started yesterday and is still running.
     """
     hours = normalize_working_hours(raw)
     today = hours.get(day_key(target))
-
-    yesterday = target - timedelta(days=1)
-    previous = hours.get(day_key(yesterday))
-    if previous and previous["is_open"] and crosses_midnight(previous):
-        still_running = closing_datetime(yesterday, previous)
-        if still_running is not None and still_running > datetime.combine(target, time.min):
-            return previous, datetime.combine(yesterday, parse_hhmm(previous["open_time"])), still_running
 
     if not today or not today["is_open"]:
         return None
@@ -291,6 +284,33 @@ def resolve_window(
     if opened is None or closed is None:
         return None
     return today, opened, closed
+
+
+def current_window(raw: Any, moment: datetime) -> tuple[dict[str, Any], datetime, datetime] | None:
+    """The window that is running at ``moment``, or ``None`` when closed.
+
+    Checks today's own window first, then a window opened yesterday that crosses
+    midnight and has not finished yet — and only while it is genuinely still
+    running, so a finished carry-over cannot mask the rest of the day.
+    """
+    hours = normalize_working_hours(raw)
+    today = hours.get(day_key(moment.date()))
+
+    if today and today["is_open"] and window_contains(moment, today):
+        opened = opening_datetime(moment.date(), today)
+        closed = closing_datetime(moment.date(), today)
+        if opened is not None and closed is not None:
+            return today, opened, closed
+
+    yesterday = moment.date() - timedelta(days=1)
+    previous = hours.get(day_key(yesterday))
+    if previous and previous["is_open"] and crosses_midnight(previous):
+        opened = opening_datetime(yesterday, previous)
+        closed = closing_datetime(yesterday, previous)
+        if opened is not None and closed is not None and moment < closed:
+            return previous, opened, closed
+
+    return None
 
 
 def summarize(raw: Any) -> dict[str, Any]:

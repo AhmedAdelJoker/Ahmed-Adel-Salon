@@ -25,9 +25,8 @@ from app.core.working_hours import (
     WorkingHoursError,
     day_key,
     normalize_working_hours,
-    resolve_window,
+    current_window,
     validate_working_hours,
-    window_contains,
 )
 from app.services.websocket import manager
 
@@ -187,8 +186,8 @@ def get_employee_details(employee_id: int, db: Session = Depends(get_db), curren
     if settings and settings.working_hours:
         now = salon_now()
         hours = normalize_working_hours(settings.working_hours)
-        window = resolve_window(hours, now.date())
-        if window and window_contains(now, window[0]):
+        window = current_window(hours, now)
+        if window:
             closes_at = window[2]
             diff = int((closes_at - now).total_seconds() / 60)
             if diff > 0:

@@ -44,7 +44,7 @@ def _get_or_create_business_settings(db: Session) -> BusinessSettings:
     return row
 
 
-def _row_to_response(row: BusinessSettings):
+def _row_to_response(row: BusinessSettings, etag: bool = False):
     """Serialize the ORM row using camelCase aliases for the React frontend."""
     schema = BusinessSettingsRead.model_validate(row)
     published_version = getattr(row, "public_site_published_version", None)
@@ -53,7 +53,12 @@ def _row_to_response(row: BusinessSettings):
         published_version is not None
         and int(published_version) != int(getattr(row, "version", 1) or 1)
     )
-    return JSONResponse(content=payload)
+    out = JSONResponse(content=payload)
+    if etag:
+        # Returning a Response drops FastAPI's `response.headers` merge, so the
+        # validator has to be stamped here instead.
+        out.headers["ETag"] = f'W/"{getattr(row, "version", 1)}"'
+    return out
 
 
 def _changed_fields(before: dict, after: dict) -> list[str]:
@@ -97,7 +102,6 @@ def update_business_settings(
     incoming = payload.model_dump(exclude_none=True, exclude={"expected_version"})
     if not incoming:
         return _row_to_response(row)
-
     expected = payload.expected_version
     current_version = int(getattr(row, "version", 1) or 1)
     if expected is not None and int(expected) != current_version:
@@ -134,8 +138,7 @@ def update_business_settings(
             ),
         )
 
-    response.headers["ETag"] = f'W/"{row.version}"'
-    return _row_to_response(row)
+    return _row_to_response(row, etag=True)
 
 
 @router.post("/logo", response_model=BusinessSettingsRead)

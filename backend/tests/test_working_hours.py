@@ -8,6 +8,7 @@ from app.core.working_hours import (
     WorkingHoursError,
     closing_datetime,
     crosses_midnight,
+    current_window,
     day_key,
     is_open_at,
     normalize_working_hours,
@@ -159,18 +160,65 @@ def test_closing_datetime_stays_same_day_for_normal_window():
     assert closing_datetime(monday, config) == datetime(2026, 9, 28, 22, 0)
 
 
-def test_resolve_window_carries_overnight_into_the_next_day():
+def test_resolve_window_is_keyed_by_its_opening_day():
+    """Bookable slots on a date use that date's own window, never the previous day's.
+
+    Carrying Saturday's tail into Sunday would make 00:30 bookable on both days.
+    """
+    hours = validate_working_hours(
+        {"saturday": {"is_open": True, "open_time": "22:00", "close_time": "02:00"}}
+    )
+    saturday = date(2026, 9, 26)
+    sunday = date(2026, 9, 27)
+
+    _cfg, opens, closes = resolve_window(hours, saturday)
+    assert opens == datetime(2026, 9, 26, 22, 0)
+    assert closes == datetime(2026, 9, 27, 2, 0)
+
+    assert resolve_window(hours, sunday) is None
+
+
+def test_current_window_follows_an_overnight_tail_into_the_next_day():
     hours = validate_working_hours(
         {"saturday": {"is_open": True, "open_time": "22:00", "close_time": "02:00"}}
     )
     sunday = date(2026, 9, 27)
-    window = resolve_window(hours, sunday)
+
+    window = current_window(hours, datetime(2026, 9, 27, 1, 0))
     assert window is not None
     _cfg, opens, closes = window
     assert opens == datetime(2026, 9, 26, 22, 0)
     assert closes == datetime(2026, 9, 27, 2, 0)
     assert window_contains(datetime(2026, 9, 27, 1, 0), _cfg) is True
     assert window_contains(datetime(2026, 9, 27, 2, 30), _cfg) is False
+
+
+def test_current_window_drops_a_carry_over_once_it_has_finished():
+    """A finished overnight window must not mask the rest of the day."""
+    hours = validate_working_hours(
+        {
+            "friday": {"is_open": True, "open_time": "09:00", "close_time": "03:00"},
+            "saturday": {"is_open": True, "open_time": "09:00", "close_time": "03:00"},
+        }
+    )
+    saturday = date(2026, 9, 26)
+
+    # Friday's window closed at 03:00 Saturday, so midday Saturday belongs to
+    # Saturday's own window — not to a stale Friday carry-over.
+    midday = current_window(hours, datetime(2026, 9, 26, 11, 48))
+    assert midday is not None
+    _cfg, opens, closes = midday
+    assert opens == datetime(2026, 9, 26, 9, 0)
+    assert closes == datetime(2026, 9, 27, 3, 0)
+
+
+def test_current_window_is_none_in_the_gap_between_windows():
+    hours = validate_working_hours(
+        {"saturday": {"is_open": True, "open_time": "22:00", "close_time": "02:00"}}
+    )
+    assert current_window(hours, datetime(2026, 9, 26, 5, 0)) is None
+    assert current_window(hours, datetime(2026, 9, 26, 12, 0)) is None
+    assert current_window(hours, datetime(2026, 9, 26, 23, 0)) is not None
 
 
 def test_resolve_window_returns_none_on_a_closed_day():
