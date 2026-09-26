@@ -4,7 +4,13 @@ backend/generated_invoices/
 backend/**/__pycache__/
 backend/**/*.py[cod]
 frontend/node_modules/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 public-site/node_modules/
+public-site/.env
+public-site/.env.local
+public-site/.env.*.local
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -27,6 +33,8 @@ test-results/
 playwright-report/
 *.bak
 *.backup
+*.bak_*
+*.db.bak_*
 # External runnable program - بره المشروع
 SalonPro_External/
 SalonPro_External_Data/

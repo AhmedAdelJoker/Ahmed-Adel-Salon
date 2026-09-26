@@ -1,6 +1,6 @@
 {
   "name": "salon-management-pro",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "overrides": {
@@ -29,9 +29,9 @@
     "playwright:a11y": "playwright test --config=playwright.a11y.config.ts",
     "typecheck": "tsc --noEmit",
     "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
-    "electron:build": "npm run build && electron-builder",
-    "electron:pack": "npm run build && electron-builder --dir",
-    "electron:preview": "npm run build && electron .",
+    "electron:build": "cross-env ELECTRON_BUILD=1 npm run build && electron-builder",
+    "electron:pack": "cross-env ELECTRON_BUILD=1 npm run build && electron-builder --dir",
+    "electron:preview": "cross-env ELECTRON_BUILD=1 npm run build && electron .",
     "prepare:update": "node scripts/prepare-update.mjs"
   },
   "build": {
@@ -45,7 +45,8 @@
     "files": [
       "dist/**/*",
       "electron-main.cjs",
-      "electron-preload.cjs"
+      "electron-preload.cjs",
+      "update-public-key.pem"
     ],
     "extraResources": [
       {
