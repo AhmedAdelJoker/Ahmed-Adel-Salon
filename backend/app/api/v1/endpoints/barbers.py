@@ -4,7 +4,11 @@ from pydantic import BaseModel
 from typing import Optional
 
 from app.db.session import get_db
-from app.api.deps import require_any_staff, require_owner_or_manager
+from app.api.deps import (
+    require_any_staff,
+    require_barber_or_manager,
+    require_owner_or_manager,
+)
 from app.models.user import User
 from app.models.employee import Employee
 from app.schemas.employee import EmployeeListItem, EmployeeRead
@@ -58,7 +62,7 @@ def update_barber_profile(
     barber_id: int,
     payload: BarberProfileUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_barber_or_manager),
 ):
     barber = db.query(Employee).filter(Employee.id == barber_id).first()
     if not barber:
@@ -69,10 +73,9 @@ def update_barber_profile(
             raise HTTPException(status_code=403, detail="غير مصرح لك بتعديل هذا الملف")
     mapping = {
         "full_name": "full_name",
-        "phone": "phone",
-        "email": "email",
-        "address": "address",
-        "bio": "bio",
+        "phone": "phone_primary",
+        "address": "detailed_address",
+        "bio": "bio_ar",
         "commission_rate": "commission_rate",
         "avatar_url": "profile_image_url",
     }

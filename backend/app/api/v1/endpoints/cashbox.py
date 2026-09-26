@@ -253,7 +253,7 @@ def get_transaction_receipt_pdf(
 def create_manual_cash_transaction(
     payload: CashTransactionCreate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_cashier_manager_owner)
+    current_user: User = Depends(deps.require_owner_or_manager)
 ):
     try:
         transaction_type = "manual_deposit" if payload.direction == "in" else "manual_withdraw"

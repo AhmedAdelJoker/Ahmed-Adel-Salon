@@ -135,8 +135,6 @@ def approve_discount_request(
         requested_discount = subtotal
 
     invoice.discount_amount = requested_discount
-    invoice.discount_reason = row.reason
-    invoice.discount_approved_by_user_id = current_user.id
     invoice.total_amount = subtotal - requested_discount
 
     row.status = "approved"

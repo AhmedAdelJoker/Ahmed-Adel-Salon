@@ -69,10 +69,37 @@ def test_leave_filter_by_status(client, db_session):
 
 
 def test_update_missing_leave_404(client, db_session):
-    make_user(db_session, role="cashier")
+    make_user(db_session, username="owner1", role="owner")
     resp = client.patch(
         "/api/v1/barber-presence/leaves/999999",
         json={"status": "approved"},
+        headers=auth_headers(client, username="owner1"),
+    )
+    assert resp.status_code == 404, resp.text
+
+
+def test_cashier_cannot_approve_leave(client, db_session):
+    make_user(db_session, role="cashier")
+    barber = _seed_barber(db_session)
+
+    created = client.post(
+        "/api/v1/barber-presence/leaves",
+        json={
+            "employee_id": barber.id,
+            "type": "vacation",
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-03",
+        },
         headers=auth_headers(client),
     )
-    assert resp.status_code == 404
+    assert created.status_code == 200, created.text
+    leave_id = created.json()["id"]
+
+    # Front-desk cashiers may file and view leave requests, but approving is a
+    # management decision and must be rejected (privilege-escalation guard).
+    resp = client.patch(
+        f"/api/v1/barber-presence/leaves/{leave_id}",
+        json={"status": "approved"},
+        headers=auth_headers(client),
+    )
+    assert resp.status_code == 403, resp.text

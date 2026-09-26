@@ -43,6 +43,8 @@ def remove_stock(db: Session, *, product: Product, amount: Decimal, note: str | 
 def adjust_stock(db: Session, *, product: Product, new_quantity: Decimal, note: str | None, created_by_user_id: int | None):
     current_qty = Decimal(str(product.quantity or 0))
     new_quantity = Decimal(str(new_quantity))
+    if new_quantity < 0:
+        raise HTTPException(status_code=400, detail="لا يمكن أن يكون رصيد المخزون سالبًا")
     delta = new_quantity - current_qty
     product.quantity = new_quantity
     log = InventoryLog(
@@ -147,6 +149,8 @@ def deduct_stock_for_session(db: Session, session_id: int, created_by_user_id: i
         return
 
     session_products = db.query(SessionProduct).filter(SessionProduct.session_id == session.id).all()
+    if not session_products:
+        return
 
     for sp in session_products:
         product = sp.product

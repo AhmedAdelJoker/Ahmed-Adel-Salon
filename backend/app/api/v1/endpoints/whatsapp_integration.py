@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import json
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -122,7 +125,24 @@ async def receive_meta_whatsapp_webhook(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    payload = await request.json()
+    if not settings.META_WA_APP_SECRET:
+        raise HTTPException(status_code=503, detail="META_WA_APP_SECRET is not configured")
+    signature = request.headers.get("X-Hub-Signature-256", "")
+    body = await request.body()
+    expected = (
+        "sha256="
+        + hmac.new(
+            settings.META_WA_APP_SECRET.encode("utf-8"),
+            body,
+            hashlib.sha256,
+        ).hexdigest()
+    )
+    if not signature or not hmac.compare_digest(signature, expected):
+        raise HTTPException(status_code=403, detail="Invalid webhook signature")
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload") from exc
     updated_logs_count = update_logs_from_webhook_payload(db, payload)
     return WhatsAppWebhookReceiveRead(received=True, updated_logs_count=updated_logs_count)
 

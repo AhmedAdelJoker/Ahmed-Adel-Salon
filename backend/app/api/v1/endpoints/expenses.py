@@ -267,7 +267,8 @@ def create_expense(
     requiring = {"إيجار", "مشتريات"}
     if payload.category in requiring and not (payload.recipient_name and str(payload.recipient_name).strip()):
         raise HTTPException(status_code=400, detail="اسم المستفيد/المورد مطلوب لفئة الإيجار والمشتريات")
-    status_val = getattr(payload, "status", None) or ("pending_audit" if str(current_user.role).lower() == "cashier" else "approved")
+    role = str(current_user.role or "").strip().lower()
+    status_val = "approved" if role in {"owner", "admin"} else "pending_audit"
     expense = Expense(
         title=payload.title or f"مصروف {payload.category}",
         amount=payload.amount,
@@ -284,31 +285,26 @@ def create_expense(
         created_by_user_id=current_user.id,
     )
     db.add(expense)
-    db.commit()
-    db.refresh(expense)
-    # reload with creator for response
-    expense = db.query(Expense).options(joinedload(Expense.created_by_user)).filter(Expense.id == expense.id).first()
+    db.flush()
 
-    # ديناميكي: أي مصروف معتمد يسجل حركة خزنة تلقائياً (كاش/غير كاش)
     if status_val == "approved" and expense.amount and float(expense.amount) > 0:
-        try:
-            pm = str(expense.payment_method or "cash").strip().lower()
-            create_cash_transaction(
-                db,
-                direction="out",
-                amount=float(expense.amount),
-                transaction_type="expense_payment",
-                payment_method=pm or "cash",
-                notes=f"مصروف: {expense.title} - {expense.category}",
-                user_id=current_user.id,
-                reference_type="expense",
-                reference_id=expense.id,
-                reference_no=f"EXP-{expense.id}",
-                commit=True,
-            )
-        except Exception as _e:
-            print(f"[Cashbox] expense auto-withdraw failed for expense {expense.id}: {_e}")
+        pm = str(expense.payment_method or "cash").strip().lower()
+        create_cash_transaction(
+            db,
+            direction="out",
+            amount=float(expense.amount),
+            transaction_type="expense_payment",
+            payment_method=pm or "cash",
+            notes=f"مصروف: {expense.title} - {expense.category}",
+            user_id=current_user.id,
+            reference_type="expense",
+            reference_id=expense.id,
+            reference_no=f"EXP-{expense.id}",
+            commit=False,
+        )
 
+    db.commit()
+    expense = db.query(Expense).options(joinedload(Expense.created_by_user)).filter(Expense.id == expense.id).first()
     return expense
 
 
@@ -323,33 +319,36 @@ def approve_expense(
         raise HTTPException(status_code=404, detail="Expense not found")
     
     was_pending = expense.status == "pending_audit"
+    if expense.status not in {"pending_audit", "approved"}:
+        raise HTTPException(status_code=400, detail="لا يمكن اعتماد هذه الحالة")
     expense.status = "approved"
+
+    if was_pending and expense.amount and float(expense.amount) > 0:
+        from app.crud.core_business import find_existing_cash_transaction
+        existing = find_existing_cash_transaction(
+            db,
+            reference_type="expense",
+            reference_id=expense.id,
+            transaction_type="expense_payment",
+        )
+        if not existing:
+            pm = str(expense.payment_method or "cash").strip().lower()
+            create_cash_transaction(
+                db,
+                direction="out",
+                amount=float(expense.amount),
+                transaction_type="expense_payment",
+                payment_method=pm or "cash",
+                notes=f"مصروف معتمد: {expense.title} - {expense.category}",
+                user_id=current_user.id,
+                reference_type="expense",
+                reference_id=expense.id,
+                reference_no=f"EXP-{expense.id}",
+                commit=False,
+            )
+
     db.commit()
     db.refresh(expense)
-
-    # إذا كان معلق سابقاً، الآن يسمع في الخزنة
-    if was_pending and expense.amount and float(expense.amount) > 0:
-        try:
-            from app.crud.core_business import find_existing_cash_transaction
-            existing = find_existing_cash_transaction(db, reference_type="expense", reference_id=expense.id, transaction_type="expense_payment")
-            if not existing:
-                pm = str(expense.payment_method or "cash").strip().lower()
-                create_cash_transaction(
-                    db,
-                    direction="out",
-                    amount=float(expense.amount),
-                    transaction_type="expense_payment",
-                    payment_method=pm or "cash",
-                    notes=f"مصروف معتمد: {expense.title} - {expense.category}",
-                    user_id=current_user.id,
-                    reference_type="expense",
-                    reference_id=expense.id,
-                    reference_no=f"EXP-{expense.id}",
-                    commit=True,
-                )
-        except Exception as _e:
-            print(f"[Cashbox] approve auto-withdraw failed for expense {expense.id}: {_e}")
-
     return expense
 
 

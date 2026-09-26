@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from app.models.employee import Employee
@@ -6,6 +6,7 @@ from app.models.service import Service
 from app.models.product import Product
 from app.models.service_product import ServiceProduct
 from app.models.invoice import Invoice
+from app.models.business_settings import BusinessSettings
 from app.models.cash_transaction import CashTransaction
 from tests.helpers import auth_headers, make_user
 from tests.test_dashboard import _seed_customer
@@ -230,3 +231,88 @@ def test_public_booking_realtime_poll_returns_event(client):
     assert response.status_code == 200, response.text
     assert response.json()["event"]["type"] == "booking.created"
     assert response.json()["event"]["data"]["bookingId"] == 42
+
+
+def test_session_completion_does_not_deduct_stock_twice(client, db_session):
+    headers, customer, barber, service = _setup(client, db_session)
+    product = Product(name="Session Serum", quantity=Decimal("10"))
+    db_session.add(product)
+    db_session.flush()
+    db_session.add(
+        ServiceProduct(service_id=service.id, product_id=product.id, amount_used=2)
+    )
+    db_session.commit()
+    db_session.refresh(product)
+
+    appointment = client.post(
+        "/api/v1/appointments",
+        json=_payload(customer.customer_id, barber.id, service.id),
+        headers=headers,
+    )
+    assert appointment.status_code == 201, appointment.text
+
+    session = client.post(
+        "/api/v1/sessions",
+        json={
+            "appointment_id": appointment.json()["id"],
+            "customer_id": customer.customer_id,
+            "barber_id": barber.id,
+        },
+        headers=headers,
+    )
+    assert session.status_code == 201, session.text
+    db_session.refresh(product)
+    assert float(product.quantity) == 8
+
+    completed = client.patch(
+        f"/api/v1/sessions/{session.json()['id']}/status",
+        json={"status": "completed"},
+        headers=headers,
+    )
+    assert completed.status_code == 200, completed.text
+    db_session.refresh(product)
+    assert float(product.quantity) == 8
+
+
+def test_public_booking_does_not_overwrite_existing_customer_identity(
+    client,
+    db_session,
+):
+    customer = _seed_customer(db_session, phone="01001239876")
+    barber = _seed_barber(db_session)
+    service = _seed_service(db_session)
+    db_session.add(
+        BusinessSettings(
+            salon_name="Audit Salon",
+            currency="EGP",
+            public_slug="audit-salon",
+            public_site_published_at=datetime.now(),
+            public_site_snapshot={
+                "salon_name": "Audit Salon",
+                "shop_phone": "01000000000",
+                "public_slug": "audit-salon",
+            },
+        )
+    )
+    db_session.commit()
+    booking_date = date.today() + timedelta(days=2)
+    while booking_date.weekday() == 4:
+        booking_date += timedelta(days=1)
+
+    response = client.post(
+        "/api/v1/public/booking",
+        json={
+            "salon_slug": "audit-salon",
+            "first_name": "Different",
+            "last_name": "Name",
+            "phone": customer.phone,
+            "appointment_date": booking_date.isoformat(),
+            "appointment_time": "12:00",
+            "barber_id": barber.id,
+            "services": [{"service_id": service.id, "quantity": 1}],
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    db_session.refresh(customer)
+    assert customer.first_name == "Sara"

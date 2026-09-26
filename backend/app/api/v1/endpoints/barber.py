@@ -57,10 +57,17 @@ def _get_barber(db: Session, current_user) -> int:
         raise HTTPException(status_code=404, detail="Barber profile not found")
     return barber_id
 
+
+def _assert_appointment_access(appointment: Appointment, current_user) -> None:
+    if current_user.role == "barber":
+        barber_id = _resolve_barber_id(current_user)
+        if barber_id != appointment.barber_id:
+            raise HTTPException(status_code=403, detail="ليس لديك صلاحية لهذا الحجز")
+
 @router.get("/stats")
 def get_barber_stats(
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
     period: str = "today" # today, week, month
 ) -> Any:
     """
@@ -122,7 +129,7 @@ def get_barber_queue(
     page_size: Optional[int] = Query(None, ge=1, le=500, description="Optional page size"),
     sort: Optional[str] = Query(None, description="Sort field. '-' prefix for DESC"),
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """
     Get the barber's specific queue (waiting and completed).
@@ -235,16 +242,13 @@ def update_service_status(
     appointment_id: int,
     status: str, # in-service, completed
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Appointment not found")
     
-    # Security check
-    resolved = current_user.barber_id or current_user.employee_id
-    if current_user.role == "barber" and resolved != appointment.barber_id:
-        raise HTTPException(status_code=403, detail="Not authorized for this appointment")
+    _assert_appointment_access(appointment, current_user)
 
     # Workflow Alignment: If barber says 'completed', it goes to 'ready_for_payment'
     # so it shows up in the POS for the cashier.
@@ -263,7 +267,7 @@ def update_service_status(
 @router.get("/calendar")
 def get_barber_calendar(
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
     month: str = None,
 ) -> Any:
     """
@@ -340,7 +344,7 @@ def get_barber_calendar(
 @router.get("/performance")
 def get_barber_performance(
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
     days: int = 7,
 ) -> Any:
     """
@@ -387,7 +391,7 @@ def get_barber_performance(
 @router.get("/schedule")
 def get_barber_schedule(
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
     date: str = None,
 ) -> Any:
     """
@@ -414,9 +418,12 @@ def get_barber_schedule(
 
     # Get working hours
     from app.models.business_settings import BusinessSettings
+    from app.core.working_hours import day_key, normalize_working_hours
     settings = db.query(BusinessSettings).first()
-    day_name = target_date.strftime("%A").lower()
-    working_hours = settings.working_hours.get(day_name, {}) if settings and settings.working_hours else None
+    day_name = day_key(target_date)
+    working_hours = None
+    if settings and settings.working_hours:
+        working_hours = normalize_working_hours(settings.working_hours).get(day_name)
 
     return {
         "date": str(target_date),
@@ -444,7 +451,7 @@ def get_barber_schedule(
 def get_appointment_by_id(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """
     Get appointment details by ID for the barber's workstation.
@@ -483,7 +490,7 @@ def get_appointment_by_id(
 @router.get("/clients")
 def get_barber_clients(
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Customers who had appointments with this barber."""
     barber_id = _get_barber(db, current_user)
@@ -512,7 +519,7 @@ def get_barber_clients(
 def create_barber_client(
     payload: ClientPayload,
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Create a new customer record."""
     parts = (payload.name or "").strip().split(maxsplit=1)
@@ -544,12 +551,24 @@ def update_barber_client(
     client_id: int,
     payload: ClientPayload,
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Update an existing customer record."""
     customer = db.query(Customer).filter(Customer.customer_id == client_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="العميل غير موجود")
+    if current_user.role == "barber":
+        barber_id = _get_barber(db, current_user)
+        has_appointment = (
+            db.query(Appointment.id)
+            .filter(
+                Appointment.customer_id == customer.customer_id,
+                Appointment.barber_id == barber_id,
+            )
+            .first()
+        )
+        if not has_appointment:
+            raise HTTPException(status_code=403, detail="هذا العميل غير مرتبط بحجوزاتك")
     parts = (payload.name or "").strip().split(maxsplit=1)
     customer.first_name = parts[0] if parts else payload.name or customer.first_name
     customer.last_name = parts[1] if len(parts) > 1 else ""
@@ -573,7 +592,7 @@ def update_barber_client(
 @router.get("/working-hours")
 def get_my_working_hours(
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Get working hours for the logged-in barber, keyed by day name."""
     barber_id = _get_barber(db, current_user)
@@ -599,7 +618,7 @@ def get_my_working_hours(
 def save_my_working_hours(
     payload: WorkingHoursPayload,
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Replace the working hours for the logged-in barber."""
     from datetime import time as dtime
@@ -636,7 +655,7 @@ def save_my_working_hours(
 @router.get("/time-off")
 def get_my_time_off(
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Get time-off days for the logged-in barber."""
     barber_id = _get_barber(db, current_user)
@@ -659,7 +678,7 @@ def get_my_time_off(
 def create_my_time_off(
     payload: TimeOffPayload,
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Add a time-off day for the logged-in barber."""
     from datetime import date as ddate, timedelta
@@ -686,7 +705,7 @@ def update_my_time_off(
     off_id: int,
     payload: TimeOffPayload,
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Update a time-off day for the logged-in barber."""
     from datetime import date as ddate
@@ -716,7 +735,7 @@ def update_my_time_off(
 def delete_my_time_off(
     off_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Delete a time-off day for the logged-in barber."""
     barber_id = _get_barber(db, current_user)
@@ -734,7 +753,7 @@ def delete_my_time_off(
 @router.get("/earnings-summary")
 def get_barber_earnings_summary(
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Summary of the barber's earnings."""
     barber_id = _get_barber(db, current_user)
@@ -772,7 +791,7 @@ def get_barber_earnings_summary(
 @router.get("/commissions")
 def get_barber_commissions(
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
     period: str = "week",
     limit: int = Query(200, ge=1, le=500),
 ) -> Any:
@@ -829,7 +848,7 @@ def get_barber_commissions(
 @router.get("/earnings-chart")
 def get_barber_earnings_chart(
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
     period: str = "week",
 ) -> Any:
     """Daily revenue for charts (plain array)."""
@@ -858,7 +877,7 @@ def get_barber_earnings_chart(
 def save_notification_settings(
     payload: NotificationSettingsPayload,
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Save notification preferences for the barber."""
     from app.models.preference import Preference
@@ -878,12 +897,13 @@ def add_appointment_tip(
     appointment_id: int,
     payload: TipPayload,
     db: Session = Depends(deps.get_db),
-    current_user: Any = Depends(deps.get_current_active_user),
+    current_user: Any = Depends(deps.require_barber_or_manager),
 ) -> Any:
     """Record a tip for an appointment (recorded in the appointment notes)."""
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="الموعد غير موجود")
+    _assert_appointment_access(appointment, current_user)
     amount = max(0.0, float(payload.amount or 0))
     tip_line = f"بقشيش: {amount} ({date.today().isoformat()})"
     appointment.notes = (appointment.notes or "") + "\n" + tip_line if appointment.notes else tip_line
