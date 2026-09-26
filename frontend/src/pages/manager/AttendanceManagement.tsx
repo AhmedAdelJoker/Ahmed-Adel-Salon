@@ -99,6 +99,14 @@ const AttendanceManagement = () => {
   const isOwner = ["OWNER", "ADMIN"].includes(
     String(user?.role || "").toUpperCase(),
   );
+  // Approve/reject hits PATCH /barber-presence/leaves/{id} which is restricted
+  // to owner_or_manager (owner/admin/manager/accountant) on the backend.
+  const canApproveLeaves = [
+    "OWNER",
+    "ADMIN",
+    "MANAGER",
+    "ACCOUNTANT",
+  ].includes(String(user?.role || "").toUpperCase());
 
 
 
@@ -352,6 +360,7 @@ const AttendanceManagement = () => {
             setLeaveFilter={setLeaveFilter}
             onNewLeave={() => setShowLeaveForm(true)}
             onLeaveAction={handleLeaveAction}
+            canApprove={canApproveLeaves}
           />
         )}
 

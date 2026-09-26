@@ -5,7 +5,6 @@ import {
   BadgeDollarSign,
   Briefcase,
   CalendarDays,
-  ChevronRight,
   Download,
   Receipt,
   RefreshCw,
@@ -33,6 +32,7 @@ import { cn, formatCurrency, formatNumber } from "@/lib/core/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PremiumCard, StatCard } from "@/components/shared/PremiumUI";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import { useEmployeePerformance } from "@/hooks/useApi";
 import {
   Podium,
@@ -549,32 +549,27 @@ export default function EmployeeReports() {
                 })}
               </AnimatePresence>
             </div>
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
-                <span className="text-sm font-bold text-muted">
-                  صفحة {page} من {totalPages} — إجمالي {data?.total || 0} موظف
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1 || isFetching}
-                  >
-                    <ChevronRight size={16} className="rotate-180" /> السابق
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages || isFetching}
-                  >
-                    التالي <ChevronRight size={16} />
-                  </Button>
+            {/* Phase 2: unified pagination */}
+            {totalPages > 1 && (() => {
+              const paginator = createPaginationState({
+                page,
+                size: PAGE_SIZE,
+                total: data?.total || 0,
+              });
+              return (
+                <div className="border-t border-border px-2 py-3">
+                  <Pagination
+                    paginator={paginator}
+                    onPageChange={(p) => setPage(p)}
+                    showSizeChanger={false}
+                    locale="ar"
+                  />
+                  <p className="text-center text-[10px] font-bold text-muted">
+                    صفحة {page} من {totalPages} — إجمالي {data?.total || 0} موظف
+                  </p>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </>
         )}
       </PremiumCard>

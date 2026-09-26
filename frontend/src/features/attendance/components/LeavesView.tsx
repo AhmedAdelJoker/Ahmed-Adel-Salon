@@ -12,12 +12,14 @@ export default function LeavesView({
   setLeaveFilter,
   onNewLeave,
   onLeaveAction,
+  canApprove,
 }: {
   leaves: LeaveRecord[];
   leaveFilter: string;
   setLeaveFilter: (v: string) => void;
   onNewLeave: () => void;
   onLeaveAction: (leaveId: string | number | undefined, action: string) => void;
+  canApprove: boolean;
 }) {
   return (
           <motion.div
@@ -101,7 +103,7 @@ export default function LeavesView({
                             ? "مرفوض"
                             : "قيد الانتظار"}
                       </Badge>
-                      {leave.status === "pending" && (
+                      {leave.status === "pending" && canApprove && (
                         <>
                           <Button
                             variant="success"

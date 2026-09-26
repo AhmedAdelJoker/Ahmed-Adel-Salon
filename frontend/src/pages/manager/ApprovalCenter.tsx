@@ -24,6 +24,7 @@ import { adaptList } from "@/services/apiAdapter";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { formatCurrency } from "@/lib/core/utils";
 import { PremiumCard } from "@/components/shared/PremiumUI";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import { Badge } from "@/components/ui/badge";
 
 const ApprovalCenter = () => {
@@ -44,30 +45,40 @@ const ApprovalCenter = () => {
     status: string;
   }
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  // Phase 2: pagination for discount requests (largest table)
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [totalDiscounts, setTotalDiscounts] = useState(0);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const [discountsRes, expensesRes, payrollRes] = await Promise.all([
-        api.get("/discount-approvals"),
-        api.get("/expenses"),
-        api.get("/payroll/all"), // Assuming an endpoint to get all payroll records
+        api.get("/discount-approvals", { params: { page, size: pageSize, status: "pending" } }),
+        api.get("/expenses", { params: { status: "pending_audit", page: 1, size: 50 } }),
+        api.get("/payroll/all", { params: { page: 1, size: 50 } }), // Phase 2: bounded
       ]);
 
-      setDiscountRequests(
-         
-        adaptList(discountsRes).filter((r: any) => r.status === "pending"),
-      );
+      setDiscountRequests(adaptList(discountsRes).filter((r: any) => r.status === "pending"));
       setPendingExpenses(
-         
         adaptList(expensesRes).filter((e: any) => e.status === "pending_audit"),
       );
       setPendingPayroll(
         adaptList(payrollRes).filter(
-           
           (p: any) => p.status === "generated" || p.status === "draft",
         ),
       );
+
+      // Phase 2: read X-Total-Count for discounts
+      const headers = (discountsRes as { headers?: Record<string, unknown> }).headers ?? {};
+      const headerTotal = headers["x-total-count"] ?? headers["X-Total-Count"];
+      const n = Number(headerTotal);
+      if (Number.isFinite(n) && n >= 0) {
+        setTotalDiscounts(n);
+      } else {
+        const all = adaptList(discountsRes);
+        setTotalDiscounts(all.length < pageSize && page === 1 ? all.length : all.length + (page - 1) * pageSize);
+      }
     } catch (err) {
       console.error("Fetch data error:", err);
       // Fallback for missing endpoints
@@ -373,6 +384,27 @@ const ApprovalCenter = () => {
               </tbody>
               </table>
               </div>
+              {/* Phase 2: unified pagination — reads X-Total-Count header */}
+              {totalDiscounts > pageSize && (() => {
+                const paginator = createPaginationState({
+                  page,
+                  size: pageSize,
+                  total: totalDiscounts,
+                });
+                return (
+                  <div className="border-t border-border bg-soft/30 px-2 py-3">
+                    <Pagination
+                      paginator={paginator}
+                      onPageChange={(p) => { setPage(p); void fetchData(); }}
+                      showSizeChanger={false}
+                      locale="ar"
+                    />
+                    <p className="text-center text-[10px] font-bold text-muted">
+                      صفحة {page} • {totalDiscounts} طلب إجمالي
+                    </p>
+                  </div>
+                );
+              })()}
           </Card>
         </TabsContent>
 
