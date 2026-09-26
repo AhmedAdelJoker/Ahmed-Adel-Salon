@@ -739,7 +739,8 @@ Salon-Management-Pro/
 
 - clean Alembic chain نجح بعد repair revision `c4d8e1f2a3b4`؛ نسخة production قبل cleanup كانت عند `b7e2f1a9c4d0` وتنتقل إلى `d6e7f8a9b0c1`، وكانت تكشف `58` مخالفة legacy FK؛ بعد cleanup على copy يصبح `PRAGMA foreign_key_check = 0`.
 - Docker غير متاح في البيئة، لذلك تم التحقق من الصياغة فقط ولم يتم تشغيل startup smoke test الحقيقي.
-- بدأ تنفيذ release: syntax/workflow جاهزان، و`prepare-update` يفشل بأمان بدون مفتاح؛ التنفيذ متوقف على `UPDATE_SIGNING_PRIVATE_KEY` و`UPDATE_SIGNING_PUBLIC_KEY` ثم وسم الإصدار.
+- وُضع `frontend/update-public-key.pem` (public key فقط) داخل المشروع المحلي، وأُضيف إلى Electron `build.files`، وتم التحقق من وجوده في packaged output دون أي private material.
+- بدأ تنفيذ release: syntax/workflow جاهزان، و`prepare-update` يفشل بأمان بدون مفتاح؛ التنفيذ متوقف على `UPDATE_SIGNING_PRIVATE_KEY` ثم وسم الإصدار.
 - invoice/stock: تم إغلاق الفجوات الأساسية للـmanual/draft pricing وsplit/stock وإضافة idempotency وdaily counters؛ ما زال appointment issuance concurrency يحتاج مراجعة.
 - frontend contracts: تم إصلاح provider order وinventory/HR pagination؛ bookings متوافق، وما زالت بقية العقود غير الـpagination تحتاج مراجعة.
 - CI/CD وpublic-site contracts تم إضافتهما؛ ما زالت remote workflow execution غير متاحة محليًا.
