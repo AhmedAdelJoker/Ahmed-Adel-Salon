@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -21,7 +22,7 @@ logger = logging.getLogger("app.main")
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     ensure_runtime_schema()
-    seed_data()
+    seed_data(include_demo_data=not _is_prod or settings.SEED_DEMO_DATA)
     logger.info("Server started. Background scheduler for POS shifts is active.")
     yield
     try:
@@ -184,7 +185,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"],
-    expose_headers=["Content-Disposition", "X-Export-Empty", "X-Export-Filename", "X-Total-Count"],
+    expose_headers=[
+        "Content-Disposition",
+        "X-Export-Empty",
+        "X-Export-Filename",
+        "X-Total-Count",
+        "X-2FA-Required",
+    ],
 )
 
 
@@ -248,3 +255,15 @@ app.include_router(api_router, prefix="/api/v1")
 @app.get("/")
 def root():
     return {"message": "SalonPro backend is running"}
+
+
+@app.get("/health")
+def health():
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "ok"}
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "degraded", "database": "error"})
+    finally:
+        db.close()

@@ -1,6 +1,6 @@
 from typing import List, Union
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     # Explicit test-mode flag (set TESTING=true in test env). Feature gates
     # must use this instead of sniffing DATABASE_URL filenames.
     TESTING: bool = False
+    SEED_DEMO_DATA: bool = False
+
+    # IANA zone the salon physically operates in. Working hours, POS shifts and
+    # attendance are wall-clock concepts and must be evaluated in this zone, not
+    # the server's. Falls back to UTC+03:00 when the name cannot be resolved.
+    SALON_TIMEZONE: str = "Africa/Cairo"
 
     DATABASE_URL: str
 
@@ -24,6 +30,8 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: Union[str, List[str]] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
     ]
     ALLOWED_HOSTS: Union[str, List[str]] = [
         "localhost",
@@ -64,6 +72,7 @@ class Settings(BaseSettings):
     META_WA_PHONE_NUMBER_ID: str | None = None
     META_WA_ACCESS_TOKEN: str | None = None
     META_WA_VERIFY_TOKEN: str | None = None
+    META_WA_APP_SECRET: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -117,6 +126,12 @@ class Settings(BaseSettings):
         if len(v) < 8:
             raise ValueError("FIRST_SUPERUSER_PASSWORD must be at least 8 characters")
         return v
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self):
+        if self.ENVIRONMENT == "production" and self.SECRET_KEY == "test-secret-key-for-testing-only":
+            raise ValueError("Test SECRET_KEY cannot be used in production")
+        return self
 
 
 settings = Settings()
