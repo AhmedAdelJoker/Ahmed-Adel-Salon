@@ -351,23 +351,20 @@ def add_product_stock(
 
     # إذا كان مشتريات، سجل حركة خزنة (كاش افتراضياً) — ديناميكي
     if pending_expense is not None and pending_expense.amount and float(pending_expense.amount) > 0:
-        try:
-            from app.crud.core_business import create_cash_transaction
-            create_cash_transaction(
-                db,
-                direction="out",
-                amount=float(pending_expense.amount),
-                transaction_type="expense_payment",
-                payment_method="cash",
-                notes=f"مشتريات مخزون: {product.name} ({payload.amount} عبوة)",
-                user_id=current_user.id,
-                reference_type="expense",
-                reference_id=pending_expense.id,
-                reference_no=f"EXP-{pending_expense.id}",
-                commit=False,
-            )
-        except Exception as _e:
-            print(f"[Cashbox] purchase auto-withdraw failed: {_e}")
+        from app.crud.core_business import create_cash_transaction
+        create_cash_transaction(
+            db,
+            direction="out",
+            amount=float(pending_expense.amount),
+            transaction_type="expense_payment",
+            payment_method="cash",
+            notes=f"مشتريات مخزون: {product.name} ({payload.amount} عبوة)",
+            user_id=current_user.id,
+            reference_type="expense",
+            reference_id=pending_expense.id,
+            reference_no=f"EXP-{pending_expense.id}",
+            commit=False,
+        )
 
     db.commit()
     db.refresh(product)

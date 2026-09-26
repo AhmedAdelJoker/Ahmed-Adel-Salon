@@ -5,7 +5,11 @@ from decimal import Decimal
 from typing import List, Optional
 
 from app.db.session import get_db
-from app.api.deps import require_cashier_manager_owner, require_owner_or_manager
+from app.api.deps import (
+    require_cashier_manager_owner,
+    require_owner_or_manager,
+    require_shift_operator,
+)
 from app.models.user import User
 from app.models.pos_shift import PosShift
 from app.models.invoice import Invoice
@@ -25,7 +29,7 @@ router = APIRouter(prefix="/pos-shifts", tags=["POS Shifts"])
 @router.post("/auto-close-expired")
 def auto_close_expired_shifts_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner)
+    current_user: User = Depends(require_owner_or_manager)
 ):
     """Trigger global auto-close check for all shifts."""
     count = auto_close_expired_shifts(db)
@@ -34,7 +38,7 @@ def auto_close_expired_shifts_endpoint(
 @router.get("/current")
 def get_current_shift(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner)
+    current_user: User = Depends(require_shift_operator)
 ):
     # Proactively check and close all expired shifts
     auto_close_expired_shifts(db)
@@ -49,7 +53,7 @@ def get_current_shift(
 def open_shift(
     payload: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner)
+    current_user: User = Depends(require_shift_operator)
 ):
     # Check working hours
     if not is_within_working_hours(db):
@@ -75,30 +79,26 @@ def open_shift(
         status="open"
     )
     db.add(shift)
+    db.flush()
+
+    from app.crud.core_business import create_cash_transaction
+    oc = float(shift.opening_cash or 0)
+    if oc > 0:
+        create_cash_transaction(
+            db,
+            direction="in",
+            amount=oc,
+            transaction_type="opening_balance",
+            payment_method="cash",
+            notes=f"رصيد افتتاحي وردية #{shift.id} - {current_user.full_name or current_user.username}",
+            user_id=current_user.id,
+            reference_type="pos_shift",
+            reference_id=shift.id,
+            reference_no=f"SHIFT-{shift.id}",
+            commit=False,
+        )
+
     db.commit()
-    db.refresh(shift)
-
-    # خزنة الكاشير تسمع في الخزنة المركزية — رصيد افتتاحي كاش
-    try:
-        from app.crud.core_business import create_cash_transaction
-        oc = float(shift.opening_cash or 0)
-        if oc > 0:
-            create_cash_transaction(
-                db,
-                direction="in",
-                amount=oc,
-                transaction_type="opening_balance",
-                payment_method="cash",
-                notes=f"رصيد افتتاحي وردية #{shift.id} - {current_user.full_name or current_user.username}",
-                user_id=current_user.id,
-                reference_type="pos_shift",
-                reference_id=shift.id,
-                reference_no=f"SHIFT-{shift.id}",
-                commit=True,
-            )
-    except Exception as _e:
-        print(f"[Cashbox] opening_balance failed for shift {shift.id}: {_e}")
-
     db.refresh(shift)
     return shift
 
@@ -107,12 +107,14 @@ def close_shift(
     shift_id: int,
     payload: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner)
+    current_user: User = Depends(require_shift_operator)
 ):
     shift = db.query(PosShift).filter(PosShift.id == shift_id).first()
     if not shift:
         raise HTTPException(status_code=404, detail="الوردية غير موجودة")
-    
+    if current_user.role == "cashier" and shift.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="يمكنك إغلاق ورديتك فقط")
+
     if shift.status == "closed":
         raise HTTPException(status_code=400, detail="الوردية مغلقة بالفعل")
 
@@ -160,13 +162,20 @@ def close_shift(
     # Expenses in this shift
     expenses = db.query(Expense).filter(
         Expense.created_at >= shift.opened_at,
+        Expense.created_by_user_id == shift.user_id,
+        Expense.status.in_(["approved", "recorded"]),
     ).all()
     total_expenses = sum(Decimal(str(e.amount)) for e in expenses)
+    cash_expenses = sum(
+        Decimal(str(e.amount))
+        for e in expenses
+        if str(e.payment_method or "cash").lower() == "cash"
+    )
     
     shift.status = "closed"
     shift.closed_at = datetime.now()
     shift.actual_closing_cash = Decimal(str(payload.get("countedCash") or payload.get("closing_cash") or 0))
-    shift.expected_closing_cash = shift.opening_cash + cash_sales # Only cash affects the drawer
+    shift.expected_closing_cash = shift.opening_cash + cash_sales - cash_expenses
     shift.total_sales = total_sales
     shift.invoice_count = len(invoices)
     shift.discount_total = discount_total

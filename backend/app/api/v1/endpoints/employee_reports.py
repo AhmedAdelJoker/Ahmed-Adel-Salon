@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_owner_or_manager
@@ -28,11 +28,7 @@ def _num(value: Any) -> float:
 
 
 def _table_exists(db: Session, table_name: str) -> bool:
-    row = db.execute(
-        text("SELECT name FROM sqlite_master WHERE type='table' AND name=:name"),
-        {"name": table_name},
-    ).first()
-    return row is not None
+    return inspect(db.get_bind()).has_table(table_name)
 
 
 def _rows(db: Session, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:

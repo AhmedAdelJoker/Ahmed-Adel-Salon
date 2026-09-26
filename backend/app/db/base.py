@@ -4,6 +4,7 @@ from app.db.base_class import Base  # noqa
 from app.models.user import User  # noqa
 from app.models.barber import Barber  # noqa
 from app.models.customer import Customer  # noqa
+from app.models.member_account import MemberAccount  # noqa
 from app.models.customer_cancellation_log import CustomerCancellationLog  # noqa
 from app.models.booking_audit_log import BookingAuditLog  # noqa
 from app.models.employee import Employee  # noqa

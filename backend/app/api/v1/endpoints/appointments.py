@@ -18,6 +18,7 @@ from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
 from app.models.invoice_payment import InvoicePayment
 from app.models.business_settings import BusinessSettings
+from app.core.working_hours import resolve_window
 from app.models.service_session import ServiceSession
 
 from app.schemas.appointment import (
@@ -76,6 +77,24 @@ def log_booking_change(db: Session, appointment_id: int, user_id: int | None, ac
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
 ACTIVE_BOOKING_STATUSES = {"pending", "confirmed", "waiting"}
+APPOINTMENT_STATUSES = {
+    "pending",
+    "confirmed",
+    "waiting",
+    "in-service",
+    "in_service",
+    "in-progress",
+    "in_progress",
+    "ready_for_payment",
+    "ready_for_pos",
+    "completed",
+    "done",
+    "checked_out",
+    "paid",
+    "cancelled",
+    "auto_cancelled",
+    "no_show",
+}
 
 def _appointment_to_read(db: Session, appointment: Appointment) -> AppointmentRead:
     customer = db.query(Customer).filter(Customer.customer_id == appointment.customer_id).first()
@@ -136,36 +155,16 @@ def _is_within_shop_hours(db: Session, appt_date: date, appt_time: time, duratio
     settings = db.query(BusinessSettings).first()
     if not settings or not settings.working_hours:
         return True
-    
-    day_name = appt_date.strftime("%A").lower()
-    day_config = settings.working_hours.get(day_name)
-    
-    if not day_config or not day_config.get("is_open"):
+
+    window = resolve_window(settings.working_hours, appt_date)
+    if window is None:
         return False
-        
-    shop_open_str = day_config.get("open_time")
-    shop_close_str = day_config.get("close_time")
-    
-    if not shop_open_str or not shop_close_str:
-        return True
-        
-    try:
-        shop_open_time = datetime.strptime(shop_open_str, "%H:%M").time()
-        shop_close_time = datetime.strptime(shop_close_str, "%H:%M").time()
-        
-        appt_start_dt = datetime.combine(appt_date, appt_time)
-        appt_end_dt = appt_start_dt + timedelta(minutes=duration_minutes)
-        
-        shop_open_dt = datetime.combine(appt_date, shop_open_time)
-        shop_close_dt = datetime.combine(appt_date, shop_close_time)
-        
-        # Handle overnight shop hours if necessary, but usually shops close same day
-        if shop_close_time < shop_open_time:
-            shop_close_dt += timedelta(days=1)
-            
-        return appt_start_dt >= shop_open_dt and appt_end_dt <= shop_close_dt
-    except Exception:
-        return True
+
+    _day_config, shop_open_dt, shop_close_dt = window
+    appt_start_dt = datetime.combine(appt_date, appt_time)
+    appt_end_dt = appt_start_dt + timedelta(minutes=duration_minutes)
+
+    return appt_start_dt >= shop_open_dt and appt_end_dt <= shop_close_dt
 
 def _validate_future_datetime(appt_date: date, appt_time: time):
     if isinstance(appt_time, str):
@@ -854,10 +853,12 @@ async def patch_appointment(
     appointment_id: int,
     payload: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_cashier_manager_owner),
 ):
     appointment = _get_manageable_appointment(db, appointment_id)
-    
+    if current_user.role == "accountant":
+        raise HTTPException(status_code=403, detail="ليس لديك صلاحية تعديل الحجز")
+
     field_map = {
         "customerId": "customer_id",
         "employeeId": "barber_id",
@@ -874,9 +875,17 @@ async def patch_appointment(
     }
     
     # Check for date/time/barber changes
+    p_customer = payload.get("customerId") or payload.get("customer_id")
+    p_status = payload.get("status")
+    if p_status is not None and str(p_status).lower() not in APPOINTMENT_STATUSES:
+        raise HTTPException(status_code=400, detail="حالة الحجز غير صالحة")
     p_date = payload.get("appointmentDate") or payload.get("appointment_date")
     p_time = payload.get("appointmentTime") or payload.get("appointment_time")
     p_barber = payload.get("employeeId") or payload.get("barber_id")
+    if p_customer and not db.query(Customer).filter(Customer.customer_id == p_customer).first():
+        raise HTTPException(status_code=404, detail="العميل غير موجود")
+    if p_barber:
+        _ensure_existing_barber(db, p_barber)
 
     if p_date or p_time or p_barber or "services" in payload:
         new_date = p_date or appointment.appointment_date
@@ -914,14 +923,31 @@ async def patch_appointment(
                 exclude_appointment_id=appointment.id
             )
 
+    allowed_fields = {
+        "customer_id",
+        "barber_id",
+        "appointment_date",
+        "appointment_time",
+        "notes",
+        "status",
+        "booking_source",
+    }
+    if p_status is not None:
+        appointment.status = str(p_status).lower()
+
     for key, value in payload.items():
-        if key in ("status", "services"): continue # handled separately
-        db_key = field_map.get(key, key)
-        # Avoid setting relationship attributes directly to prevent SQLAlchemy errors
-        if db_key in ("customer", "barber", "services", "invoices", "sessions"):
+        if key in {"status", "services"}:
             continue
-        if hasattr(appointment, db_key):
-            setattr(appointment, db_key, value)
+        db_key = field_map.get(key, key)
+        if db_key not in allowed_fields:
+            raise HTTPException(status_code=400, detail=f"الحقل غير مسموح: {key}")
+        if db_key == "appointment_date" and isinstance(value, str):
+            value = date.fromisoformat(value)
+        elif db_key == "appointment_time" and isinstance(value, str):
+            value = time.fromisoformat(value[:5])
+        elif db_key == "status" and value is not None:
+            value = str(value).lower()
+        setattr(appointment, db_key, value)
             
     if "services" in payload:
         _rebuild_appointment_services(db, appointment, payload["services"])
@@ -943,6 +969,8 @@ async def update_appointment_status(appointment_id: int, payload: AppointmentSta
     
     old_status = appointment.status
     new_status = payload.status.lower()
+    if new_status not in APPOINTMENT_STATUSES:
+        raise HTTPException(status_code=400, detail="حالة الحجز غير صالحة")
     
     if new_status == "cancelled" and old_status != "cancelled":
         customer = db.query(Customer).filter(Customer.customer_id == appointment.customer_id).first()
@@ -1097,7 +1125,8 @@ def issue_invoice_from_appointment(appointment_id: int, payment_method: str = "c
         db.add(session)
 
     update_customer_loyalty(db, appointment.customer_id, total_amount)
-    deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=getattr(current_user, "id", None))
+    if session is None:
+        deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=getattr(current_user, "id", None))
 
     if total_amount > 0:
         db.add(

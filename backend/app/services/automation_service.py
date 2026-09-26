@@ -12,6 +12,30 @@ from app.services.meta_whatsapp_service import (
     is_meta_whatsapp_configured
 )
 
+def _appointments_in_window(
+    db: Session,
+    window_start: datetime,
+    window_end: datetime,
+    reminder_field: str,
+):
+    candidates = db.query(Appointment).filter(
+        Appointment.status == "confirmed",
+        Appointment.appointment_date >= window_start.date(),
+        Appointment.appointment_date <= window_end.date(),
+        getattr(Appointment, reminder_field) == False,
+    ).all()
+    return [
+        appointment
+        for appointment in candidates
+        if window_start
+        <= datetime.combine(
+            appointment.appointment_date,
+            appointment.appointment_time,
+        )
+        <= window_end
+    ]
+
+
 def run_automated_reminders(db: Session):
     """
     سكان للمواعيد القادمة وإرسال التذكيرات اللازمة.
@@ -29,12 +53,12 @@ def run_automated_reminders(db: Session):
     target_24h_start = now + timedelta(hours=23)
     target_24h_end = now + timedelta(hours=25)
     
-    appointments_24h = db.query(Appointment).filter(
-        Appointment.status == "confirmed",
-        Appointment.start_at >= target_24h_start,
-        Appointment.start_at <= target_24h_end,
-        Appointment.reminder_24h_sent == False
-    ).all()
+    appointments_24h = _appointments_in_window(
+        db,
+        target_24h_start,
+        target_24h_end,
+        "reminder_24h_sent",
+    )
     
     sent_24h = 0
     for appt in appointments_24h:
@@ -59,12 +83,12 @@ def run_automated_reminders(db: Session):
     target_2h_start = now + timedelta(hours=1)
     target_2h_end = now + timedelta(hours=3)
     
-    appointments_2h = db.query(Appointment).filter(
-        Appointment.status == "confirmed",
-        Appointment.start_at >= target_2h_start,
-        Appointment.start_at <= target_2h_end,
-        Appointment.reminder_2h_sent == False
-    ).all()
+    appointments_2h = _appointments_in_window(
+        db,
+        target_2h_start,
+        target_2h_end,
+        "reminder_2h_sent",
+    )
     
     sent_2h = 0
     for appt in appointments_2h:

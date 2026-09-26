@@ -344,7 +344,29 @@ def create_manual_invoice(
 
     loyalty_discount = calculate_loyalty_discount(db, customer_id, total_amount)
     loyalty_discount = _normalize_money(loyalty_discount)
-    total_manual_discount = _normalize_money(payload.discount_amount) + loyalty_discount
+    manual_discount = _normalize_money(payload.discount_amount)
+    business_settings = db.query(BusinessSettings).first()
+    if (
+        current_user.role == "cashier"
+        and business_settings
+        and manual_discount > 0
+    ):
+        limit_type = str(
+            business_settings.cashier_discount_limit_type or "percentage"
+        ).lower()
+        limit_value = Decimal(
+            str(business_settings.cashier_discount_limit_value or 0)
+        )
+        if limit_type == "percentage" and total_amount > 0:
+            allowed = total_amount * limit_value / Decimal("100")
+        else:
+            allowed = limit_value
+        if manual_discount > allowed:
+            raise HTTPException(
+                status_code=403,
+                detail="الخصم يتجاوز الحد المسموح لك؛ أنشئ طلب خصم للاعتماد",
+            )
+    total_manual_discount = manual_discount + loyalty_discount
     if total_manual_discount > total_amount:
         raise HTTPException(status_code=400, detail="الخصم لا يمكن أن يتجاوز إجمالي الفاتورة")
     final_amount = (total_amount - total_manual_discount).quantize(Decimal("0.01"))
@@ -387,7 +409,15 @@ def create_manual_invoice(
     update_customer_loyalty(db, customer_id, final_amount)
     
     # 7. Deduct stock for the invoice
-    deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=current_user.id)
+    linked_session = None
+    if payload.appointment_id:
+        linked_session = (
+            db.query(ServiceSession)
+            .filter(ServiceSession.appointment_id == payload.appointment_id)
+            .first()
+        )
+    if linked_session is None:
+        deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=current_user.id)
 
     payment_label = {
         "cash": "نقدي",
@@ -923,9 +953,18 @@ def create_draft_invoice(
     current_user: User = Depends(require_cashier_manager_owner),
 ):
     """إنشاء مسودة فاتورة جديدة"""
+    walk_in = db.query(Customer).filter(Customer.first_name == "Walk-in").first()
+    if not walk_in:
+        walk_in = Customer(
+            first_name="Walk-in",
+            last_name="Customer",
+            phone="0000000000",
+        )
+        db.add(walk_in)
+        db.flush()
     draft = Invoice(
         invoice_no=f"DRAFT-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-        customer_id=1,
+        customer_id=walk_in.customer_id,
         payment_method="cash",
         subtotal_amount=0,
         discount_amount=0,

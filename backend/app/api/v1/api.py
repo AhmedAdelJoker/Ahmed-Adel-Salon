@@ -37,7 +37,6 @@ from app.api.v1.endpoints.offers import router as offers_router
 from app.api.v1.endpoints.attendance import router as attendance_router
 from app.api.v1.endpoints.barber_presence import router as barber_presence_router
 from app.api.v1.endpoints.barber_availability import router as barber_availability_router
-from app.api.v1.endpoints.admin import router as admin_router
 from app.api.v1.endpoints.public_seo import router as public_seo_router
 from app.api.v1.endpoints.reminders import router as reminders_router
 from app.api.v1.endpoints.exports import router as exports_router
@@ -104,7 +103,6 @@ api_router.include_router(offers_router)
 api_router.include_router(attendance_router)
 api_router.include_router(barber_presence_router)
 api_router.include_router(barber_availability_router)
-api_router.include_router(admin_router)
 api_router.include_router(public_seo_router)
 api_router.include_router(reminders_router)
 api_router.include_router(exports_router)

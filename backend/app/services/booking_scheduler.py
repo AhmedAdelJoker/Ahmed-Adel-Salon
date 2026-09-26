@@ -141,32 +141,20 @@ def _build_employee_day_schedule(
         end_time = working_hour.end_time
     else:
         from app.models.business_settings import BusinessSettings
+        from app.core.working_hours import (
+            DEFAULT_FALLBACK_HOURS,
+            closing_datetime,
+            day_key,
+            normalize_working_hours,
+            opening_datetime,
+        )
         settings_row = db.query(BusinessSettings).first()
         salon_hours = settings_row.working_hours if settings_row else None
-        
-        fallback_hours = {
-            "saturday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "sunday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "monday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "tuesday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "wednesday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "thursday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "friday": {"is_open": False, "open_time": None, "close_time": None}
-        }
-        
-        hours_dict = salon_hours if salon_hours else fallback_hours
-        weekday_map = {
-            0: "monday",
-            1: "tuesday",
-            2: "wednesday",
-            3: "thursday",
-            4: "friday",
-            5: "saturday",
-            6: "sunday"
-        }
-        day_name = weekday_map[booking_date.weekday()]
+
+        hours_dict = normalize_working_hours(salon_hours) if salon_hours else dict(DEFAULT_FALLBACK_HOURS)
+        day_name = day_key(booking_date)
         day_config = hours_dict.get(day_name)
-        
+
         if not day_config or not day_config.get("is_open"):
             if strict_schedule:
                 return None
@@ -174,14 +162,10 @@ def _build_employee_day_schedule(
                 start_time = time(0, 0)
                 end_time = time(23, 59)
         else:
-            open_str = day_config.get("open_time") or "10:00"
-            close_str = day_config.get("close_time") or "22:00"
-            try:
-                start_time = datetime.strptime(open_str, "%H:%M").time()
-                end_time = datetime.strptime(close_str, "%H:%M").time()
-            except ValueError:
-                start_time = time(10, 0)
-                end_time = time(22, 0)
+            start_dt = opening_datetime(booking_date, day_config)
+            end_dt = closing_datetime(booking_date, day_config)
+            start_time = start_dt.time() if start_dt else time(10, 0)
+            end_time = end_dt.time() if end_dt else time(22, 0)
 
     busy_intervals, day_load = _build_busy_intervals(
         db,
