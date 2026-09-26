@@ -45,7 +45,7 @@ export default function PermissionsModal({
       <DialogContent
         className="max-w-2xl rounded-[32px] border-border bg-card p-0 shadow-premium overflow-hidden"
       >
-        <DialogHeader className="p-10 pb-6 bg-[#1B1714] relative overflow-hidden">
+        <DialogHeader className="relative p-10 pb-6 bg-neutral-900 text-white overflow-hidden dark:bg-black/40">
           <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-[80px] -mr-32 -mt-32" />
           <div className="relative z-10 space-y-2">
             <DialogTitle className="text-3xl font-black text-white uppercase tracking-tight flex items-center gap-4 leading-none">

@@ -24,18 +24,29 @@ export const PAYMENT_METHODS = [
   { value: "wallet", label: "محفظة" },
 ];
 
+/**
+ * Category accent colours.
+ *
+ * These drive pie slices, chips and table accents. They were the raw Tailwind
+ * palette, so on the dark surface they read as unrelated colours next to the
+ * gold brand. The chart tokens keep the categories distinguishable while
+ * following the theme in both modes.
+ *
+ * They are CSS custom properties, so anything that needs a translucent variant
+ * must use `color-mix()` rather than appending an alpha suffix.
+ */
 export const CATEGORY_COLORS: Record<string, string> = {
-  رواتب: "#6366f1",
-  إيجار: "#f59e0b",
-  مشتريات: "#10b981",
-  كهرباء: "#3b82f6",
-  مياه: "#06b6d4",
-  إنترنت: "#8b5cf6",
-  صيانة: "#ef4444",
-  تسويق: "#ec4899",
-  ضيافة: "#f97316",
-  سلف: "#14b8a6",
-  أخرى: "#6b7280",
+  رواتب: "var(--chart-2)",
+  إيجار: "var(--chart-4)",
+  مشتريات: "var(--chart-3)",
+  كهرباء: "var(--chart-6)",
+  مياه: "var(--chart-8)",
+  إنترنت: "var(--chart-5)",
+  صيانة: "var(--chart-7)",
+  تسويق: "var(--chart-1)",
+  ضيافة: "var(--warning)",
+  سلف: "var(--info)",
+  أخرى: "var(--text-muted)",
 };
 
 export const CATEGORY_ICONS: Record<string, typeof Users> = {

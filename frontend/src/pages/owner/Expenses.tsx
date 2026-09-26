@@ -186,14 +186,14 @@ const ExpensesPage = () => {
           <AnimatePresence>
             {expenseRows.map((exp, i) => {
               const CatIcon = CATEGORY_ICONS[exp.category ?? ""] || FileText;
-              const catColor = CATEGORY_COLORS[exp.category ?? ""] || "#6b7280";
+              const catColor = CATEGORY_COLORS[exp.category ?? ""] || "var(--text-muted)";
               const isPending = exp.status === "pending_audit";
               const isCancelled = exp.status === "cancelled" || exp.status === "rejected";
               return (
                 <motion.div key={exp.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: i * 0.02 }}>
                   <PremiumCard className="group p-4 sm:p-5 hover:shadow-premium transition-all">
                     <div className="flex items-start gap-4">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/50 shadow-sm" style={{ backgroundColor: `${catColor}12`, color: catColor }}>
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/50 shadow-sm" style={{ backgroundColor: `color-mix(in srgb, ${catColor} 10%, transparent)`, color: catColor }}>
                         <CatIcon size={18} />
                       </div>
                       <div className="min-w-0 flex-1">

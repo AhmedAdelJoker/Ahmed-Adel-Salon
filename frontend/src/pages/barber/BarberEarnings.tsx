@@ -268,8 +268,8 @@ const BarberEarnings = () => {
                       <Area
                         type="monotone"
                         dataKey="revenue"
-                        stroke="#10b981"
-                        fill="#10b981"
+                        stroke="var(--primary)"
+                        fill="var(--primary)"
                         fillOpacity={0.15}
                         strokeWidth={2}
                       />
@@ -291,17 +291,17 @@ const BarberEarnings = () => {
                           {
                             name: "نقدي",
                             value: earnings.cash || 0,
-                            color: "#10b981",
+                            color: "var(--chart-3)",
                           },
                           {
                             name: "بطاقة",
                             value: earnings.card || 0,
-                            color: "#3b82f6",
+                            color: "var(--chart-2)",
                           },
                           {
                             name: "تحويل",
                             value: earnings.transfer || 0,
-                            color: "#8b5cf6",
+                            color: "var(--chart-5)",
                           },
                         ].filter((d) => d.value > 0)}
                         cx="50%"
@@ -311,9 +311,9 @@ const BarberEarnings = () => {
                         dataKey="value"
                       >
                         {[
-                          { color: "#10b981" },
-                          { color: "#3b82f6" },
-                          { color: "#8b5cf6" },
+                          { color: "var(--chart-3)" },
+                          { color: "var(--chart-2)" },
+                          { color: "var(--chart-5)" },
                         ].map((e, i) => (
                           <Cell key={i} fill={e.color} />
                         ))}
@@ -473,7 +473,7 @@ const BarberEarnings = () => {
                       />
                       <Bar
                         dataKey="revenue"
-                        fill="#6366f1"
+                        fill="var(--primary)"
                         radius={[8, 8, 0, 0]}
                       />
                     </BarChart>
@@ -499,7 +499,7 @@ const BarberEarnings = () => {
                       <Line
                         type="monotone"
                         dataKey="revenue"
-                        stroke="#10b981"
+                        stroke="var(--primary)"
                         strokeWidth={3}
                         dot={{ r: 4 }}
                       />

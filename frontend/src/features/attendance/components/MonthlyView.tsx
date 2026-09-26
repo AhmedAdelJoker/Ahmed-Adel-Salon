@@ -62,12 +62,12 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                       <Legend />
                       <Bar
                         dataKey="ساعات"
-                        fill="#10b981"
+                        fill="var(--chart-3)"
                         radius={[8, 8, 0, 0]}
                       />
                       <Bar
                         dataKey="تأخير"
-                        fill="#f59e0b"
+                        fill="var(--chart-4)"
                         radius={[8, 8, 0, 0]}
                       />
                     </BarChart>
@@ -92,7 +92,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                                     100 >=
                                   90,
                               ).length || 1,
-                            color: "#10b981",
+                            color: "var(--chart-3)",
                           },
                           {
                             name: "جيد (70-89%)",
@@ -103,7 +103,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                                   100;
                                 return r >= 70 && r < 90;
                               }).length || 1,
-                            color: "#3b82f6",
+                            color: "var(--chart-2)",
                           },
                           {
                             name: "متوسط (50-69%)",
@@ -114,7 +114,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                                   100;
                                 return r >= 50 && r < 70;
                               }).length || 0,
-                            color: "#f59e0b",
+                            color: "var(--chart-4)",
                           },
                           {
                             name: "ضعيف (<50%)",
@@ -125,7 +125,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                                     100 <
                                   50,
                               ).length || 0,
-                            color: "#ef4444",
+                            color: "var(--chart-7)",
                           },
                         ].filter((d) => d.value > 0)}
                         cx="50%"
@@ -138,10 +138,10 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                         labelLine={false}
                       >
                         {[
-                          { color: "#10b981" },
-                          { color: "#3b82f6" },
-                          { color: "#f59e0b" },
-                          { color: "#ef4444" },
+                          { color: "var(--chart-3)" },
+                          { color: "var(--chart-2)" },
+                          { color: "var(--chart-4)" },
+                          { color: "var(--chart-7)" },
                         ].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
@@ -180,9 +180,9 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                       <Line
                         type="monotone"
                         dataKey="حضور"
-                        stroke="#10b981"
+                        stroke="var(--chart-3)"
                         strokeWidth={3}
-                        dot={{ fill: "#10b981", r: 5 }}
+                        dot={{ fill: "var(--chart-3)", r: 5 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>

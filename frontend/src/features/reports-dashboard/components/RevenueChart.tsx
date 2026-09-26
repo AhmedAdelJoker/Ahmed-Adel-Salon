@@ -78,7 +78,7 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
                 dataKey="name"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: "var(--text)", fontSize: 12, fontWeight: 700 }}
+                tick={{ fill: "var(--text-muted)", fontSize: 12, fontWeight: 700 }}
                 dy={10}
               />
               <YAxis
@@ -146,7 +146,7 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
                 type="category"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: "var(--text)", fontSize: 12, fontWeight: 700 }}
+                tick={{ fill: "var(--text-muted)", fontSize: 12, fontWeight: 700 }}
                 width={90}
                 orientation="left"
                 padding={{ top: 10, bottom: 10 }}

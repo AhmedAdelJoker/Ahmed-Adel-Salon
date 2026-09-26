@@ -10,11 +10,14 @@ const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
 const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
 
+// These were the stock shadcn purple/cyan defaults, so every dropdown in the
+// app (header user menu, settings, all forms) carried a focus ring in a colour
+// that appears nowhere else in the product.
 const itemClass =
-  "relative flex cursor-pointer select-none items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 text-gray-800 focus:bg-purple-50 focus:text-[#6D28D9] dark:text-gray-100 dark:focus:bg-cyan-400/10 dark:focus:text-[#22D3EE]";
+  "relative flex cursor-pointer select-none items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 text-main focus:bg-primary-soft focus:text-primary";
 
 const contentClass =
-  "z-[9999] overflow-hidden rounded-2xl border border-black/10 bg-white p-2 text-gray-900 shadow-2xl backdrop-blur-md data-[state=open]:animate-scale-in dark:border-white/10 dark:bg-[#171717] dark:text-gray-100";
+  "z-[9999] overflow-hidden rounded-2xl border border-border bg-card p-2 text-main shadow-premium backdrop-blur-md data-[state=open]:animate-scale-in";
 
 interface DropdownMenuSubTriggerProps
   extends React.ComponentPropsWithoutRef<
@@ -112,7 +115,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
       checked={checked}
       {...props}
     >
-      <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center text-[#6D28D9] dark:text-[#22D3EE]">
+      <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center text-primary">
         <DropdownMenuPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />
         </DropdownMenuPrimitive.ItemIndicator>
@@ -134,7 +137,7 @@ const DropdownMenuRadioItem = React.forwardRef<
       className={cn(itemClass, "pl-4 pr-10", className)}
       {...props}
     >
-      <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center text-[#6D28D9] dark:text-[#22D3EE]">
+      <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center text-primary">
         <DropdownMenuPrimitive.ItemIndicator>
           <CircleIcon className="size-2 fill-current" />
         </DropdownMenuPrimitive.ItemIndicator>

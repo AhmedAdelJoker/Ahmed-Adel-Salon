@@ -114,7 +114,7 @@ export function ExpensesSummaryCards({
                 <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 700 }} interval={0} angle={-15} textAnchor="end" height={36} tickMargin={8} />
                 <YAxis tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} width={36} />
                 <Tooltip formatter={(value) => formatCurrency(value)} cursor={{ fill: "rgba(0,0,0,0.04)" }} contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", fontWeight: 700, fontSize: 11 }} />
-                <Bar dataKey="value" fill="#0f172a" radius={[8, 8, 0, 0]} barSize={28} maxBarSize={42} />
+                <Bar dataKey="value" fill="var(--chart-1)" radius={[8, 8, 0, 0]} barSize={28} maxBarSize={42} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>

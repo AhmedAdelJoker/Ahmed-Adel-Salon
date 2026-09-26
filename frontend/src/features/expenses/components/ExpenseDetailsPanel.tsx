@@ -83,7 +83,7 @@ export function ExpenseDetailsPanel({
             <div className="rounded-2xl bg-soft border border-border p-4">
               <div className="text-[9px] font-black text-muted uppercase tracking-widest mb-1">التصنيف</div>
               <div className="text-sm font-black text-main flex items-center gap-2">
-                <span className="h-7 w-7 rounded-lg flex items-center justify-center text-white text-xs" style={{ backgroundColor: CATEGORY_COLORS[viewItem.category ?? ""] || "#6b7280" }}>{String(viewItem.category || "?")[0]}</span>
+                <span className="h-7 w-7 rounded-lg flex items-center justify-center text-white text-xs" style={{ backgroundColor: CATEGORY_COLORS[viewItem.category ?? ""] || "var(--text-muted)" }}>{String(viewItem.category || "?")[0]}</span>
                 {String(viewItem.category || "—")}
               </div>
               {viewItem.recipient_name ? <div className="text-[11px] font-bold text-muted mt-1 truncate">المستفيد: {String(viewItem.recipient_name)}</div> : null}

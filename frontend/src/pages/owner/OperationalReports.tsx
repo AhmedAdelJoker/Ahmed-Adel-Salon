@@ -435,12 +435,12 @@ export default function OperationalReports() {
                     <AreaChart data={financialMetrics.timeline} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                       <defs>
                         <linearGradient id="opIncome" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.28} />
-                          <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                          <stop offset="5%" stopColor="var(--chart-3)" stopOpacity={0.28} />
+                          <stop offset="95%" stopColor="var(--chart-3)" stopOpacity={0} />
                         </linearGradient>
                         <linearGradient id="opExpenses" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.28} />
-                          <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
+                          <stop offset="5%" stopColor="var(--chart-7)" stopOpacity={0.28} />
+                          <stop offset="95%" stopColor="var(--chart-7)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="var(--border)" opacity={0.5} />
@@ -449,7 +449,7 @@ export default function OperationalReports() {
                         axisLine={false}
                         tickLine={false}
                         minTickGap={24}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                         dy={8}
                       />
                       <YAxis
@@ -457,28 +457,28 @@ export default function OperationalReports() {
                         tickLine={false}
                         width={56}
                         tickFormatter={compactTick}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                       />
                       <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
                       <Area
                         type="monotone"
                         dataKey="income"
                         name="الدخل"
-                        stroke="#10B981"
+                        stroke="var(--chart-3)"
                         strokeWidth={2.5}
                         fill="url(#opIncome)"
                         dot={false}
-                        activeDot={{ r: 5, strokeWidth: 2, stroke: "#10B981", fill: "#fff" }}
+                        activeDot={{ r: 5, strokeWidth: 2, stroke: "var(--chart-3)", fill: "var(--bg-card)" }}
                       />
                       <Area
                         type="monotone"
                         dataKey="expenses"
                         name="المصروفات"
-                        stroke="#F43F5E"
+                        stroke="var(--chart-7)"
                         strokeWidth={2.5}
                         fill="url(#opExpenses)"
                         dot={false}
-                        activeDot={{ r: 5, strokeWidth: 2, stroke: "#F43F5E", fill: "#fff" }}
+                        activeDot={{ r: 5, strokeWidth: 2, stroke: "var(--chart-7)", fill: "var(--bg-card)" }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -586,7 +586,7 @@ export default function OperationalReports() {
                         type="category"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 11, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 11, fontWeight: 800, fill: "var(--text-muted)" }}
                         width={120}
                       />
                       <ReTooltip content={<ServiceTooltip />} cursor={{ fill: "var(--border)", opacity: 0.25 }} />
@@ -664,7 +664,7 @@ export default function OperationalReports() {
                         axisLine={false}
                         tickLine={false}
                         interval={2}
-                        tick={{ fontSize: 9, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 9, fontWeight: 800, fill: "var(--text-muted)" }}
                         dy={8}
                       />
                       <YAxis
@@ -672,14 +672,14 @@ export default function OperationalReports() {
                         tickLine={false}
                         width={40}
                         allowDecimals={false}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                       />
                       <ReTooltip content={<HourTooltip />} cursor={{ fill: "var(--border)", opacity: 0.25 }} />
                       <Bar dataKey="count" name="العمليات" radius={[5, 5, 0, 0]} maxBarSize={22}>
                         {operationalMetrics.hourlyData.map((h, i) => (
                           <Cell
                             key={i}
-                            fill={operationalMetrics.peakHour?.hour === h.hour ? "#6366F1" : "#C7D2FE"}
+                            fill={operationalMetrics.peakHour?.hour === h.hour ? "var(--primary)" : "var(--primary-soft)"}
                             fillOpacity={operationalMetrics.peakHour?.hour === h.hour ? 1 : 0.65}
                           />
                         ))}

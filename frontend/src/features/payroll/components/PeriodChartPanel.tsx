@@ -80,13 +80,13 @@ export default function PeriodChartPanel({
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={52} outerRadius={78} paddingAngle={3} dataKey="value" stroke="none">
-                  <Cell fill="#0f172a" />
-                  <Cell fill="#0ea5e9" />
-                  <Cell fill="#10b981" />
-                  <Cell fill="#f43f5e" />
-                  <Cell fill="#f59e0b" />
+                  <Cell fill="var(--chart-1)" />
+                  <Cell fill="var(--chart-2)" />
+                  <Cell fill="var(--chart-3)" />
+                  <Cell fill="var(--chart-7)" />
+                  <Cell fill="var(--chart-4)" />
                 </Pie>
-                <RechartsTooltip formatter={(v: number | string) => formatCurrency(v)} contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", fontWeight: 800, fontSize: 12 }} />
+                <RechartsTooltip formatter={(v: number | string) => formatCurrency(v)} contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", fontWeight: 800, fontSize: 12 }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11, fontWeight: 800, paddingTop: 8 }} />
               </PieChart>
             </ResponsiveContainer>

@@ -67,7 +67,7 @@ export default function CustomerTable({
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50 text-sm font-black text-[#6D28D9] dark:bg-cyan-400/10 dark:text-[#22D3EE]">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-sm font-black text-primary">
                           {getInitials(customerName(customer))}
                         </div>
                         <div>

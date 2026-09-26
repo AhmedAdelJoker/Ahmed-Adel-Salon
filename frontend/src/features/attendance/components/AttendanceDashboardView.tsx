@@ -55,16 +55,16 @@ export default function AttendanceDashboardView({
                 <Area
                   type="monotone"
                   dataKey="حضور"
-                  stroke="#10b981"
-                  fill="#10b981"
+                  stroke="var(--chart-3)"
+                  fill="var(--chart-3)"
                   fillOpacity={0.15}
                   strokeWidth={2}
                 />
                 <Area
                   type="monotone"
                   dataKey="تأخير"
-                  stroke="#f59e0b"
-                  fill="#f59e0b"
+                  stroke="var(--chart-4)"
+                  fill="var(--chart-4)"
                   fillOpacity={0.15}
                   strokeWidth={2}
                 />
@@ -90,20 +90,20 @@ export default function AttendanceDashboardView({
                           (r) =>
                             Number(r.stats?.totalHours) > 0 && !r.isComplete,
                         ).length || 1,
-                      color: "#10b981",
+                      color: "var(--chart-3)",
                     },
                     {
                       name: "مكتمل",
                       value:
                         todayRecords.filter((r) => r.isComplete).length || 1,
-                      color: "#6366f1",
+                      color: "var(--chart-2)",
                     },
                     {
                       name: "متأخر",
                       value:
                         todayRecords.filter((r) => (r.stats?.lateMinutes ?? 0) > 0)
                           .length || 0,
-                      color: "#f59e0b",
+                      color: "var(--chart-4)",
                     },
                   ].filter((d) => d.value > 0)}
                   cx="50%"
@@ -114,9 +114,9 @@ export default function AttendanceDashboardView({
                   dataKey="value"
                 >
                   {[
-                    { name: "متواجد", color: "#10b981" },
-                    { name: "مكتمل", color: "#6366f1" },
-                    { name: "متأخر", color: "#f59e0b" },
+                    { name: "متواجد", color: "var(--chart-3)" },
+                    { name: "مكتمل", color: "var(--chart-2)" },
+                    { name: "متأخر", color: "var(--chart-4)" },
                   ].map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}

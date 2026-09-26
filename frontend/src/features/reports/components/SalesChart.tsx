@@ -69,7 +69,7 @@ export function SalesChart({ rows }: { rows: SalesChartRow[] }) {
             orientation="right"
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "var(--text)", fontSize: 12, fontWeight: 700 }}
+            tick={{ fill: "var(--text-muted)", fontSize: 12, fontWeight: 700 }}
             width={110}
           />
           <Tooltip

@@ -38,6 +38,41 @@
   --info: #1d4ed8;
   --info-soft: rgba(29, 78, 216, 0.08);
 
+  /* Foreground colours for text sitting on a filled brand/status surface.
+     These were referenced by the Tailwind config and the inventory token file
+     but never defined, so `text-primary-foreground` and friends resolved to
+     nothing. The light values are white because the light-mode brand gold is
+     dark enough to carry white text. */
+  --primary-foreground: #ffffff;
+  --success-foreground: #ffffff;
+  --warning-foreground: #ffffff;
+  --danger-foreground: #ffffff;
+  --info-foreground: #ffffff;
+
+  /* Legacy aliases. The token layer and the Tailwind config both use the
+     shorter names, so both spellings resolve to the same value. */
+  --muted: var(--text-muted);
+  --muted-soft: var(--bg-soft);
+  --muted-foreground: var(--bg-card);
+
+  --border-strong: rgba(166, 139, 92, 0.28);
+  --shadow-accent: 0 10px 30px -12px rgba(166, 139, 92, 0.28);
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Chart series palette.
+     Eight distinguishable hues that still belong to the gold theme, so a pie
+     or multi-series chart reads correctly in both modes. Recharts takes these
+     as plain `fill`/`stroke` values, and SVG resolves var() fine, which keeps
+     the charts theme-aware instead of frozen at light-mode hex. */
+  --chart-1: #a68b5c; /* gold, series default */
+  --chart-2: #1d4ed8; /* info */
+  --chart-3: #15803d; /* success */
+  --chart-4: #b45309; /* warning */
+  --chart-5: #7c3aed; /* violet */
+  --chart-6: #0e7490; /* cyan */
+  --chart-7: #b91c1c; /* danger */
+  --chart-8: #4d7c0f; /* olive */
+
   /* Shadows & Radius */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md:
@@ -87,6 +122,28 @@
   --text-soft: #57534e; /* Stone 600 */
   --inverse: #fdfbf7;
   --border: rgba(212, 175, 55, 0.15);
+
+  /* Dark mode: the brand gold is bright, so filled surfaces take dark text. */
+  --primary-foreground: #1c1917;
+  --success-foreground: #ffffff;
+  --warning-foreground: #1c1917;
+  --danger-foreground: #ffffff;
+  --info-foreground: #ffffff;
+
+  --border-strong: rgba(212, 175, 55, 0.32);
+  --shadow-accent: 0 10px 30px -12px rgba(212, 175, 55, 0.22);
+
+  /* Chart series palette, dark mode.
+     Lifted for contrast against the near-black surface; the hue order matches
+     light mode so a given series keeps its identity when the theme flips. */
+  --chart-1: #d4af37;
+  --chart-2: #60a5fa;
+  --chart-3: #4ade80;
+  --chart-4: #fbbf24;
+  --chart-5: #a78bfa;
+  --chart-6: #22d3ee;
+  --chart-7: #f87171;
+  --chart-8: #a3e635;
 
   --shadow-premium:
     0 30px 60px -12px rgba(0, 0, 0, 0.7), 0 0 20px -5px rgba(212, 175, 55, 0.05);

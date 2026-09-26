@@ -4,13 +4,16 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { ContentPanel } from "@/components/shared/PremiumUI";
 import type { ServiceSlice } from "@/features/reports-dashboard/constants";
 
+// The last entry used to be `var(--secondary)`, which is not defined in
+// src/styles/index.css, so the sixth slice rendered with an invalid fill and
+// silently fell back to black.
 const SLICE_COLORS = [
   `var(--primary)`,
   `var(--info)`,
   `var(--warning)`,
   `var(--success)`,
   `var(--danger)`,
-  `var(--secondary)`,
+  `var(--chart-5)`,
 ];
 
 export interface ServiceDistributionProps {
@@ -43,7 +46,7 @@ export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceD
                   outerRadius={85}
                   paddingAngle={4}
                   dataKey="value"
-                  stroke="var(--bg)"
+                  stroke="var(--bg-card)"
                   strokeWidth={2}
                   label={({ name, percent }) =>
                     typeof percent === "number" && percent > 0.08 ? `${name} ${(percent * 100).toFixed(0)}%` : false
@@ -54,7 +57,7 @@ export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceD
                     <Cell
                       key={`cell-${index}`}
                       fill={SLICE_COLORS[index % 6]}
-                      stroke="var(--bg)"
+                      stroke="var(--bg-card)"
                       strokeWidth={2}
                     />
                   ))}
