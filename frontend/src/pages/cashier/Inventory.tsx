@@ -12,6 +12,7 @@ import {
   Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/shared/PageShell";
 import {
   Tabs,
   TabsList,
@@ -114,8 +115,8 @@ export default function Inventory() {
   }
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <PageHeader className={undefined}
           title="إدارة المستودع"
           subtitle="نظام أتمتة المخزون والربط المالي الكامل"
@@ -563,9 +564,9 @@ export default function Inventory() {
           onOpenChange={setIsViewOpen}
           product={viewProduct}
           staticBaseUrl={STATIC_BASE_URL}
-          onOpenHistory={openHistory}
-        />
-      </div>
+            onOpenHistory={openHistory}
+          />
+      </PageShell>
     </div>
   );
 }

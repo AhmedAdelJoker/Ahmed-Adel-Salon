@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { PageShell } from "@/components/shared/PageShell";
 import React, { useState, useEffect, useCallback } from "react";
 import type {
   AttendanceNotification,
@@ -315,8 +316,8 @@ const AttendanceManagement = () => {
   }
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <AttendancePageHeader
           onShowSettings={() => setShowSettings(true)}
           onExportPDF={handleExportPDF}
@@ -392,7 +393,7 @@ const AttendanceManagement = () => {
             setEndDate={setEndDate}
           />
         )}
-      </div>
+      </PageShell>
 
       {/* Settings Modal */}
       {showSettings && (
@@ -633,12 +634,11 @@ const AttendanceManagement = () => {
                 إرسال
               </Button>
             </div>
-          </motion.div>
-        </div>
-      )}
+            </motion.div>
+          </div>
+        )}
     </div>
   );
 };
-
 export default AttendanceManagement;
 

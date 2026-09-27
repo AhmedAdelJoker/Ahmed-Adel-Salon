@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/shared/EmptyState";
+import { PageShell } from "@/components/shared/PageShell";
 import { motion } from "framer-motion";
 import {
   Archive,
@@ -52,8 +53,8 @@ function InvoiceArchive() {
   } = useInvoiceArchive();
 
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-6">
+    <div>
+      <PageShell contained>
         <PageHeader className={undefined}
           title="الأرشيف الشهري للفواتير"
           subtitle="استعرض وأغلق فواتير الأشهر المنتهية أو أعدها للمراجعة — كل الفلاتر والإجراءات من هنا"
@@ -172,7 +173,6 @@ function InvoiceArchive() {
             </AnimatePresence>
           </div>
         )}
-      </div>
 
       <CloseReopenDialogs
         confirmClose={confirmClose}
@@ -184,6 +184,7 @@ function InvoiceArchive() {
         onConfirmClose={handleCloseMonth}
         onConfirmReopen={handleReopenMonth}
       />
+      </PageShell>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import { printThermalReceipt } from "@/lib/print/receipt";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/core/utils";
 import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";
+import { PageShell } from "@/components/shared/PageShell";
 import InlineNotice from "@/components/shared/InlineNotice";
 import {
   useInvoicesData,
@@ -82,8 +83,7 @@ export default function Invoices() {
   } = useInvoicesData();
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-5 px-3 pt-4 sm:px-4 lg:px-6 lg:space-y-6">
+    <PageShell contained>
         <PageHeader className={undefined}
           title="الفواتير"
           subtitle="تتبع المبيعات وإدارة الفواتير والمدفوعات"
@@ -278,7 +278,6 @@ export default function Invoices() {
           adjustmentSubmitting={adjustmentSubmitting}
           onSubmit={submitAdjustmentRequest}
         />
-      </div>
-    </div>
+    </PageShell>
   );
 }

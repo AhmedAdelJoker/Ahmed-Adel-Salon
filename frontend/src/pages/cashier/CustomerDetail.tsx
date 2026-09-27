@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageShell } from "@/components/shared/PageShell";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -102,8 +103,8 @@ function CustomerDetailPage() {
   }
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <PageHeader
           className={undefined}
           title={`${customer.first_name} ${customer.last_name || ""}`}
@@ -349,7 +350,7 @@ function CustomerDetailPage() {
           cancelText="إلغاء"
           variant="danger"
         />
-      </div>
+      </PageShell>
     </div>
   );
 }

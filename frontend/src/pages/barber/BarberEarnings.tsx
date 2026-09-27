@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { PageShell } from "@/components/shared/PageShell";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -97,8 +98,8 @@ const BarberEarnings = () => {
   }, [fetchEarnings]);
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <PageHeader
           title="الأرباح والعمولات"
           subtitle="متابعة تفصيلية لدخلك وعمولاتك"
@@ -508,13 +509,12 @@ const BarberEarnings = () => {
                 </div>
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
-      </div>
+            </TabsContent>
+          </Tabs>
+      </PageShell>
     </div>
   );
 };
-
 import api from "@/services/api";
 import { Badge } from "@/components/ui/badge";
 

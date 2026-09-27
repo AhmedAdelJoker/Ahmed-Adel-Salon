@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { PageShell } from "@/components/shared/PageShell";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -150,8 +151,8 @@ const BarberAvailability = () => {
   const today = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <PageHeader
           title="ساعات العمل والإجازات"
           subtitle="إدارة جدول عملك وإجازاتك"
@@ -360,7 +361,7 @@ const BarberAvailability = () => {
             </div>
           )}
         </div>
-      </div>
+      </PageShell>
 
       {/* Time Off Modal */}
       <Dialog open={showTimeOffModal} onOpenChange={setShowTimeOffModal}>
@@ -460,10 +461,9 @@ const BarberAvailability = () => {
               {editingTimeOff ? "حفظ" : "إضافة"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
     </div>
   );
 };
-
 export default BarberAvailability;

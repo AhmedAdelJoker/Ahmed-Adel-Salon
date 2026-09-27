@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { PageShell } from "@/components/shared/PageShell";
 import { EmptyState } from "@/components/shared/EmptyState";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
@@ -119,8 +120,8 @@ const BarberClients = () => {
   );
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <PageHeader
           title="عملائي"
           subtitle="إدارة العملاء وتاريخهم وتفضيلاتهم"
@@ -368,11 +369,10 @@ const BarberClients = () => {
                 {isEditing ? "حفظ" : "إضافة"}
               </Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DialogContent>
+          </Dialog>
+      </PageShell>
     </div>
   );
 };
-
 export default BarberClients;

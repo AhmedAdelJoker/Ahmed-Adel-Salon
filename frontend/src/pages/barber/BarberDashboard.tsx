@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Zap, Scissors, BarChart3, CalendarDays, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/AsyncState";
+import { PageShell } from "@/components/shared/PageShell";
 
 const BarberDashboard = () => {
   const {
@@ -46,8 +47,8 @@ const BarberDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-4">
@@ -123,12 +124,11 @@ const BarberDashboard = () => {
 
           {/* Schedule Tab */}
           <TabsContent value="schedule" className="space-y-4">
-            <BarberSchedule />
-          </TabsContent>
-        </Tabs>
-      </div>
+              <BarberSchedule />
+            </TabsContent>
+          </Tabs>
+      </PageShell>
     </div>
   );
 };
-
 export default BarberDashboard;
