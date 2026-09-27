@@ -18,7 +18,8 @@ export {
   TableHead as Th,
   TableCell as Td,
 } from "@/components/ui/table";
-export { EmptyState } from "@/components/ui/EmptyState";
+// EmptyState is the single component for that case and lives with the other
+// page-level primitives: import it from "@/components/shared/EmptyState".
 
 // Legacy shadcn/ui components (keep for backward compatibility)
 export {

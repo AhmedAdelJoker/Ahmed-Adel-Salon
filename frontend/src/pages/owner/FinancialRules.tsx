@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/core/utils";
-import { TableEmptyState } from "@/components/shared/TableEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -732,10 +732,10 @@ function AuditPanel({ rows, searchTerm, setSearchTerm }: { rows: Record<string, 
             {rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="h-64">
-                  <TableEmptyState
+                  <EmptyState variant="table"
                     icon={FileLock2}
                     title="لا توجد عمليات رقابية مسجلة"
-                    description="جرّب كلمة بحث مختلفة أو تأكد من اتصال النظام بالخادم."
+                    message="جرّب كلمة بحث مختلفة أو تأكد من اتصال النظام بالخادم."
                   />
                 </TableCell>
               </TableRow>

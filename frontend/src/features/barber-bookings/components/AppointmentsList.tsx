@@ -1,4 +1,5 @@
 import { Calendar, Clock, Scissors, CheckCircle, Play } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/core/utils";
 import { Badge } from "@/components/ui/badge";
@@ -40,13 +41,7 @@ export const AppointmentsList = ({
 
   if (filteredAppointments.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-16 text-center">
-        <Calendar size={40} className="mb-3 text-muted" />
-        <p className="text-base font-black text-main">لا توجد مواعيد</p>
-        <p className="mt-1 text-xs font-bold text-muted">
-          لا توجد مواعيد مطابقة للفلاتر المحددة
-        </p>
-      </div>
+      <EmptyState variant="section" icon={Calendar} title="لا توجد مواعيد" message="لا توجد مواعيد مطابقة للفلاتر المحددة" />
     );
   }
 

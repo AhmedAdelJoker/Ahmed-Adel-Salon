@@ -3,7 +3,7 @@ import { CalendarClock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, formatTime12h } from "@/lib/core/utils";
 import { getStatusConfig } from "@/features/customers/utils/customer";
-import CustomerInlineEmptyState from "@/features/customers/components/CustomerInlineEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { TabsContent } from "@/components/ui/tabs";
 
 export default function CustomerAppointmentsTab({
@@ -22,10 +22,10 @@ export default function CustomerAppointmentsTab({
                 ))}
               </div>
             ) : appointments.length === 0 ? (
-              <CustomerInlineEmptyState
+              <EmptyState variant="inline"
                 icon={CalendarClock}
                 title="لا توجد مواعيد"
-                description="لم يتم تسجيل أي مواعيد لهذا العميل"
+                message="لم يتم تسجيل أي مواعيد لهذا العميل"
               />
             ) : (
               <div className="space-y-2">

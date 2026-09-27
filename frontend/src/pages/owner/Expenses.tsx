@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/shared/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -166,21 +167,40 @@ const ExpensesPage = () => {
           ))}
         </div>
       ) : expenseRows.length === 0 ? (
-        <PremiumCard className="py-16 text-center border-dashed">
-          <div className="flex flex-col items-center">
-            <div className="h-16 w-16 rounded-2xl bg-soft border border-border flex items-center justify-center">
-              <FileText size={28} className="text-muted" />
-            </div>
-            <p className="mt-4 text-base font-black text-main">لا توجد مصاريف</p>
-            <p className="mt-1 text-sm font-bold text-muted">لم نعثر على سجلات مطابقة للفلتر الحالي</p>
-            <div className="flex gap-2 mt-4">
-              <Button onClick={() => { resetForm(); setIsModalOpen(true); }} className="h-11 rounded-xl px-6 bg-slate-900 text-white font-black">
+        <EmptyState
+          variant="section"
+          icon={FileText}
+          title="لا توجد مصاريف"
+          message="لم نعثر على سجلات مطابقة للفلتر الحالي"
+          action={
+            <div className="flex gap-2 mt-2">
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsModalOpen(true);
+                }}
+                className="h-11 rounded-xl px-6 font-black"
+              >
                 <Plus size={14} className="ml-1.5" /> إضافة مصروف
               </Button>
-              {hasActiveFilters && <Button variant="outline" onClick={() => { setCategoryFilter("all"); setPaymentFilter("all"); setDateFrom(""); setDateTo(""); setSearchTerm(""); }} className="h-11 rounded-xl">مسح الفلاتر</Button>}
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setCategoryFilter("all");
+                    setPaymentFilter("all");
+                    setDateFrom("");
+                    setDateTo("");
+                    setSearchTerm("");
+                  }}
+                  className="h-11 rounded-xl"
+                >
+                  مسح الفلاتر
+                </Button>
+              )}
             </div>
-          </div>
-        </PremiumCard>
+          }
+        />
       ) : (
         <div className="space-y-3">
           <AnimatePresence>

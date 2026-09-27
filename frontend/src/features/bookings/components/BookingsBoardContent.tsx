@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Calendar, Clock, Edit3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
@@ -67,18 +68,7 @@ export default function BookingsBoardContent({
             {viewMode === "grid" ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                 {filteredBookings.length === 0 ? (
-                  <div className="col-span-full py-20 text-center text-muted bg-soft/20 rounded-3xl border border-dashed border-border/60 p-8 space-y-2">
-                    <Calendar
-                      size={40}
-                      className="mx-auto text-muted/40 mb-2"
-                    />
-                    <p className="font-black text-sm text-main">
-                      لم يتم العثور على أي مواعيد بهذه الفلاتر.
-                    </p>
-                    <p className="text-xs font-bold text-muted">
-                      جرب تغيير الفلاتر أو تاريخ الحجز لعرض النتيجة.
-                    </p>
-                  </div>
+                  <EmptyState variant="section" icon={Calendar} title="لم يتم العثور على أي مواعيد بهذه الفلاتر." message="جرب تغيير الفلاتر أو تاريخ الحجز لعرض النتيجة." />
                 ) : (
                   filteredBookings.map((b: any) => (
                     <BookingCardFull
@@ -154,15 +144,7 @@ export default function BookingsBoardContent({
 
                       <div className="space-y-3 flex-1 overflow-y-auto custom-scrollbar p-1 min-h-0">
                         {empBookings.length === 0 ? (
-                          <div className="py-16 text-center border-2 border-dashed border-border/50 rounded-2xl text-muted/60 space-y-1">
-                            <Clock
-                              size={24}
-                              className="mx-auto opacity-30 mb-1"
-                            />
-                            <p className="text-xs font-bold">
-                              لا توجد حجوزات حالياً
-                            </p>
-                          </div>
+                          <EmptyState variant="section" icon={Clock} title="لا توجد حجوزات حالياً" />
                         ) : (
                           empBookings.map((b: any) => (
                             <div

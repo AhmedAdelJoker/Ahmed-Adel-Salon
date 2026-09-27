@@ -36,10 +36,10 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -184,26 +184,12 @@ export default function OperationalReports() {
 
   if (loadError && !hasData && hasLoaded) {
     return (
-      <div className="erp-page-container space-y-6 pb-16">
-        <PageHeader
-          title="التقارير التشغيلية"
-          subtitle="تحليل الأداء التشغيلي المتقدم."
-          badge="التقارير التشغيلية"
-          icon={BarChart3}
-        />
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-            <p className="text-lg font-black text-main">تعذر تحميل البيانات التشغيلية</p>
-            <p className="max-w-md text-sm font-bold text-muted">
-              تحقق من الاتصال بالخادم ثم أعد المحاولة. النطاق الحالي: {startDate} إلى{" "}
-              {endDate}.
-            </p>
-            <Button onClick={fetchData} loading={refreshing}>
-              <RefreshCw size={16} /> إعادة المحاولة
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <EmptyState
+        variant="section"
+        icon={RefreshCw}
+        title="تعذر تحميل البيانات التشغيلية"
+        message={`تحقق من الاتصال بالخادم ثم أعد المحاولة. النطاق الحالي: ${startDate} إلى ${endDate}.`}
+      />
     );
   }
 

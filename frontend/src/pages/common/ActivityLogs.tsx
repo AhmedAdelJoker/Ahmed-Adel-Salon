@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TableEmptyState } from "@/components/shared/TableEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -503,10 +503,10 @@ export default function ActivityLogs() {
                 {logs.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5}>
-                      <TableEmptyState
+                      <EmptyState variant="table"
                         icon={ClipboardList}
                         title="لا توجد سجلات"
-                        description={
+                        message={
                           hasActiveFilters
                             ? "لم يتم العثور على عمليات مطابقة للفلاتر الحالية — جرب توسيع الفترة أو مسح البحث."
                             : "لم يتم العثور على عمليات مطابقة للفلاتر الحالية."
@@ -522,10 +522,10 @@ export default function ActivityLogs() {
           {/* Mobile cards */}
           <div className="grid gap-3 p-4 lg:hidden">
             {logs.length === 0 ? (
-              <TableEmptyState
+              <EmptyState variant="table"
                 icon={ClipboardList}
                 title="لا توجد سجلات"
-                description={
+                message={
                   hasActiveFilters
                     ? "لم يتم العثور على عمليات مطابقة للفلاتر الحالية — جرب توسيع الفترة أو مسح البحث."
                     : "لم يتم العثور على عمليات مطابقة للفلاتر الحالية."

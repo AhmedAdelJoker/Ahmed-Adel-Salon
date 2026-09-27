@@ -91,19 +91,27 @@ describe("POS Page Accessibility (axe-core)", () => {
     document.documentElement.lang = "ar";
   });
 
-  test("POS page has no accessibility violations on initial load", async () => {
-    const { container } = renderPOS();
+  // axe-core over the whole POS tree is the slowest thing in the suite and
+  // outran the 10s global timeout whenever the runner was also busy with the
+  // file-scanning suites, which made this fail intermittently rather than for
+  // any accessibility reason.
+  test(
+    "POS page has no accessibility violations on initial load",
+    async () => {
+      const { container } = renderPOS();
 
-    // Wait for loading to complete
-    await waitFor(() => {
-      expect(
-        screen.queryByText("تنشيط محطة الـ POS الآمنة..."),
-      ).not.toBeInTheDocument();
-    });
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(
+          screen.queryByText("تنشيط محطة الـ POS الآمنة..."),
+        ).not.toBeInTheDocument();
+      });
 
-    const results = await axe.run(container);
-    expect(results).toHaveNoViolations();
-  });
+      const results = await axe.run(container);
+      expect(results).toHaveNoViolations();
+    },
+    60_000,
+  );
 
   test("Shift sidebar has no accessibility violations", async () => {
     const { container } = renderPOS();

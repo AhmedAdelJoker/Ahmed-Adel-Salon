@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { hasRoleAccess } from "@/lib/access/roles";
-import { TableEmptyState } from "@/components/shared/TableEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -290,10 +290,10 @@ const SmartAlerts = () => {
 
         {alertRows.length === 0 && (
           <Card className="rounded-[26px] border border-border bg-card p-8 shadow-soft">
-            <TableEmptyState
+            <EmptyState variant="table"
               icon={ShieldCheck}
               title="لا توجد تنبيهات"
-              description="جميع البنود الحالية تمت مراجعتها أو لا توجد عناصر تطابق الفلتر النشط."
+              message="جميع البنود الحالية تمت مراجعتها أو لا توجد عناصر تطابق الفلتر النشط."
             />
           </Card>
         )}

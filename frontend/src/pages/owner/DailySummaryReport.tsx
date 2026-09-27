@@ -19,7 +19,7 @@ import { toast } from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   PageHeader,
   PremiumCard,
@@ -233,7 +233,7 @@ const DailySummaryReport = () => {
           {shifts.length === 0 ? (
             <EmptyState
               title="لا توجد ورديات"
-              text="لا توجد ورديات مسجلة لهذا اليوم."
+              message="لا توجد ورديات مسجلة لهذا اليوم."
               icon={Clock}
             />
           ) : (
@@ -315,7 +315,7 @@ const DailySummaryReport = () => {
           {expenses.length === 0 ? (
             <EmptyState
               title="لا توجد مصروفات"
-              text="لا توجد مصروفات مسجلة لهذا اليوم."
+              message="لا توجد مصروفات مسجلة لهذا اليوم."
               icon={ShoppingBag}
             />
           ) : (

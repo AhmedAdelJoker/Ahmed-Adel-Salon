@@ -17,7 +17,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { formatCurrency, cn } from "@/lib/core/utils";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -484,7 +484,7 @@ export default function Inventory() {
             ) : (
               <EmptyState
                 title="لا توجد نتائج"
-                text="لم نجد أي أصناف في هذا القسم حالياً."
+                message="لم نجد أي أصناف في هذا القسم حالياً."
                 icon={Package}
                 action={
                   <Button

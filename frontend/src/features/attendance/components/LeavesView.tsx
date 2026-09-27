@@ -1,5 +1,6 @@
 /** Attendance Leaves view (moved from AttendanceManagement page, no logic changes). */
 import { motion } from "framer-motion";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { CheckCircle2, Plane, Plus, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,12 +53,7 @@ export default function LeavesView({
               </div>
             </div>
             {leaves.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16">
-                <Plane size={40} className="mb-3 text-muted" />
-                <p className="text-base font-black text-main">
-                  لا توجد طلبات إجازات
-                </p>
-              </div>
+              <EmptyState variant="section" icon={Plane} title="لا توجد طلبات إجازات" />
             ) : (
               <div className="space-y-2">
                 {leaves.map((leave) => (

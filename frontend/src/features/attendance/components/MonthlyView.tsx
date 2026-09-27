@@ -1,5 +1,6 @@
 /** Attendance Monthly view (moved from AttendanceManagement page, no logic changes). */
 import { motion } from "framer-motion";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { BarChart3, TrendingUp } from "lucide-react";
 import {
   Bar,
@@ -289,15 +290,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                   );
                 })
               ) : (
-                <div className="md:col-span-2 flex flex-col items-center justify-center py-16 rounded-2xl border border-dashed border-border bg-card">
-                  <TrendingUp size={60} className="mb-4 text-muted" />
-                  <p className="text-xl font-black text-main">
-                    لا توجد بيانات شهرية
-                  </p>
-                  <p className="mt-1 text-xs font-bold text-muted">
-                    لم يتم تسجيل أي بيانات حضور لهذا الشهر
-                  </p>
-                </div>
+                <EmptyState variant="section" icon={TrendingUp} title="لا توجد بيانات شهرية" message="لم يتم تسجيل أي بيانات حضور لهذا الشهر" />
               )}
             </div>
           </motion.div>

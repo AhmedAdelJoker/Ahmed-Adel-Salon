@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { PremiumCard, StatCard, SkeletonCard } from "@/components/shared/PremiumUI";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { staticURL } from "@/services/api";
@@ -472,7 +472,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                 ) : (
                   <EmptyState
                     title="المعرض فارغ"
-                    text="أضف صور أعمالك — ستظهر كشبكة جذابة في صفحة العميل."
+                    message="أضف صور أعمالك — ستظهر كشبكة جذابة في صفحة العميل."
                     icon={ImageIcon}
                     action={
                       <label className="h-11 cursor-pointer inline-flex items-center gap-2 rounded-xl bg-primary px-6 text-xs font-black text-white shadow-md hover:bg-primary/90 transition-colors">

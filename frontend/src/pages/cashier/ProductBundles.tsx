@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import { cn, formatCurrency, formatNumber } from "@/lib/core/utils";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import {
   PageHeader,
@@ -441,7 +441,7 @@ export default function ProductBundles() {
             {offers.length === 0 ? (
               <EmptyState
                 title="لا توجد عروض منتجات"
-                text="ابدأ بإنشاء أول حزمة منتجات (Bundle) لزيادة مبيعاتك وتفريغ المخزون الراكد."
+                message="ابدأ بإنشاء أول حزمة منتجات (Bundle) لزيادة مبيعاتك وتفريغ المخزون الراكد."
                 icon={Gift}
                 action={
                   <Button onClick={openCreate} className="h-11 rounded-xl px-6 font-black">
@@ -452,7 +452,7 @@ export default function ProductBundles() {
             ) : (
               <EmptyState
                 title="لا نتائج"
-                text="لم نجد حزماً تطابق بحثك — جرب توسيع الفلتر أو مسح البحث."
+                message="لم نجد حزماً تطابق بحثك — جرب توسيع الفلتر أو مسح البحث."
                 icon={Search}
                 action={
                   <Button variant="outline" onClick={handleResetFilters} className="h-10 rounded-xl font-black">

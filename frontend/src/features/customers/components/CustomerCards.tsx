@@ -4,7 +4,7 @@ import { History, Trash2 } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
 import { formatCurrency } from "@/lib/core/utils";
 import { customerId, customerName, getInitials } from "@/features/customers/utils/customer";
-import { EmptyState } from "@/components/shared";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function CustomerCards({
   rows,

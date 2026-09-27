@@ -3,7 +3,7 @@ import { Receipt } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, formatCurrency } from "@/lib/core/utils";
 import { getInvoiceStatusConfig } from "@/features/customers/utils/customer";
-import CustomerInlineEmptyState from "@/features/customers/components/CustomerInlineEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { TabsContent } from "@/components/ui/tabs";
 
 export default function CustomerInvoicesTab({
@@ -22,10 +22,10 @@ export default function CustomerInvoicesTab({
                 ))}
               </div>
             ) : invoices.length === 0 ? (
-              <CustomerInlineEmptyState
+              <EmptyState variant="inline"
                 icon={Receipt}
                 title="لا توجد فواتير"
-                description="لم يتم إصدار أي فواتير لهذا العميل"
+                message="لم يتم إصدار أي فواتير لهذا العميل"
               />
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">

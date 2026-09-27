@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { EmptyState } from "@/components/shared/EmptyState";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -175,13 +176,7 @@ const BarberClients = () => {
               />
             ))
           ) : filteredClients.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-16 text-center">
-              <Users size={40} className="mb-3 text-muted" />
-              <p className="text-base font-black text-main">لا توجد عملاء</p>
-              <p className="mt-1 text-xs font-bold text-muted">
-                ابدأ بإضافة أول عميل
-              </p>
-            </div>
+            <EmptyState variant="section" icon={Users} title="لا توجد عملاء" message="ابدأ بإضافة أول عميل" />
           ) : (
             filteredClients.map((client, i) => (
               <motion.div

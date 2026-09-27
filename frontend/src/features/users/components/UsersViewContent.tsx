@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PremiumCard, SkeletonCard } from "@/components/shared/PremiumUI";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
 
 export interface UsersViewUser {
@@ -49,7 +49,7 @@ export function UsersViewContent({
           <div className="p-4 sm:p-6">
             <EmptyState
               title="لا توجد نتائج"
-              text="لم نجد مستخدمين يطابقون بحثك — جرب كلمات أخرى أو امسح الفلتر."
+              message="لم نجد مستخدمين يطابقون بحثك — جرب كلمات أخرى أو امسح الفلتر."
               icon={Search}
             />
           </div>

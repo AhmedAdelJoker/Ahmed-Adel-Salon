@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/shared/EmptyState";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -445,29 +446,30 @@ const CustomerArchive = () => {
           ))}
         </div>
       ) : filteredCustomers.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-4 py-16 text-center sm:py-20">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-soft sm:h-16 sm:w-16">
-            <Archive size={28} className="text-muted" />
-          </div>
-          <p className="text-sm font-black text-main sm:text-base">
-            {customers.length === 0 ? "الأرشيف فارغ" : "لا توجد نتائج مطابقة"}
-          </p>
-          <p className="mt-1 text-xs font-bold text-muted">
-            {customers.length === 0
+        <EmptyState
+          variant="page"
+          icon={Archive}
+          title={
+            customers.length === 0 ? "الأرشيف فارغ" : "لا توجد نتائج مطابقة"
+          }
+          message={
+            customers.length === 0
               ? "لا يوجد عملاء محذوفون حالياً"
-              : "جرّب كلمة بحث مختلفة أو امسح البحث لعرض الكل"}
-          </p>
-          {customers.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleSearchChange("")}
-              className="mt-4 gap-1.5 rounded-xl text-xs font-black"
-            >
-              <X size={13} /> مسح البحث
-            </Button>
-          )}
-        </div>
+              : "جرّب كلمة بحث مختلفة أو امسح البحث لعرض الكل"
+          }
+          action={
+            customers.length > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSearchChange("")}
+                className="gap-1.5 rounded-xl text-xs font-black"
+              >
+                <X size={13} /> مسح البحث
+              </Button>
+            ) : null
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filteredCustomers.map((customer) => {

@@ -23,7 +23,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import api, { baseURL } from "@/services/api";
 import { useNavigate } from "react-router-dom";
 import { cn, formatDate, formatNumber } from "@/lib/core/utils";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   PageHeader,
   PremiumCard,
@@ -451,7 +451,7 @@ export default function SuppliesArchive() {
           <div className="p-4 sm:p-6">
             <EmptyState
               title="الأرشيف فارغ"
-              text="لم نجد أي عمليات مسجلة تطابق بحثك — جرب توسيع نطاق التاريخ أو مسح البحث."
+              message="لم نجد أي عمليات مسجلة تطابق بحثك — جرب توسيع نطاق التاريخ أو مسح البحث."
               icon={History}
               action={
                 <Button

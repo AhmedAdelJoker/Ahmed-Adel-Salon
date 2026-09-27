@@ -26,7 +26,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/core/utils";
 import { EMPLOYMENT_TYPES, JOB_TITLE_BLUEPRINTS } from "@/features/hr/utils/constants";
 import { isCustomJobTitleValue } from "@/features/hr/utils/helpers";
@@ -58,7 +58,7 @@ export default function EmployeeCardGrid({
           <EmptyState
             icon={Users}
             title="لا يوجد كوادر مطابقة"
-            description="جرب تعديل كلمات البحث أو أضف موظفاً جديداً للمنظومة."
+            message="جرب تعديل كلمات البحث أو أضف موظفاً جديداً للمنظومة."
             action={
               <Button onClick={onCreate} className="rounded-xl bg-accent text-white font-black">
                 <Plus size={16} className="ml-2"/> إضافة موظف جديد
