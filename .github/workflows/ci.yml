@@ -112,39 +112,21 @@ jobs:
           cd backend
           python scripts/check_mojibake.py
 
+      # `alembic upgrade head` exiting 0 only means every upgrade() ran without
+      # raising; the script is what compares the resulting schema against the
+      # models. It lives in scripts/ rather than inline because the previous
+      # inline version ended with `import app.main`, which instantiates
+      # Settings and needs DATABASE_URL, SECRET_KEY and FIRST_SUPERUSER_PASSWORD
+      # -- so the schema check died on a pydantic ValidationError and CI called
+      # it a migration failure. `alembic upgrade head` on the line above survives
+      # the same problem only because alembic/env.py wraps its settings lookup in
+      # a try/except; the check must not import the application at all.
       - name: Verify clean-room migrations
         run: |
           cd backend
           rm -f salon_pro.db
           alembic upgrade head
-          python - <<'PY'
-          import subprocess
-          from sqlalchemy import create_engine, inspect, text
-          from app.db.base import Base
-          import app.main  # noqa: F401  — importing registers every model
-
-          # Resolve the head dynamically so adding a migration never breaks CI.
-          head = subprocess.run(
-              ["alembic", "heads"], capture_output=True, text=True, check=True
-          ).stdout.split()[0]
-
-          engine = create_engine("sqlite:///salon_pro.db")
-          with engine.connect() as conn:
-              stamped = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-              assert stamped == head, f"stamped {stamped} != head {head}"
-              assert not conn.execute(text("PRAGMA foreign_key_check")).fetchall()
-
-          # Every mapped model table/column must actually exist after migrating.
-          inspector = inspect(engine)
-          db_tables = set(inspector.get_table_names())
-          missing = sorted(set(Base.metadata.tables) - db_tables)
-          assert not missing, f"tables missing from schema: {missing}"
-          for table in Base.metadata.sorted_tables:
-              have = {c["name"] for c in inspector.get_columns(table.name)}
-              want = {c.name for c in table.columns}
-              assert not (want - have), f"{table.name} missing columns: {sorted(want - have)}"
-          print(f"clean-room migration OK at {head} ({len(db_tables)} tables)")
-          PY
+          python scripts/verify_migration_head.py
 
   frontend-lint:
     runs-on: ubuntu-latest
