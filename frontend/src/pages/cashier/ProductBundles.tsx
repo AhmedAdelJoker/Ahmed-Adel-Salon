@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/select";
 import { staticURL } from "@/services/api";
 import { useProductBundles } from "@/features/product-bundles";
+import { currencyLabel } from "@/lib/core/currency";
 
 function resolveBundleImage(offer: any): string {
   if (!offer?.image_url) return "";
@@ -601,9 +602,7 @@ export default function ProductBundles() {
                       )}
                       placeholder="0.00"
                     />
-                    <div className={cn("absolute left-4 top-1/2 -translate-y-1/2 font-black text-sm", isPriceInvalid ? "text-danger" : "text-muted")}>
-                      ج.م
-                    </div>
+                    <div className={cn("absolute left-4 top-1/2 -translate-y-1/2 font-black text-sm", isPriceInvalid ? "text-danger" : "text-muted")}>{currencyLabel()}</div>
                   </div>
                   {isPriceInvalid && <p className="text-[11px] font-bold text-danger">لا يمكن أن يتجاوز {formatCurrency(totalPrice)}</p>}
                   {!isPriceInvalid && !isPriceEmpty && totalPrice === 0 && (

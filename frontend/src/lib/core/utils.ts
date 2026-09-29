@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { currencyLabel, getCurrency } from "@/lib/core/currency";
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
@@ -25,18 +26,25 @@ export function toArray<T>(value: unknown): T[] {
  * Format a number as currency in a clean, RTL-safe way.
  *
  * We deliberately do NOT use `style: "currency"` because browsers
- * emit weird bidi markers (‏) and reorder the symbol in a way that
+ * emit weird bidi markers (?) and reorder the symbol in a way that
  * breaks visual alignment in RTL layouts. Instead we format the
  * number with `ar-EG-u-nu-latn` (Latin digits) and append a fixed
  * Arabic currency label. This guarantees:
  *   - no stray bidi characters inside the value cell
  *   - symbol is always in the SAME position relative to the number
  *   - safe to use inside flex / grid / dir="rtl" containers
+ *
+ * The currency comes from `getCurrency()`, which holds whatever
+ * `business_settings.currency` says. It used to be hardcoded to EGP here, and
+ * the salon could change the setting all day without a single price on screen
+ * changing -- the column has existed on `business_settings` since the beginning
+ * and nothing read it. Passing `currencyCode` explicitly still overrides, for
+ * the one case that needs a different currency than the salon's own.
  */
 export function formatCurrency(
   value: unknown,
   _locale = "ar-EG-u-nu-latn",
-  currencyCode = "EGP",
+  currencyCode?: string,
 ): string {
   const num = safeNumber(value, 0);
   const formatted = new Intl.NumberFormat("en-US", {
@@ -44,7 +52,7 @@ export function formatCurrency(
     maximumFractionDigits: 2,
   }).format(Math.abs(num));
   const sign = num < 0 ? "-" : "";
-  const label = currencyCode === "EGP" ? "ج.م" : currencyCode;
+  const label = currencyLabel(currencyCode ?? getCurrency());
   return `${sign}${formatted} ${label}`;
 }
 

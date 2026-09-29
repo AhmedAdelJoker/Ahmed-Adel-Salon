@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { formatCurrency } from "@/lib/core/utils";
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUI } from "@/context/UIContext";
@@ -42,6 +43,7 @@ import {
 } from "@/components/shared/PremiumUI";
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
+import { currencyLabel } from "@/lib/core/currency";
 
 import {
   PersonalTab,
@@ -419,7 +421,7 @@ const HRManagement = () => {
                     </div>
                     <div className="rounded-2xl bg-soft border border-border/50 p-3 text-center">
                       <div className="text-[8px] font-black text-muted uppercase tracking-widest mb-1">الراتب</div>
-                      <div className="text-[11px] font-black text-main">{Number(formData.baseSalary||0).toLocaleString("ar-EG")} <span className="text-[9px] text-muted">ج.م</span></div>
+                      <div className="text-[11px] font-black text-main">{Number(formData.baseSalary||0).toLocaleString("ar-EG")} <span className="text-[9px] text-muted">{currencyLabel()}</span></div>
                     </div>
                   </div>
 
@@ -498,7 +500,7 @@ const HRManagement = () => {
                     <div className="text-[10px] font-bold text-accent">{currentBlueprint.title}</div>
                     <div className="flex gap-1 mt-1">
                       <span className={cn("text-[8px] px-1.5 py-0.5 rounded-full font-black border", formData.status==="active"?"bg-success text-white border-success":"bg-danger text-white border-danger")}>{formData.status==="active"?"نشط":"معلّق"}</span>
-                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-soft border border-border font-bold text-muted">{Number(formData.baseSalary||0).toLocaleString("ar-EG")} ج.م</span>
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-soft border border-border font-bold text-muted">{formatCurrency(formData.baseSalary || 0)}</span>
                     </div>
                   </div>
                   <div className="text-[9px] font-black text-muted">{Math.round(((DYNAMIC_TABS.findIndex(t=>t.id===activeTab)+1)/DYNAMIC_TABS.length)*100)}%</div>

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { formatCurrency } from "@/lib/core/utils";
 import { DollarSign, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -94,7 +95,7 @@ export default function EmployeeTable({
                     </span>
                   </TableCell>
                   <TableCell className="px-4 py-4 sm:px-5 font-black text-main">
-                    {Number(emp.baseSalary ?? 0).toLocaleString("ar-EG")} ج.م
+                    {formatCurrency(emp.baseSalary ?? 0)}
                   </TableCell>
                   <TableCell className="px-4 py-4 sm:px-5">
                     <div className="flex items-center justify-center gap-2">
@@ -172,7 +173,7 @@ export default function EmployeeTable({
                 </div>
                 <div className="rounded-xl bg-soft border border-border p-3">
                   <div className="text-[9px] font-black text-muted uppercase">الراتب</div>
-                  <div className="font-black text-main mt-1">{Number(emp.baseSalary ?? 0).toLocaleString("ar-EG")} ج.م</div>
+                  <div className="font-black text-main mt-1">{formatCurrency(emp.baseSalary ?? 0)}</div>
                 </div>
               </div>
               <div className="mt-3 flex gap-2">

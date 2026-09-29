@@ -1,7 +1,10 @@
 import { Calendar, Clock, Scissors, CheckCircle, Play } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/core/utils";
+import {
+  cn,
+  formatCurrency,
+} from "@/lib/core/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type {
@@ -109,7 +112,7 @@ export const AppointmentsList = ({
                             ? apt.total_amount
                             : Number(apt.total_amount || 0)) > 0 && (
                             <span className="text-[10px] font-bold text-primary">
-                              {String(apt.total_amount)} ج.م
+                              {formatCurrency(String(apt.total_amount))}
                             </span>
                           )}
                         </div>

@@ -15,6 +15,7 @@ import {
   normalizeUnit,
 } from "@/features/inventory/design-tokens";
 import { FormField } from "@/features/inventory";
+import { currencyLabel } from "@/lib/core/currency";
 import {
   NATIVE_SELECT_CLASS,
   TEXTAREA_CLASS,
@@ -231,9 +232,7 @@ export function ProductFormModal({
                   }
                   className="h-10 rounded-xl bg-soft border-border font-black text-success ps-10 sm:h-12 sm:ps-12"
                 />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">
-                  ج.م
-                </span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">{currencyLabel()}</span>
               </div>
             </FormField>
             <FormField label="تكلفة العبوة">
@@ -249,9 +248,7 @@ export function ProductFormModal({
                   }
                   className="h-10 rounded-xl bg-soft border-border font-black ps-10 sm:h-12 sm:ps-12"
                 />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">
-                  ج.م
-                </span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">{currencyLabel()}</span>
               </div>
             </FormField>
           </div>

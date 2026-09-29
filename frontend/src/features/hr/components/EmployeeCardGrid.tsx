@@ -31,6 +31,7 @@ import { cn } from "@/lib/core/utils";
 import { EMPLOYMENT_TYPES, JOB_TITLE_BLUEPRINTS } from "@/features/hr/utils/constants";
 import { isCustomJobTitleValue } from "@/features/hr/utils/helpers";
 import type { EmployeeRecord } from "@/types/employee";
+import { currencyLabel } from "@/lib/core/currency";
 
 export default function EmployeeCardGrid({
   employees,
@@ -165,7 +166,7 @@ export default function EmployeeCardGrid({
                       <span className="text-[9px] font-black text-muted uppercase tracking-widest">الراتب الأساسي</span>
                     </div>
                     <div className="text-[15px] font-black text-main">
-                      {Number(emp.baseSalary).toLocaleString("ar-EG")} <span className="text-[10px] font-bold text-muted">ج.م</span>
+                      {Number(emp.baseSalary).toLocaleString("ar-EG")} <span className="text-[10px] font-bold text-muted">{currencyLabel()}</span>
                     </div>
                   </div>
                   <div className="group/stat rounded-2xl bg-soft border border-border/60 p-3 sm:p-4 hover:border-primary/20 hover:bg-card transition-colors">

@@ -11,12 +11,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { formatNumber } from "@/lib/core/utils";
+import {
+  formatCurrency,
+  formatNumber,
+} from "@/lib/core/utils";
 import {
   formatQuantity,
   getAvailablePacks,
 } from "@/features/inventory/design-tokens";
 import { FormField } from "@/features/inventory";
+import { currencyLabel } from "@/lib/core/currency";
 import type {
   InventoryProductAny,
   StockFormData,
@@ -176,9 +180,7 @@ export function StockSupplyModal({
                       placeholder={editingProduct?.cost_price || "0.00"}
                       className="h-10 rounded-xl bg-soft border-border font-black text-success ps-10 sm:h-12 sm:ps-12"
                     />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">
-                      ج.م
-                    </span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">{currencyLabel()}</span>
                   </div>
                 </FormField>
               </motion.div>
@@ -197,8 +199,7 @@ export function StockSupplyModal({
                     تغير في سعر التكلفة!
                   </h3>
                   <p className="mt-2 text-xs font-bold text-muted">
-                    تم التوريد بسعر جديد ({stockFormData.purchase_price}{" "}
-                    ج.م) بدلاً من ({editingProduct?.cost_price} ج.م). هل تود
+                    تم التوريد بسعر جديد ({stockFormData.purchase_price}{formatCurrency(" ")}) بدلاً من ({formatCurrency(editingProduct?.cost_price)}). هل تود
                     تحديث سعر البيع؟
                   </p>
                 </div>
@@ -211,9 +212,7 @@ export function StockSupplyModal({
                       className="h-10 rounded-xl font-black text-primary border-primary/40 bg-primary/5 ps-10 sm:h-12 sm:ps-12"
                       autoFocus
                     />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-primary/40 sm:left-4">
-                      ج.م
-                    </span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-primary/40 sm:left-4">{currencyLabel()}</span>
                   </div>
                 </FormField>
               </motion.div>

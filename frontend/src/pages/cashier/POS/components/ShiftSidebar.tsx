@@ -29,6 +29,7 @@ import { printReceiptNative } from "@/lib/print/thermal";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { currencyLabel } from "@/lib/core/currency";
 
 const ShiftSidebar = () => {
   const {
@@ -323,9 +324,7 @@ const ShiftSidebar = () => {
                   disabled={!isShopOpen}
                   className="h-10 sm:h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 font-black text-base sm:text-lg px-3 focus:border-primary/40 transition-all shadow-sm disabled:opacity-50 touch-target"
                 />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] sm:text-[9px] font-black text-slate-300">
-                  ج.م
-                </span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] sm:text-[9px] font-black text-slate-300">{currencyLabel()}</span>
               </div>
             </div>
             <Button
@@ -501,9 +500,7 @@ const ShiftSidebar = () => {
                     placeholder="0.00"
                     className="h-16 rounded-2xl font-black text-2xl border-2 border-primary/10 focus:border-primary/40 bg-white dark:bg-white/5 pe-4 ps-12 transition-all shadow-sm touch-target"
                   />
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-bold text-sm">
-                    ج.م
-                  </div>
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-bold text-sm">{currencyLabel()}</div>
                 </div>
               </div>
 

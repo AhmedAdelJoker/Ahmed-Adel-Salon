@@ -13,6 +13,7 @@ import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
 import { CATEGORIES, PAYMENT_METHODS } from "@/features/expenses/constants";
 import type { ExpenseFormData } from "@/types/expenses";
+import { currencyLabel } from "@/lib/core/currency";
 
 interface ExpenseFormSectionsProps {
   formData: ExpenseFormData;
@@ -57,7 +58,7 @@ export function ExpenseFormSections({
             <label className="text-[10px] font-black text-muted uppercase tracking-widest">المبلغ *</label>
             <div className="relative">
               <Input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} disabled={isEditing && !isOwner} className="h-11 rounded-xl bg-soft border-border font-black pe-4 ps-12" placeholder="0.00" />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">ج.م</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">{currencyLabel()}</span>
             </div>
           </div>
         </div>

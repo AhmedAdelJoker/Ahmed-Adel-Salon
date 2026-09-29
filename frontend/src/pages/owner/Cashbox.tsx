@@ -49,6 +49,7 @@ import {
 import type { Transaction } from "@/types/cashbox";
 import cashboxService from "@/services/cashboxService";
 import { staticURL } from "@/services/api";
+import { currencyLabel } from "@/lib/core/currency";
 
 const SYSTEM_LINKS = [
   { label: "نقطة البيع", icon: Receipt, href: "/pos" },
@@ -590,7 +591,7 @@ export default function Cashbox() {
             </div>
             <div className="relative">
               <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} placeholder="0.00" className="h-12 text-xl font-black text-center pe-4 ps-10 rounded-xl" autoFocus />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted">ج.م</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted">{currencyLabel()}</span>
             </div>
             <div className="text-xs text-muted">رصيد النقدي: <b className="text-main">{formatCurrency(summary.cash_balance_detail)}</b> • الرقمي: <b className="text-main">{formatCurrency(summary.non_cash_balance)}</b></div>
 

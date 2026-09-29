@@ -867,7 +867,13 @@ const Settings = () => {
                                 <SelectItem value="SAR">ريال سعودي — SAR</SelectItem>
                                 <SelectItem value="USD">دولار — USD</SelectItem>
                                 <SelectItem value="AED">درهم إماراتي — AED</SelectItem>
-                                <SelectItem value="ج.م">ج.م</SelectItem>
+                                {/* The fifth entry was `value="ج.م"` labelled ج.م:
+                                    an option whose value was a rendered symbol
+                                    rather than a currency code, and identical to
+                                    the EGP entry above it. Selecting it stored
+                                    "ج.م" in business_settings.currency, which no
+                                    formatter understood. The codes above are the
+                                    contract. */}
                               </SelectContent>
                             </Select>
                           </div>

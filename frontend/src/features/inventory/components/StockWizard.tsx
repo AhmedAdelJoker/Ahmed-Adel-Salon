@@ -28,6 +28,7 @@ import { Metric } from "@/features/inventory";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { AnimatePresence } from "framer-motion";
+import { currencyLabel } from "@/lib/core/currency";
 
 const STEPS = [
   {
@@ -524,9 +525,7 @@ function SupplyDetailsForm({
                 step="0.01"
                 min="0"
               />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">
-                ج.م
-              </span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">{currencyLabel()}</span>
             </div>
           </div>
         )}
@@ -614,8 +613,7 @@ function PriceReviewForm({
           تنبيه: تغير في سعر التكلفة!
         </h3>
         <p className="text-sm font-bold text-muted leading-relaxed">
-          لقد قمت بتوريد الصنف بسعر شراء جديد ({priceAlertData?.purchasePrice}{" "}
-          ج.م) بدلاً من ({priceAlertData?.oldCost} ج.م). هل تود مراجعة وتعديل
+          لقد قمت بتوريد الصنف بسعر شراء جديد ({priceAlertData?.purchasePrice}{formatCurrency(" ")}) بدلاً من ({formatCurrency(priceAlertData?.oldCost)}). هل تود مراجعة وتعديل
           سعر البيع الآن؟
         </p>
       </div>
@@ -643,9 +641,7 @@ function PriceReviewForm({
               step="0.01"
               min="0"
             />
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-accent/40">
-              ج.م
-            </span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-accent/40">{currencyLabel()}</span>
           </div>
         </div>
       </div>

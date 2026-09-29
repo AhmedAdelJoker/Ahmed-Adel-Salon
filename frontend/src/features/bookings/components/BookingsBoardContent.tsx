@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { formatCurrency } from "@/lib/core/utils";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Calendar, Clock, Edit3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -199,7 +200,7 @@ export default function BookingsBoardContent({
                       <div className="pt-3 mt-1 border-t border-border/40 flex items-center justify-between text-[11px] font-black text-muted shrink-0">
                         <span>إيراد متوقع</span>
                         <span className="text-primary tabular-nums">
-                          {empRevenue.toLocaleString("en-EG")} ج.م
+                          {formatCurrency(empRevenue)}
                         </span>
                       </div>
                     </div>

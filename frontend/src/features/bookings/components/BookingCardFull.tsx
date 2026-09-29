@@ -24,7 +24,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
-import { cn, formatTime12h } from "@/lib/core/utils";
+import {
+  cn,
+  formatCurrency,
+  formatTime12h,
+} from "@/lib/core/utils";
 import {
   TODAY,
   normalizeStatus,
@@ -253,7 +257,7 @@ export default function BookingCardFull({
           </span>
           {booking.total_estimated_price > 0 && (
             <span className="text-primary font-black tabular-nums shrink-0">
-              {booking.total_estimated_price} ج.م
+              {formatCurrency(booking.total_estimated_price)}
             </span>
           )}
         </div>

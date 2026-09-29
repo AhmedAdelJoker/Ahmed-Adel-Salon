@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
 import { cn } from "@/lib/core/utils";
 import type { AttendanceRecord } from "@/features/attendance/types";
+import { currencyLabel } from "@/lib/core/currency";
 
 export default function MonthlyView({ processedData }: { processedData: AttendanceRecord[] }) {
   return (
@@ -262,7 +263,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                           </p>
                           <p className="text-xl font-black text-emerald-600">
                             {emp.payroll?.netSalary || 0}
-                            <small className="text-xs"> ج.م</small>
+                            <small className="text-xs">{currencyLabel()}</small>
                           </p>
                         </div>
                       </div>
