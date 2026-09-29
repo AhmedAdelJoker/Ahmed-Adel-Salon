@@ -17,6 +17,10 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
       - run: npm ci
+      # Named-commit convention, matching the other audit steps: a dependency
+      # report that does not say which lockfile it read cannot be compared
+      # against a later run.
+      - run: echo "audited state $(git rev-parse --short HEAD)"
       - run: npm audit --omit=dev --audit-level=high
 
   backend-tests:
@@ -44,6 +48,22 @@ jobs:
         # `backend/` says so explicitly; this one now does too.
         working-directory: backend
         run: |
+          # Print what is being audited, before auditing it.
+          #
+          # This exists because a stale log is indistinguishable from a real
+          # failure when the only thing the log reports is a package name and a
+          # version. Three fixes in a row were pushed, each correcting something
+          # the previous CI run had reported, and a report of
+          # "cryptography 46.0.3 has vulnerabilities" cannot tell you whether it
+          # describes the file as it is now or as it was three commits ago.
+          #
+          # A log that names its own commit and its own pins is either current
+          # or visibly not, with no guessing.
+          echo "::group::audited state"
+          echo "commit: $(git rev-parse --short HEAD)"
+          echo "ref:    $(git rev-parse --abbrev-ref HEAD)"
+          grep -E '^(cryptography|PyJWT|pyotp)==' requirements.txt
+          echo "::endgroup::"
           python -m pip install pip-audit
           pip-audit -r requirements.txt
 
@@ -145,6 +165,10 @@ jobs:
 
       - name: Audit production dependencies
         run: |
+          # Same reasoning as the backend audit: name the commit, so a log is
+          # either current or visibly not. `npm audit` output otherwise carries
+          # nothing that ties it to a lockfile.
+          echo "audited state: $(git rev-parse --short HEAD) ($(git rev-parse --abbrev-ref HEAD))"
           cd frontend
           npm audit --omit=dev --audit-level=high
 
