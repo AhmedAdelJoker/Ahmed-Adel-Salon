@@ -32,18 +32,18 @@ import { toast } from "react-hot-toast";
 
 import { Input } from "@/components/ui/input";
 import {
+  ArchiveView,
+  AttendanceDashboardView,
+  AttendanceLoading,
   AttendancePageHeader,
   AttendanceStatsCards,
   AttendanceViewTabs,
-} from "@/features/attendance/components/AttendanceHeader";
-import AttendanceDashboardView from "@/features/attendance/components/AttendanceDashboardView";
-import AttendanceLoading from "@/features/attendance/components/AttendanceLoading";
+  CalendarView,
+  LeavesView,
+  MonthlyView,
+  PulseView,
+} from "@/features/attendance";
 import type { AttendanceViewMode } from "@/features/attendance/types";
-import PulseView from "@/features/attendance/components/PulseView";
-import MonthlyView from "@/features/attendance/components/MonthlyView";
-import LeavesView from "@/features/attendance/components/LeavesView";
-import CalendarView from "@/features/attendance/components/CalendarView";
-import ArchiveView from "@/features/attendance/components/ArchiveView";
 
 const AttendanceManagement = () => {
   const navigate = useNavigate();

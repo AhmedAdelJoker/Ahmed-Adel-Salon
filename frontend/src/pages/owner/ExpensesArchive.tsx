@@ -19,7 +19,7 @@ import {
   X,
   TrendingUp,
 } from "lucide-react";
-import expenseService from "@/features/expenses/services/expenseService";
+import { expenseService } from "@/features/expenses";
 import exportService from "@/services/exportService";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

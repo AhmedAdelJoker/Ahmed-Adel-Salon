@@ -11,10 +11,10 @@ import InlineNotice from "@/components/shared/InlineNotice";
 import { PageShell } from "@/components/shared/PageShell";
 import i18n from "@/i18n";
 import { useBarberBookings } from "@/features/barber-bookings/hooks/useBarberBookings";
-import { QuickStats } from "@/features/barber-bookings/components/QuickStats";
-import { BookingsFilters } from "@/features/barber-bookings/components/BookingsFilters";
-import { AppointmentsList } from "@/features/barber-bookings/components/AppointmentsList";
-import { CalendarView } from "@/features/barber-bookings/components/CalendarView";
+import { QuickStats } from "@/features/barber-bookings";
+import { BookingsFilters } from "@/features/barber-bookings";
+import { AppointmentsList } from "@/features/barber-bookings";
+import { CalendarView } from "@/features/barber-bookings";
 
 const BarberBookings = () => {
   const {

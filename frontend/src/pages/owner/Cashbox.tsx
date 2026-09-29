@@ -33,8 +33,8 @@ import { StatCard as StatCardDisplay } from "@/components/shared/DisplayComponen
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCashbox, type CashDirectionTab } from "@/features/cashbox/hooks/useCashbox";
-import { CashboxCharts } from "@/features/cashbox/components/CashboxCharts";
-import { CashboxTable } from "@/features/cashbox/components/CashboxTable";
+import { CashboxCharts } from "@/features/cashbox";
+import { CashboxTable } from "@/features/cashbox";
 import {
   formatDateTimeLocal,
   getTypeLabel,

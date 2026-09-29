@@ -18,11 +18,11 @@ import {
 } from "@/components/shared/PremiumUI";
 import { KPI_CONFIG, PERIODS } from "@/features/reports-dashboard/constants";
 import { useReportsDashboard } from "@/features/reports-dashboard/hooks/useReportsDashboard";
-import { KpiStats } from "@/features/reports-dashboard/components/KpiStats";
-import { RevenueChart } from "@/features/reports-dashboard/components/RevenueChart";
-import { ServiceDistribution } from "@/features/reports-dashboard/components/ServiceDistribution";
-import { SmartInsights } from "@/features/reports-dashboard/components/SmartInsights";
-import { QuickActions } from "@/features/reports-dashboard/components/QuickActions";
+import { KpiStats } from "@/features/reports-dashboard";
+import { RevenueChart } from "@/features/reports-dashboard";
+import { ServiceDistribution } from "@/features/reports-dashboard";
+import { SmartInsights } from "@/features/reports-dashboard";
+import { QuickActions } from "@/features/reports-dashboard";
 
 export default function ReportsDashboard() {
   const navigate = useNavigate();

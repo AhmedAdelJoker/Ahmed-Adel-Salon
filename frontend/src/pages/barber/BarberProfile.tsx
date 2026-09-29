@@ -8,10 +8,10 @@ import { User, Bell, Shield, Palette, ArrowLeft } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { adaptObject } from "@/services/apiAdapter";
-import { ProfileTab } from "@/features/barber-profile/components/ProfileTab";
-import { NotificationsTab } from "@/features/barber-profile/components/NotificationsTab";
-import { SecurityTab } from "@/features/barber-profile/components/SecurityTab";
-import { AppearanceTab } from "@/features/barber-profile/components/AppearanceTab";
+import { ProfileTab } from "@/features/barber-profile";
+import { NotificationsTab } from "@/features/barber-profile";
+import { SecurityTab } from "@/features/barber-profile";
+import { AppearanceTab } from "@/features/barber-profile";
 import type {
   BarberProfileForm,
   NotificationsState,

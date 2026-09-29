@@ -32,7 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/core/utils";
 import { validateImageSize } from "@/lib/media/upload";
 import { PageHeader, PremiumCard, ContentPanel, SkeletonCard } from "@/components/shared/PremiumUI";
-import TwoFactorPanel from "@/features/security/components/TwoFactorPanel";
+import { TwoFactorPanel } from "@/features/security";
 import { AnimatePresence } from "framer-motion";
 
 const SETTINGS_TABS = [

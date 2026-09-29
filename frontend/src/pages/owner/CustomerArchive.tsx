@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import CustomerDetailsDialog from "@/features/customers/components/CustomerDetailsDialog";
+import { CustomerDetailsDialog } from "@/features/customers";
 import { exportService } from "@/services/exportService";
 import { cn, formatDateTime } from "@/lib/core/utils";
 import api from "@/services/api";
