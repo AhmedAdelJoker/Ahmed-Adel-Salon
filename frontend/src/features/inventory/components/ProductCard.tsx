@@ -419,7 +419,7 @@ export function ProductCard({
               tabIndex={0}
             >
               <svg
-                className="h-4 w-4 inline ml-1.5"
+                className="h-4 w-4 inline ms-1.5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

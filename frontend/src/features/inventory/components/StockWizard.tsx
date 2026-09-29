@@ -360,7 +360,7 @@ export function StockWizard({
                 className="h-12 rounded-xl px-8 font-black uppercase text-xs"
                 disabled={isSubmitting}
               >
-                <ChevronRight size={18} className="mr-2" /> رجوع
+                <ChevronRight size={18} className="me-2" /> رجوع
               </Button>
             )}
           </div>
@@ -370,7 +370,7 @@ export function StockWizard({
                 <Button
                   variant="secondary"
                   onClick={() => onOpenChange(false)}
-                  className="h-12 rounded-xl px-8 font-black uppercase text-xs mr-2"
+                  className="h-12 rounded-xl px-8 font-black uppercase text-xs me-2"
                   disabled={isSubmitting}
                 >
                   إلغاء
@@ -398,7 +398,7 @@ export function StockWizard({
                         Number(formData.purchase_price) <= 0)))
                 }
               >
-                التالي <ChevronLeft size={18} className="ml-2" />
+                التالي <ChevronLeft size={18} className="ms-2" />
               </Button>
             )}
           </div>
@@ -457,7 +457,7 @@ function SupplyDetailsForm({
                 setFormData((p) => ({ ...p, amount: e.target.value }))
               }
               placeholder="0"
-              className="h-12 rounded-xl bg-soft border-border focus:bg-card font-black pl-14"
+              className="h-12 rounded-xl bg-soft border-border focus:bg-card font-black ps-14"
               min="1"
               step="1"
               autoFocus
@@ -520,7 +520,7 @@ function SupplyDetailsForm({
                   setFormData((p) => ({ ...p, purchase_price: e.target.value }))
                 }
                 placeholder={product?.cost_price || "0.00"}
-                className="h-12 rounded-xl bg-soft border-border focus:bg-card font-black text-emerald-600 pl-12"
+                className="h-12 rounded-xl bg-soft border-border focus:bg-card font-black text-emerald-600 ps-12"
                 step="0.01"
                 min="0"
               />
@@ -638,7 +638,7 @@ function PriceReviewForm({
               type="number"
               value={newSellPrice}
               onChange={(e) => setNewSellPrice(e.target.value)}
-              className="h-12 rounded-xl font-black text-accent border-accent/40 bg-accent/5 pl-12 focus:ring-accent/10"
+              className="h-12 rounded-xl font-black text-accent border-accent/40 bg-accent/5 ps-12 focus:ring-accent/10"
               autoFocus
               step="0.01"
               min="0"

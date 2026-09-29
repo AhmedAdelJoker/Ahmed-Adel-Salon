@@ -475,7 +475,7 @@ const Settings = () => {
             variant="primary"
             className="h-10 rounded-xl px-5 text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary border-none shadow-sm"
           >
-            <ShieldCheck size={16} className="ml-2" strokeWidth={2.5} />{" "}
+            <ShieldCheck size={16} className="ms-2" strokeWidth={2.5} />{" "}
             {isOwnerLike ? "صلاحيات وصول المالك" : "صلاحيات المدير — ساعات العمل فقط"}
           </Badge>
         }
@@ -504,7 +504,7 @@ const Settings = () => {
             loading={publishing}
             className="h-8 shrink-0 rounded-xl px-4 text-[11px] font-black"
           >
-            <Upload size={13} className="ml-1" /> انشر الآن
+            <Upload size={13} className="ms-1" /> انشر الآن
           </Button>
         </div>
       )}
@@ -653,7 +653,7 @@ const Settings = () => {
                           onClick={fetchData}
                           className="h-8 self-start rounded-xl border-amber-300 px-3 text-[11px] font-black text-amber-800 dark:border-amber-700 dark:text-amber-200"
                         >
-                          <Activity size={13} className="ml-1" /> جلب أحدث نسخة
+                          <Activity size={13} className="ms-1" /> جلب أحدث نسخة
                         </Button>
                       </div>
                     )}
@@ -669,7 +669,7 @@ const Settings = () => {
                             ? "تعذر الحفظ"
                             : `تعذر الحفظ — ${shopSaveErrors.length} أخطاء من الخادم`}
                         </p>
-                        <ul className="mt-2 space-y-1 pr-4">
+                        <ul className="mt-2 space-y-1 pe-4">
                           {shopSaveErrors.map((line, index) => (
                             <li
                               key={`${line.field ?? "err"}-${index}`}
@@ -760,7 +760,7 @@ const Settings = () => {
                             <span className="text-[10px] font-black uppercase tracking-widest text-muted">
                               معاينة الإيصال
                             </span>
-                            <span className="mr-auto text-[10px] font-bold text-muted">حيّة</span>
+                            <span className="me-auto text-[10px] font-bold text-muted">حيّة</span>
                           </div>
                           <div className="p-4 flex flex-col items-center gap-2 text-center">
                             {getLogoPreviewUrl() ? (
@@ -804,7 +804,7 @@ const Settings = () => {
                       <div className="space-y-5 min-w-0">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-1.5">
-                            <label htmlFor="settings-salon-name" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-salon-name" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <Store size={11} /> المسمى التجاري الرسمي <span className="text-danger">*</span>
                             </label>
                             <Input
@@ -815,12 +815,12 @@ const Settings = () => {
                               placeholder="مثال: صالون الأناقة"
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1 tabular-nums">
+                            <p className="text-[10px] font-bold text-muted me-1 tabular-nums">
                               {shopSettings.salon_name.length}/255
                             </p>
                           </div>
                           <div className="space-y-1.5">
-                            <label htmlFor="settings-shop-phone" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-shop-phone" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <Bell size={11} /> رقم التواصل
                             </label>
                             <Input
@@ -833,10 +833,10 @@ const Settings = () => {
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                               dir="ltr"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1">يظهر في الفاتورة الحرارية</p>
+                            <p className="text-[10px] font-bold text-muted me-1">يظهر في الفاتورة الحرارية</p>
                           </div>
                           <div className="space-y-1.5">
-                            <label htmlFor="settings-shop-whatsapp" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-shop-whatsapp" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <MessageCircle size={11} /> واتساب
                             </label>
                             <Input
@@ -849,10 +849,10 @@ const Settings = () => {
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                               dir="ltr"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1">للتواصل وروابط الحجز</p>
+                            <p className="text-[10px] font-bold text-muted me-1">للتواصل وروابط الحجز</p>
                           </div>
                           <div className="space-y-1.5">
-                            <label htmlFor="settings-currency" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-currency" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <Coins size={11} /> العملة
                             </label>
                             <Select
@@ -872,7 +872,7 @@ const Settings = () => {
                             </Select>
                           </div>
                           <div className="md:col-span-2 space-y-1.5">
-                            <label htmlFor="settings-address" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-address" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <MapPin size={11} /> العنوان الجغرافي
                             </label>
                             <Input
@@ -883,10 +883,10 @@ const Settings = () => {
                               placeholder="المنطقة، الشارع، علامة مميزة"
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1 tabular-nums">{shopSettings.address.length}/500</p>
+                            <p className="text-[10px] font-bold text-muted me-1 tabular-nums">{shopSettings.address.length}/500</p>
                           </div>
                           <div className="md:col-span-2 space-y-1.5">
-                            <label htmlFor="settings-maps-url" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-maps-url" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <Globe size={11} /> رابط الخريطة (Google Maps)
                             </label>
                             <div className="flex gap-2">
@@ -913,10 +913,10 @@ const Settings = () => {
                                 </Button>
                               )}
                             </div>
-                            <p className="text-[10px] font-bold text-muted mr-1">يظهر زر الخريطة في الموقع العام — يجب أن يبدأ بـ https://</p>
+                            <p className="text-[10px] font-bold text-muted me-1">يظهر زر الخريطة في الموقع العام — يجب أن يبدأ بـ https://</p>
                           </div>
                           <div className="md:col-span-2 space-y-1.5">
-                            <label htmlFor="settings-receipt-footer" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-receipt-footer" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <Receipt size={11} /> تذييل الإيصال
                             </label>
                             <Textarea
@@ -928,7 +928,7 @@ const Settings = () => {
                               placeholder="مثال: شكراً لزيارتكم — نتطلع لخدمتكم مجدداً"
                               className="rounded-xl bg-soft border-border/60 font-bold"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1 tabular-nums">
+                            <p className="text-[10px] font-bold text-muted me-1 tabular-nums">
                               {shopSettings.receipt_footer.length}/500 — يظهر أسفل كل فاتورة
                             </p>
                           </div>
@@ -952,7 +952,7 @@ const Settings = () => {
                     <span className="text-xs font-bold text-muted hidden sm:inline">
                       {shopIsDirty ? "لديك تغييرات غير محفوظة" : "محفوظ"}
                     </span>
-                    <div className="flex gap-2 mr-auto">
+                    <div className="flex gap-2 me-auto">
                       <Button
                         variant="outline"
                         onClick={() => {

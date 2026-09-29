@@ -280,7 +280,7 @@ export default function Settings() {
             </Badge>
             {isOwnerLike && (
               <Button variant="outline" onClick={() => navigate("/owner/settings")} className="h-9 rounded-xl px-4 text-xs font-black">
-                <Store size={14} className="ml-1.5" /> إعدادات المحل
+                <Store size={14} className="ms-1.5" /> إعدادات المحل
               </Button>
             )}
           </div>
@@ -397,7 +397,7 @@ export default function Settings() {
                   <form onSubmit={handleProfileSubmit} className="space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label htmlFor="account-fullname" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                        <label htmlFor="account-fullname" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                           الاسم الكامل
                         </label>
                         <Input
@@ -411,14 +411,14 @@ export default function Settings() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label htmlFor="account-username" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                        <label htmlFor="account-username" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                           اسم المستخدم
                         </label>
                         <Input id="account-username" value={profileData.username} disabled className="h-11 rounded-xl bg-soft opacity-60 font-bold" dir="ltr" />
-                        <p className="text-[10px] font-bold text-muted mr-1">يُدار من إدارة المستخدمين</p>
+                        <p className="text-[10px] font-bold text-muted me-1">يُدار من إدارة المستخدمين</p>
                       </div>
                       <div className="space-y-1.5 md:col-span-2">
-                        <label htmlFor="account-email" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                        <label htmlFor="account-email" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                           البريد الإلكتروني
                         </label>
                         <Input
@@ -436,7 +436,7 @@ export default function Settings() {
                       {isBarber && (
                         <>
                           <div className="space-y-1.5 md:col-span-2">
-                            <label htmlFor="account-displayname" className="text-[10px] font-black tracking-widest text-primary uppercase mr-1">
+                            <label htmlFor="account-displayname" className="text-[10px] font-black tracking-widest text-primary uppercase me-1">
                               اسم العرض (للموقع العام)
                             </label>
                             <Input
@@ -449,7 +449,7 @@ export default function Settings() {
                             />
                           </div>
                           <div className="space-y-1.5 md:col-span-2">
-                            <label htmlFor="account-bio" className="text-[10px] font-black tracking-widest text-primary uppercase mr-1">
+                            <label htmlFor="account-bio" className="text-[10px] font-black tracking-widest text-primary uppercase me-1">
                               النبذة
                             </label>
                             <Textarea
@@ -461,7 +461,7 @@ export default function Settings() {
                               placeholder="نبذة قصيرة تظهر للعملاء"
                               className="rounded-xl bg-soft border-border/60 font-bold"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1 tabular-nums">{profileData.bioAr.length}/1000</p>
+                            <p className="text-[10px] font-bold text-muted me-1 tabular-nums">{profileData.bioAr.length}/1000</p>
                           </div>
                         </>
                       )}
@@ -481,7 +481,7 @@ export default function Settings() {
                 <ContentPanel title="الأمان وكلمة المرور" subtitle="غيّر كلمة المرور — تُطبّق فوراً على كل جلساتك.">
                   <form onSubmit={handlePasswordSubmit} className="space-y-5 max-w-xl">
                     <div className="space-y-1.5">
-                      <label htmlFor="account-old-password" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                      <label htmlFor="account-old-password" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                         كلمة المرور الحالية
                       </label>
                       <Input
@@ -496,7 +496,7 @@ export default function Settings() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label htmlFor="account-new-password" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                        <label htmlFor="account-new-password" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                           الجديدة
                         </label>
                         <Input
@@ -510,7 +510,7 @@ export default function Settings() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label htmlFor="account-confirm-password" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                        <label htmlFor="account-confirm-password" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                           تأكيد الجديدة
                         </label>
                         <Input
@@ -563,7 +563,7 @@ export default function Settings() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black tracking-widest text-muted uppercase mr-1 flex items-center gap-1.5">
+                        <label className="text-[10px] font-black tracking-widest text-muted uppercase me-1 flex items-center gap-1.5">
                           <Languages size={12} /> لغة النظام
                         </label>
                         <div className="grid grid-cols-2 gap-2">

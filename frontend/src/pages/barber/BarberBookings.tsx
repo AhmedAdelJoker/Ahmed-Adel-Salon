@@ -59,7 +59,7 @@ const BarberBookings = () => {
                 className="h-10 rounded-xl px-3"
                 onClick={fetchAppointments}
               >
-                <RefreshCw size={14} className="ml-1.5" />
+                <RefreshCw size={14} className="ms-1.5" />
                 <span className="hidden sm:inline">تحديث</span>
               </Button>
             </div>
@@ -74,13 +74,13 @@ const BarberBookings = () => {
               value="list"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <FileText size={14} className="ml-1.5" /> قائمة المواعيد
+              <FileText size={14} className="ms-1.5" /> قائمة المواعيد
             </TabsTrigger>
             <TabsTrigger
               value="calendar"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Calendar size={14} className="ml-1.5" /> التقويم
+              <Calendar size={14} className="ms-1.5" /> التقويم
             </TabsTrigger>
           </TabsList>
 

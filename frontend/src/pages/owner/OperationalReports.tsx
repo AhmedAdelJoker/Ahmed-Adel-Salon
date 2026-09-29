@@ -6,8 +6,6 @@ import {
   Award,
   BarChart3,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Download,
   History,
@@ -50,6 +48,7 @@ import {
 } from "@/components/ui/table";
 import AIInsights from "@/components/AIInsights";
 import { PageHeader, ContentPanel, SkeletonCard } from "@/components/shared/PremiumUI";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import {
   ChartCard,
   CurrencyStatCard,
@@ -64,7 +63,6 @@ import {
   formatSignedPct,
 } from "@/features/financial-reports";
 import {
-  OP_HISTORY_PAGE_SIZE,
   useOperationalReports,
   type OpTabId,
 } from "@/features/operational-reports";
@@ -146,6 +144,8 @@ export default function OperationalReports() {
     setSearchQuery,
     historyPage,
     setHistoryPage,
+    historyPageSize,
+    setHistoryPageSize,
     historyTotal,
     historyTotalPages,
     financialMetrics,
@@ -200,14 +200,6 @@ export default function OperationalReports() {
   const topServiceByRevenue = [...operationalMetrics.topServices].sort(
     (a, b) => b.revenue - a.revenue,
   )[0];
-  const rangeStart = (safeHistoryPageStart() - 1) * OP_HISTORY_PAGE_SIZE + 1;
-
-  function safeHistoryPageStart(): number {
-    return historyTotal === 0 ? 0 : historyPage;
-  }
-
-  const rangeEnd = Math.min(historyTotal, historyPage * OP_HISTORY_PAGE_SIZE);
-  const rangeFrom = historyTotal === 0 ? 0 : rangeStart;
 
   return (
     <div className="erp-page-container space-y-6 pb-16">
@@ -757,7 +749,7 @@ export default function OperationalReports() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="بحث بالبيان، التصنيف، المبلغ، أو التاريخ (YYYY-MM-DD)..."
                   aria-label="بحث في سجل العمليات"
-                  className="h-11 rounded-xl pr-10 text-xs font-bold"
+                  className="h-11 rounded-xl pe-10 text-xs font-bold"
                 />
               </div>
             </div>
@@ -842,35 +834,26 @@ export default function OperationalReports() {
                   </TableBody>
                 </Table>
 
-                <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
-                  <p className="text-[11px] font-bold tabular-nums text-muted">
-                    عرض {formatNumber(rangeFrom)}–{formatNumber(rangeEnd)} من {formatNumber(historyTotal)}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setHistoryPage(Math.max(1, historyPage - 1))}
-                      disabled={historyPage <= 1}
-                      className="gap-1 text-[11px] font-black"
-                      aria-label="الصفحة السابقة"
-                    >
-                      <ChevronRight size={14} /> السابق
-                    </Button>
-                    <span className="min-w-[90px] text-center text-[11px] font-black tabular-nums text-main">
-                      {formatNumber(historyPage)} / {formatNumber(historyTotalPages)}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setHistoryPage(Math.min(historyTotalPages, historyPage + 1))}
-                      disabled={historyPage >= historyTotalPages}
-                      className="gap-1 text-[11px] font-black"
-                      aria-label="الصفحة التالية"
-                    >
-                      التالي <ChevronLeft size={14} />
-                    </Button>
-                  </div>
+                <div className="mt-2 border-t border-border pt-3">
+                  {historyTotal > 0 && (() => {
+                    const paginator = createPaginationState({
+                      page: historyPage,
+                      size: historyPageSize,
+                      total: historyTotal,
+                    });
+                    return (
+                      <Pagination
+                        paginator={paginator}
+                        onPageChange={setHistoryPage}
+                        onSizeChange={(s) => {
+                          setHistoryPageSize(s);
+                          setHistoryPage(1);
+                        }}
+                        sizeOptions={[10, 15, 25, 50]}
+                        locale="ar"
+                      />
+                    );
+                  })()}
                 </div>
               </>
             )}

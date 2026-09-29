@@ -48,7 +48,7 @@ export default function LeavesView({
                   className="h-9 rounded-xl text-xs"
                   onClick={onNewLeave}
                 >
-                  <Plus size={14} className="ml-1" /> طلب جديد
+                  <Plus size={14} className="ms-1" /> طلب جديد
                 </Button>
               </div>
             </div>
@@ -109,7 +109,7 @@ export default function LeavesView({
                               onLeaveAction(leave.id, "approved")
                             }
                           >
-                            <CheckCircle2 size={12} className="ml-1" /> قبول
+                            <CheckCircle2 size={12} className="ms-1" /> قبول
                           </Button>
                           <Button
                             variant="danger"
@@ -119,7 +119,7 @@ export default function LeavesView({
                               onLeaveAction(leave.id, "rejected")
                             }
                           >
-                            <XCircle size={12} className="ml-1" /> رفض
+                            <XCircle size={12} className="ms-1" /> رفض
                           </Button>
                         </>
                       )}

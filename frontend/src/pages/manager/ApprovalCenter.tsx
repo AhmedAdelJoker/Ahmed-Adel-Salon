@@ -349,7 +349,7 @@ const ApprovalCenter = () => {
                             }
                             className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-[10px] font-black uppercase shadow-lg shadow-emerald-100"
                           >
-                            <CheckCircle size={14} className="ml-2" /> اعتماد
+                            <CheckCircle size={14} className="ms-2" /> اعتماد
                           </Button>
                           <Button
                             onClick={() =>
@@ -362,7 +362,7 @@ const ApprovalCenter = () => {
                             variant="ghost"
                             className="h-9 px-4 rounded-xl text-rose-600 hover:bg-rose-50 text-[10px] font-black uppercase"
                           >
-                            <XCircle size={14} className="ml-2" /> رفض
+                            <XCircle size={14} className="ms-2" /> رفض
                           </Button>
                         </div>
                       </td>
@@ -466,7 +466,7 @@ const ApprovalCenter = () => {
                             }
                             className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-[10px] font-black uppercase shadow-lg shadow-emerald-100"
                           >
-                            <CheckCircle size={14} className="ml-2" /> تدقيق
+                            <CheckCircle size={14} className="ms-2" /> تدقيق
                           </Button>
                           <Button
                             onClick={() =>
@@ -479,7 +479,7 @@ const ApprovalCenter = () => {
                             variant="ghost"
                             className="h-9 px-4 rounded-xl text-rose-600 hover:bg-rose-50 text-[10px] font-black uppercase"
                           >
-                            <XCircle size={14} className="ml-2" /> رفض
+                            <XCircle size={14} className="ms-2" /> رفض
                           </Button>
                         </div>
                       </td>
@@ -565,7 +565,7 @@ const ApprovalCenter = () => {
                             }
                             className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-[10px] font-black uppercase shadow-lg shadow-indigo-100"
                           >
-                            <CheckCircle size={14} className="ml-2" /> اعتماد
+                            <CheckCircle size={14} className="ms-2" /> اعتماد
                           </Button>
                           <Button
                             onClick={() =>
@@ -578,7 +578,7 @@ const ApprovalCenter = () => {
                             variant="ghost"
                             className="h-9 px-4 rounded-xl text-rose-600 hover:bg-rose-50 text-[10px] font-black uppercase"
                           >
-                            <Trash2 size={14} className="ml-2" /> حذف
+                            <Trash2 size={14} className="ms-2" /> حذف
                           </Button>
                         </div>
                       </td>

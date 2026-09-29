@@ -226,14 +226,14 @@ export default function ExpensesArchive() {
         actions={
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Button variant="outline" onClick={() => exportService.downloadExcel("/exports/expenses/archive/excel", "expenses_archive", buildCleanParams(filters) as Record<string, unknown>)} className="h-11 rounded-xl px-4 font-black text-xs">
-              <FileSpreadsheet size={16} className="ml-1.5" /> Excel
+              <FileSpreadsheet size={16} className="ms-1.5" /> Excel
             </Button>
             <Button variant="outline" onClick={handlePrint} className="h-11 rounded-xl px-4 font-black text-xs">
-              <Printer size={16} className="ml-1.5" /> طباعة / PDF
+              <Printer size={16} className="ms-1.5" /> طباعة / PDF
             </Button>
             <Link to="/expenses">
               <Button variant="ghost" className="h-11 rounded-xl border border-border bg-card px-4 font-black text-xs">
-                <ArrowRight size={16} className="ml-1.5" /> العودة للمصروفات
+                <ArrowRight size={16} className="ms-1.5" /> العودة للمصروفات
               </Button>
             </Link>
           </div>
@@ -268,7 +268,7 @@ export default function ExpensesArchive() {
               <h3 className="text-sm font-black">فلاتر البحث المتقدم</h3>
               <p className="text-[11px] font-bold text-muted">نطاق زمني + تصنيف + طريقة دفع — البحث يحدّث تلقائياً</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleReset} className="mr-auto h-8 rounded-xl text-xs font-black gap-1"><X size={12} /> إعادة ضبط</Button>
+            <Button variant="ghost" size="sm" onClick={handleReset} className="me-auto h-8 rounded-xl text-xs font-black gap-1"><X size={12} /> إعادة ضبط</Button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -297,7 +297,7 @@ export default function ExpensesArchive() {
               <Field label="بحث في العنوان أو الوصف">
                 <div className="relative">
                   <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted" />
-                  <Input value={qDraft} onChange={(e) => setQDraft(e.target.value)} placeholder="مثال: إيجار، كهرباء، صيانة..." className="h-11 pr-9 rounded-xl bg-soft border-border font-bold" />
+                  <Input value={qDraft} onChange={(e) => setQDraft(e.target.value)} placeholder="مثال: إيجار، كهرباء، صيانة..." className="h-11 pe-9 rounded-xl bg-soft border-border font-bold" />
                   {qDraft && <button onClick={() => setQDraft("")} className="absolute left-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg bg-card border flex items-center justify-center text-muted"><X size={12} /></button>}
                 </div>
               </Field>
@@ -317,7 +317,7 @@ export default function ExpensesArchive() {
           <div className="flex items-center gap-2 text-[11px] font-bold text-muted">
             <span className="hidden sm:inline">النتائج تحدّث تلقائياً • </span>
             <span>{total} عملية • صفحة {filters.page} من {totalPages}</span>
-            <span className="mr-auto hidden sm:inline-flex items-center gap-1">ترتيب حسب {filters.sortBy === "amount" ? "المبلغ" : "التاريخ"} {filters.sortDir === "asc" ? "↑" : "↓"}</span>
+            <span className="me-auto hidden sm:inline-flex items-center gap-1">ترتيب حسب {filters.sortBy === "amount" ? "المبلغ" : "التاريخ"} {filters.sortDir === "asc" ? "↑" : "↓"}</span>
           </div>
         </div>
       </PremiumCard>
@@ -438,7 +438,7 @@ export default function ExpensesArchive() {
                 <DialogTitle className="text-lg font-black text-white">تفاصيل المصروف</DialogTitle>
                 <DialogDescription className="text-xs font-bold text-slate-300">قراءة فقط • الأرشيف</DialogDescription>
               </div>
-              <div className="mr-auto"><Badge variant={detailItem ? getStatusVariant(detailItem.status) as never : "secondary"} className="rounded-full bg-white/10 text-white border-white/10">{detailItem ? getStatusLabel(detailItem.status) : ""}</Badge></div>
+              <div className="me-auto"><Badge variant={detailItem ? getStatusVariant(detailItem.status) as never : "secondary"} className="rounded-full bg-white/10 text-white border-white/10">{detailItem ? getStatusLabel(detailItem.status) : ""}</Badge></div>
             </div>
           </div>
           {detailItem ? (
@@ -483,7 +483,7 @@ export default function ExpensesArchive() {
                       else if (t === "invoice") navigate("/invoices");
                       else if (t === "product") navigate("/inventory");
                       else if (t === "booking") navigate("/bookings");
-                    }} className="mr-auto text-xs font-black text-indigo-600 hover:underline">فتح المرجع</button>
+                    }} className="me-auto text-xs font-black text-indigo-600 hover:underline">فتح المرجع</button>
                   </div>
                 </div>
               ) : null}
@@ -492,7 +492,7 @@ export default function ExpensesArchive() {
                 <Wallet size={14} className="text-muted" />
                 <span className="text-xs font-bold text-muted">حركة الخزنة:</span>
                 <span className="font-black text-xs">EXP-{String(detailItem.id)}</span>
-                <button onClick={() => navigate("/owner/cashbox")} className="mr-auto text-xs font-black text-primary hover:underline">عرض في الخزنة</button>
+                <button onClick={() => navigate("/owner/cashbox")} className="me-auto text-xs font-black text-primary hover:underline">عرض في الخزنة</button>
               </div>
 
               {detailItem.internal_notes && String(detailItem.internal_notes).trim() ? (
@@ -517,5 +517,5 @@ export default function ExpensesArchive() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-2"><label className="mr-1 text-[11px] font-black uppercase tracking-widest text-muted">{label}</label>{children}</div>;
+  return <div className="space-y-2"><label className="me-1 text-[11px] font-black uppercase tracking-widest text-muted">{label}</label>{children}</div>;
 }

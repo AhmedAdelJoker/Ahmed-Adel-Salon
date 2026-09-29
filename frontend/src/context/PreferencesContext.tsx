@@ -69,6 +69,55 @@ function getStoredTheme(): ThemeName {
     : "light";
 }
 
+/**
+ * Reads the explicit theme this device last used, or null when the user has
+ * never chosen one. `null` means "follow the system", which is distinct from
+ * "chose dark" — see `resolvePreference`.
+ */
+function getExplicitTheme(): ThemeName | null {
+  if (typeof window === "undefined") return null;
+  const stored = localStorage.getItem("theme");
+  return stored === "light" || stored === "dark" ? stored : null;
+}
+
+/**
+ * Reads the language this device last used.
+ *
+ * Returns `null` when the user has never chosen, which is distinct from
+ * "chose Arabic". That distinction is what stops the server round-trip from
+ * silently reverting a deliberate switch back to the profile default: see
+ * `resolveLanguage` below.
+ */
+function getStoredLanguage(): LanguageCode | null {
+  if (typeof window === "undefined") return null;
+  const stored = localStorage.getItem("language");
+  return stored === "ar" || stored === "en" ? stored : null;
+}
+
+/**
+ * Reconciles a device preference with the one on the profile.
+ *
+ * The device value wins whenever the user has made an explicit choice on this
+ * browser, because that is the newer intent — they picked it *after* the
+ * profile was last written. The profile only seeds a device that has never
+ * been configured, which is what makes a fresh login on a new machine adopt
+ * the settings the user already chose elsewhere.
+ *
+ * Without this, `GET /preferences` returned the server defaults on every load
+ * and overwrote the stored values, so both switches reverted on each reload:
+ * the locale appeared to work for the length of the session and then snapped
+ * back to `rtl`, and the theme flipped to dark regardless of the choice.
+ */
+function resolvePreference<T extends string>(
+  serverValue: T,
+  storedValue: T | null,
+  allowed: readonly T[],
+): T {
+  return storedValue && (allowed as readonly string[]).includes(storedValue)
+    ? storedValue
+    : serverValue;
+}
+
 function normalizePreferences(
   data: Partial<Preferences> & Record<string, unknown> = {},
 ): Preferences {
@@ -108,6 +157,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferencesState] = useState<Preferences>(() => ({
     ...DEFAULT_PREFERENCES,
     theme: getStoredTheme(),
+    // Applied before the first paint so an English user never sees a frame of
+    // RTL Arabic layout flipping to LTR once preferences resolve.
+    language: getStoredLanguage() ?? DEFAULT_PREFERENCES.language,
   }));
   const [loading, setLoading] = useState(() => {
     const storedTheme = localStorage.getItem("theme");
@@ -118,24 +170,35 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   const darkMode = preferences.theme === "dark";
 
+  // The document direction has to track the initial language too, not just
+  // later updates: the i18n module's boot hook runs before this provider
+  // mounts, and it only knows about localStorage.
+  useEffect(() => {
+    applyDocumentDirection(preferences.language);
+  }, [preferences.language]);
+
   function setPreferences(next: PreferencesUpdate): void {
     setPreferencesState((prev) => {
       const value = typeof next === "function" ? next(prev) : next;
       const merged = normalizePreferences({ ...prev, ...value });
       applyTheme(merged.theme);
+      applyDocumentDirection(merged.language);
       return merged;
     });
   }
 
   async function loadPreferences() {
     const token = localStorage.getItem("token");
+    const storedLanguage = getStoredLanguage();
     if (!token || !isAuthenticated) {
       const localPreferences = {
         ...DEFAULT_PREFERENCES,
         theme: getStoredTheme(),
+        language: storedLanguage ?? DEFAULT_PREFERENCES.language,
       };
       setPreferencesState(localPreferences);
       applyTheme(localPreferences.theme);
+      applyDocumentDirection(localPreferences.language);
       setLoading(false);
       return;
     }
@@ -145,18 +208,39 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await api.get("/preferences");
-      const nextPreferences = normalizePreferences(response.data || {});
+      const serverPreferences = normalizePreferences(response.data || {});
+      const nextPreferences: Preferences = {
+        ...serverPreferences,
+        // A deliberate choice made in this browser outranks the profile.
+        language: resolvePreference(
+          serverPreferences.language,
+          storedLanguage,
+          ["ar", "en"],
+        ) as LanguageCode,
+        theme: resolvePreference(
+          serverPreferences.theme,
+          getExplicitTheme(),
+          ["light", "dark"],
+        ) as ThemeName,
+      };
+      // Persist the resolved values so the bootstrap block, i18next's detector
+      // and the next boot all agree with the profile instead of re-deriving it.
+      localStorage.setItem("language", nextPreferences.language);
+      localStorage.setItem("theme", nextPreferences.theme);
       setPreferencesState(nextPreferences);
       applyTheme(nextPreferences.theme);
+      applyDocumentDirection(nextPreferences.language);
     } catch (err) {
       console.error("Load preferences error:", err);
       const apiErr = err as ApiErrorShape;
       const localPreferences = {
         ...DEFAULT_PREFERENCES,
         theme: getStoredTheme(),
+        language: storedLanguage ?? DEFAULT_PREFERENCES.language,
       };
       setPreferencesState(localPreferences);
       applyTheme(localPreferences.theme);
+      applyDocumentDirection(localPreferences.language);
       if (apiErr?.response?.status !== 401) {
         setError("تعذر تحميل التفضيلات");
       }
@@ -236,9 +320,11 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     return setLanguage(preferences.language === "ar" ? "en" : "ar");
   }
 
+  // Appearance must never depend on the realtime connection. Gating this on
+  // the socket meant a dropped or still-connecting websocket left the document
+  // showing whatever the previous render had, which is how a user ends up
+  // staring at a light dashboard after choosing dark.
   useEffect(() => {
-    if (!socket) return;
-
     applyTheme(preferences.theme);
   }, [preferences.theme]);
 
@@ -253,8 +339,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (authLoading) return;
-    loadPreferences();
-     
+    void loadPreferences();
   }, [authLoading, isAuthenticated, user?.id]);
 
   const value = useMemo<PreferencesContextValue>(

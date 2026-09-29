@@ -676,7 +676,7 @@ function AuditPanel({ rows, searchTerm, setSearchTerm }: { rows: Record<string, 
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="بحث بالنوع أو الوصف أو القسم..."
               aria-label="بحث في سجل الرقابة"
-              className="h-11 rounded-xl border-border/60 bg-card pr-11 text-xs font-bold shadow-sm focus-visible:ring-primary/30"
+              className="h-11 rounded-xl border-border/60 bg-card pe-11 text-xs font-bold shadow-sm focus-visible:ring-primary/30"
             />
           </div>
         </div>

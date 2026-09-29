@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   LayoutGrid,
   Package,
+  Palette,
   Receipt,
   Scissors,
   Settings,
@@ -153,6 +154,7 @@ export interface PermissionPage {
 // Common
 const Login = lazy(() => import("@/pages/common/Login"));
 const PersonalSettings = lazy(() => import("@/pages/common/Settings"));
+const Appearance = lazy(() => import("@/pages/common/Appearance"));
 const ActivityLogs = lazy(() => import("@/pages/common/ActivityLogs"));
 
 // Owner
@@ -827,6 +829,24 @@ export const APP_ROUTES: readonly AppRoute[] = [
     },
   },
   {
+    // Appearance is a device preference, not a profile one, so it sits beside
+    // personal settings rather than inside the owner settings tabs. Available
+    // to every role including BARBER, who is otherwise locked out of the
+    // system group.
+    path: "/appearance",
+    component: Appearance,
+    roles: ROLES.EVERYONE,
+    title: "المظهر",
+    nav: {
+      label: "المظهر",
+      icon: Palette,
+      group: "system",
+      order: 10,
+      roles: ROLES.EVERYONE,
+      searchCategory: "النظام",
+    },
+  },
+  {
     path: "/activity-logs",
     component: ActivityLogs,
     roles: [...ROLES.MANAGEMENT, "CASHIER", "ACCOUNTANT"],
@@ -1165,6 +1185,7 @@ export const NAV_ICONS = {
   LayoutDashboard,
   LayoutGrid,
   Package,
+  Palette,
   Receipt,
   Scissors,
   Settings,

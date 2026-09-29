@@ -152,7 +152,7 @@ export function UsersViewContent({
                       onClick={() => onOpenPerms(user)}
                       className="w-full h-10 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white border border-border hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm"
                     >
-                      <Shield size={14} className="ml-2" /> تعديل بروتوكول
+                      <Shield size={14} className="ms-2" /> تعديل بروتوكول
                       الصلاحيات
                     </Button>
                   </div>

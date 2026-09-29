@@ -86,7 +86,7 @@ export default function OffersPanel({
                             <div className="text-sm font-black tabular-nums text-emerald-600">
                               {offer.offer_price} <span className="text-[10px] font-bold">ج.م</span>
                               {offer.original_price && (
-                                <span className="text-[11px] font-bold text-muted line-through mr-2">
+                                <span className="text-[11px] font-bold text-muted line-through me-2">
                                   {offer.original_price} ج.م
                                 </span>
                               )}
@@ -170,7 +170,7 @@ export default function OffersPanel({
                       </div>
                       <div className="flex items-center justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => onEdit(offer)} className="h-9 rounded-xl px-4 text-xs font-black">
-                          <Pencil size={14} className="ml-1" /> تعديل
+                          <Pencil size={14} className="ms-1" /> تعديل
                         </Button>
                         <Button
                           variant="ghost"

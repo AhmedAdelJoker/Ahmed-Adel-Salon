@@ -139,13 +139,13 @@ export default function Payroll() {
               <Button variant={isCurrentPreset ? "primary" : "outline"} size="sm" onClick={() => applyPreset("current")} className="h-9 rounded-xl text-[11px] font-black">الشهر الحالي</Button>
               <Button variant={!isCurrentPreset ? "primary" : "outline"} size="sm" onClick={() => applyPreset("prev")} className="h-9 rounded-xl text-[11px] font-black">الشهر السابق</Button>
               <span className="hidden sm:inline h-6 w-px bg-border" />
-              <Button variant="outline" onClick={() => exportService.downloadExcel("/exports/payroll/excel", "payroll_report", period as unknown as Record<string, unknown>)} className="h-9 rounded-xl px-3 text-[11px] font-black"><FileSpreadsheet size={14} className="ml-1.5 text-success" />Excel</Button>
-              <Button variant="outline" onClick={handlePrint} className="h-9 rounded-xl px-3 text-[11px] font-black"><Printer size={14} className="ml-1.5" /> طباعة / PDF</Button>
+              <Button variant="outline" onClick={() => exportService.downloadExcel("/exports/payroll/excel", "payroll_report", period as unknown as Record<string, unknown>)} className="h-9 rounded-xl px-3 text-[11px] font-black"><FileSpreadsheet size={14} className="ms-1.5 text-success" />Excel</Button>
+              <Button variant="outline" onClick={handlePrint} className="h-9 rounded-xl px-3 text-[11px] font-black"><Printer size={14} className="ms-1.5" /> طباعة / PDF</Button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => setIsAdvanceModalOpen(true)} className="h-9 rounded-xl px-3 text-[11px] font-black text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-600 hover:text-white"><MinusCircle size={14} className="ml-1.5" /> سلفة</Button>
-              <Button variant="outline" onClick={() => navigate("/owner/payroll/archive")} className="h-9 rounded-xl px-3 text-[11px] font-black"><Archive size={14} className="ml-1.5" /> الأرشيف</Button>
-              <Button onClick={handleCalculate} disabled={loading || refreshing} className="h-9 rounded-xl px-5 bg-primary hover:bg-primary-strong text-white font-black shadow-lg"><RefreshCw size={14} className={cn("ml-1.5", refreshing && "animate-spin")} /> تحديث الحسابات</Button>
+              <Button variant="outline" onClick={() => setIsAdvanceModalOpen(true)} className="h-9 rounded-xl px-3 text-[11px] font-black text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-600 hover:text-white"><MinusCircle size={14} className="ms-1.5" /> سلفة</Button>
+              <Button variant="outline" onClick={() => navigate("/owner/payroll/archive")} className="h-9 rounded-xl px-3 text-[11px] font-black"><Archive size={14} className="ms-1.5" /> الأرشيف</Button>
+              <Button onClick={handleCalculate} disabled={loading || refreshing} className="h-9 rounded-xl px-5 bg-primary hover:bg-primary-strong text-white font-black shadow-lg"><RefreshCw size={14} className={cn("ms-1.5", refreshing && "animate-spin")} /> تحديث الحسابات</Button>
             </div>
           </div>
         }
@@ -157,13 +157,13 @@ export default function Payroll() {
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center"><Building2 size={16} /></div>
             <div><h3 className="text-sm font-black text-main">ترابط الرواتب بالنظام</h3><p className="text-[11px] font-bold text-muted">كل راتب هو حلقة وصل بين الحضور والعمولات والخزنة — الأرقام حية من نفس الفترة</p></div>
-            <Badge className="mr-auto hidden rounded-full border-primary/20 bg-primary-soft text-primary text-[10px] font-black sm:flex">تكامل تلقائي • {MONTHS.find((m) => m.value === period.month)?.label} {period.year}</Badge>
+            <Badge className="me-auto hidden rounded-full border-primary/20 bg-primary-soft text-primary text-[10px] font-black sm:flex">تكامل تلقائي • {MONTHS.find((m) => m.value === period.month)?.label} {period.year}</Badge>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {systemLinks.map((l) => (
               <button key={l.label} onClick={() => { if (l.href.includes("#advances")) document.getElementById("advances")?.scrollIntoView({ behavior: "smooth" }); else navigate(l.href); }} className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-right hover:border-primary hover:shadow-md transition-all">
                 <div className={cn("h-10 w-10 rounded-xl text-white flex items-center justify-center shrink-0", l.color)}><l.icon size={18} /></div>
-                <div className="min-w-0 flex-1"><div className="text-xs font-black text-main flex items-center gap-1">{l.label} <span className="mr-auto rounded-full bg-soft border border-border px-2 py-0.5 text-[9px] font-black">{l.badge}</span> <ArrowUpRight size={12} className="text-muted group-hover:text-primary shrink-0" /></div><div className="text-[10px] font-bold text-muted leading-tight mt-0.5 line-clamp-2 text-start">{l.desc}</div></div>
+                <div className="min-w-0 flex-1"><div className="text-xs font-black text-main flex items-center gap-1">{l.label} <span className="me-auto rounded-full bg-soft border border-border px-2 py-0.5 text-[9px] font-black">{l.badge}</span> <ArrowUpRight size={12} className="text-muted group-hover:text-primary shrink-0" /></div><div className="text-[10px] font-bold text-muted leading-tight mt-0.5 line-clamp-2 text-start">{l.desc}</div></div>
               </button>
             ))}
           </div>

@@ -108,7 +108,7 @@ const ManagerDashboard = () => {
             variant="success"
             className="h-10 px-4 rounded-xl font-black text-[10px] uppercase tracking-wider"
           >
-            <div className="h-1.5 w-1.5 rounded-full ml-2 bg-white animate-pulse" />
+            <div className="h-1.5 w-1.5 rounded-full ms-2 bg-white animate-pulse" />
             الرقابة التشغيلية نشطة
           </Badge>
         }
@@ -158,7 +158,7 @@ const ManagerDashboard = () => {
               className="text-[10px] font-black uppercase"
             >
               إدارة الموظفين{" "}
-              <ArrowRight size={14} className="mr-2 rotate-180" />
+              <ArrowRight size={14} className="me-2 rotate-180" />
             </Button>
           }
           noPadding

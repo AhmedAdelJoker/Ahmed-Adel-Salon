@@ -42,7 +42,7 @@ export default function CustomerToolbar({
             <Search className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <Input
               placeholder="البحث بالاسم أو رقم الجوال..."
-              className="pr-11 h-12 rounded-xl bg-soft border-border/60 font-bold"
+              className="pe-11 h-12 rounded-xl bg-soft border-border/60 font-bold"
               value={searchTerm || ""}
               onChange={(event) => onSearch(event.target.value)}
             />

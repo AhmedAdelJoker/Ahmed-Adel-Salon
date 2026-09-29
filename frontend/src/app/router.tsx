@@ -32,6 +32,7 @@ import MobileNav from "@/components/layout/MobileNav";
 import CommandPalette from "@/components/layout/CommandPalette";
 import DynamicBackground from "@/components/layout/DynamicBackground";
 import { cn } from "@/lib/core/utils";
+import { needsTwoFactorEnrollment } from "@/lib/auth/twoFactorEnrollment";
 
 // Electron يشغّل الواجهة عبر file:// — BrowserRouter يعتمد على history API
 // الخاص بالسيرفر ويفشل هناك، لذلك نستخدم HashRouter داخل تطبيق الويندوز.
@@ -96,6 +97,23 @@ function RequireAuth({
         replace
         state={{ error: "account_disabled", from: location }}
       />
+    );
+  }
+
+  // Mandatory two-factor enrolment.
+  //
+  // The backend already refuses every other route for this session with 403, so
+  // without this the user lands on a dashboard that fails every single request
+  // and shows a wall of errors. Redirecting here turns that into one clear
+  // instruction. Placed after the `is_active` check, because a disabled account
+  // must reach the login screen and nothing else.
+  if (needsTwoFactorEnrollment()) {
+    // The 2FA panel is the "security" tab of Settings, not a page of its own --
+    // which is why this is a query parameter and not a route. Guessing a
+    // `/settings/two-factor` path here would redirect to a 404 on the one
+    // screen the user cannot get past.
+    return (
+      <Navigate to="/settings?tab=security" replace state={{ from: location }} />
     );
   }
 

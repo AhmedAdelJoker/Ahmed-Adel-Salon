@@ -164,25 +164,25 @@ const BarberProfile = () => {
               value="profile"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <User size={14} className="ml-1.5" /> الملف الشخصي
+              <User size={14} className="ms-1.5" /> الملف الشخصي
             </TabsTrigger>
             <TabsTrigger
               value="notifications"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Bell size={14} className="ml-1.5" /> الإشعارات
+              <Bell size={14} className="ms-1.5" /> الإشعارات
             </TabsTrigger>
             <TabsTrigger
               value="security"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Shield size={14} className="ml-1.5" /> الأمان
+              <Shield size={14} className="ms-1.5" /> الأمان
             </TabsTrigger>
             <TabsTrigger
               value="appearance"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Palette size={14} className="ml-1.5" /> المظهر
+              <Palette size={14} className="ms-1.5" /> المظهر
             </TabsTrigger>
           </TabsList>
 

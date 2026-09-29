@@ -57,7 +57,7 @@ export default function UsersPanelTab({ users, searchTerm, setSearchTerm }: User
             value={searchTerm || ""}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="بحث عن مستخدم أو دور..."
-            className="h-11 pr-11 bg-soft border-border focus:bg-card"
+            className="h-11 pe-11 bg-soft border-border focus:bg-card"
           />
         </div>
       </div>

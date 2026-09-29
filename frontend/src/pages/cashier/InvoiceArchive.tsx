@@ -67,7 +67,7 @@ function InvoiceArchive() {
                 className="h-10 rounded-xl px-4"
                 onClick={() => navigate("/invoices")}
               >
-                <Receipt size={16} className="ml-2" /> الفواتير الحالية
+                <Receipt size={16} className="ms-2" /> الفواتير الحالية
               </Button>
               <Button
                 onClick={handleExportPDF}

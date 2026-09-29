@@ -146,7 +146,7 @@ const BarberClients = () => {
                 setIsModalOpen(true);
               }}
             >
-              <Plus size={14} className="ml-1.5" /> إضافة عميل
+              <Plus size={14} className="ms-1.5" /> إضافة عميل
             </Button>
           }
         />
@@ -162,7 +162,7 @@ const BarberClients = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="بحث بالاسم أو الهاتف..."
-              className="h-10 w-full pr-9 text-sm"
+              className="h-10 w-full pe-9 text-sm"
             />
           </div>
         </div>

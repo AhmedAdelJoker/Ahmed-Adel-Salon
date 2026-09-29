@@ -234,7 +234,7 @@ const HRManagement = () => {
               onClick={openCreate}
               className="h-11 rounded-2xl bg-accent px-8 text-sm font-black shadow-xl shadow-accent/20 transition-all active:scale-95"
             >
-              <Plus className="ml-2" size={20} strokeWidth={3} /> إضافة موظف
+              <Plus className="ms-2" size={20} strokeWidth={3} /> إضافة موظف
               جديد
             </Button>
             <Button
@@ -242,7 +242,7 @@ const HRManagement = () => {
               onClick={() => navigate("/owner/hr/archive")}
               className="h-9 rounded-xl border-border bg-card/50 px-5 text-xs font-black text-muted transition-all hover:border-accent/20 hover:text-main"
             >
-              <Archive className="ml-2" size={16} /> الأرشيف
+              <Archive className="ms-2" size={16} /> الأرشيف
             </Button>
           </>
         }
@@ -253,7 +253,7 @@ const HRManagement = () => {
       {/* ═══ RELATED NAV — هوية HR (مرحلة 3) ═══ */}
       <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
         <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ml-2">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ms-2">
             <Sparkles size={12} className="text-accent" /> انتقال سريع
           </span>
           {[
@@ -530,7 +530,7 @@ const HRManagement = () => {
                   disabled={DYNAMIC_TABS.findIndex((t) => t.id === activeTab) === 0}
                   className="h-11 sm:h-12 px-6 sm:px-8 rounded-xl font-black text-[11px] uppercase tracking-widest order-2 sm:order-1"
                 >
-                  <ArrowRight size={16} className="ml-2" /> السابق
+                  <ArrowRight size={16} className="ms-2" /> السابق
                 </Button>
                 <div className="hidden sm:flex items-center gap-2 order-2">
                   {DYNAMIC_TABS.map((tab) => (
@@ -545,7 +545,7 @@ const HRManagement = () => {
                     }}
                     className="h-11 sm:h-12 px-6 sm:px-8 rounded-xl bg-accent text-white font-black text-[11px] uppercase tracking-widest order-1 sm:order-3"
                   >
-                    التالي <ArrowLeft size={16} className="mr-2" />
+                    التالي <ArrowLeft size={16} className="me-2" />
                   </Button>
                 ) : (
                   <div className="hidden sm:block w-[100px] order-3" />
@@ -554,7 +554,7 @@ const HRManagement = () => {
               {/* Mobile Save Button */}
               <div className="xl:hidden mt-6">
                 <Button onClick={handleSubmit} disabled={isActionLoading || activeTab !== "review"} className={cn("h-12 w-full rounded-xl font-black text-white shadow-lg", activeTab==="review" ? "bg-accent hover:bg-accent/90 shadow-accent/20" : "bg-soft text-muted opacity-60 cursor-not-allowed")}>
-                  <Save size={18} className="ml-2" /> {editingEmp ? "تحديث البيانات" : "حفظ الموظف"}
+                  <Save size={18} className="ms-2" /> {editingEmp ? "تحديث البيانات" : "حفظ الموظف"}
                 </Button>
                 {activeTab !== "review" && <p className="mt-2 text-center text-[10px] font-bold text-muted">أكمل الخطوات للوصول للمراجعة ثم الحفظ</p>}
               </div>
@@ -649,7 +649,7 @@ const HRManagement = () => {
                       : "bg-soft cursor-not-allowed opacity-50",
                   )}
                 >
-                  <Save size={20} className="ml-2" />
+                  <Save size={20} className="ms-2" />
                   {editingEmp ? "تحديث البيانات" : "حفظ الموظف الجديد"}
                 </Button>
                 {activeTab !== "review" && (

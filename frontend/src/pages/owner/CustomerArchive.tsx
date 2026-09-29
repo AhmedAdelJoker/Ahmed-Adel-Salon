@@ -362,7 +362,7 @@ const CustomerArchive = () => {
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="بحث بالاسم أو الجوال أو الإيميل..."
             aria-label="بحث في أرشيف العملاء"
-            className="h-11 w-full rounded-xl pr-9 text-sm font-bold shadow-sm"
+            className="h-11 w-full rounded-xl pe-9 text-sm font-bold shadow-sm"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -412,7 +412,7 @@ const CustomerArchive = () => {
                 onClick={() => setConfirmAction("bulk_restore")}
                 disabled={isActionLoading}
               >
-                <RotateCcw size={11} className="ml-1" /> استعادة
+                <RotateCcw size={11} className="ms-1" /> استعادة
               </Button>
               <Button
                 variant="ghost"
@@ -421,7 +421,7 @@ const CustomerArchive = () => {
                 onClick={() => setConfirmAction("bulk_permanent_delete")}
                 disabled={isActionLoading}
               >
-                <Trash2 size={11} className="ml-1" /> حذف
+                <Trash2 size={11} className="ms-1" /> حذف
               </Button>
               <Button
                 variant="ghost"
@@ -547,7 +547,7 @@ const CustomerArchive = () => {
                     onClick={() => openConfirm(customer, "restore")}
                     className="h-8 flex-1 rounded-lg border-success/30 text-[10px] font-black text-success hover:bg-success-soft sm:text-xs"
                   >
-                    <RotateCcw size={11} className="ml-1" /> استعادة
+                    <RotateCcw size={11} className="ms-1" /> استعادة
                   </Button>
                   <Button
                     variant="ghost"

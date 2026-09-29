@@ -113,11 +113,11 @@ const BarberEarnings = () => {
                 className="h-10 rounded-xl px-3"
                 onClick={fetchEarnings}
               >
-                <RefreshCw size={14} className="ml-1.5" />
+                <RefreshCw size={14} className="ms-1.5" />
                 <span className="hidden sm:inline">تحديث</span>
               </Button>
               <Button variant="outline" className="h-10 rounded-xl px-3">
-                <Download size={14} className="ml-1.5" />
+                <Download size={14} className="ms-1.5" />
                 <span className="hidden sm:inline">تصدير</span>
               </Button>
             </div>
@@ -225,19 +225,19 @@ const BarberEarnings = () => {
               value="overview"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <TrendingUp size={14} className="ml-1.5" /> نظرة عامة
+              <TrendingUp size={14} className="ms-1.5" /> نظرة عامة
             </TabsTrigger>
             <TabsTrigger
               value="commissions"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Wallet size={14} className="ml-1.5" /> العمولات
+              <Wallet size={14} className="ms-1.5" /> العمولات
             </TabsTrigger>
             <TabsTrigger
               value="chart"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <PieIcon size={14} className="ml-1.5" /> الرسوم البيانية
+              <PieIcon size={14} className="ms-1.5" /> الرسوم البيانية
             </TabsTrigger>
           </TabsList>
 

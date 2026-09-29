@@ -279,7 +279,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
           <p className="text-sm font-black text-main">تعذر تحميل بروتوكول التشغيل</p>
           <p className="text-xs font-bold text-muted max-w-md">{loadError}</p>
           <Button onClick={fetchHours} className="h-11 rounded-xl px-6 text-xs font-black">
-            <RotateCcw size={14} className="ml-2" /> إعادة المحاولة
+            <RotateCcw size={14} className="ms-2" /> إعادة المحاولة
           </Button>
         </div>
       </div>
@@ -358,7 +358,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                 onClick={fetchHours}
                 className="h-8 rounded-xl border-amber-300 px-3 text-[11px] font-black text-amber-800 dark:border-amber-700 dark:text-amber-200"
               >
-                <RotateCcw size={13} className="ml-1" /> جلب أحدث نسخة
+                <RotateCcw size={13} className="ms-1" /> جلب أحدث نسخة
               </Button>
               <span className="text-[10px] font-bold text-amber-700/80 dark:text-amber-300/80">
                 تعديلاتك هتتمسح من الشاشة — انسخها لو محتاج تحتفظ بيها.              </span>
@@ -377,7 +377,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                 ? "تعذر الحفظ"
                 : `تعذر الحفظ — ${saveErrors.length} أخطاء من الخادم`}
             </div>
-            <ul className="mt-2 space-y-1 pr-4">
+            <ul className="mt-2 space-y-1 pe-4">
               {saveErrors.map((line, index) => (
                 <li
                   key={`${line.field ?? "err"}-${index}`}
@@ -402,7 +402,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
               disabled={!isDirty || saving}
               className="h-9 rounded-xl px-4 text-xs font-black hidden sm:inline-flex"
             >
-              <RotateCcw size={14} className="ml-1" /> تراجع
+              <RotateCcw size={14} className="ms-1" /> تراجع
             </Button>
             <Button
               onClick={handleSave}
@@ -410,7 +410,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
               disabled={!isDirty || hasErrors}
               className="h-9 rounded-xl px-5 text-xs font-black"
             >
-              <Save size={14} className="ml-1" /> حفظ المواعيد
+              <Save size={14} className="ms-1" /> حفظ المواعيد
             </Button>
           </div>
         }
@@ -667,7 +667,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                           <div className="flex-1 sm:flex-none space-y-1">
                             <label
                               htmlFor={`open-${day}`}
-                              className="text-[9px] font-black text-muted uppercase tracking-widest mr-1 block"
+                              className="text-[9px] font-black text-muted uppercase tracking-widest me-1 block"
                             >
                               الفتح
                             </label>
@@ -689,7 +689,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                           <div className="flex-1 sm:flex-none space-y-1">
                             <label
                               htmlFor={`close-${day}`}
-                              className="text-[9px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1"
+                              className="text-[9px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1"
                             >
                               الإغلاق
                               {overnight && (
@@ -717,7 +717,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between sm:justify-end gap-2 sm:pr-4 sm:border-r border-border bg-card sm:bg-transparent rounded-xl sm:rounded-none border sm:border-0 p-2 sm:p-0">
+                      <div className="flex items-center justify-between sm:justify-end gap-2 sm:pe-4 sm:border-r border-border bg-card sm:bg-transparent rounded-xl sm:rounded-none border sm:border-0 p-2 sm:p-0">
                         <div className="flex items-center gap-2">
                           <Button
                             variant="ghost"

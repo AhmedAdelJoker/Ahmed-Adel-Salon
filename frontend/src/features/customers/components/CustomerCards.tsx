@@ -94,7 +94,7 @@ export default function CustomerCards({
                         onOpenDetails(customer);
                       }}
                     >
-                      <History className="h-3.5 w-3.5 ml-1.5" /> السجل
+                      <History className="h-3.5 w-3.5 ms-1.5" /> السجل
                     </Button>
                     {isOwner && (
                       <Button

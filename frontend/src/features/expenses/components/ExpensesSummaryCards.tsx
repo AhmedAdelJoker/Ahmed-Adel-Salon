@@ -52,7 +52,7 @@ export function ExpensesSummaryCards({
               <h3 className="text-sm font-black text-main">ترابط المصروفات مع النظام</h3>
               <p className="text-[11px] font-bold text-muted">كل مصروف هو عقدة مالية مرتبطة بباقي الوحدات</p>
             </div>
-            <Badge variant="outline" className="mr-auto hidden sm:flex rounded-full bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-black">تكامل تلقائي</Badge>
+            <Badge variant="outline" className="me-auto hidden sm:flex rounded-full bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-black">تكامل تلقائي</Badge>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {SYSTEM_LINKS.map((link) => (
@@ -86,7 +86,7 @@ export function ExpensesSummaryCards({
           <span className="h-1 w-1 rounded-full bg-border" />
           <span className="text-muted">الإجمالي:</span>
           <span className="font-black text-main">{formatCurrency(summary.total_amount || 0)}</span>
-          {hasActiveFilters && <Badge variant="outline" className="rounded-full bg-amber-50 text-amber-700 border-amber-200 mr-2">مفلتر</Badge>}
+          {hasActiveFilters && <Badge variant="outline" className="rounded-full bg-amber-50 text-amber-700 border-amber-200 me-2">مفلتر</Badge>}
         </div>
       )}
 

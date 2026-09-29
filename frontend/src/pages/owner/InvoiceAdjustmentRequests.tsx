@@ -223,7 +223,7 @@ export default function InvoiceAdjustmentRequests() {
           >
             <RefreshCw
               size={18}
-              className={loading ? "ml-2 animate-spin" : "ml-2"}
+              className={loading ? "ms-2 animate-spin" : "ms-2"}
             />
             تحديث الطلبات
           </Button>
@@ -265,7 +265,7 @@ export default function InvoiceAdjustmentRequests() {
               value={query || ""}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="بحث برقم الطلب أو الفاتورة أو السبب..."
-              className="h-12 pr-11"
+              className="h-12 pe-11"
             />
           </div>
           <Select value={statusFilter || ""} onValueChange={setStatusFilter}>
@@ -290,7 +290,7 @@ export default function InvoiceAdjustmentRequests() {
         </div>
         {loading ? (
           <div className="flex min-h-52 items-center justify-center text-gray-500">
-            <RefreshCw className="ml-2 h-5 w-5 animate-spin" /> جاري تحميل
+            <RefreshCw className="ms-2 h-5 w-5 animate-spin" /> جاري تحميل
             الطلبات...
           </div>
         ) : filteredRequests.length === 0 ? (

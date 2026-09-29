@@ -36,13 +36,13 @@ const DropdownMenuSubTrigger = React.forwardRef<
       className={cn(
         itemClass,
         "data-[state=open]:bg-purple-50 dark:data-[state=open]:bg-cyan-400/10",
-        inset && "pr-10",
+        inset && "pe-10",
         className,
       )}
       {...props}
     >
       {children}
-      <ChevronRightIcon className="mr-auto size-4 opacity-60" />
+      <ChevronRightIcon className="me-auto size-4 opacity-60" />
     </DropdownMenuPrimitive.SubTrigger>
   ),
 );
@@ -97,7 +97,7 @@ const DropdownMenuItem = React.forwardRef<
   ({ className, inset, ...props }, ref) => (
     <DropdownMenuPrimitive.Item
       ref={ref}
-      className={cn(itemClass, inset && "pr-10", className)}
+      className={cn(itemClass, inset && "pe-10", className)}
       {...props}
     />
   ),
@@ -111,7 +111,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
   ({ className, children, checked, ...props }, ref) => (
     <DropdownMenuPrimitive.CheckboxItem
       ref={ref}
-      className={cn(itemClass, "pl-4 pr-10", className)}
+      className={cn(itemClass, "ps-4 pe-10", className)}
       checked={checked}
       {...props}
     >
@@ -134,7 +134,7 @@ const DropdownMenuRadioItem = React.forwardRef<
   ({ className, children, ...props }, ref) => (
     <DropdownMenuPrimitive.RadioItem
       ref={ref}
-      className={cn(itemClass, "pl-4 pr-10", className)}
+      className={cn(itemClass, "ps-4 pe-10", className)}
       {...props}
     >
       <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center text-primary">
@@ -162,7 +162,7 @@ const DropdownMenuLabel = React.forwardRef<
       ref={ref}
       className={cn(
         "px-4 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400",
-        inset && "pr-10",
+        inset && "pe-10",
         className,
       )}
       {...props}
@@ -189,7 +189,7 @@ const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTML
   return (
     <span
       className={cn(
-        "mr-auto text-[10px] font-bold tracking-widest text-gray-500 dark:text-gray-400",
+        "me-auto text-[10px] font-bold tracking-widest text-gray-500 dark:text-gray-400",
         className,
       )}
       {...props}

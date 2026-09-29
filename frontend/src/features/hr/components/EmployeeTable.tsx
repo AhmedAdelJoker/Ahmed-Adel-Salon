@@ -177,7 +177,7 @@ export default function EmployeeTable({
               </div>
               <div className="mt-3 flex gap-2">
                 <Button variant="outline" size="sm" className="flex-1 rounded-xl font-black" onClick={() => onEdit(emp)}>
-                  <Pencil size={14} className="ml-1" /> تعديل
+                  <Pencil size={14} className="ms-1" /> تعديل
                 </Button>
                 <Button variant="ghost" size="sm" className="rounded-xl" onClick={() => onDelete(emp)}>
                   <Trash2 size={14} />

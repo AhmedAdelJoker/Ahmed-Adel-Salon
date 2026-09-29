@@ -59,7 +59,7 @@ export function ScheduleHeaderActions({
         onClick={onNewBooking}
         className="h-11 px-8 rounded-xl shadow-accent"
       >
-        <Plus size={18} className="ml-2" /> حجز جديد
+        <Plus size={18} className="ms-2" /> حجز جديد
       </Button>
     </div>
   );

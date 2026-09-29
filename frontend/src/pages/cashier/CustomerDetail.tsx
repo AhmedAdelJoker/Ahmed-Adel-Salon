@@ -95,7 +95,7 @@ function CustomerDetailPage() {
             onClick={() => navigate("/customers")}
             className="rounded-xl"
           >
-            <ArrowRight size={16} className="ml-2" /> العودة للعملاء
+            <ArrowRight size={16} className="ms-2" /> العودة للعملاء
           </Button>
         </div>
       </div>
@@ -118,14 +118,14 @@ function CustomerDetailPage() {
                 onClick={() => navigate("/customers")}
                 className="h-10 rounded-xl px-3 text-xs"
               >
-                <ArrowRight size={14} className="ml-1.5" /> العودة
+                <ArrowRight size={14} className="ms-1.5" /> العودة
               </Button>
               <Button
                 variant="primary"
                 className="h-10 rounded-xl px-3 text-xs"
                 onClick={() => setIsBookingOpen(true)}
               >
-                <Plus size={14} className="ml-1.5" /> حجز جديد
+                <Plus size={14} className="ms-1.5" /> حجز جديد
               </Button>
               {isOwner && (
                 <>
@@ -134,14 +134,14 @@ function CustomerDetailPage() {
                     onClick={openEdit}
                     className="h-10 rounded-xl px-3 text-xs"
                   >
-                    <Edit3 size={14} className="ml-1.5" /> تعديل
+                    <Edit3 size={14} className="ms-1.5" /> تعديل
                   </Button>
                   <Button
                     variant="danger"
                     onClick={() => setIsDeleteOpen(true)}
                     className="h-10 rounded-xl px-3 text-xs"
                   >
-                    <Trash2 size={14} className="ml-1.5" /> حذف
+                    <Trash2 size={14} className="ms-1.5" /> حذف
                   </Button>
                 </>
               )}
@@ -175,7 +175,7 @@ function CustomerDetailPage() {
                     tierInfo.bg,
                   )}
                 >
-                  <tierInfo.icon size={10} className="ml-1" /> {tierInfo.label}
+                  <tierInfo.icon size={10} className="ms-1" /> {tierInfo.label}
                 </Badge>
               </div>
               <div className="flex flex-wrap items-center gap-3 mt-1 text-xs">

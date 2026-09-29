@@ -112,7 +112,7 @@ export default function ReportsDashboard() {
               </Badge>
             )}
             <Button onClick={loadData} variant="outline" className="h-10 rounded-xl" disabled={loading} aria-label="تحديث البيانات">
-              <Loader2 className={cn("ml-2 h-4 w-4", loading ? "animate-spin" : "")} aria-hidden="true" />
+              <Loader2 className={cn("ms-2 h-4 w-4", loading ? "animate-spin" : "")} aria-hidden="true" />
               <span className="hidden sm:inline">تحديث</span>
             </Button>
           </div>
@@ -127,7 +127,7 @@ export default function ReportsDashboard() {
           <AlertTriangle size={18} className="shrink-0" />
           <p className="text-xs font-bold flex-1 min-w-[200px]">{loadError}</p>
           <Button variant="outline" size="sm" onClick={loadData} className="shrink-0">
-            <RefreshCw size={14} className="ml-1.5" />
+            <RefreshCw size={14} className="ms-1.5" />
             إعادة المحاولة
           </Button>
         </div>
@@ -147,7 +147,7 @@ export default function ReportsDashboard() {
       {/* شريط هوية — انتقال سريع (مرحلة 3) */}
       <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
         <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ml-2">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ms-2">
             <LayoutDashboard size={12} className="text-accent" /> انتقال سريع
           </span>
           {[

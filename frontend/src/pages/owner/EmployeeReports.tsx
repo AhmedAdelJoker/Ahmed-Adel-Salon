@@ -185,9 +185,9 @@ export default function EmployeeReports() {
                 className="h-11 rounded-xl px-4 font-black bg-white text-primary hover:bg-white/90"
               >
                 {exporting ? (
-                  <RefreshCw size={16} className="ml-1.5 animate-spin" />
+                  <RefreshCw size={16} className="ms-1.5 animate-spin" />
                 ) : (
-                  <Download size={16} className="ml-1.5" />
+                  <Download size={16} className="ms-1.5" />
                 )}
                 تصدير CSV
               </Button>
@@ -239,7 +239,7 @@ export default function EmployeeReports() {
               size="sm"
               className="shrink-0 rounded-xl"
             >
-              <RefreshCw size={14} className="ml-1" /> إعادة المحاولة
+              <RefreshCw size={14} className="ms-1" /> إعادة المحاولة
             </Button>
           </div>
         </PremiumCard>
@@ -301,7 +301,7 @@ export default function EmployeeReports() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="مثال: أحمد - قص شعر..."
-                className="h-11 pr-10 rounded-xl bg-soft border-border font-bold"
+                className="h-11 pe-10 rounded-xl bg-soft border-border font-bold"
               />
             </div>
           </div>
@@ -584,7 +584,7 @@ export default function EmployeeReports() {
             <button
               key={l.label}
               onClick={() => navigate(l.href)}
-              className="group flex items-center gap-2 rounded-full border border-border bg-card py-1.5 pr-1.5 pl-4 hover:border-primary/40 hover:shadow-sm transition-all"
+              className="group flex items-center gap-2 rounded-full border border-border bg-card py-1.5 pe-1.5 ps-4 hover:border-primary/40 hover:shadow-sm transition-all"
             >
               <span
                 className={cn(

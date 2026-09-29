@@ -145,7 +145,7 @@ export function CashboxCharts({ trend, breakdown, todayNet, byMethod = [] }: Pro
               />
             </PieChart>
           </ResponsiveContainer>
-          <div className="grid grid-cols-1 gap-1 mt-2 max-h-[90px] overflow-y-auto custom-scrollbar pr-1">
+          <div className="grid grid-cols-1 gap-1 mt-2 max-h-[90px] overflow-y-auto custom-scrollbar pe-1">
             {breakdown.slice(0, 4).map((t) => {
               const color = getTypeColor(t.type);
               const label = getTypeLabel(t.type);
@@ -209,7 +209,7 @@ export function CashboxCharts({ trend, breakdown, todayNet, byMethod = [] }: Pro
                 <div key={t.method} className="flex items-center gap-1.5 rounded-xl border border-border bg-soft/30 px-2 py-1.5 min-w-0">
                   <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: col }} />
                   <span className="text-[11px] font-black text-main truncate">{label}</span>
-                  <span className="text-[10px] font-bold text-muted mr-auto">{pct}%</span>
+                  <span className="text-[10px] font-bold text-muted me-auto">{pct}%</span>
                 </div>
               );
             })}

@@ -165,7 +165,7 @@ const BarberAvailability = () => {
               onClick={handleSaveHours}
               loading={saving}
             >
-              <Save size={14} className="ml-1.5" /> حفظ التغييرات
+              <Save size={14} className="ms-1.5" /> حفظ التغييرات
             </Button>
           }
         />
@@ -277,7 +277,7 @@ const BarberAvailability = () => {
                 setShowTimeOffModal(true);
               }}
             >
-              <Plus size={14} className="ml-1.5" /> إضافة إجازة
+              <Plus size={14} className="ms-1.5" /> إضافة إجازة
             </Button>
           </div>
 

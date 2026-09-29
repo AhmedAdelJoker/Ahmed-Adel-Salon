@@ -111,13 +111,13 @@ const ExpensesPage = () => {
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" className="h-11 rounded-xl px-3 text-xs border-border bg-card font-black hover:border-primary/20" onClick={exportToCSV}>
-              <Download size={14} className="ml-1.5" /> <span className="hidden sm:inline">تصدير CSV</span>
+              <Download size={14} className="ms-1.5" /> <span className="hidden sm:inline">تصدير CSV</span>
             </Button>
             <Button variant="outline" className="h-11 rounded-xl px-3 text-xs border-border bg-card font-black" onClick={() => navigate("/expenses/archive")}>
-              <Archive size={14} className="ml-1.5" /> <span className="hidden sm:inline">الأرشيف</span>
+              <Archive size={14} className="ms-1.5" /> <span className="hidden sm:inline">الأرشيف</span>
             </Button>
             <Button className="h-11 rounded-xl px-5 text-xs bg-slate-900 hover:bg-slate-800 text-white font-black shadow-lg" onClick={() => { resetForm(); setIsModalOpen(true); }}>
-              <Plus size={14} className="ml-1.5" /> إضافة مصروف
+              <Plus size={14} className="ms-1.5" /> إضافة مصروف
             </Button>
           </div>
         }
@@ -181,7 +181,7 @@ const ExpensesPage = () => {
                 }}
                 className="h-11 rounded-xl px-6 font-black"
               >
-                <Plus size={14} className="ml-1.5" /> إضافة مصروف
+                <Plus size={14} className="ms-1.5" /> إضافة مصروف
               </Button>
               {hasActiveFilters && (
                 <Button
@@ -248,7 +248,7 @@ const ExpensesPage = () => {
                           </Button>
                           {isPending && isOwner && exp.id && (
                             <Button size="sm" className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] px-3" onClick={() => exp.id != null && handleApprove(exp.id)}>
-                              <CheckCircle2 size={12} className="ml-1" /> اعتماد
+                              <CheckCircle2 size={12} className="ms-1" /> اعتماد
                             </Button>
                           )}
                           {isOwner ? (
@@ -329,7 +329,7 @@ const ExpensesPage = () => {
             <Button variant="outline" onClick={() => { resetForm(); setIsModalOpen(false); }} className="h-11 flex-1 rounded-xl font-black">إلغاء</Button>
             {(!isEditing || isOwner) && (
               <Button onClick={handleSubmit} disabled={isSubmitting || uploading} className="h-11 flex-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black">
-                {isSubmitting ? <RefreshCw size={14} className="ml-1.5 animate-spin" /> : <Save size={14} className="ml-1.5" />} {isEditing ? "حفظ التعديل" : "إضافة"}
+                {isSubmitting ? <RefreshCw size={14} className="ms-1.5 animate-spin" /> : <Save size={14} className="ms-1.5" />} {isEditing ? "حفظ التعديل" : "إضافة"}
               </Button>
             )}
           </DialogFooter>

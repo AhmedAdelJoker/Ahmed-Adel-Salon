@@ -40,7 +40,7 @@ export default function FinancialTab({
                         baseSalary: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className={`${FIELD_INPUT_CLASS} pr-12`}
+                    className={"${FIELD_INPUT_CLASS} pe-12"}
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-muted">
                     ج.م
@@ -61,7 +61,7 @@ export default function FinancialTab({
                         commissionRate: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className={`${FIELD_INPUT_CLASS} pr-12`}
+                    className={"${FIELD_INPUT_CLASS} pe-12"}
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-muted">
                     %

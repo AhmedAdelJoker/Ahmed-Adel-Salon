@@ -231,7 +231,7 @@ export function ProductDetailsModal({
                 }}
                 className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black"
               >
-                <History size={14} className="ml-2" /> سجل الحركات
+                <History size={14} className="ms-2" /> سجل الحركات
               </Button>
             </div>
           </div>

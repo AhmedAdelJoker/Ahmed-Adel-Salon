@@ -59,7 +59,7 @@ export default function CustomerHeader({
             onClick={() => fileInputRef.current?.click()}
             className="h-12 w-full px-6 border-black/10 dark:border-white/10 sm:w-auto"
           >
-            <FileUp size={18} className="ml-2" /> استيراد
+            <FileUp size={18} className="ms-2" /> استيراد
           </Button>
           <Button
             variant="outline"
@@ -67,7 +67,7 @@ export default function CustomerHeader({
             onClick={() => onExport("excel")}
             className="h-12 w-full px-6 border-black/10 dark:border-white/10 sm:w-auto"
           >
-            <FileDown size={18} className="ml-2" /> تصدير
+            <FileDown size={18} className="ms-2" /> تصدير
           </Button>
           {isManagerOrOwner && (
             <Button
@@ -76,7 +76,7 @@ export default function CustomerHeader({
               onClick={onArchive}
               className="h-12 w-full px-6 border-black/10 dark:border-white/10 sm:w-auto"
             >
-              <Archive size={18} className="ml-2" /> الأرشيف
+              <Archive size={18} className="ms-2" /> الأرشيف
             </Button>
           )}
           <Button
@@ -84,7 +84,7 @@ export default function CustomerHeader({
             onClick={onCreate}
             className="h-12 w-full px-8 text-base sm:w-auto"
           >
-            <Plus size={20} className="ml-2" /> إضافة عميل
+            <Plus size={20} className="ms-2" /> إضافة عميل
           </Button>
         </div>
       </div>

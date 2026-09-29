@@ -187,7 +187,7 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="بحث بالاسم أو رقم الجوال..."
-            className="h-12 pl-4 pr-12 rounded-xl bg-white border-border focus:border-primary shadow-sm transition-all font-bold text-sm"
+            className="h-12 ps-4 pe-12 rounded-xl bg-white border-border focus:border-primary shadow-sm transition-all font-bold text-sm"
           />
         </div>
         <StatCard
@@ -270,7 +270,7 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
                   onClick={() => setConfirmTarget(employee)}
                   className="w-full h-12 rounded-xl font-black text-sm uppercase tracking-widest bg-white border border-border hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm"
                 >
-                  <RotateCcw size={18} className="ml-2" /> استعادة للعمل
+                  <RotateCcw size={18} className="ms-2" /> استعادة للعمل
                 </Button>
               </div>
             </PremiumCard>

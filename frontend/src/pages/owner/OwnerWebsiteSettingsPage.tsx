@@ -27,7 +27,7 @@ export default function OwnerWebsiteSettingsPage() {
               onClick={() => window.open(`${window.location.origin}/`, "_blank")}
               className="h-11 rounded-xl px-4 font-black border-border bg-card"
             >
-              <ExternalLink size={14} className="ml-1.5" /> عرض الموقع
+              <ExternalLink size={14} className="ms-1.5" /> عرض الموقع
             </Button>
             <Button
               variant="outline"

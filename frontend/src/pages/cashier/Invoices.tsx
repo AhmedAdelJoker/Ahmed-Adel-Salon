@@ -97,7 +97,7 @@ export default function Invoices() {
                   className="h-10 rounded-xl px-3"
                   onClick={() => navigate("/owner/adjustment-requests")}
                 >
-                  <ShieldCheck size={14} className="ml-1.5" />
+                  <ShieldCheck size={14} className="ms-1.5" />
                   <span className="hidden sm:inline">طلبات التعديل</span>
                 </Button>
               )}
@@ -106,7 +106,7 @@ export default function Invoices() {
                 className="h-10 rounded-xl px-3"
                 onClick={() => navigate("/invoices/archive")}
               >
-                <Archive size={14} className="ml-1.5" />
+                <Archive size={14} className="ms-1.5" />
                 <span className="hidden sm:inline">الأرشيف</span>
               </Button>
               <Button
@@ -116,7 +116,7 @@ export default function Invoices() {
               >
                 <RefreshCw
                   size={14}
-                  className={cn("ml-1.5", loading && "animate-spin")}
+                  className={cn("ms-1.5", loading && "animate-spin")}
                 />
                 <span className="hidden sm:inline">تحديث</span>
               </Button>

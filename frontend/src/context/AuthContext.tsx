@@ -178,10 +178,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           },
         });
 
-        const { access_token, refresh_token, user: userData } = response.data as {
+        const {
+          access_token,
+          refresh_token,
+          user: userData,
+          "2fa_enrollment_required": enrollmentRequired,
+          "2fa_enrollment_due": enrollmentDue,
+        } = response.data as {
           access_token: string;
           refresh_token?: string;
           user: AuthUser;
+          "2fa_enrollment_required"?: boolean;
+          "2fa_enrollment_due"?: string | null;
         };
         localStorage.setItem("token", access_token);
 
@@ -189,8 +197,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           localStorage.setItem("refresh_token", refresh_token);
         }
 
+        // Mandatory 2FA.
+        //
+        // A restricted session is still stored, deliberately: the two enrolment
+        // endpoints are the only ones it can reach, so throwing the token away
+        // would leave the user unable to complete the setup that unlocks it.
+        // Every other route answers 403 for this token, which
+        // `ProtectedRoute` turns back into a redirect here.
+        //
+        // The softer case is a normal session with a deadline. It is recorded so
+        // the UI can prompt, and deliberately not surfaced as an error: a working
+        // login should not look like a failed one.
+        if (enrollmentRequired) {
+          localStorage.setItem("2fa_enrollment_required", "true");
+        } else {
+          localStorage.removeItem("2fa_enrollment_required");
+        }
+
+        if (enrollmentDue) {
+          localStorage.setItem("2fa_enrollment_due", enrollmentDue);
+        } else {
+          localStorage.removeItem("2fa_enrollment_due");
+        }
+
         localStorage.setItem("user", JSON.stringify(userData));
         setUser(userData);
+
+        if (enrollmentRequired) {
+          // `toast()` rather than `toast.warning`: react-hot-toast has no
+          // `warning` method, and calling one that does not exist is a TypeError
+          // on the login path -- exactly the moment this must not fail.
+          toast("يجب تفعيل التحقق بخطوتين قبل متابعة استخدام النظام");
+          return userData;
+        }
 
         toast.success(
           `مرحباً بك مجدداً، ${

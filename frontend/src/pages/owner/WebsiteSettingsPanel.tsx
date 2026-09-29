@@ -394,7 +394,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                         onClick={removeCoverImage}
                         className="text-danger border-danger/20 bg-card hover:bg-danger-soft hover:text-danger text-[11px] rounded-xl h-10"
                       >
-                        <Trash2 size={14} className="ml-1" /> حذف
+                        <Trash2 size={14} className="ms-1" /> حذف
                       </Button>
                     )}
                   </div>
@@ -514,7 +514,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                       <label htmlFor={social.id} className="text-[10px] font-black text-muted uppercase tracking-widest">
                         {social.label}
                       </label>
-                      {String(settings[social.id] || "").trim() && <Badge variant="success" size="sm" className="mr-auto rounded-full text-[9px]">مفعل</Badge>}
+                      {String(settings[social.id] || "").trim() && <Badge variant="success" size="sm" className="me-auto rounded-full text-[9px]">مفعل</Badge>}
                     </div>
                     <Input
                       id={social.id}
@@ -662,7 +662,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
           loading={saving}
           className="h-12 rounded-xl px-8 font-black text-xs shadow-md disabled:opacity-60"
         >
-          <Save size={16} className="ml-2" /> {saving ? "جاري الحفظ..." : "حفظ إعدادات الموقع"}
+          <Save size={16} className="ms-2" /> {saving ? "جاري الحفظ..." : "حفظ إعدادات الموقع"}
         </Button>
       </div>
     </div>

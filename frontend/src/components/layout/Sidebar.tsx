@@ -73,7 +73,7 @@ function SidebarLink({ item, active, collapsed, onNavigate }) {
       ) : null}
 
       {!collapsed && active && (
-        <div className="mr-auto h-1 w-1 rounded-full bg-accent animate-pulse" />
+        <div className="me-auto h-1 w-1 rounded-full bg-accent animate-pulse" />
       )}
     </NavLink>
   );

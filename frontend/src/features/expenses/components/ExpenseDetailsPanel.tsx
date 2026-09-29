@@ -115,7 +115,7 @@ export function ExpenseDetailsPanel({
                   else if (t === "invoice") onNavigate(`/invoices`);
                   else if (t === "product") onNavigate(`/inventory`);
                   else if (t === "booking") onNavigate(`/bookings`);
-                }} className="mr-auto text-xs font-black text-indigo-600 hover:underline">فتح المرجع</button>
+                }} className="me-auto text-xs font-black text-indigo-600 hover:underline">فتح المرجع</button>
               </div>
             </div>
           )}
@@ -123,7 +123,7 @@ export function ExpenseDetailsPanel({
             <Wallet size={14} className="text-muted" />
             <span className="text-xs font-bold text-muted">حركة الخزنة:</span>
             <span className="font-black text-xs">EXP-{String(viewItem.id)}</span>
-            <button onClick={() => onNavigate("/owner/cashbox")} className="mr-auto text-xs font-black text-primary hover:underline">عرض في الخزنة</button>
+            <button onClick={() => onNavigate("/owner/cashbox")} className="me-auto text-xs font-black text-primary hover:underline">عرض في الخزنة</button>
           </div>
 
           {viewItem.description ? (
@@ -156,7 +156,7 @@ export function ExpenseDetailsPanel({
           </div>
           <div className="flex gap-2 pt-2">
             <Button variant="outline" className="flex-1 h-11 rounded-xl font-black" onClick={onClose}>إغلاق</Button>
-            {isOwner && <Button className="flex-1 h-11 rounded-xl bg-slate-900 text-white font-black" onClick={() => { onClose(); onEdit(viewItem); }}>تعديل <FileText size={14} className="mr-2" /></Button>}
+            {isOwner && <Button className="flex-1 h-11 rounded-xl bg-slate-900 text-white font-black" onClick={() => { onClose(); onEdit(viewItem); }}>تعديل <FileText size={14} className="me-2" /></Button>}
           </div>
         </div>
       ) : null}

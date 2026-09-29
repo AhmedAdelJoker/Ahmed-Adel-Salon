@@ -107,22 +107,22 @@ export default function PeriodChartPanel({
       </PremiumCard>
 
       <div className="xl:col-span-4 grid grid-cols-2 gap-3 min-w-0 content-start">
-        <PremiumCard className="p-4 border-l-4 border-slate-900" animate={false}>
+        <PremiumCard className="p-4 border-s-4 border-slate-900" animate={false}>
           <div className="text-[10px] font-black text-muted uppercase">الأساسي</div>
           <div className="text-lg font-black tabular-nums">{formatCurrency(summary?.total_base_salary)}</div>
           <div className="text-[10px] font-bold text-muted">{toNumber(summary?.employees_count) || 0} موظف</div>
         </PremiumCard>
-        <PremiumCard className="p-4 border-l-4 border-sky-500" animate={false}>
+        <PremiumCard className="p-4 border-s-4 border-sky-500" animate={false}>
           <div className="text-[10px] font-black text-muted uppercase">العمولات</div>
           <div className="text-lg font-black tabular-nums text-sky-600">{formatCurrency(summary?.total_commissions)}</div>
           <div className="text-[10px] font-bold text-sky-600/70">{pctLabel(summary?.total_commissions, summary?.total_net_salary)}</div>
         </PremiumCard>
-        <PremiumCard className="p-4 border-l-4 border-emerald-500" animate={false}>
+        <PremiumCard className="p-4 border-s-4 border-emerald-500" animate={false}>
           <div className="text-[10px] font-black text-muted uppercase">المكافآت</div>
           <div className="text-lg font-black text-emerald-600">{formatCurrency(summary?.total_bonuses)}</div>
           <div className="text-[10px] font-bold text-emerald-600/70">{pctLabel(summary?.total_bonuses, summary?.total_net_salary)}</div>
         </PremiumCard>
-        <PremiumCard className="p-4 border-l-4 border-rose-500" animate={false}>
+        <PremiumCard className="p-4 border-s-4 border-rose-500" animate={false}>
           <div className="text-[10px] font-black text-muted uppercase">استقطاعات + سلف</div>
           <div className="text-lg font-black text-rose-600">{formatCurrency(toNumber(summary?.total_deductions) + toNumber(summary?.total_advances))}</div>
           <div className="text-[10px] font-bold text-rose-600/70">يخصم من الصافي</div>

@@ -86,19 +86,19 @@ const BarberDashboard = () => {
               value="queue"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Zap size={14} className="ml-1.5" /> قائمة الانتظار
+              <Zap size={14} className="ms-1.5" /> قائمة الانتظار
             </TabsTrigger>
             <TabsTrigger
               value="performance"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <BarChart3 size={14} className="ml-1.5" /> الأداء
+              <BarChart3 size={14} className="ms-1.5" /> الأداء
             </TabsTrigger>
             <TabsTrigger
               value="schedule"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <CalendarDays size={14} className="ml-1.5" /> الجدول
+              <CalendarDays size={14} className="ms-1.5" /> الجدول
             </TabsTrigger>
           </TabsList>
 

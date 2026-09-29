@@ -129,7 +129,7 @@ export default function Inventory() {
                 className="h-10 rounded-xl px-3 text-xs"
                 onClick={() => navigate("/inventory/bundles")}
               >
-                <Gift size={14} className="ml-1.5" />{" "}
+                <Gift size={14} className="ms-1.5" />{" "}
                 <span className="hidden sm:inline">حزم</span>
               </Button>
               <Button
@@ -137,7 +137,7 @@ export default function Inventory() {
                 className="h-10 rounded-xl px-3 text-xs"
                 onClick={() => navigate("/inventory/archive")}
               >
-                <History size={14} className="ml-1.5" />{" "}
+                <History size={14} className="ms-1.5" />{" "}
                 <span className="hidden sm:inline">أرشيف</span>
               </Button>
               <Button
@@ -145,14 +145,14 @@ export default function Inventory() {
                 className="h-10 rounded-xl px-3 text-xs"
                 onClick={() => handleExport("excel")}
               >
-                <FileDown size={14} className="ml-1.5" />{" "}
+                <FileDown size={14} className="ms-1.5" />{" "}
                 <span className="hidden sm:inline">تصدير</span>
               </Button>
               <Button
                 onClick={openCreate}
                 className="h-10 rounded-xl px-4 text-xs"
               >
-                <Plus size={14} className="ml-1.5" /> إضافة
+                <Plus size={14} className="ms-1.5" /> إضافة
               </Button>
             </div>
           }
@@ -293,7 +293,7 @@ export default function Inventory() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="ابحث بالاسم أو التصنيف أو الكود..."
-                  className="h-10 w-full rounded-xl bg-soft border-border pr-9 text-xs font-bold sm:h-12 sm:rounded-xl sm:text-sm"
+                  className="h-10 w-full rounded-xl bg-soft border-border pe-9 text-xs font-bold sm:h-12 sm:rounded-xl sm:text-sm"
                 />
               </div>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -475,7 +475,7 @@ export default function Inventory() {
                           className="h-8 flex-1 rounded-lg text-[10px] font-black sm:h-10 sm:text-xs"
                           onClick={() => openStockModal(product)}
                         >
-                          <Plus size={12} className="ml-1" /> توريد
+                          <Plus size={12} className="ms-1" /> توريد
                         </Button>
                       </div>
                     </PremiumCard>

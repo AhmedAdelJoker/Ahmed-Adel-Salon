@@ -123,7 +123,7 @@ const Toolbar = ({
             size={17}
           />
           <input
-            className="w-full h-11 pr-10 rounded-xl bg-soft border border-border focus:bg-card focus:border-accent focus:ring-0 transition-all font-bold placeholder:text-muted text-sm"
+            className="w-full h-11 pe-10 rounded-xl bg-soft border border-border focus:bg-card focus:border-accent focus:ring-0 transition-all font-bold placeholder:text-muted text-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="بحث سريع (اسم، خدمة، هاتف)..."

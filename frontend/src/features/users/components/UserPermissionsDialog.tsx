@@ -153,7 +153,7 @@ export function UserPermissionsDialog({
                                   </span>
                                 </div>
                               </div>
-                              <div className="pl-2">
+                              <div className="ps-2">
                                 {state === true ? (
                                   <div className="h-7 w-7 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 animate-in zoom-in-50 duration-500">
                                     <Check size={14} strokeWidth={4} />

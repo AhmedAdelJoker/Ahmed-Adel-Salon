@@ -41,7 +41,7 @@ export default function DocumentsTab({
                 onClick={() => (document.getElementById("doc-upload") as HTMLInputElement | null)?.click()}
                 className="h-12 px-6 rounded-xl bg-accent font-black text-xs uppercase tracking-widest shadow-lg shadow-accent/20"
               >
-                <Plus size={18} className="ml-2" /> رفع مستند جديد
+                <Plus size={18} className="ms-2" /> رفع مستند جديد
                 <input
                   id="doc-upload"
                   type="file"

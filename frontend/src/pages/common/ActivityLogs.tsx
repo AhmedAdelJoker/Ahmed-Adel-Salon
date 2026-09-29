@@ -279,13 +279,13 @@ export default function ActivityLogs() {
               title={`تصدير كامل النطاق المفلتر (${formatNumber(totalCount)} سجل)`}
               className="h-11 rounded-xl px-4 text-xs font-black"
             >
-              <Download size={15} className="ml-1.5" /> تصدير CSV
+              <Download size={15} className="ms-1.5" /> تصدير CSV
             </Button>
             <Button variant="outline" onClick={handlePrint} className="h-11 rounded-xl px-4 text-xs font-black">
-              <Printer size={15} className="ml-1.5" /> طباعة / PDF
+              <Printer size={15} className="ms-1.5" /> طباعة / PDF
             </Button>
             <Button onClick={() => fetchLogs({ background: true })} loading={refreshing} disabled={loading} className="h-11 rounded-xl px-5 text-xs font-black">
-              <RefreshCw size={15} className="ml-1.5" /> تحديث
+              <RefreshCw size={15} className="ms-1.5" /> تحديث
             </Button>
           </div>
         }
@@ -327,7 +327,7 @@ export default function ActivityLogs() {
           <ShieldCheck size={14} className="text-primary" />
           <span className="text-[11px] font-black tracking-widest text-muted uppercase">فلاتر السجل</span>
           {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={handleReset} className="mr-auto h-8 gap-1 rounded-xl text-xs font-black">
+            <Button variant="ghost" size="sm" onClick={handleReset} className="me-auto h-8 gap-1 rounded-xl text-xs font-black">
               <RotateCcw size={12} /> إعادة ضبط
             </Button>
           )}
@@ -345,7 +345,7 @@ export default function ActivityLogs() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="ابحث بالإجراء، الكيان، أو الوصف..."
                 aria-label="بحث في سجل النشاط"
-                className="h-11 pr-10 rounded-xl bg-soft border-border font-bold"
+                className="h-11 pe-10 rounded-xl bg-soft border-border font-bold"
               />
             </div>
           </div>
@@ -446,7 +446,7 @@ export default function ActivityLogs() {
               <p className="text-xs font-bold text-muted mt-1 max-w-md">{loadError}</p>
             </div>
             <Button onClick={() => fetchLogs()} loading={loading} className="h-11 rounded-xl px-6 text-xs font-black">
-              <RefreshCw size={14} className="ml-1.5" /> إعادة المحاولة
+              <RefreshCw size={14} className="ms-1.5" /> إعادة المحاولة
             </Button>
           </div>
         </PremiumCard>

@@ -121,7 +121,7 @@ export function StockSupplyModal({
                             amount: e.target.value,
                           }))
                         }
-                        className="h-10 rounded-xl bg-soft border-border font-black pl-10 sm:h-12 sm:pl-12"
+                        className="h-10 rounded-xl bg-soft border-border font-black ps-10 sm:h-12 sm:ps-12"
                       />
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">
                         عبوة
@@ -174,7 +174,7 @@ export function StockSupplyModal({
                         }))
                       }
                       placeholder={editingProduct?.cost_price || "0.00"}
-                      className="h-10 rounded-xl bg-soft border-border font-black text-success pl-10 sm:h-12 sm:pl-12"
+                      className="h-10 rounded-xl bg-soft border-border font-black text-success ps-10 sm:h-12 sm:ps-12"
                     />
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">
                       ج.م
@@ -208,7 +208,7 @@ export function StockSupplyModal({
                       type="number"
                       value={newSellPrice}
                       onChange={(e) => setNewSellPrice(e.target.value)}
-                      className="h-10 rounded-xl font-black text-primary border-primary/40 bg-primary/5 pl-10 sm:h-12 sm:pl-12"
+                      className="h-10 rounded-xl font-black text-primary border-primary/40 bg-primary/5 ps-10 sm:h-12 sm:ps-12"
                       autoFocus
                     />
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-primary/40 sm:left-4">

@@ -32,7 +32,14 @@
     "electron:build": "cross-env ELECTRON_BUILD=1 npm run build && electron-builder",
     "electron:pack": "cross-env ELECTRON_BUILD=1 npm run build && electron-builder --dir",
     "electron:preview": "cross-env ELECTRON_BUILD=1 npm run build && electron .",
-    "prepare:update": "node scripts/prepare-update.mjs"
+    "prepare:update": "node scripts/prepare-update.mjs",
+    "check:tokens": "node scripts/check-encoding.mjs && node scripts/check-arabic-strings.mjs",
+    "prune:css": "node scripts/prune-dead-css.mjs",
+    "prune:css:check": "node scripts/prune-dead-css.mjs --check",
+    "audit:rtl": "node scripts/audit-rtl.mjs",
+    "codemod:rtl": "node scripts/codemod-logical-spacing.mjs",
+    "codemod:rtl:check": "node scripts/codemod-logical-spacing.mjs --check",
+    "codemod:rtl:full": "node scripts/codemod-logical-spacing.mjs --full"
   },
   "build": {
     "appId": "com.salonmanagement.pro",

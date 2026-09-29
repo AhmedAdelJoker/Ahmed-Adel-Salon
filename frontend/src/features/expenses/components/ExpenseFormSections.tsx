@@ -56,7 +56,7 @@ export function ExpenseFormSections({
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-muted uppercase tracking-widest">المبلغ *</label>
             <div className="relative">
-              <Input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} disabled={isEditing && !isOwner} className="h-11 rounded-xl bg-soft border-border font-black pr-4 pl-12" placeholder="0.00" />
+              <Input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} disabled={isEditing && !isOwner} className="h-11 rounded-xl bg-soft border-border font-black pe-4 ps-12" placeholder="0.00" />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">ج.م</span>
             </div>
           </div>
@@ -100,7 +100,7 @@ export function ExpenseFormSections({
         <div className="flex items-center gap-2">
           <div className="h-6 w-6 rounded-lg bg-amber-500 text-white flex items-center justify-center text-[10px] font-black">3</div>
           <span className="text-[11px] font-black uppercase tracking-widest text-muted">الربط والملاحظات الداخلية</span>
-          <Badge variant="outline" className="mr-auto rounded-full text-[9px] font-black">اختياري</Badge>
+          <Badge variant="outline" className="me-auto rounded-full text-[9px] font-black">اختياري</Badge>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">

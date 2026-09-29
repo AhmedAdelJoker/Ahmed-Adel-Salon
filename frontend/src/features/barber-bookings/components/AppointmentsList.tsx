@@ -128,7 +128,7 @@ export const AppointmentsList = ({
                           className="h-8 rounded-lg px-3 text-[10px] font-black"
                           onClick={() => handleStatusChange(apt.id, "in-service")}
                         >
-                          <Play size={10} className="ml-1" /> بدء
+                          <Play size={10} className="ms-1" /> بدء
                         </Button>
                       )}
                       {apt.status === "in-service" && (
@@ -138,13 +138,13 @@ export const AppointmentsList = ({
                           className="h-8 rounded-lg px-3 text-[10px] font-black"
                           onClick={() => handleStatusChange(apt.id, "completed")}
                         >
-                          <CheckCircle size={10} className="ml-1" /> إنهاء
+                          <CheckCircle size={10} className="ms-1" /> إنهاء
                         </Button>
                       )}
                     </div>
                   </div>
                   {apt.notes && (
-                    <p className="mt-2 text-[10px] font-bold text-muted mr-13">
+                    <p className="mt-2 text-[10px] font-bold text-muted me-13">
                       📝 {String(apt.notes)}
                     </p>
                   )}

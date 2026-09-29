@@ -117,7 +117,7 @@ const BarberWorkStation = () => {
                 عندما يتم حجز موعد لك، سيظهر هنا
               </p>
               <Button onClick={fetchAppointments} variant="outline">
-                <RefreshCw size={14} className="ml-1.5" /> تحديث
+                <RefreshCw size={14} className="ms-1.5" /> تحديث
               </Button>
             </div>
           ) : (

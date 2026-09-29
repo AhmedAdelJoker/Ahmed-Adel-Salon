@@ -25,7 +25,7 @@ export default function HrToolbar({
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="ابحث باسم الموظف أو المسمى الوظيفي..."
-          className="h-14 rounded-2xl border-border bg-card/80 pr-12 text-sm font-bold shadow-sm focus:border-accent focus:bg-card"
+          className="h-14 rounded-2xl border-border bg-card/80 pe-12 text-sm font-bold shadow-sm focus:border-accent focus:bg-card"
         />
       </div>
       <div className="flex items-center gap-2 rounded-2xl bg-card/60 border border-border p-1.5 shadow-sm">

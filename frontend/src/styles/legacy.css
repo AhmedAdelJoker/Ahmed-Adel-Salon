@@ -1,0 +1,774 @@
+/* ============================================================
+   ENTERPRISE UTILITIES
+   ============================================================ */
+@layer utilities{
+  
+
+  
+
+  
+  
+
+  
+  
+
+  
+
+  .surface-toolbar{
+    @apply rounded-[1.25rem] border border-border/70 bg-card p-3 shadow-sm backdrop-blur-xl;
+  }
+
+  .chip-scroller{
+    @apply flex gap-2 overflow-x-auto pb-1 pr-px;
+  }
+
+  .page-header{
+    @apply flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between;
+  }
+
+  .page-subtitle{
+    @apply max-w-2xl text-sm font-bold text-muted sm:text-base;
+  }
+
+  .content-panel{
+    @apply rounded-premium border border-border/70 bg-card shadow-sm backdrop-blur-xl;
+  }
+}
+
+/* ============================================================
+   COMPONENTS
+   ============================================================ */
+@layer components{
+  /* ── App Shell ─────────────────────────────────────────── */
+
+  /*
+   * The shell uses a full-viewport, no-outer-scroll architecture:
+   *   - .app-shell fills 100dvh, clips overflow
+   *   - .app-shell__layout is a flex row (sidebar + body)
+   *   - .app-shell__body + __main use flex-grow + min-height:0
+   *     so they can shrink and allow *internal* scrolling
+   *   - On mobile: sidebar collapses, layout becomes column
+   *     with a fixed bottom nav slot
+   */
+
+  .app-shell{
+    height: 100dvh;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: row;
+    background: var(--grad-page);
+  }
+
+  
+
+  /* ── Sidebar Slot (desktop) ── */
+  .app-shell__sidebar-slot{
+    flex: 0 0 auto;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    z-index: 40;
+    min-width: 0;
+  }
+
+  /* ── Scrollable body column ── */
+  .app-shell__body{
+    min-width: 0;
+    flex: 1 1 0%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--shell-gap);
+    overflow: hidden;
+  }
+
+  /* ── Scrollable main area (only place that can scroll internally) ── */
+  .app-shell__main{
+    min-width: 0;
+    width: 100%;
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    position: relative;
+  }
+
+  .app-shell__main > *{
+    min-width: 0;
+    width: 100%;
+    min-height: min-content;
+  }
+
+  .app-shell__content{
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+    overflow-x: hidden;
+  }
+
+  @media (min-width: 1536px){
+    .app-shell__content{
+      max-width: 96rem; /* 1536px - يستغل الشاشات الكبيرة */
+      padding-inline: 0.5rem;
+    }
+    .app-shell__main{
+      padding-inline: 0.5rem;
+    }
+  }
+
+  .app-shell__content > *{
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  
+
+  
+
+  
+
+  /* ── ERP page layout — unified responsive approach ──────── */
+  .erp-page,
+  .erp-page-container{
+    display: flex;
+    flex-direction: column;
+    gap: clamp(1rem, 3vh, 2rem);
+    width: 100%;
+    min-height: 0;
+    position: relative;
+    z-index: 10;
+  }
+
+  .erp-page *,
+  .erp-page-container *,
+  .content-panel *,
+  .premium-card *,
+  .glass-card *{
+    min-width: 0;
+  }
+
+  .erp-page :where(.grid, .flex),
+  .erp-page-container :where(.grid, .flex){
+    min-width: 0;
+  }
+
+  /* Fixed height mode for pages that need it (like POS) on desktop */
+  .erp-page--fixed{
+    height: 100%;
+    overflow: hidden;
+  }
+
+  @media (max-width: 1023px){
+    .erp-page--fixed{
+      height: auto;
+      overflow: visible;
+    }
+
+    .erp-page,
+    .erp-page-container{
+      gap: 0.75rem;
+    }
+  }
+
+  .erp-page__filters{
+    flex-shrink: 0;
+    width: 100%;
+  }
+
+  .erp-page__stats{
+    flex-shrink: 0;
+    width: 100%;
+  }
+
+  .erp-page__table{
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .table-wrapper{
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  .table-wrapper table,
+  .premium-table table{
+    min-width: max-content;
+  }
+
+  .table-wrapper :where(th, td),
+  .premium-table :where(th, td){
+    overflow-wrap: anywhere;
+    vertical-align: middle;
+  }
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  /* ── Internal scrollable area (sidebar lists, table bodies, etc.) ── */
+  .custom-scrollbar{
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  
+
+  
+  
+
+  
+
+  /* ── Card ── */
+  .card{
+    position: relative;
+    isolation: isolate;
+    overflow: clip;
+    min-width: 0;
+    transition:
+      transform 360ms var(--ease-spring),
+      border-color 320ms ease,
+      box-shadow 320ms ease,
+      background 320ms ease;
+  }
+
+  .card:hover{
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    box-shadow: 0 20px 40px -15px var(--accent-glow);
+  }
+
+  .card::before{
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.24),
+      transparent 28%
+    );
+    opacity: 0.7;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .dark .card::before,
+  [data-theme="dark"] .card::before{
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.06),
+      transparent 26%
+    );
+    opacity: 1;
+  }
+
+  .card > *{
+    position: relative;
+    z-index: 1;
+  }
+
+  
+
+  
+
+  .dark .premium-card,
+  [data-theme="dark"] .premium-card{
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 20%),
+      color-mix(in srgb, var(--bg-card) 94%, var(--surface-shade) 6%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 24px 60px -40px rgba(2, 8, 23, 0.82);
+  }
+
+  
+
+  
+
+  
+
+  
+
+  .dark .topbar-modern,
+  [data-theme="dark"] .topbar-modern{
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 24%),
+      color-mix(in srgb, var(--sidebar-surface-strong) 88%, transparent);
+  }
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  .dark .premium-button,
+  [data-theme="dark"] .premium-button{
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 20px 40px -28px rgba(2, 8, 23, 0.72);
+  }
+
+  .dark .premium-button::before,
+  [data-theme="dark"] .premium-button::before{
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.06),
+      transparent 30%
+    );
+  }
+
+  
+
+  
+
+  
+
+  .dark .premium-control-surface,
+  [data-theme="dark"] .premium-control-surface{
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 24%),
+      color-mix(in srgb, var(--bg-card) 92%, var(--surface-shade) 8%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 18px 38px -28px rgba(2, 8, 23, 0.78);
+  }
+
+  
+
+  .dark .premium-select-content,
+  [data-theme="dark"] .premium-select-content{
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 22%),
+      color-mix(in srgb, var(--bg-card) 94%, var(--surface-shade) 6%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 30px 68px -38px rgba(2, 8, 23, 0.86);
+  }
+
+  
+
+  
+
+  
+
+  
+
+  .dark .sidebar-modern__edge,
+  [data-theme="dark"] .sidebar-modern__edge{
+    background: conic-gradient(
+      from 180deg,
+      rgba(255, 255, 255, 0.04),
+      rgba(108, 182, 255, 0.16) 18%,
+      transparent 38%,
+      rgba(108, 182, 255, 0.1) 58%,
+      transparent 76%,
+      rgba(108, 182, 255, 0.06)
+    );
+  }
+
+  
+
+  
+
+  .dark .sidebar-modern__surface,
+  [data-theme="dark"] .sidebar-modern__surface{
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -26px 50px rgba(2, 8, 23, 0.26);
+  }
+
+  
+
+  
+
+  
+
+  
+
+  .sidebar-item:hover,
+  .sidebar-item.active{
+    color: var(--text-main);
+    transform: translateY(-1px);
+  }
+
+  .sidebar-item:hover::before,
+  .sidebar-item.active::before,
+  .sidebar-item:hover::after,
+  .sidebar-item.active::after{
+    opacity: 1;
+  }
+
+  .sidebar-item:hover::after,
+  .sidebar-item.active::after{
+    transform: scale(1);
+    box-shadow: var(--shadow-neon);
+  }
+
+  
+
+  .dark .sidebar-item__icon-wrap,
+  [data-theme="dark"] .sidebar-item__icon-wrap{
+    border-color: rgba(148, 163, 184, 0.14);
+    background: rgba(15, 23, 42, 0.42);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .sidebar-item:hover .sidebar-item__icon-wrap,
+  .sidebar-item.active .sidebar-item__icon-wrap{
+    color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 10px 24px -16px var(--accent-glow);
+  }
+
+  
+
+  /* ── Premium table ── */
+  .premium-table{
+    position: relative;
+    isolation: isolate;
+    border-color: var(--border);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 18%),
+      color-mix(in srgb, var(--bg-card) 97%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.26),
+      0 22px 48px -40px rgba(15, 23, 42, 0.32);
+  }
+
+  .premium-table::before{
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .premium-table__head{
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-soft) 86%, white 14%),
+      color-mix(in srgb, var(--bg-soft) 60%, transparent)
+    );
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+
+  .dark .premium-table,
+  [data-theme="dark"] .premium-table{
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 18%),
+      color-mix(in srgb, var(--bg-card) 95%, var(--surface-shade) 5%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 24px 56px -42px rgba(2, 8, 23, 0.82);
+  }
+
+  .dark .premium-table__head,
+  [data-theme="dark"] .premium-table__head{
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.04),
+      rgba(255, 255, 255, 0.015)
+    );
+  }
+
+  
+}
+
+/* ============================================================
+   RESPONSIVE — no-scroll layout on all breakpoints
+   Strategy:
+     - Mobile  (< 768px):  sidebar hidden, bottom nav shown,
+                            content fills full viewport height
+     - Tablet  (768–1023): narrow sidebar or collapsed icon rail
+     - Desktop (≥ 1024px): full sidebar + content side-by-side
+   ============================================================ */
+
+/* ── Mobile (< 768px) ── */
+@media (max-width: 767px){
+  .app-shell{
+    flex-direction: column;
+  }
+
+  
+
+  .app-shell__sidebar-slot{
+    display: none;
+  }
+
+  .app-shell__body{
+    gap: 0.75rem;
+    padding: 0;
+  }
+
+  .app-shell__content{
+    max-width: 100%;
+  }
+
+  .app-shell__main{
+    border-radius: 1rem;
+  }
+}
+
+/* ── Tablet (768px – 1023px) ── */
+@media (min-width: 768px) and (max-width: 1023px){
+  .app-shell__sidebar-slot{
+    display: none; /* MobileNav and Drawer handle this */
+  }
+}
+
+/* ── Ultra-wide (≥ 1920px) ── */
+@media (min-width: 1920px){
+  .app-shell__content{
+    max-width: 100%;
+  }
+}
+
+/* ============================================================
+   ACCESSIBILITY — respect user motion preference
+   ============================================================ */
+@media (prefers-reduced-motion: reduce){
+  *,
+  *::before,
+  *::after{
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+@layer utilities{
+  /* Single definition — no duplicates */
+  .no-scrollbar{
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar{
+    display: none;
+  }
+
+  /* Semantic color aliases */
+  .text-main{
+    color: var(--text-main);
+  }
+  .text-muted{
+    color: var(--text-muted);
+  }
+  .text-accent{
+    color: var(--accent);
+  }
+  
+  .bg-main{
+    background: var(--bg-main);
+  }
+  .bg-card{
+    background: var(--bg-card);
+  }
+  .bg-soft{
+    background: var(--bg-soft);
+  }
+  .bg-accent{
+    background: var(--accent);
+  }
+  .bg-accent-strong{
+    background: var(--accent-strong);
+  }
+  .border-border{
+    border-color: var(--border);
+  }
+
+  
+
+  .mobile-bottom-safe{
+    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom));
+  }
+
+  /* Touch target utilities (WCAG AA: 48×48px minimum) */
+  .touch-target{
+    min-height: 3rem; /* 48px */
+    min-width: 3rem;
+  }
+  
+
+  /* ============================================================
+     NO-OVERLAY / NO-OVERFLOW UTILITIES
+     --------------------------------------------------------
+     These rules guarantee that dense KPI cards, list rows, and
+     chart containers never bleed into neighbouring cells.
+     Apply the matching `data-no-overlap` / `data-stats-grid` to
+     a parent; children that opt in via `data-cell` get the
+     truncation behaviour automatically.
+     ============================================================ */
+  [data-no-overlap="true"]{
+    container-type: inline-size;
+  }
+  [data-no-overlap="true"] > *{
+    min-width: 0;
+  }
+  [data-stats-grid="true"]{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  [data-stats-grid="true"] > *{
+    min-width: 0;
+    min-height: 110px;
+  }
+
+  /* Stable numeric layout: prevents digit width jumps when values change. */
+  .tabular-nums{
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Force a single line + ellipsis for any cell labelled "single-line". */
+  .single-line{
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  
+
+  
+
+  /* Recharts: stop legends from overflowing the chart card. */
+  .recharts-legend-wrapper{
+    max-width: 100% !important;
+  }
+  .recharts-legend-item{
+    margin-inline-end: 0.75rem !important;
+  }
+  .recharts-cartesian-axis-tick-value{
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  
+}
+
+/* ============================================================
+   SHARED UTILITY CLASSES — Phase 1 UI/UX unification
+   ============================================================ */
+
+/* Card surface — single canonical container style */
+.card-surface{
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+
+.dark .card-glass{
+  background: linear-gradient(
+    135deg,
+    rgba(18, 18, 20, 0.85),
+    rgba(18, 18, 20, 0.6)
+  );
+}
+
+
+
+
+
+
+
+
+/* Truncate text on single line with ellipsis */
+.truncate-1{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.truncate-2{
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+
+/* Scroll container that respects RTL/LTR overflow */
+.scroll-x{
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Touch target size (44x44 minimum for accessibility) */
+.touch-target{
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Focus ring — accessibility */
+.focus-ring{
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color 0.15s ease, box-shadow 0.15s ease;
+}
+.focus-ring:focus-visible{
+  outline-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+/* Reduced motion respect */
+@media (prefers-reduced-motion: reduce){
+  *,
+  *::before,
+  *::after{
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
