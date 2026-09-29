@@ -37,6 +37,73 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.close()
 
 
+def pytest_report_header(config):
+    """Say which commit, which interpreter and which clocks this run used.
+
+    A pytest failure tail carries no provenance. It says a test failed; it does
+    not say which commit's code failed, on which Python, in which timezone. That
+    was not a hypothetical problem here -- a stale CI log for
+    `test_daily_summary` was read three times as a current failure, because the
+    assertion it quoted (`date.today()`) had already been replaced on the branch
+    and nothing in the output said so.
+
+    So every run states its own identity, and the two clocks that this codebase
+    genuinely has two of:
+
+        commit / branch    which code
+        python             which interpreter
+        TZ / local now     the machine's clock
+        salon timezone     Africa/Cairo by default
+        salon today        the app's notion of the current day
+
+    The last two are the ones that matter: a suite that passes at UTC+3 and fails
+    at UTC looks exactly like a genuine regression unless the run says which
+    clock it used, and the difference between "the application is wrong" and "the
+    test wrote its fixtures in the wrong timezone" is decided by one line.
+    """
+    import os
+    import platform
+    import subprocess
+    import sys
+    from datetime import datetime
+
+    def git(*args: str) -> str:
+        try:
+            out = subprocess.run(
+                ["git", *args],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                cwd=os.path.dirname(os.path.abspath(__file__)),
+            )
+            return out.stdout.strip() or "-"
+        except Exception:  # noqa: BLE001 - provenance is best-effort
+            return "-"
+
+    lines = [
+        f"commit:      {git('rev-parse', '--short', 'HEAD')}",
+        f"branch:      {git('rev-parse', '--abbrev-ref', 'HEAD')}",
+        f"python:      {platform.python_version()} ({sys.executable})",
+        f"platform:    {platform.system()} {platform.release()}",
+        f"TZ env:      {os.environ.get('TZ', '(unset)')}",
+        f"local now:   {datetime.now().isoformat(timespec='seconds')}",
+    ]
+
+    try:
+        from app.core.clock import salon_now
+        from app.core.config import settings
+
+        lines += [
+            f"salon tz:    {getattr(settings, 'SALON_TIMEZONE', '?')}",
+            f"salon now:   {salon_now().isoformat(timespec='seconds')}",
+            f"salon today: {salon_now().date()}",
+        ]
+    except Exception as exc:  # noqa: BLE001
+        lines.append(f"salon clock: unavailable ({type(exc).__name__})")
+
+    return lines
+
+
 def _reset_singletons():
     """Clear limiter and lockout state between tests.
 
