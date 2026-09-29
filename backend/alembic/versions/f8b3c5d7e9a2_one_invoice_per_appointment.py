@@ -182,15 +182,19 @@ def upgrade():
     if "appointment_id" not in {c["name"] for c in inspector.get_columns("invoices")}:
         return
 
-    already = bind.execute(
-        sa.text(
-            "SELECT 1 FROM information_schema.table_constraints "
-            "WHERE table_schema = current_schema() AND table_name = 'invoices' "
-            "  AND constraint_name = :n"
-        ),
-        {"n": CONSTRAINT},
-    ).fetchone()
-    if already:
+    # `_has_index`, not a direct `information_schema` query.
+    #
+    # `information_schema` is a PostgreSQL catalogue. SQLite has no such table,
+    # so asking it whether the index exists raises
+    # `sqlite3.OperationalError: no such table: information_schema.table_constraints`
+    # and the clean-room migration dies on the last revision of the chain.
+    #
+    # Which is the third instance of exactly this mistake in this branch --
+    # `pragma_table_info` in an earlier migration, `sqlite_master` in another,
+    # and now this -- and the reason is that the migration was only ever run
+    # against PostgreSQL. `_has_index` below already branches on the dialect, so
+    # the check uses it rather than a second, hand-rolled version.
+    if _has_index(bind, CONSTRAINT):
         return
 
     detached = _detach_extra_invoices(bind)
