@@ -3,9 +3,13 @@ from sqlalchemy import text
 import app.db.base  # noqa: F401
 from app.db.base_class import Base
 from app.db.session import engine
+from app.db.identifiers import assert_valid_identifier
 
 
 def _has_column(connection, table_name: str, column_name: str) -> bool:
+    # A PRAGMA's argument is an identifier, so it cannot be a bind parameter.
+    # Validated rather than trusted: see app/db/identifiers.py for why.
+    assert_valid_identifier(table_name, kind="table name")
     try:
         rows = connection.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
     except Exception:
@@ -19,8 +23,15 @@ def _ensure_column(connection, table_name: str, column_name: str, ddl: str) -> N
 
 
 def _ensure_index(connection, index_name: str, ddl: str) -> None:
+    # `sqlite_master.name` is a *value* in the WHERE clause, not a grammar
+    # element, so it binds as a parameter and no identifier is interpolated at
+    # all. The only identifier here is the DDL, which is a literal at every call
+    # site, so there is nothing to validate and nothing for a scanner to flag.
     try:
-        rows = connection.execute(text(f"SELECT name FROM sqlite_master WHERE type='index' AND name='{index_name}'")).fetchall()
+        rows = connection.execute(
+            text("SELECT name FROM sqlite_master WHERE type='index' AND name = :name"),
+            {"name": index_name},
+        ).fetchall()
         if not rows:
             connection.execute(text(ddl))
     except Exception:
