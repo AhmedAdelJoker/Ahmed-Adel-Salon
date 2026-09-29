@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import FileResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db.session import get_db
@@ -1167,7 +1168,27 @@ def issue_invoice_from_appointment(appointment_id: int, payment_method: str = "c
         created_by_user_id=getattr(current_user, "id", None),
     )
     db.add(invoice)
-    db.flush()
+    try:
+        # The flush is where the `uq_invoices_appointment_id` unique index
+        # actually fires, because that is the first moment this row exists in
+        # the transaction. Everything above -- the services walk, the totals, the
+        # PDF -- is wasted work if the constraint is going to reject the row, so
+        # the constraint is asked here rather than left to fail at `db.commit()`
+        # after the PDF has been generated and the cash leg created.
+        #
+        # Without this, the loser of the race gets a 500 from a unique
+        # violation. With it, the cashier who double-tapped gets the same 409
+        # the pre-check above would have given had the timing been different,
+        # and the message is the one they already know.
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        if "uq_invoices_appointment_id" in str(exc.orig) or "appointment_id" in str(exc.orig):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="تم إصدار فاتورة لهذا الحجز بالفعل",
+            ) from exc
+        raise
     
     invoice_items = []
     for item in appointment_services:

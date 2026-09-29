@@ -139,6 +139,91 @@ def test_issue_invoice_sets_totals_and_deducts_stock(client, db_session, monkeyp
     )
 
 
+def test_the_schema_refuses_two_invoices_for_one_appointment(db_session):
+    """The unique index is what stops the double invoice, and it must exist.
+
+    This is deliberately a schema assertion rather than an endpoint test. The
+    endpoint has a pre-check that returns 400 on a repeated request, so a test
+    that issues twice in sequence never reaches the index and would pass whether
+    or not it existed -- the guard, not the guarantee.
+
+    The guarantee is the database's, and it is what holds when two requests
+    arrive at the same instant and both pass the pre-check. That scenario needs
+    two real transactions, which SQLite cannot provide: it serialises every
+    writer, so the second one simply waits and then sees the first one's row.
+    It is covered where it can actually happen, in
+    `tests/test_postgres_concurrency.py::test_two_invoices_cannot_be_issued_for_one_appointment`,
+    which measured two invoices issued for one appointment before the index
+    existed and one afterwards.
+
+    What belongs here is the cheap half: that a database built from the models
+    carries the constraint. A deployment that boots the application without
+    running migrations builds its schema from `create_all` instead, and this is
+    the test that would notice.
+    """
+    from sqlalchemy import text
+
+    ddl = db_session.execute(
+        text("SELECT sql FROM sqlite_master WHERE name='invoices'")
+    ).scalar()
+    assert ddl is not None, "invoices table is missing"
+    assert "UNIQUE (appointment_id)" in ddl, (
+        "invoices has no unique constraint on appointment_id, so two cashiers "
+        "can bill one appointment"
+    )
+
+
+def test_the_unique_violation_is_translated_to_a_409(client, db_session, monkeypatch):
+    """Whatever the index raises becomes a 409, checked by reading the source.
+
+    This is a source-level assertion and it is here because the behaviour cannot
+    be reached honestly from a test client. The endpoint's pre-check returns 400
+    for a second request, so the unique-index path is only reachable when two
+    requests pass that SELECT at the same moment -- which needs two real
+    transactions, which SQLite will not provide because it serialises every
+    writer. Forcing it here would mean stubbing `flush` and the pre-check both,
+    and a test built on two stubs of the code under test proves only that the
+    stubs agree with each other.
+
+    What is actually being asserted is the handler: that an IntegrityError
+    mentioning the appointment_id constraint leaves as a 409 rather than an
+    unhandled 500, and that some other IntegrityError is not swallowed. The
+    constraint itself is covered in tests/test_postgres_concurrency.py, where two
+    threads on a real PostgreSQL produced two invoices before the index existed
+    and one after.
+    """
+    import inspect
+
+    from app.api.v1.endpoints import appointments as endpoint
+
+    source = inspect.getsource(endpoint.issue_invoice_from_appointment)
+
+    assert "except IntegrityError" in source, (
+        "the unique violation is unhandled, so a concurrent second issue is a 500"
+    )
+    assert "status_code=status.HTTP_409_CONFLICT" in source, (
+        "the handler exists but does not answer 409"
+    )
+    # The `raise` that re-raises anything else must come after the 409 branch and
+    # before the rest of the endpoint. Anything that is not this particular
+    # violation has to keep propagating, or a genuine data fault reaches the
+    # cashier as "this appointment is already billed", which is worse than a
+    # 500 because it is confidently wrong.
+    handler = source.split("except IntegrityError", 1)[1]
+    conflict_at = handler.find("HTTP_409_CONFLICT")
+    # Eight spaces, and the `raise` alone on its line. `raise HTTPException(` is
+    # the 409 branch, not the re-raise; matching on the substring "raise" finds
+    # the wrong one and the test passes for a reason that has nothing to do with
+    # what it claims to check.
+    reraise_at = handler.find("\n        raise\n", conflict_at)
+    assert conflict_at != -1, "the 409 branch is missing"
+    assert reraise_at > conflict_at > -1, (
+        "the handler does not re-raise IntegrityErrors that are not about "
+        "appointment_id, so unrelated data faults would be reported to the "
+        "cashier as an already-billed appointment"
+    )
+
+
 def test_create_appointment_requires_auth(client):
     resp = client.post(
         "/api/v1/appointments",

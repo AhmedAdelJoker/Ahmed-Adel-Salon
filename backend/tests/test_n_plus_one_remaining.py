@@ -236,8 +236,19 @@ def test_barber_day_view_does_not_query_per_appointment(db_session, barbers_and_
 
 
 def test_barber_day_view_invoiced_count_survives_a_second_invoice(db_session, barbers_and_customers):
-    """`appt.invoices` replaced `.first()`, which also raised on a second invoice."""
+    """A duplicate line on one invoice must not double-count the appointment.
+
+    The original shape of this test put two *invoices* on one appointment, which
+    used to be how it proved the grouping counted an appointment once rather than
+    once per related row. That state is no longer possible: `invoices` carries a
+    unique constraint on `appointment_id` (migration `f8b3c5d7e9a2`), because
+    two invoices for one appointment meant the customer was charged twice for one
+    haircut. The test now uses the remaining way to have several invoice rows
+    point at one appointment -- two lines on a single invoice -- which exercises
+    the same grouping without relying on a data shape the schema forbids.
+    """
     from app.api.v1.endpoints.appointments import get_appointments_by_barber
+    from app.models.invoice_item import InvoiceItem
 
     barbers, customers = barbers_and_customers
     appointments = []
@@ -253,17 +264,27 @@ def test_barber_day_view_invoiced_count_survives_a_second_invoice(db_session, ba
         appointments.append(appointment)
     db_session.flush()
 
-    # Two invoices on one appointment: a has-many must count it once, not raise.
-    for index in range(2):
+    # Two lines on one invoice for one appointment: the has-many must join to it
+    # once, not raise and not count twice.
+    invoice = Invoice(
+        appointment_id=appointments[0].id,
+        customer_id=customers[0].customer_id,
+        invoice_no="INV-DAY-0",
+        subtotal_amount=Decimal(200),
+        discount_amount=Decimal(0),
+        total_amount=Decimal(200),
+        is_draft=False,
+    )
+    db_session.add(invoice)
+    db_session.flush()
+    for line in range(2):
         db_session.add(
-            Invoice(
-                appointment_id=appointments[0].id,
-                customer_id=customers[0].customer_id,
-                invoice_no=f"INV-DAY-{index}",
-                subtotal_amount=Decimal(100),
-                discount_amount=Decimal(0),
-                total_amount=Decimal(100),
-                is_draft=False,
+            InvoiceItem(
+                invoice_id=invoice.id,
+                service_name=f"Service {line}",
+                quantity=1,
+                unit_price=Decimal(100),
+                total_price=Decimal(100),
             )
         )
     db_session.commit()

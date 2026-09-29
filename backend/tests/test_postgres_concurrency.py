@@ -51,11 +51,34 @@ def db_url():
 
 @pytest.fixture
 def conn_factory(db_url):
+    """A connection factory, with a lease discipline.
+
+    The previous version handed out pooled connections and never guaranteed a
+    caller would return or close them. Most tests used `with conn_factory() as
+    conn`, which closes the lease, but two setups used a bare `conn_factory()`
+    that stayed open for the rest of the test -- and one of them left a
+    transaction open.
+
+    The consequence was a hang, not a failure. `_seed_minimum` opens with
+    `TRUNCATE ... CASCADE`, which wants ACCESS EXCLUSIVE; an open transaction
+    holding any lock on any of those tables blocks it, and the next test waits
+    for a lock that is never released. It looked like a slow machine: every
+    test passed alone in about 2s, and the suite ran forever once two of them
+    ran together. `test_concurrent_writes_do_not_corrupt_a_row` followed by
+    `test_two_invoices_cannot_be_issued_for_one_appointment` was the minimal
+    reproduction -- eight updater threads on one row, then a TRUNCATE.
+
+    Disposing the engine at teardown rolls back anything still open, so a test
+    that leaks a connection is slow rather than fatal, and the next test starts
+    from a clean lock state.
+    """
     from sqlalchemy import create_engine
 
     engine = create_engine(db_url, pool_size=10, max_overflow=10)
-    yield lambda: engine.connect()
-    engine.dispose()
+    try:
+        yield lambda: engine.connect()
+    finally:
+        engine.dispose()
 
 
 def _required_columns(conn, table: str) -> list[tuple[str, str]]:
@@ -199,8 +222,8 @@ def test_concurrent_deductions_of_one_source_apply_once(db_url, conn_factory):
     """
     import sqlalchemy as sa
 
-    setup = conn_factory()
-    _seed_minimum(setup)
+    with conn_factory() as setup:
+        _seed_minimum(setup)
 
     source_id = str(uuid.uuid4().int % 1_000_000_000)
     errors: list[str] = []
@@ -298,22 +321,25 @@ def test_two_concurrent_writers_both_commit_and_the_version_advances(db_url, con
     """
     import sqlalchemy as sa
 
-    setup = conn_factory()
-    _seed_minimum(setup)
-    # `business_settings` has its own required columns -- `currency` among them --
-    # so the same schema-driven insert is used rather than naming them, which is
-    # how an earlier version of this test failed with a NOT NULL violation on
-    # `currency` after the threads had already been written.
-    with setup.begin():
-        _insert_minimal(
-            setup, "business_settings", {"id": "1", "salon_name": "'Original'"}
-        )
-        setup.execute(
-            sa.text("UPDATE business_settings SET version = 1 WHERE id = 1")
-        )
-    before = setup.execute(
-        sa.text("SELECT version FROM business_settings WHERE id=1")
-    ).scalar()
+    # `with`, for the same reason as in `test_concurrent_writes_do_not_corrupt_a_row`:
+    # a bare connection here would still be holding a transaction when the next
+    # test's TRUNCATE runs.
+    with conn_factory() as setup:
+        _seed_minimum(setup)
+        # `business_settings` has its own required columns -- `currency` among them --
+        # so the same schema-driven insert is used rather than naming them, which is
+        # how an earlier version of this test failed with a NOT NULL violation on
+        # `currency` after the threads had already been written.
+        with setup.begin():
+            _insert_minimal(
+                setup, "business_settings", {"id": "1", "salon_name": "'Original'"}
+            )
+            setup.execute(
+                sa.text("UPDATE business_settings SET version = 1 WHERE id = 1")
+            )
+        before = setup.execute(
+            sa.text("SELECT version FROM business_settings WHERE id=1")
+        ).scalar()
 
     barrier = threading.Barrier(2)
     saved: list[str] = []
@@ -435,21 +461,32 @@ def test_concurrent_writes_do_not_corrupt_a_row(db_url, conn_factory):
     """
     import sqlalchemy as sa
 
-    setup = conn_factory()
-    _seed_minimum(setup)
-    with setup.begin():
-        setup.execute(
-            sa.text(
-                "INSERT INTO activity_logs (user_id, action, entity_type) "
-                "VALUES (1, 'test', 'test')"
+    # `with`, not a bare `conn_factory()`. A bare connection stays open for the
+    # rest of the test, and the `SELECT` below opens a transaction that nothing
+    # commits. That leaves the connection idle-in-transaction holding a lock on
+    # `activity_logs` when the test ends.
+    #
+    # The next test to run opens with `TRUNCATE ... CASCADE`, which wants
+    # ACCESS EXCLUSIVE, and waits for that lock forever. Nothing fails, nothing
+    # times out on its own, and the suite simply stops. It presented as a slow
+    # machine -- each test alone takes about 2s -- until `pg_stat_activity`
+    # showed the holder: `idle in transaction` on a `SELECT`, and a second
+    # connection `active` on `Lock/relation` against the TRUNCATE.
+    with conn_factory() as setup:
+        _seed_minimum(setup)
+        with setup.begin():
+            setup.execute(
+                sa.text(
+                    "INSERT INTO activity_logs (user_id, action, entity_type) "
+                    "VALUES (1, 'test', 'test')"
+                )
+            ) if _has_column(setup, "activity_logs", "user_id") else setup.execute(
+                sa.text("INSERT INTO activity_logs (action, entity_type) VALUES ('test','test')")
             )
-        ) if _has_column(setup, "activity_logs", "user_id") else setup.execute(
-            sa.text("INSERT INTO activity_logs (action, entity_type) VALUES ('test','test')")
-        )
 
-    activity_id = setup.execute(
-        sa.text("SELECT id FROM activity_logs ORDER BY id LIMIT 1")
-    ).scalar()
+        activity_id = setup.execute(
+            sa.text("SELECT id FROM activity_logs ORDER BY id LIMIT 1")
+        ).scalar()
 
     def attempt(_):
         with conn_factory() as conn:
@@ -487,4 +524,238 @@ def _has_column(conn, table: str, column: str) -> bool:
             ),
             {"t": table, "c": column},
         ).fetchone()
+    )
+
+
+# --------------------------------------------------------------------------
+# Issuance: two check-then-act races the database has to arbitrate
+# --------------------------------------------------------------------------
+#
+# Both of these are the same bug in different clothes. The endpoint reads
+# something, decides the world is fine, and then writes -- with nothing between
+# the read and the write that would stop a second transaction from deciding the
+# same thing. One session cannot see it; two can.
+
+
+def _seed_bookable_appointment(conn) -> int:
+    """An appointment and a service attached to it, ready to invoice."""
+    import sqlalchemy as sa
+
+    _insert_minimal(
+        conn,
+        "appointments",
+        {
+            "id": "1",
+            "customer_id": "1",
+            "barber_id": "1",
+            "appointment_date": "CURRENT_DATE",
+            "appointment_time": "'10:00'",
+            "status": "'confirmed'",
+        },
+    )
+    _insert_minimal(
+        conn,
+        "appointment_services",
+        {
+            "id": "1",
+            "appointment_id": "1",
+            "service_id": "NULL",
+            "service_name_snapshot": "'Cut'",
+            "price_snapshot": "100",
+            "quantity": "1",
+        },
+    )
+    conn.commit()
+    return 1
+
+
+def test_two_invoices_cannot_be_issued_for_one_appointment(db_url, conn_factory):
+    """Issuing an invoice twice for the same appointment must be impossible.
+
+    `issue_invoice_from_appointment` checks for an existing invoice, and if it
+    finds none, issues one. Two cashiers pressing the button at the same moment
+    both find none. The customer is charged twice for one haircut and receives
+    two PDFs, and nothing in the application or the schema objects -- because
+    `invoices.appointment_id` is a plain indexed column, not a unique one. An
+    index answers "which invoices point here"; only a constraint answers "at
+    most one may".
+
+    This asserts the constraint is in the database rather than the Python guard,
+    because the Python guard is the thing that failed.
+    """
+    import sqlalchemy as sa
+
+    with conn_factory() as setup:
+        _seed_minimum(setup)
+        _seed_bookable_appointment(setup)
+
+    errors: list[str] = []
+    barrier = threading.Barrier(2)
+    appt_id = 1
+
+    def issue_once(n: int):
+        with conn_factory() as conn:
+            barrier.wait(timeout=10)
+            try:
+                already = conn.execute(
+                    sa.text("SELECT 1 FROM invoices WHERE appointment_id = :a"),
+                    {"a": appt_id},
+                ).fetchone()
+                if already:
+                    return "declined"
+                conn.execute(
+                    sa.text(
+                        "INSERT INTO invoices "
+                        "(invoice_no, customer_id, barber_id, appointment_id, "
+                        " payment_method, subtotal_amount, total_amount, "
+                        " discount_amount) "
+                        "VALUES (:no, 1, 1, :a, 'cash', 100, 100, 0)"
+                    ),
+                    {"no": f"INV-RACE-{n}", "a": appt_id},
+                )
+                conn.commit()
+                return "issued"
+            except sa.exc.IntegrityError as exc:
+                # The constraint doing its job. A UNIQUE violation here is the
+                # outcome this test exists to produce, so it is a result and not
+                # an error -- recording it in `errors` and asserting that list is
+                # empty is how the first version of this test failed *after* the
+                # fix had already landed, which is a confusing way to spend an
+                # afternoon.
+                conn.rollback()
+                return "rejected"
+            except Exception as exc:  # noqa: BLE001
+                conn.rollback()
+                errors.append(f"{type(exc).__name__}: {exc}")
+                return "errored"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(issue_once, range(2)))
+
+    assert not errors, f"an unexpected failure, not the constraint: {errors}"
+    assert "issued" in outcomes, f"both transactions lost: {outcomes}"
+    assert outcomes.count("issued") == 1, (
+        f"one must win and one must be rejected, got {outcomes}"
+    )
+
+    with conn_factory() as conn:
+        count = conn.execute(
+            sa.text("SELECT COUNT(*) FROM invoices WHERE appointment_id = :a"),
+            {"a": appt_id},
+        ).scalar()
+    assert count == 1, f"{count} invoices for one appointment"
+
+
+def test_invoice_number_cannot_be_handed_out_twice(db_url, conn_factory):
+    """`INV-YYYYMMDD-0001` must name one invoice, not two.
+
+    `_generate_invoice_no` counts today's invoices and adds one. That is a
+    read-modify-write, and the daily-counter table added for the manual invoice
+    path does not cover it -- this helper was never moved onto it. Two concurrent
+    issuances both read count 41 and both write 42.
+
+    What saves the number is `ix_invoices_invoice_no` being UNIQUE, which it
+    already is. So this test passes, and it is here to keep passing: the correct
+    way to fix the race is to serialise the counter, and doing that must not
+    quietly drop the unique index that is currently the only thing preventing a
+    duplicate receipt number from reaching a customer.
+
+    The loser of the race gets an IntegrityError rather than a clean 4xx, which
+    is ugly but not a data problem. The appointment_id case below is the one that
+    has no such backstop, and is a data problem.
+    """
+    import sqlalchemy as sa
+
+    with conn_factory() as setup:
+        _seed_minimum(setup)
+        _seed_bookable_appointment(setup)
+        setup.execute(sa.text("DELETE FROM invoices"))
+        setup.commit()
+
+    errors: list[str] = []
+    barrier = threading.Barrier(2)
+    day = "2031-04-05"
+    number = f"INV-{day.replace('-', '')}-0001"
+
+    def take_number():
+        with conn_factory() as conn:
+            barrier.wait(timeout=10)
+            try:
+                taken = conn.execute(
+                    sa.text(
+                        "SELECT COUNT(*) FROM invoices WHERE invoice_no LIKE :p"
+                    ),
+                    {"p": f"INV-{day.replace('-', '')}%"},
+                ).scalar()
+                conn.execute(
+                    sa.text(
+                        "INSERT INTO invoices "
+                        "(invoice_no, customer_id, barber_id, appointment_id, "
+                        " payment_method, subtotal_amount, total_amount, "
+                        " discount_amount) "
+                        "VALUES (:no, 1, 1, 1, 'cash', 100, 100, 0)"
+                    ),
+                    {"no": f"INV-{day.replace('-', '')}-{taken + 1:04d}"},
+                )
+                conn.commit()
+                return "ok"
+            except Exception as exc:  # noqa: BLE001
+                conn.rollback()
+                errors.append(f"{type(exc).__name__}: {exc}")
+                return "rejected"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(lambda _: take_number(), range(2)))
+
+    with conn_factory() as conn:
+        rows = conn.execute(
+            sa.text("SELECT COUNT(*) FROM invoices WHERE invoice_no = :no"),
+            {"no": number},
+        ).scalar()
+    assert rows <= 1, f"{rows} invoices share invoice_no {number}"
+
+
+def test_the_one_invoice_per_appointment_constraint_exists(db_url, conn_factory):
+    """A unique constraint, or a partial one. Either, but one.
+
+    Historic invoices may have a null `appointment_id` -- an invoice raised at
+    the counter has no appointment behind it -- and a plain UNIQUE would reject
+    those, because SQL treats NULLs as distinct from each other but a
+    `UNIQUE(appointment_id)` is still violated by two NULLs in some engines
+    rather than none. Postgres is permissive here, which means the constraint
+    can be plain and the manual invoices keep working. This test pins which one
+    it actually is, so that changing it is a decision rather than an accident.
+    """
+    import sqlalchemy as sa
+
+    with conn_factory() as conn:
+        # `pg_index`, not `information_schema.table_constraints`. A unique
+        # *index* is not listed in table_constraints -- only a declared
+        # CONSTRAINT is -- and the migration builds the uniqueness with
+        # `create_index(unique=True)`, which is the same thing to the engine and
+        # invisible to that view. Querying table_constraints reported "no
+        # constraint" while the index was present and enforcing, which is how a
+        # test can be wrong and the code be right.
+        covering = conn.execute(
+            sa.text(
+                """
+                SELECT i.indexrelid::regclass::text AS name
+                FROM pg_index i
+                JOIN pg_class t ON t.oid = i.indrelid
+                JOIN pg_namespace n ON n.oid = t.relnamespace
+                WHERE n.nspname = 'public' AND t.relname = 'invoices'
+                  AND i.indisunique
+                  AND 'appointment_id' = ANY (
+                        SELECT a.attname
+                        FROM unnest(i.indkey) AS k
+                        JOIN pg_attribute a
+                          ON a.attrelid = i.indrelid AND a.attnum = k
+                  )
+                """
+            )
+        ).fetchall()
+
+    assert covering, (
+        "invoices has no unique index covering appointment_id, so two cashiers "
+        "can invoice one appointment"
     )

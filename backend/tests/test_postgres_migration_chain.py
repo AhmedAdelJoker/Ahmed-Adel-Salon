@@ -32,7 +32,7 @@ import pytest
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
-HEAD = "e7a2c4d6b8f1"
+HEAD = "f8b3c5d7e9a2"
 
 # Revisions that create indexes, and so depend on `statement_timeout` and on the
 # raw-connection autocommit dance in c4d7e9f1a3b5. Used to decide whether a
