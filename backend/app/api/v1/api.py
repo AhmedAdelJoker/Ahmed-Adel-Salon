@@ -16,6 +16,7 @@ from app.api.v1.endpoints.reports import router as reports_router
 from app.api.v1.endpoints.preferences import router as preferences_router
 from app.api.v1.endpoints.dashboard import router as dashboard_router
 from app.api.v1.endpoints.activity_logs import router as activity_logs_router
+from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.business_settings import router as business_settings_router
 from app.api.v1.endpoints.users_roles import router as users_roles_router
 from app.api.v1.endpoints.products import router as products_router
@@ -113,3 +114,4 @@ api_router.include_router(financial_rules_router)
 api_router.include_router(exports_runtime_router)
 api_router.include_router(employee_reports_router)
 api_router.include_router(dashboard_core_router)
+api_router.include_router(health_router)

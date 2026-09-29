@@ -114,7 +114,15 @@ def verify_meta_whatsapp_webhook(
     if not settings.META_WA_VERIFY_TOKEN:
         raise HTTPException(status_code=503, detail="Verify token is not configured")
 
-    if hub_mode == "subscribe" and hub_verify_token == settings.META_WA_VERIFY_TOKEN:
+    # `compare_digest`, not `==`. The POST half of this webhook already does this
+    # for the app secret, and the asymmetry was the tell: the verify token is a
+    # shared secret on an unauthenticated endpoint, so a byte-by-byte comparison
+    # leaks how much of it a guess got right. Exploiting it over a network is
+    # slow, but the fix costs nothing and the reasoning is the same as everywhere
+    # else a secret is compared.
+    if hub_mode == "subscribe" and hmac.compare_digest(
+        hub_verify_token, settings.META_WA_VERIFY_TOKEN
+    ):
         return hub_challenge
 
     raise HTTPException(status_code=403, detail="Webhook verification failed")

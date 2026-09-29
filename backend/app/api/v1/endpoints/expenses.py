@@ -3,7 +3,7 @@ from uuid import uuid4
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query, Response
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query, Request, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -15,6 +15,7 @@ from app.schemas.expense import ExpenseCreate, ExpenseRead, ExpenseSummary, Expe
 from app.utils.expense_labels import expense_label_ar
 from app.utils.media import process_image_content, get_upload_path
 from app.core.upload_security import validate_image_or_pdf
+from app.core.audit import audit_log
 from app.crud.core_business import create_cash_transaction
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
@@ -311,6 +312,7 @@ def create_expense(
 @router.post("/{expense_id}/approve", response_model=ExpenseRead)
 def approve_expense(
     expense_id: int,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
@@ -321,7 +323,20 @@ def approve_expense(
     was_pending = expense.status == "pending_audit"
     if expense.status not in {"pending_audit", "approved"}:
         raise HTTPException(status_code=400, detail="لا يمكن اعتماد هذه الحالة")
+    previous_status = expense.status
     expense.status = "approved"
+
+    # Snapshot before the commit: approving an expense is the operation that
+    # actually moves money (it writes a `direction="out"` CashTransaction), so
+    # it is the financial event most worth tracing back to a user + IP.
+    snapshot = {
+        "title": expense.title,
+        "category": expense.category,
+        "amount": float(expense.amount or 0),
+        "payment_method": expense.payment_method,
+        "previous_status": previous_status,
+        "cash_movement_created": False,
+    }
 
     if was_pending and expense.amount and float(expense.amount) > 0:
         from app.crud.core_business import find_existing_cash_transaction
@@ -346,15 +361,24 @@ def approve_expense(
                 reference_no=f"EXP-{expense.id}",
                 commit=False,
             )
+            snapshot["cash_movement_created"] = True
 
     db.commit()
     db.refresh(expense)
+    audit_log(
+        db, request, current_user,
+        action="approve_expense",
+        entity_type="expense",
+        entity_id=expense_id,
+        description=snapshot,
+    )
     return expense
 
 
 @router.post("/{expense_id}/reject", response_model=ExpenseRead)
 def reject_expense(
     expense_id: int,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
@@ -362,9 +386,24 @@ def reject_expense(
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
     
+    # Rejecting blocks a payout, so it is the mirror of approve: both move the
+    # expense across the audit boundary and both need a trail.
+    snapshot = {
+        "title": expense.title,
+        "category": expense.category,
+        "amount": float(expense.amount or 0),
+        "previous_status": expense.status,
+    }
     expense.status = "rejected"
     db.commit()
     db.refresh(expense)
+    audit_log(
+        db, request, current_user,
+        action="reject_expense",
+        entity_type="expense",
+        entity_id=expense_id,
+        description=snapshot,
+    )
     return expense
 
 
@@ -434,15 +473,17 @@ def delete_expense(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    # User requested to disable deleting financial records
+    """Hard delete of a financial record — permanently disabled.
+
+    Raising 403 is the whole point of keeping this route: it returns a clear
+    "not allowed" instead of a 404 from a removed path, so the UI can explain
+    the policy instead of looking broken.
+
+    No audit_log call here — the operation cannot happen. The financial events
+    on this router that DO move money (`approve_expense`, which writes a
+    `direction="out"` CashTransaction) are the audited ones.
+    """
     raise HTTPException(
         status_code=403, 
         detail="حذف السجلات المالية غير مسموح به لضمان نزاهة البيانات"
     )
-    
-    # expense = db.query(Expense).filter(Expense.id == expense_id).first()
-    # if not expense:
-    #     raise HTTPException(status_code=404, detail="المصروف غير موجود")
-    # db.delete(expense)
-    # db.commit()
-    # return None

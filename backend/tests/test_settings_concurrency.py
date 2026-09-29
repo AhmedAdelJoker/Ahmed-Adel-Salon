@@ -95,10 +95,7 @@ def test_empty_payload_does_not_bump_the_version(client, db_session):
 
 def test_settings_update_writes_an_audit_entry(client, db_session):
     headers = _owner(client, db_session)
-    _put(client, headers, {
-        "salonName": "م salon",
-        "workingHours": {"monday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"}},
-    })
+    _put(client, headers, {"salonName": "salon name"})
 
     entries = (
         db_session.query(ActivityLog)
@@ -107,9 +104,70 @@ def test_settings_update_writes_an_audit_entry(client, db_session):
     )
     assert len(entries) == 1
     description = entries[0].description
-    assert "ساعات العمل" in description
     assert "اسم المنشأة" in description
     assert "الإصدار 2" in description
+
+
+def test_working_hours_save_logs_its_own_action(client, db_session):
+    """Hours changes get a distinct action so they can be audited separately."""
+    headers = _owner(client, db_session)
+    _put(client, headers, {"salonName": "salon name"})
+
+    generic = (
+        db_session.query(ActivityLog)
+        .filter(ActivityLog.action == "UPDATE_BUSINESS_SETTINGS")
+        .all()
+    )
+    assert len(generic) == 1
+    assert "ساعات العمل" not in generic[0].description
+
+    _put(client, headers, {
+        "workingHours": {"monday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"}}
+    })
+
+    hours_entries = (
+        db_session.query(ActivityLog)
+        .filter(ActivityLog.action == "UPDATE_WORKING_HOURS")
+        .all()
+    )
+    assert len(hours_entries) == 1
+    assert "ساعات العمل" in hours_entries[0].description
+
+
+def test_presence_endpoint_logs_a_per_day_hours_diff(client, db_session):
+    make_user(db_session, username="mgr1", role="manager")
+    # first write: everything open
+    first = client.post(
+        "/api/v1/barber-presence/working-hours",
+        json={"working_hours": {
+            "monday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
+            "friday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
+        }},
+        headers=auth_headers(client, "mgr1"),
+    )
+    assert first.status_code == 200, first.text
+
+    # second write: friday closes and monday shifts
+    resp = client.post(
+        "/api/v1/barber-presence/working-hours",
+        json={"working_hours": {
+            "friday": {"is_open": False, "open_time": None, "close_time": None},
+            "monday": {"is_open": True, "open_time": "12:00", "close_time": "20:00"},
+        }},
+        headers=auth_headers(client, "mgr1"),
+    )
+    assert resp.status_code == 200, resp.text
+
+    entry = (
+        db_session.query(ActivityLog)
+        .filter(ActivityLog.action == "UPDATE_WORKING_HOURS")
+        .order_by(ActivityLog.id.desc())
+        .first()
+    )
+    assert entry is not None
+    assert "الجمعة: مغلق" in entry.description
+    assert "الاثنين" in entry.description
+    assert "12:00" in entry.description
 
 
 def test_audit_entry_records_the_actor(client, db_session):

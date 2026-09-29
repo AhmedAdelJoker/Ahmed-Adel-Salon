@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.api.deps import require_owner_or_manager, require_any_staff, ensure_working_hours_editor
+from app.core.config import settings
+from app.core.rate_limit import rate_limit
 from app.models.user import User
 from app.models.business_settings import BusinessSettings
 from app.schemas.business_settings import BusinessSettingsRead, BusinessSettingsUpdate
@@ -87,7 +89,18 @@ def read_business_settings(
     return _row_to_response(row)
 
 
-@router.put("")
+@router.put(
+    "",
+    dependencies=[
+        Depends(
+            rate_limit(
+                "business_settings_write",
+                max_requests=settings.SETTINGS_WRITE_RATE_LIMIT_MAX_REQUESTS,
+                window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+            )
+        )
+    ],
+)
 def update_business_settings(
     payload: BusinessSettingsUpdate,
     response: Response,
@@ -127,14 +140,23 @@ def update_business_settings(
 
     changed = _changed_fields(before, incoming)
     if changed:
+        labels = {
+            "UPDATE_BUSINESS_SETTINGS": "تعديل الإعدادات",
+            "UPDATE_WORKING_HOURS": "تعديل ساعات العمل",
+        }
         log_activity(
             db,
             user_id=current_user.id,
-            action="UPDATE_BUSINESS_SETTINGS",
+            action=(
+                "UPDATE_WORKING_HOURS"
+                if "working_hours" in incoming
+                else "UPDATE_BUSINESS_SETTINGS"
+            ),
             entity_type="BusinessSettings",
             entity_id=str(row.id),
             description=(
-                f"تعديل الإعدادات: {', '.join(changed)} (الإصدار {row.version})"
+                f"{labels['UPDATE_WORKING_HOURS'] if 'working_hours' in incoming else labels['UPDATE_BUSINESS_SETTINGS']}"
+                f": {', '.join(changed)} (الإصدار {row.version})"
             ),
         )
 

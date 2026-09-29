@@ -1,11 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db.session import get_db
 from app.api.deps import require_any_staff, require_cashier_manager_owner
 from app.models.user import User
-from app.models.customer import Customer
-from app.models.barber import Barber
 from app.models.appointment import Appointment
 from app.models.service_session import ServiceSession
 
@@ -22,9 +20,30 @@ from app.services.session_service import (
 router = APIRouter(prefix="/sessions", tags=["Service Sessions"])
 
 
-def _serialize_session(db: Session, session: ServiceSession) -> ServiceSessionRead:
-    customer = db.query(Customer).filter(Customer.customer_id == session.customer_id).first()
-    barber = db.query(Barber).filter(Barber.id == session.barber_id).first()
+def _session_load_options() -> tuple:
+    """Eager-load everything `_serialize_session` touches.
+
+    `customer` and `barber` are to-one, so joinedload is right and cheap.
+    `products` is to-many — joinedload would multiply the result rows and
+    force SQLAlchemy to de-duplicate in Python, so it uses selectinload.
+    """
+    return (
+        joinedload(ServiceSession.customer),
+        joinedload(ServiceSession.barber),
+        selectinload(ServiceSession.products),
+    )
+
+
+def _serialize_session(session: ServiceSession) -> ServiceSessionRead:
+    """Serialize using the already-eager-loaded relationships.
+
+    Phase 2: this used to take `db` and issue two queries per row
+    (`Customer` + `Employee`), making `list_sessions` cost 1 + 2N. Callers
+    now pass a row loaded through `_session_load_options()`, so the
+    relationships are already in the identity map and no query is issued.
+    """
+    customer = session.customer
+    barber = session.barber
 
     return ServiceSessionRead(
         id=session.id,
@@ -52,7 +71,7 @@ def list_sessions(
 ):
     query = (
         db.query(ServiceSession)
-        .options(joinedload(ServiceSession.products))
+        .options(*_session_load_options())
         .order_by(ServiceSession.id.desc())
     )
 
@@ -60,7 +79,7 @@ def list_sessions(
         query = query.filter(ServiceSession.barber_id == current_user.barber_id)
 
     rows = query.all()
-    return [_serialize_session(db, row) for row in rows]
+    return [_serialize_session(row) for row in rows]
 
 
 @router.get("/{session_id}", response_model=ServiceSessionRead)
@@ -71,7 +90,7 @@ def get_session(
 ):
     session_row = (
         db.query(ServiceSession)
-        .options(joinedload(ServiceSession.products))
+        .options(*_session_load_options())
         .filter(ServiceSession.id == session_id)
         .first()
     )
@@ -81,7 +100,7 @@ def get_session(
     if current_user.role == "barber" and current_user.barber_id != session_row.barber_id:
         raise HTTPException(status_code=403, detail="ليس لديك صلاحية لهذه الجلسة")
 
-    return _serialize_session(db, session_row)
+    return _serialize_session(session_row)
 
 
 @router.post("", response_model=ServiceSessionRead, status_code=status.HTTP_201_CREATED)
@@ -116,12 +135,12 @@ def create_session(
 
     session_row = (
         db.query(ServiceSession)
-        .options(joinedload(ServiceSession.products))
+        .options(*_session_load_options())
         .filter(ServiceSession.id == session_row.id)
         .first()
     )
 
-    return _serialize_session(db, session_row)
+    return _serialize_session(session_row)
 
 
 @router.patch("/{session_id}/status", response_model=ServiceSessionRead)
@@ -144,9 +163,9 @@ def update_session_status(
 
     session_row = (
         db.query(ServiceSession)
-        .options(joinedload(ServiceSession.products))
+        .options(*_session_load_options())
         .filter(ServiceSession.id == session_id)
         .first()
     )
 
-    return _serialize_session(db, session_row)
+    return _serialize_session(session_row)

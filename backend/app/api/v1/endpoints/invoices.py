@@ -1,7 +1,8 @@
 from __future__ import annotations
+import logging
 from pathlib import Path
 from datetime import date, datetime
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
@@ -27,14 +28,17 @@ from app.services.activity_service import log_activity
 from app.services.meta_whatsapp_service import upload_and_send_pdf
 from app.services.pdf_service import generate_invoice_pdf
 from app.services.inventory_service import deduct_stock_for_invoice
+from app.core.audit import audit_log
 from app.models.business_settings import BusinessSettings
-import asyncio
 import hashlib
 import json
 from decimal import Decimal, InvalidOperation
 from app.services.loyalty_service import update_customer_loyalty, calculate_loyalty_discount
 from app.services.websocket import manager
 from app.crud.core_business import create_cash_transaction
+
+logger = logging.getLogger("app.invoices")
+
 
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
@@ -490,7 +494,7 @@ def create_manual_invoice(
         )
         invoice.pdf_path = pdf_path
     except Exception as e:
-        print(f"Error generating PDF: {e}")
+        logger.exception("Error generating PDF: %s", e)
 
     try:
         db.commit()
@@ -517,24 +521,25 @@ def create_manual_invoice(
         return _serialize_invoice(replayed_invoice, replayed_customer, replayed_barber)
     db.refresh(invoice)
     
-    # 10. Broadcast WebSocket event to update POS ready-for-payment list
+    # 10. Broadcast WebSocket event to update POS ready-for-payment list.
+    #
+    # This endpoint is `def`, so FastAPI runs it in a threadpool where no event
+    # loop is running. The previous code called `asyncio.ensure_future`, which
+    # raises there, and the surrounding `except Exception` swallowed it — so
+    # paying an invoice never refreshed the POS board on any deployment, and
+    # the only trace was a warning in the log.
+    #
+    # `publish` is synchronous and hands the work to the app's loop itself, so
+    # it works from a worker thread and cannot be lost silently. Delivery errors
+    # surface instead of disappearing.
     if payload.appointment_id:
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(manager.broadcast({
-                    "event": "appointment_status_changed",
-                    "appointment_id": payload.appointment_id,
-                    "status": "completed",
-                }))
-            else:
-                loop.run_until_complete(manager.broadcast({
-                    "event": "appointment_status_changed",
-                    "appointment_id": payload.appointment_id,
-                    "status": "completed",
-                }))
-        except Exception as e:
-            print(f"WebSocket broadcast error: {e}")
+        manager.publish(
+            {
+                "event": "appointment_status_changed",
+                "appointment_id": payload.appointment_id,
+                "status": "completed",
+            }
+        )
     
     return _serialize_invoice(invoice, customer, barber)
 
@@ -1117,7 +1122,7 @@ def finalize_draft(
         )
         draft.pdf_path = pdf_path
     except Exception as e:
-        print(f"Error generating PDF for finalized draft: {e}")
+        logger.exception("Error generating PDF for finalized draft: %s", e)
     
     db.commit()
     db.refresh(draft)
@@ -1138,6 +1143,7 @@ def finalize_draft(
 @router.delete("/drafts/{draft_id}")
 def delete_draft(
     draft_id: int,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
@@ -1146,9 +1152,23 @@ def delete_draft(
     if not draft:
         raise HTTPException(status_code=404, detail="المسودة غير موجودة")
     
+    # Snapshot before delete — after `db.delete()` the ORM state is expunged.
+    snapshot = {
+        "invoice_number": getattr(draft, "invoice_number", None),
+        "customer_id": getattr(draft, "customer_id", None),
+        "total": float(getattr(draft, "total", 0) or 0),
+        "item_count": len(draft.items or []),
+    }
     for item in draft.items:
         db.delete(item)
     db.delete(draft)
     db.commit()
-    
+
+    audit_log(
+        db, request, current_user,
+        action="delete_invoice_draft",
+        entity_type="invoice",
+        entity_id=draft_id,
+        description={"deleted": snapshot},
+    )
     return {"message": "تم حذف المسودة"}

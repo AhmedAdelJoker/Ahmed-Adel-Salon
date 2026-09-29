@@ -23,6 +23,7 @@ from app.schemas.pos_shift import (
     DailySummaryUserRead,
 )
 from app.services.pos_shift_service import auto_close_expired_shifts, is_within_working_hours
+from app.services.activity_log_service import log_activity
 from app.core.clock import salon_now
 
 router = APIRouter(prefix="/pos-shifts", tags=["POS Shifts"])
@@ -50,21 +51,37 @@ def get_current_shift(
     ).first()
     return shift
 
+SHIFT_OVERRIDE_ROLES = ("owner", "admin", "manager", "accountant")
+
+
 @router.post("/open")
 def open_shift(
     payload: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_shift_operator)
 ):
-    # Check working hours
-    if not is_within_working_hours(db):
-        # We allow it but maybe a warning is better? 
-        # User requested it to be "connected" with working hours.
-        # Let's be strict but allow an override if requested in the future.
-        raise HTTPException(
-            status_code=400, 
-            detail="لا يمكن فتح الوردية خارج ساعات عمل المحل الرسمية"
-        )
+    within_hours = is_within_working_hours(db)
+    override = bool(payload.get("override_hours") or payload.get("overrideHours"))
+    override_reason = str(
+        payload.get("override_reason") or payload.get("overrideReason") or ""
+    ).strip()
+
+    if not within_hours:
+        if not override:
+            raise HTTPException(
+                status_code=400,
+                detail="لا يمكن فتح الوردية خارج ساعات عمل المحل الرسمية",
+            )
+        if str(current_user.role or "").lower() not in SHIFT_OVERRIDE_ROLES:
+            raise HTTPException(
+                status_code=403,
+                detail="فتح الوردية خارج الدوام متاح للمدير والمالك فقط",
+            )
+        if not override_reason:
+            raise HTTPException(
+                status_code=400,
+                detail="اذكر سبب فتح الوردية خارج ساعات العمل",
+            )
 
     existing = db.query(PosShift).filter(
         PosShift.user_id == current_user.id,
@@ -72,11 +89,17 @@ def open_shift(
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="لديك وردية مفتوحة بالفعل")
-    
+
+    opening_note = payload.get("opening_note")
+    if not within_hours and override:
+        opening_note = (
+            f"{opening_note or ''} | تجاوز خارج الدوام: {override_reason}"
+        ).strip(" |")
+
     shift = PosShift(
         user_id=current_user.id,
         opening_cash=Decimal(str(payload.get("opening_cash") or payload.get("openingCash") or 0)),
-        opening_note=payload.get("opening_note"),
+        opening_note=opening_note,
         status="open"
     )
     db.add(shift)
@@ -96,6 +119,20 @@ def open_shift(
             reference_type="pos_shift",
             reference_id=shift.id,
             reference_no=f"SHIFT-{shift.id}",
+            commit=False,
+        )
+
+    if not within_hours and override:
+        log_activity(
+            db,
+            user_id=current_user.id,
+            action="OPEN_SHIFT_OUTSIDE_HOURS",
+            entity_type="PosShift",
+            entity_id=str(shift.id),
+            description=(
+                f"فتح وردية خارج ساعات العمل بواسطة "
+                f"{current_user.full_name or current_user.username} — السبب: {override_reason}"
+            ),
             commit=False,
         )
 
@@ -124,9 +161,15 @@ def close_shift(
     # CURRENT_TIMESTAMP without microseconds while bound datetimes carry
     # ".000000", so same-second invoices would string-compare as older
     # than opened_at and silently drop out of the close aggregates.
+    # The upper bound matters just as much: without it an invoice raised while
+    # this request was in flight gets folded into a shift that closed before it
+    # existed, and the day's cash no longer reconciles.
+    closing_at = salon_now()
     shift_start = shift.opened_at - timedelta(seconds=1)
+    shift_end = closing_at + timedelta(seconds=1)
     invoices = db.query(Invoice).filter(
         Invoice.created_at >= shift_start,
+        Invoice.created_at <= shift_end,
         Invoice.created_by_user_id == shift.user_id,
         Invoice.is_draft == False,
     ).all()
@@ -163,6 +206,7 @@ def close_shift(
     # Expenses in this shift
     expenses = db.query(Expense).filter(
         Expense.created_at >= shift.opened_at,
+        Expense.created_at <= shift_end,
         Expense.created_by_user_id == shift.user_id,
         Expense.status.in_(["approved", "recorded"]),
     ).all()
@@ -173,15 +217,37 @@ def close_shift(
         if str(e.payment_method or "cash").lower() == "cash"
     )
     
-    shift.status = "closed"
-    shift.closed_at = salon_now()
-    shift.actual_closing_cash = Decimal(str(payload.get("countedCash") or payload.get("closing_cash") or 0))
-    shift.expected_closing_cash = shift.opening_cash + cash_sales - cash_expenses
-    shift.total_sales = total_sales
-    shift.invoice_count = len(invoices)
-    shift.discount_total = discount_total
-    shift.closing_note = payload.get("closing_note")
-    
+    actual_closing_cash = Decimal(str(payload.get("countedCash") or payload.get("closing_cash") or 0))
+    expected_closing_cash = shift.opening_cash + cash_sales - cash_expenses
+
+    # Close atomically. Two cashiers on two terminals can both read
+    # status == "open" and both compute totals; a conditional UPDATE means the
+    # database picks one winner and the loser is told, instead of the second
+    # write overwriting the first one's figures.
+    claimed = (
+        db.query(PosShift)
+        .filter(PosShift.id == shift_id, PosShift.status == "open")
+        .update(
+            {
+                PosShift.status: "closed",
+                PosShift.closed_at: closing_at,
+                PosShift.actual_closing_cash: actual_closing_cash,
+                PosShift.expected_closing_cash: expected_closing_cash,
+                PosShift.total_sales: total_sales,
+                PosShift.invoice_count: len(invoices),
+                PosShift.discount_total: discount_total,
+                PosShift.closing_note: payload.get("closing_note"),
+            },
+            synchronize_session=False,
+        )
+    )
+    if not claimed:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="تم إغلاق الوردية من جهاز آخر — حدّث الصفحة قبل الإغلاق مرة أخرى",
+        )
+
     db.commit()
     db.refresh(shift)
     

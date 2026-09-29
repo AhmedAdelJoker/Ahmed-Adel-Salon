@@ -22,7 +22,6 @@ from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.db.base_class import Base
 from app.db.session import get_db
-from app.core.rate_limit import limiter
 
 TEST_DATABASE_URL = _TEST_DB_URL
 
@@ -39,14 +38,20 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 
 
 def _reset_singletons():
-    """Clear in-memory per-test state (rate limiter + login lockout)."""
-    limiter._events.clear()
-    try:
-        from app.core.account_lockout import get_lockout
+    """Clear limiter and lockout state between tests.
 
-        get_lockout()._state.clear()
-    except Exception:
-        pass
+    The state moved out of the two endpoint modules and into `app.core.limiter`,
+    which owns both the Redis path and the bounded in-process fallback. Tests
+    run with Redis unconfigured, so dropping the fallback is enough — and
+    forcing a backend re-probe means a test that sets REDIS_URL can take effect
+    on the next call.
+    """
+    from app.core import limiter
+    from app.core.account_lockout import reset_instance
+
+    limiter.reset_memory()
+    limiter.reset_backend_cache()
+    reset_instance()
 
 
 def _remove_db_files():

@@ -2,7 +2,6 @@ from app.db.base_class import Base  # noqa
 
 # Core models
 from app.models.user import User  # noqa
-from app.models.barber import Barber  # noqa
 from app.models.customer import Customer  # noqa
 from app.models.member_account import MemberAccount  # noqa
 from app.models.customer_cancellation_log import CustomerCancellationLog  # noqa
@@ -44,7 +43,8 @@ from app.models.walk_in_queue import WalkInQueue  # noqa
 from app.models.waitlist_entry import WaitlistEntry  # noqa
 
 # Availability / Presence / Notifications
-# Phase 2 cleanup: removed legacy Barber* models (use Employee* equivalents)
+# Phase 2: the legacy `Barber` model and its `app.models.barber` shim are gone.
+# Employee is the single source of truth; `Employee.id` is what `barber_id` means.
 from app.models.employee_working_hour import EmployeeWorkingHour  # noqa
 from app.models.employee_time_off import EmployeeTimeOff  # noqa
 from app.models.employee_presence_log import EmployeePresenceLog  # noqa

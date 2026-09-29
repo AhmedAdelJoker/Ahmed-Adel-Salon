@@ -20,6 +20,9 @@ from app.models.employee_presence_log import EmployeePresenceLog, AttendanceArch
 from app.models.leave_request import LeaveRequest
 from app.models.business_settings import BusinessSettings
 from app.core.upload_security import validate_data_sheet
+from app.core.config import settings as app_settings
+from app.core.rate_limit import rate_limit
+from app.services.activity_log_service import log_activity
 from app.core.clock import salon_now, utc_now
 from app.core.working_hours import (
     WorkingHoursError,
@@ -31,6 +34,28 @@ from app.core.working_hours import (
 from app.services.websocket import manager
 
 router = APIRouter(prefix="/barber-presence", tags=["Attendance"])
+
+
+def _working_hours_diff(before: dict, after: dict) -> str:
+    """Human-readable per-day diff, so the audit log says what actually changed."""
+    from app.core.working_hours import DAYS_AR
+
+    parts: list[str] = []
+    for day, label in DAYS_AR.items():
+        left = before.get(day) or {}
+        right = after.get(day) or {}
+        if left == right:
+            continue
+        if left.get("is_open") and not right.get("is_open"):
+            parts.append(f"{label}: مغلق")
+        elif not left.get("is_open") and right.get("is_open"):
+            parts.append(f"{label}: مفتوح {right.get('open_time')}–{right.get('close_time')}")
+        else:
+            parts.append(
+                f"{label}: {left.get('open_time')}–{left.get('close_time')} ← "
+                f"{right.get('open_time')}–{right.get('close_time')}"
+            )
+    return "تعديل ساعات العمل: " + ("، ".join(parts) if parts else "بدون تغيير فعلي")
 
 LATE_THRESHOLD_MINUTES = 15
 PENALTY_PER_LATE_MINUTE = 0.5  # Currency per minute late
@@ -479,7 +504,18 @@ def get_working_hours(db: Session = Depends(get_db), current_user: User = Depend
     return {"working_hours": normalize_working_hours(settings.working_hours if settings else None)}
 
 
-@router.post("/working-hours")
+@router.post(
+    "/working-hours",
+    dependencies=[
+        Depends(
+            rate_limit(
+                "working_hours_write",
+                max_requests=app_settings.SETTINGS_WRITE_RATE_LIMIT_MAX_REQUESTS,
+                window_seconds=app_settings.RATE_LIMIT_WINDOW_SECONDS,
+            )
+        )
+    ],
+)
 def update_working_hours(
     payload: dict,
     db: Session = Depends(get_db),
@@ -494,9 +530,23 @@ def update_working_hours(
     if not settings:
         settings = BusinessSettings(salon_name="SalonPro", currency="EGP")
         db.add(settings)
+        db.commit()
+        db.refresh(settings)
+
+    previous = normalize_working_hours(settings.working_hours)
     settings.working_hours = validated
     db.commit()
     db.refresh(settings)
+
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="UPDATE_WORKING_HOURS",
+        entity_type="BusinessSettings",
+        entity_id=str(settings.id),
+        description=_working_hours_diff(previous, normalize_working_hours(validated)),
+    )
+
     return {"working_hours": settings.working_hours, "message": "تم حفظ الإعدادات بنجاح"}
 
 

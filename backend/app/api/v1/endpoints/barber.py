@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import func
 from datetime import date, datetime, timedelta
 from typing import Any, List, Optional
@@ -148,7 +148,7 @@ def get_barber_queue(
     # Base queries (eager-load customer + services — N+1 fixed)
     waiting_q = db.query(Appointment).options(
         joinedload(Appointment.customer),
-        joinedload(Appointment.services),
+        selectinload(Appointment.services),
     ).filter(
         Appointment.barber_id == barber_id,
         Appointment.status.in_(["waiting", "in-service", "pending"]),
@@ -156,7 +156,7 @@ def get_barber_queue(
     )
     completed_q = db.query(Appointment).options(
         joinedload(Appointment.customer),
-        joinedload(Appointment.services),
+        selectinload(Appointment.services),
     ).filter(
         Appointment.barber_id == barber_id,
         Appointment.status.in_(["completed", "ready_for_payment"]),
@@ -296,7 +296,7 @@ def get_barber_calendar(
 
     appointments = db.query(Appointment).options(
         joinedload(Appointment.customer),
-        joinedload(Appointment.services),
+        selectinload(Appointment.services),
     ).filter(
         Appointment.barber_id == barber_id,
         Appointment.appointment_date >= start_date,
@@ -410,7 +410,7 @@ def get_barber_schedule(
 
     appointments = db.query(Appointment).options(
         joinedload(Appointment.customer),
-        joinedload(Appointment.services),
+        selectinload(Appointment.services),
     ).filter(
         Appointment.barber_id == barber_id,
         Appointment.appointment_date == target_date,
@@ -462,7 +462,7 @@ def get_appointment_by_id(
 
     appointment = db.query(Appointment).options(
         joinedload(Appointment.customer),
-        joinedload(Appointment.services),
+        selectinload(Appointment.services),
     ).filter(
         Appointment.id == appointment_id,
         Appointment.barber_id == barber_id
@@ -812,7 +812,7 @@ def get_barber_commissions(
         start = today - timedelta(days=6)
 
     invoices = db.query(Invoice).options(
-        joinedload(Invoice.items),
+        selectinload(Invoice.items),
         joinedload(Invoice.customer),
     ).filter(
         Invoice.barber_id == barber_id,

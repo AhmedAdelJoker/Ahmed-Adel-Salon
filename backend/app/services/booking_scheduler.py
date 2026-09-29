@@ -105,6 +105,53 @@ def _build_busy_intervals(
     return busy_intervals, len(appointments)
 
 
+def salon_booking_window(db: Session, booking_date: date) -> tuple[datetime, datetime] | None:
+    """Absolute open/close window of the salon itself on ``booking_date``.
+
+    ``None`` means "the salon has not published hours" and the caller should not
+    restrict anything. A window is keyed by its opening day, so a ``22:00 →
+    02:00`` Saturday closes at 02:00 on the Sunday.
+    """
+    from app.core.working_hours import resolve_window
+    from app.models.business_settings import BusinessSettings
+
+    settings = db.query(BusinessSettings).first()
+    if settings is None or not settings.working_hours:
+        return None
+    window = resolve_window(settings.working_hours, booking_date)
+    if window is None:
+        return None
+    _config, opens, closes = window
+    return opens, closes
+
+
+def _intersect_with_salon(
+    db: Session,
+    schedule: EmployeeDaySchedule,
+    booking_date: date,
+) -> EmployeeDaySchedule | None:
+    """Clamp an employee schedule to the salon's opening hours.
+
+    Every public booking path funnels through ``_build_employee_day_schedule``,
+    so clamping here is what stops a customer from booking 03:00 on a day the
+    salon closed at 22:00 — without duplicating the check in the slot lister,
+    the auto-assigner and the create handler.
+    """
+    window = salon_booking_window(db, booking_date)
+    if window is None:
+        return schedule
+
+    opens, closes = window
+    start_at = max(schedule.start_at, opens)
+    end_at = min(schedule.end_at, closes)
+    if end_at <= start_at:
+        return None
+
+    schedule.start_at = start_at
+    schedule.end_at = end_at
+    return schedule
+
+
 def _build_employee_day_schedule(
     db: Session,
     *,
@@ -179,12 +226,16 @@ def _build_employee_day_schedule(
     if end_dt <= start_dt:
         end_dt += timedelta(days=1)
 
-    return EmployeeDaySchedule(
-        employee=employee,
-        start_at=start_dt,
-        end_at=end_dt,
-        busy_intervals=busy_intervals,
-        day_load=day_load,
+    return _intersect_with_salon(
+        db,
+        EmployeeDaySchedule(
+            employee=employee,
+            start_at=start_dt,
+            end_at=end_dt,
+            busy_intervals=busy_intervals,
+            day_load=day_load,
+        ),
+        booking_date,
     )
 
 

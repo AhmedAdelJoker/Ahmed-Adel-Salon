@@ -1,5 +1,5 @@
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from typing import List, Optional
@@ -12,6 +12,7 @@ from app.models.employee import Employee
 from app.models.payroll_record import PayrollRecord
 from app.models.salary_advance import SalaryAdvance
 from app.models.expense import Expense
+from app.core.audit import audit_log
 from app.schemas.payroll import (
     PayrollCreate, PayrollRead, PayrollUpdate, 
     PayrollSummary, PayrollArchiveResponse, PayrollCalculateRequest
@@ -434,6 +435,7 @@ def cancel_payroll(
 @router.delete("/{payroll_id}")
 def delete_payroll(
     payroll_id: int, 
+    request: Request = None,
     db: Session = Depends(get_db), 
     current_user: User = Depends(require_owner_or_manager)
 ):
@@ -444,8 +446,22 @@ def delete_payroll(
     if record.status == "paid":
         raise HTTPException(status_code=400, detail="Cannot delete paid payroll")
         
+    # Snapshot before delete — after `db.delete()` the ORM state is expunged.
+    snapshot = {
+        "employee_id": getattr(record, "employee_id", None),
+        "period": getattr(record, "period", None) or getattr(record, "month", None),
+        "base_salary": float(getattr(record, "base_salary", 0) or 0),
+        "status": record.status,
+    }
     db.delete(record)
     db.commit()
+    audit_log(
+        db, request, current_user,
+        action="delete_payroll",
+        entity_type="payroll_record",
+        entity_id=payroll_id,
+        description={"deleted": snapshot},
+    )
     return {"message": "Payroll record deleted successfully"}
 
 

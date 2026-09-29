@@ -177,6 +177,51 @@ def list_all_inventory_logs(
     )
 
     items = []
+
+    # Stock before/after each movement, derived from the live quantity:
+    #   stock_after  = current_qty - (sum of movements that came *after* this one)
+    #
+    # That "sum of later movements" is a running total, so it is computed once
+    # for the whole page with a window function rather than one aggregate query
+    # per row. The original loop issued up to `page_size` SUM queries — 200 on a
+    # full page — and `product_id` could not use the idempotency index because
+    # that constraint lists it third, so each one was a full scan.
+    #
+    # SQLite has supported window functions since 3.25 and PostgreSQL since 8.4,
+    # so this needs no dialect branch and no extra dependency.
+    #
+    # The frame is `ORDER BY id ASC` + `ROWS BETWEEN 1 FOLLOWING AND UNBOUNDED
+    # FOLLOWING`, i.e. every movement with a *greater* id — the ones that came
+    # after this one chronologically.
+    #
+    # Ordering descending and taking "1 FOLLOWING" looks equivalent and is not:
+    # over a descending sequence "following" means the next element *down*, so
+    # the frame would cover the movements that came *before*. The running
+    # balance came out reversed while still looking like a plausible stock
+    # level, which is why the test asserts the numbers and not just the count.
+    product_ids = {log.product_id for log in rows if log.product_id is not None}
+    later_sums: dict[tuple[int, int], Decimal] = {}
+
+    if product_ids:
+        running = (
+            db.query(
+                InventoryLog.product_id.label("product_id"),
+                InventoryLog.id.label("log_id"),
+                func.sum(InventoryLog.change_amount)
+                .over(
+                    partition_by=InventoryLog.product_id,
+                    order_by=InventoryLog.id.asc(),
+                    # Everything strictly after the current row.
+                    rows=(1, None),
+                )
+                .label("later_sum"),
+            )
+            .filter(InventoryLog.product_id.in_(product_ids))
+            .subquery()
+        )
+        for product_id, log_id, later_sum in db.query(running).all():
+            later_sums[(product_id, log_id)] = Decimal(str(later_sum or 0))
+
     for log in rows:
         # Creator display name (no extra query — joined above)
         creator = getattr(log, "created_by_user", None)
@@ -187,23 +232,13 @@ def list_all_inventory_logs(
                 or getattr(creator, "username", None)
                 or None
             )
-        # Stock before/after this movement, derived from the live quantity:
-        # stock_after = current_qty - (sum of later movements for this product)
-        later_sum = (
-            db.query(func.coalesce(func.sum(InventoryLog.change_amount), 0))
-            .filter(
-                InventoryLog.product_id == log.product_id,
-                InventoryLog.id > log.id,
-            )
-            .scalar()
-            or 0
-        )
+        later_sum = later_sums.get((log.product_id, log.id), Decimal("0"))
         current_qty = (
             log.product.quantity
             if log.product is not None and log.product.quantity is not None
             else 0
         )
-        stock_after = Decimal(str(current_qty)) - Decimal(str(later_sum))
+        stock_after = Decimal(str(current_qty)) - later_sum
         stock_before = stock_after - Decimal(str(log.change_amount or 0))
         items.append(
             InventoryLogWithProductRead(

@@ -1,3 +1,4 @@
+import logging
 from app.db.session import SessionLocal
 import app.db.base  # This will import all models
 from app.models.user import User
@@ -143,7 +144,7 @@ def seed_data(include_demo_data: bool = True):
 
     except Exception as e:
         db.rollback()
-        print("[seed] ERROR:", e)
+        logging.getLogger("app.seed").exception("[seed] failed")
 
     finally:
         db.close()

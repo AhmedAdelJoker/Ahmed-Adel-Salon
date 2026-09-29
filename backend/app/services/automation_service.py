@@ -1,3 +1,4 @@
+import logging
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
@@ -11,6 +12,9 @@ from app.services.meta_whatsapp_service import (
     send_text_message,
     is_meta_whatsapp_configured
 )
+
+logger = logging.getLogger("app.automation_service")
+
 
 def _appointments_in_window(
     db: Session,
@@ -76,7 +80,7 @@ def run_automated_reminders(db: Session):
                 appt.reminder_24h_sent = True
                 sent_24h += 1
         except Exception as e:
-            print(f"Error sending 24h reminder for appt {appt.id}: {e}")
+            logger.exception("Error sending 24h reminder for appt %s: %s", appt.id, e)
 
     # 2. 2h Reminders
     # Target appointments between 1h and 3h from now
@@ -104,7 +108,7 @@ def run_automated_reminders(db: Session):
                 appt.reminder_2h_sent = True
                 sent_2h += 1
         except Exception as e:
-            print(f"Error sending 2h reminder for appt {appt.id}: {e}")
+            logger.exception("Error sending 2h reminder for appt %s: %s", appt.id, e)
 
     db.commit()
     return {"sent_24h": sent_24h, "sent_2h": sent_2h}
@@ -141,7 +145,7 @@ def send_post_visit_feedback(db: Session, appointment_id: int):
             appointment_id=appt.id
         )
     except Exception as e:
-        print(f"Error sending feedback request for appt {appt.id}: {e}")
+        logger.exception("Error sending feedback request for appt %s: %s", appt.id, e)
 
 
 

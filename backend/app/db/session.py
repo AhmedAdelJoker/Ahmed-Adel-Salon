@@ -34,8 +34,20 @@ except Exception:
 
 
 def _pool_kwargs() -> dict:
+    """Connection pool sizing.
+
+    Postgres/MySQL already get a real pool (these were tuned in Phase 2).
+    SQLite needs one too: SQLAlchemy defaults a file-backed SQLite engine to
+    `QueuePool` in 2.0, but the default `pool_size=5` starves the FastAPI
+    threadpool on a busy shift, and every extra connection competes for the
+    single writer lock. A small pool + WAL beats a large one here.
+    """
     if settings.DATABASE_URL.startswith("sqlite"):
-        return {}
+        return {
+            "pool_size": int(os.getenv("DB_SQLITE_POOL_SIZE", "5")),
+            "max_overflow": int(os.getenv("DB_SQLITE_MAX_OVERFLOW", "10")),
+            "pool_timeout": int(os.getenv("DB_SQLITE_POOL_TIMEOUT", "30")),
+        }
     return {
         "pool_size": int(os.getenv("DB_POOL_SIZE", "10")),
         "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "20")),
@@ -48,11 +60,13 @@ engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
     future=True,
-    connect_args={"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {},
+    connect_args={"check_same_thread": False, "timeout": 30} if settings.DATABASE_URL.startswith("sqlite") else {},
     **_pool_kwargs(),
 )
 
-# Enable WAL and FK for SQLite (prod + dev, not just tests)
+# SQLite pragmas. WAL lets readers run concurrently with the single writer,
+# and `busy_timeout` is what turns "database is locked" into a bounded wait
+# instead of an instant 500 during the booking rush.
 if settings.DATABASE_URL.startswith("sqlite"):
 
     @event.listens_for(engine, "connect")
@@ -61,6 +75,14 @@ if settings.DATABASE_URL.startswith("sqlite"):
         try:
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA busy_timeout=10000")
+            # NORMAL trades durability of the very last transaction for a large
+            # write-speed win; WAL still survives process crashes, only a host
+            # power loss can cost the final commit.
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA cache_size=-64000")  # 64 MB page cache
+            cursor.execute("PRAGMA temp_store=MEMORY")
+            cursor.execute("PRAGMA mmap_size=268435456")  # 256 MB
         finally:
             cursor.close()
 
