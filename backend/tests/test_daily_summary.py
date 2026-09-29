@@ -1,11 +1,41 @@
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
+from app.core.clock import salon_now
 from app.models.customer import Customer
 from app.models.expense import Expense
 from app.models.invoice import Invoice
 from app.models.pos_shift import PosShift
 from tests.helpers import auth_headers, make_user
+
+# Everything in this file is written in the salon's timezone, not the machine's.
+#
+# The endpoint answers "today's summary" with `salon_now().date()`, because a
+# salon that opens at 09:00 in Cairo means something different at 22:00 UTC, and
+# a daily sales figure that rolls over at UTC midnight is wrong for every salon
+# not on UTC. These tests used `date.today()` and `datetime.now()` -- the
+# machine's clock -- and the two agree only when the machine happens to run in
+# the salon's timezone.
+#
+# On a developer's laptop in Egypt they agree, and the tests pass. On a CI runner
+# in UTC they diverge for a three-hour window every night, and the run that
+# finally failed did so at 22:30 UTC on the 29th with the salon already on the
+# 30th:
+#
+#     assert '2026-09-30' == '2026-09-29'
+#
+# followed by three aggregate assertions reading zero, because the rows had been
+# seeded with a UTC date the endpoint was not looking for. A test that passes in
+# one timezone and fails in another is not a test of the application; the
+# endpoint was right in all four cases.
+SALON_TODAY = salon_now().date()
+
+
+def _salon_today_at(hour: int, minute: int = 0) -> datetime:
+    """A datetime on the salon's current day, in its timezone."""
+    return datetime.combine(
+        SALON_TODAY, time(hour, minute), tzinfo=salon_now().tzinfo
+    )
 
 
 def _owner_headers(client, db_session):
@@ -32,7 +62,7 @@ def _seed_invoice(db_session, customer_id, user_id, total, invoice_no, is_draft=
         total_amount=Decimal(str(total)),
         created_by_user_id=user_id,
         is_draft=is_draft,
-        created_at=datetime.now(),
+        created_at=_salon_today_at(12),
     )
     db_session.add(invoice)
     db_session.commit()
@@ -43,9 +73,9 @@ def _seed_invoice(db_session, customer_id, user_id, total, invoice_no, is_draft=
 def _seed_shift(db_session, user_id, status="open"):
     from datetime import datetime
 
-    shift = PosShift(user_id=user_id, status=status, opened_at=datetime.now())
+    shift = PosShift(user_id=user_id, status=status, opened_at=_salon_today_at(9))
     if status == "closed":
-        shift.closed_at = datetime.now()
+        shift.closed_at = _salon_today_at(20)
     db_session.add(shift)
     db_session.commit()
     db_session.refresh(shift)
@@ -55,7 +85,7 @@ def _seed_shift(db_session, user_id, status="open"):
 def _seed_expense(db_session, amount, description="قرطاسية"):
     from datetime import datetime
 
-    expense = Expense(amount=float(amount), category="تشغيل", description=description, created_at=datetime.now())
+    expense = Expense(amount=float(amount), category="تشغيل", description=description, created_at=_salon_today_at(12))
     db_session.add(expense)
     db_session.commit()
     db_session.refresh(expense)
@@ -89,7 +119,7 @@ def test_daily_summary_empty(client, db_session):
     resp = client.get("/api/v1/pos-shifts/daily-summary", headers=headers)
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["date"] == date.today().isoformat()
+    assert body["date"] == SALON_TODAY.isoformat()
     assert body["shifts"] == []
     assert body["expenses"] == []
     assert float(body["summary"]["total_sales"]) == 0
@@ -155,7 +185,7 @@ def test_daily_summary_open_shift_live_sales(client, db_session):
 
 def test_daily_summary_date_filter(client, db_session):
     headers = _owner_headers(client, db_session)
-    today = date.today().isoformat()
+    today = SALON_TODAY.isoformat()
 
     resp = client.get(
         "/api/v1/pos-shifts/daily-summary",
