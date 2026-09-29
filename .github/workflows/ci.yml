@@ -321,6 +321,22 @@ jobs:
       - name: Local secret scan
         run: python scripts/scan_secrets.py
 
+      # The audit imports the real application -- `from app.main import app` --
+      # and walks its router tree, so it needs the application's dependencies,
+      # not just a driver. It was written to run against a venv that had them
+      # all, and the runner installs only `bandit psycopg2-binary` at this
+      # point, so the step died on `ModuleNotFoundError: No module named
+      # 'fastapi'`.
+      #
+      # Installed here rather than at the top with Bandit because Bandit reads
+      # source and does not import it, and `pip install -r requirements.txt`
+      # pulls in pandas, openpyxl and reportlab. A security gate that is slow
+      # enough to be tolerated-with-because-it-is-thorough is a gate that gets
+      # switched off.
+      - name: Install the application for the router audit
+        working-directory: backend
+        run: pip install -r requirements.txt
+
       # Walks the router tree and fails if any endpoint authenticates nobody, or
       # mutates state without either a role check or being self-service. This is
       # the check that would catch a `Depends(require_owner)` being dropped from a
@@ -334,13 +350,16 @@ jobs:
       # deployed to. Everything else in this file builds its database from the
       # models, so a migration that is valid SQL and invalid PostgreSQL is
       # invisible to all of it.
+      #
+      # No install step: `requirements.txt` is already installed above, for the
+      # router audit. It used to install them again here, which was harmless and
+      # slow, and it was the only reason that step was not obviously dependent on
+      # an earlier one.
       - name: Replay the migration history on PostgreSQL
         working-directory: backend
         env:
           TEST_POSTGRES_URL: postgresql+psycopg2://postgres:CI_ONLY-not-a-real-secret@127.0.0.1:5432/salon_migration_test
-        run: |
-          pip install -r requirements.txt
-          python -m pytest tests/test_postgres_migration_chain.py -q
+        run: python -m pytest tests/test_postgres_migration_chain.py -q
 
       # Concurrency. SQLite serialises every writer behind one lock, so none of
       # these races can occur there and none of them can be tested there. The
