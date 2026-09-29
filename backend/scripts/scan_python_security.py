@@ -153,6 +153,18 @@ def main() -> int:
 
     # Gate. MEDIUM and above fails the build.
     gate_code, gate_report = run_bandit("medium", None)
+
+    if not gate_report:
+        # No report at all means Bandit never ran: it is not installed, or it
+        # could not start. `python -m bandit` exits 1 when the module is
+        # missing, which is indistinguishable from "found issues", so that
+        # collision reached the line below and printed `FAILED -- 0
+        # finding(s)` -- a security gate reporting a failure it did not
+        # measure. Distinct exit code, because this is a broken tool, not a
+        # finding.
+        print("could not run Bandit; the gate proved nothing")
+        return 2
+
     blocking = [f for f in gate_report.get("results", []) if f["issue_severity"] in ("HIGH", "MEDIUM")]
 
     print("Bandit gate (HIGH + MEDIUM): ", end="", flush=True)
