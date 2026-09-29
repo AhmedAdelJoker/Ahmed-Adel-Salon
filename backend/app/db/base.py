@@ -23,6 +23,14 @@ from app.models.appointment import Appointment  # noqa
 from app.models.appointment_service import AppointmentService  # noqa
 from app.models.invoice import Invoice  # noqa
 from app.models.invoice_item import InvoiceItem  # noqa
+# Registers `invoice_counters`, which migration b8e2f3a4c5d6 creates. This
+# module is the only thing that populates the `target_metadata` Alembic's
+# autogenerate compares against, so a model imported *only* by a router is
+# absent from that comparison: the table is in the database and absent from the
+# models, which autogenerate reports as a table to DROP. That import was the
+# only thing keeping it out, and it was one endpoint away from a migration that
+# silently drops the day's invoice numbering.
+from app.models.invoice_counter import InvoiceCounter  # noqa
 from app.models.business_settings import BusinessSettings  # noqa
 from app.models.expense import Expense  # noqa
 from app.models.payroll_record import PayrollRecord  # noqa
