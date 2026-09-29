@@ -27,7 +27,24 @@ arabic-reshaper==3.0.0
 python-bidi==0.6.7
 slowapi>=0.1.9
 pyotp==2.10.0
-cryptography==46.0.3
+# Pinned, not ranged, because PyJWT's `crypto` extra is the only thing here that
+# imports it and a silent resolve can pair them badly.
+#
+# 50.0.1 clears every advisory pip-audit reports. The 46.0.3 pin this replaced was
+# flagged for PYSEC-2026-2141, -35, -36, -3552, -3553, -3554 and
+# GHSA-537c-gmf6-5ccf. The first three are fixed in 46.0.7, which is tempting as
+# the smaller change, but 46.0.7 still reports seven findings: -3552, -3553 and
+# -3554 have no fix on the 46 series at all. So the pin moves to 50.0.1 rather
+# than the version that reduces the count from thirteen to seven.
+#
+# Verified by running, not by reading: the HS256 sign/verify round trip PyJWT
+# uses, an RSA sign/verify pair, and a Fernet encrypt/decrypt all succeed on
+# 50.0.1, with the same OpenSSL 3.0.18 underneath.
+#
+# pip-audit prints one line per fix version per finding, so 13 lines is 7
+# findings, not 13. Reading that as 13 distinct problems is reading the format
+# wrong -- and would have justified a panic that a single version bump fixes.
+cryptography==50.0.1
 pandas>=2.0.0
 openpyxl>=3.1.0
 Pillow==12.3.0
