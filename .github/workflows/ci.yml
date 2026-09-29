@@ -44,6 +44,46 @@ jobs:
           cd backend
           pytest -v
 
+      # Postgres readiness.
+      #
+      # The Alembic chain contains SQLite-only DDL by design (see the migration
+      # docstrings), so the Postgres schema is built from `create_all` and
+      # stamped. This step proves that rendering actually compiles and is
+      # complete — a column type with no Postgres equivalent, or a foreign-key
+      # cycle that `CREATE TABLE` cannot satisfy, is only visible here.
+      #
+      # The FK-cycle check is the one that matters most: SQLite defers
+      # foreign-key enforcement to commit time and so accepts a cycle that
+      # PostgreSQL rejects outright, which would make the first Postgres deploy
+      # fail no matter how many tests passed beforehand.
+      - name: Verify the schema renders on PostgreSQL
+        run: |
+          cd backend
+          python scripts/verify_postgres_schema.py
+
+      # Dialect audit. Reports SQLite-only SQL that would fail on Postgres.
+      # Informational today, and worth tightening to a hard failure as the
+      # remaining migrations are made dialect-agnostic.
+      - name: Audit dialect-specific SQL
+        run: |
+          cd backend
+          python scripts/audit_postgres_readiness.py || true
+
+      - name: Audit for sync-endpoint WebSocket broadcasts
+        run: |
+          cd backend
+          python scripts/audit_sync_broadcasts.py
+
+      - name: Verify the sync-broadcast guard actually detects the defect
+        run: |
+          cd backend
+          python scripts/verify_sync_broadcast_guard.py
+
+      - name: Audit encoding
+        run: |
+          cd backend
+          python scripts/check_mojibake.py
+
       - name: Verify clean-room migrations
         run: |
           cd backend
@@ -109,6 +149,18 @@ jobs:
         run: |
           cd frontend
           npm run typecheck
+
+      # Design-system integrity. These are cheap, run on the raw source, and
+      # catch a whole class of defect that typecheck and unit tests cannot:
+      # a custom property that resolves to nothing, a self-referential token
+      # cycle, a raw hex that bypasses the theme, an Arabic string with a
+      # half-typed English word spliced into it, and a physical spacing
+      # utility that would mirror wrongly the moment the locale flips.
+      - name: Verify design tokens and copy integrity
+        run: |
+          cd frontend
+          npm run check:tokens
+          npm run prune:css:check
 
       - name: Run tests
         run: |
@@ -200,9 +252,195 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # P7.6. Two complementary scanners, because they fail in different ways.
+  #
+  # Bandit is pattern-based and catches the specific constructs that produce
+  # vulnerabilities (string-built SQL, hardcoded credentials, disabled
+  # verification). Gitleaks is entropy-based and catches the thing Bandit
+  # structurally cannot see: a working credential with no telling name, pasted
+  # into a file where nothing looks like a password.
+  #
+  # Both run here rather than relying on either alone. The repo-local scanner in
+  # scripts/scan_secrets.py is deliberately not a third gate: it is a fast
+  # pre-commit convenience and CI is where the authoritative check belongs.
+  security-sast:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: CI_ONLY-not-a-real-secret
+          POSTGRES_DB: salon_migration_test
+        ports:
+          - 5432:5432
+        # A real server, not a mock. The migration history shipped broken on
+        # PostgreSQL for its entire life because only SQLite was ever exercised,
+        # and four separate dialect errors sat in the chain undetected:
+        # `boolean DEFAULT 0`, `pragma_table_info`, `INSERT OR IGNORE`, and
+        # `CREATE INDEX CONCURRENTLY` inside Alembic's transaction.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Gitleaks needs the full history to find a secret that was committed
+          # and removed later. A shallow clone would let a scrubbed credential
+          # through permanently, which defeats the purpose of the scan.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Bandit and drivers
+        run: |
+          pip install bandit psycopg2-binary
+
+      # Fails on HIGH and MEDIUM. LOW findings are printed by the same script but
+      # do not fail the build, because every LOW in this repository is a known
+      # false positive and a gate that cries wolf gets switched off. The script
+      # annotates each one with why, and marks any unrecognised category as NEW.
+      - name: Bandit (HIGH + MEDIUM gate)
+        working-directory: backend
+        run: python scripts/scan_python_security.py
+
+      - name: Local secret scan
+        run: python scripts/scan_secrets.py
+
+      # Walks the router tree and fails if any endpoint authenticates nobody, or
+      # mutates state without either a role check or being self-service. This is
+      # the check that would catch a `Depends(require_owner)` being dropped from a
+      # destructive endpoint, which no existing test notices: the tests that
+      # exercise the endpoint use an admin token, so they pass either way.
+      - name: Authorisation audit
+        working-directory: backend
+        run: python scripts/audit_authorization.py
+
+      # The only check that runs the migration history on the dialect it is
+      # deployed to. Everything else in this file builds its database from the
+      # models, so a migration that is valid SQL and invalid PostgreSQL is
+      # invisible to all of it.
+      - name: Replay the migration history on PostgreSQL
+        working-directory: backend
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg2://postgres:CI_ONLY-not-a-real-secret@127.0.0.1:5432/salon_migration_test
+        run: |
+          pip install -r requirements.txt
+          python -m pytest tests/test_postgres_migration_chain.py -q
+
+      # Concurrency. SQLite serialises every writer behind one lock, so none of
+      # these races can occur there and none of them can be tested there. The
+      # inventory one in particular is the difference between stock that exists
+      # and stock that does not, and it is only reachable with two real
+      # transactions.
+      - name: Concurrency against a real server
+        working-directory: backend
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg2://postgres:CI_ONLY-not-a-real-secret@127.0.0.1:5432/salon_migration_test
+        run: |
+          python -m pytest tests/test_postgres_concurrency.py -q
+
+      # Whether the 46 indexes in c4d7e9f1a3b5 are actually used. Needs a
+      # seeded million rows: on the few-hundred-row test database the planner
+      # answers every one of those queries with a sequential scan, which is
+      # correct for a small table and tells you nothing about a real one.
+      - name: Index usage at a million rows
+        working-directory: backend
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg2://postgres:CI_ONLY-not-a-real-secret@127.0.0.1:5432/salon_scale
+        run: |
+          # A separate database from the migration test: seeding a million rows
+          # into the one the history was just verified against would leave it
+          # dirty for any later step, and the two jobs are independent.
+          psql "postgresql://postgres:CI_ONLY-not-a-real-secret@127.0.0.1:5432/postgres" \
+            -c "CREATE DATABASE salon_scale" || true
+          DATABASE_URL="$TEST_POSTGRES_URL" python -m alembic upgrade head
+          python scripts/seed_million_rows.py --confirm
+          python -m pytest tests/test_index_usage_at_scale.py -q
+
+      - name: Gitleaks (entropy-based)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          # Without a token the action runs in report-only mode and cannot
+          # annotate or fail a pull request from a fork. Failing on the exit code
+          # below covers both cases.
+          GITHUB_TOKEN: ${{ secrets.GITLEAKS_LICENSE }}
+        with:
+          args: --redact --verbose --no-banner
+
+      # Belt and braces. gitleaks-action already fails on a finding, but it needs
+      # a licence to annotate a pull request and is report-only without one, so
+      # this step is what makes the gate hold on a fork. `detect` exits non-zero
+      # when it finds anything, which is the whole mechanism -- no parsing.
+      - name: Fail on any Gitleaks finding
+        run: |
+          gitleaks detect --source . --redact --no-banner --verbose
+          echo "If this step fails, a secret is in the history. Rotate it first: deleting the file does not remove it from git."
+
+  # CodeQL runs as its own job because it needs the security-events write
+  # permission and a matrix over languages, and because a language that has no
+  # CodeQL support should not block the one that does.
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    needs:
+      [
+        root-dependency-audit,
+        backend-tests,
+        frontend-lint,
+        public-site,
+        e2e-smoke,
+        security-sast,
+      ]
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          language: ${{ matrix.language }}
+          # Not in the default paths: the SQL migrations and the Electron
+          # bootstrap are hand-written security-relevant code that a query would
+          # otherwise never reach.
+          paths: |
+            backend
+            frontend/src
+            frontend/scripts
+            scripts
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}
+
   production-boot:
     runs-on: ubuntu-latest
-    needs: [root-dependency-audit, backend-tests, frontend-lint, public-site, e2e-smoke]
+    needs:
+      [
+        root-dependency-audit,
+        backend-tests,
+        frontend-lint,
+        public-site,
+        e2e-smoke,
+        security-sast,
+        codeql,
+      ]
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4

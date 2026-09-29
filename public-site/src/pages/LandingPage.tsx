@@ -22,6 +22,11 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 import { buildPublicBookingPath } from "../lib/publicSite";
+import {
+  formatHoursRange,
+  isOpenNow as isOpenNowAt,
+  type WorkingHours,
+} from "../lib/workingHours";
 import { buildLandingSiteContent } from "../lib/publicSiteContent";
 import { readPublicSitePreviewDraft } from "../lib/publicSitePreview";
 import {
@@ -421,17 +426,10 @@ export default function LandingPage() {
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(settings.address)}`
       : null);
 
-  const isOpenNow = useMemo(() => {
-    const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-    const now = new Date();
-    const egypt = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
-    const today = activeHours?.[days[egypt.getDay()]];
-    if (!today?.is_open || !today.open_time || !today.close_time) return false;
-    const minutes = egypt.getHours() * 60 + egypt.getMinutes();
-    const [openH, openM] = today.open_time.split(":").map(Number);
-    const [closeH, closeM] = today.close_time.split(":").map(Number);
-    return minutes >= openH * 60 + openM && minutes <= closeH * 60 + closeM;
-  }, [activeHours]);
+  const isOpenNow = useMemo(
+    () => isOpenNowAt(activeHours as WorkingHours),
+    [activeHours],
+  );
 
   const pageUrl =
     typeof window !== "undefined"
@@ -836,7 +834,7 @@ export default function LandingPage() {
                       {dayNames[day] || day}
                     </span>
                     <span className="text-sm font-black" style={{ color: value.is_open ? theme.accent : "#F43F5E" }}>
-                      {value.is_open ? `${value.open_time} - ${value.close_time}` : "مغلق"}
+                      {formatHoursRange(value)}
                     </span>
                   </div>
                 ))}
