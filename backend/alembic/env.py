@@ -75,6 +75,31 @@ def run_migrations_online() -> None:
             compare_type=True,
             compare_server_default=True,
             render_as_batch=True,
+            # One transaction per migration, rather than one for the whole run.
+            #
+            # This is what makes `CREATE INDEX CONCURRENTLY` possible at all.
+            # PostgreSQL refuses it inside a transaction block, and with a single
+            # wrapping transaction every revision in the history shares one -- so
+            # c4d7e9f1a3b5 had to reach outside the transaction to build its
+            # indexes, and reaching outside meant committing, and committing
+            # discarded the `alembic_version` write. The symptom was a migration
+            # that applied cleanly, reported success, and left `alembic current`
+            # pointing at the revision before it -- so every subsequent deploy
+            # replayed the history and printed "created 0 index(es)".
+            #
+            # Per-migration transactions make that unnecessary: Alembic commits
+            # and stamps each revision itself, in the right order, and a
+            # migration that fails now rolls back only itself rather than
+            # silently undoing work that already succeeded.
+            #
+            # The cost is real and worth stating: a run of several migrations is
+            # no longer atomic. A failure halfway leaves the database at the last
+            # revision that succeeded, which is recoverable -- re-run `upgrade` and
+            # it continues -- whereas the old all-or-nothing behaviour meant a
+            # failure in revision 30 discarded 29 successful ones on PostgreSQL,
+            # where DDL is transactional, and was the reason migrations had to be
+            # written defensively in the first place.
+            transaction_per_migration=True,
         )
 
         with context.begin_transaction():

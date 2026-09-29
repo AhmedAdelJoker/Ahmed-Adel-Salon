@@ -16,6 +16,7 @@ Revises: f4a1c7e29b03
 """
 
 from alembic import op
+import backend_dialect_support as ds
 import sqlalchemy as sa
 
 revision = "a7b2c3d4e5f6"
@@ -27,18 +28,15 @@ MEMBER_COLUMNS = ("member_password_hash", "member_token_version")
 
 
 def _columns(conn, table: str) -> set[str]:
-    rows = conn.execute(
-        sa.text(f"SELECT name FROM pragma_table_info('{table}')")
-    ).fetchall()
-    return {r[0] for r in rows}
+    # `pragma_table_info` is a SQLite table-valued function with no PostgreSQL
+    # equivalent. On Postgres it raises UndefinedFunction, which reads like a
+    # missing table rather than like dialect-specific syntax. See
+    # alembic/dialect_support.py for the portable form.
+    return set(ds.columns_of(conn, table))
 
 
 def _table_exists(conn, table: str) -> bool:
-    row = conn.execute(
-        sa.text("SELECT name FROM sqlite_master WHERE type='table' AND name=:t"),
-        {"t": table},
-    ).first()
-    return row is not None
+    return ds.table_exists(conn, table)
 
 
 def upgrade() -> None:
@@ -58,7 +56,7 @@ def upgrade() -> None:
                 server_default="0",
                 nullable=False,
             ),
-            sa.Column("is_active", sa.Boolean(), server_default="1", nullable=False),
+            sa.Column("is_active", sa.Boolean(), server_default=sa.true(), nullable=False),
             sa.Column("last_login_at", sa.DateTime(timezone=True), nullable=True),
             sa.Column(
                 "created_at",
@@ -93,18 +91,42 @@ def upgrade() -> None:
             if has_token_version
             else "0"
         )
-        op.execute(
+        # Three dialect differences in one statement, each of which is a syntax
+        # error rather than a behaviour difference on the other engine:
+        #
+        #   INSERT OR IGNORE  ->  ON CONFLICT DO NOTHING
+        #   is_active = 1     ->  is_active = true   (integer into a boolean
+        #                           column is DatatypeMismatch, not a coercion)
+        #   != ''             ->  <> ''
+        #
+        # The `uq_member_accounts_customer_id` constraint makes the conflict
+        # clause reachable, so this is not defensive: a customer who somehow
+        # already had a row would abort the whole migration on PostgreSQL.
+        is_sqlite = conn.dialect.name == "sqlite"
+        active_literal = "1" if is_sqlite else "true"
+        # SQLite's `INSERT OR IGNORE` sits between INSERT and INTO; PostgreSQL's
+        # `ON CONFLICT DO NOTHING` goes after the whole statement. Building it as
+        # one interchangeable fragment does not work, and produces
+        # "syntax error at or near ON" -- so the two forms are separate strings.
+        insert_head = (
+            "INSERT OR IGNORE INTO member_accounts"
+            if is_sqlite
+            else "INSERT INTO member_accounts"
+        )
+        insert_tail = "" if is_sqlite else " ON CONFLICT DO NOTHING"
+        conn.execute(
             sa.text(
                 f"""
-                INSERT OR IGNORE INTO member_accounts
+                {insert_head}
                     (customer_id, password_hash, token_version, is_active)
                 SELECT customer_id,
                        member_password_hash,
                        {token_expr},
-                       1
+                       {active_literal}
                 FROM customers
                 WHERE member_password_hash IS NOT NULL
-                  AND member_password_hash != ''
+                  AND member_password_hash <> ''
+                {insert_tail}
                 """
             )
         )

@@ -10,6 +10,7 @@ Revises: c9fe786b61e8
 """
 
 from alembic import op
+import backend_dialect_support as ds
 import sqlalchemy as sa
 
 revision = "f4a1c7e29b03"
@@ -19,15 +20,11 @@ depends_on = None
 
 
 def _current_type(conn) -> str:
-    return str(
-        conn.execute(
-            sa.text(
-                "SELECT type FROM pragma_table_info('users') "
-                "WHERE name = 'totp_secret'"
-            )
-        ).scalar()
-        or ""
-    ).upper()
+    # `pragma_table_info` is a SQLite table-valued function. PostgreSQL has no
+    # equivalent and raises UndefinedFunction on it, which reads like a missing
+    # table rather than like dialect-specific syntax. `dialect_support` answers
+    # the same question portably.
+    return (ds.column_type(conn, "users", "totp_secret") or "").upper()
 
 
 def upgrade() -> None:
