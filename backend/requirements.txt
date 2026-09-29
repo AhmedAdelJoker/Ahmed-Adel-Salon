@@ -4,6 +4,16 @@ uvicorn[standard]==0.30.6
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.11
 PyJWT==2.14.0
+# Argon2id is the current hash. bcrypt is retained on purpose and only to
+# verify hashes that already exist: accounts are upgraded to Argon2id on their
+# next successful sign-in, so no password reset is ever required.
+argon2-cffi==25.1.0
+# argon2-cffi leaves its CFFI dependency unpinned, so a fresh resolve can pair
+# the two at different ABI revisions. Every combination tried here produced a
+# module that hashes correctly and then rejects its own output on verify, which
+# reads as a broken login and cannot be fixed by reinstalling the app. Pinning
+# the pair is the only cheap guard.
+argon2-cffi-bindings==25.1.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 pydantic==2.12.5
