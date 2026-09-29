@@ -135,11 +135,23 @@ def test_the_majority_of_probes_used_their_own_index(report):
 
 
 def test_the_redundant_index_is_reported_not_hidden(report):
-    """`ix_appointments_time` is served by `ix_appointments_status`.
+    """`ix_appointments_time` looked redundant and is not.
 
-    Kept as an explicit assertion because the honest finding is that one of the
-    46 indexes is not earning its write cost, and burying that in prose would let
-    it stay for years. Whether to drop it is a decision; the fact is not.
+    A first pass reported it as SUPERSEDED -- `ix_appointments_status` serves the
+    auto-cancel query, which filters on `status` as well as time. Measuring it
+    properly, with the index actually dropped, gave a 2.7% difference in either
+    direction depending on the run, which is noise on a 400k-row table. It leads
+    on a different column from the index that appears to cover it, and neither
+    can answer the other's query.
+
+    So it is kept, and the probe that covers it is marked `SEQ OK` rather than
+    `SUPERSEDED`. The assertion here is that the status is the honest one: if a
+    future measurement makes the index genuinely useless, the verdict should
+    change, and this test should be the thing that notices.
     """
-    assert "SUPERSEDED" in report
-    assert "ix_appointments_time is redundant" in report
+    assert "SUPERSEDED" not in report, (
+        "a probe is reporting a redundant index; if that is now true, it should "
+        "be a decision, and the reasoning in measure_index_usage.py updated"
+    )
+    assert "ix_appointments_time" in report
+    assert "SEQ OK" in report

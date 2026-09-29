@@ -42,10 +42,6 @@ class Probe:
     # A sequential scan is acceptable here -- the table is small, or the query
     # returns most of the table anyway and an index would only add random I/O.
     seq_scan_ok: bool = False
-    # Set when another index serves this query instead, naming it. Reported
-    # separately from SEQ SCAN because "an index answered this, just not the one
-    # we built for it" is a different decision from "no index answered this".
-    superseded_by: str | None = None
 
 
 # The queries the endpoints actually issue, one per index added in
@@ -55,32 +51,26 @@ PROBES: list[Probe] = [
     Probe("ix_appointments_date_status_barber", "appointments",
           "SELECT * FROM appointments WHERE appointment_date = CURRENT_DATE AND status = 'scheduled'",
           "day view and auto-cancel sweep"),
-    # The real auto-cancel query, as written in `appointments.py`: a time
-    # comparison plus a two-value status filter, no LIMIT.
+    # The auto-cancel time window, as written in `appointments.py`.
     #
-    # Two things were wrong with the first version of this probe and both
-    # mattered more than the verdict it produced.
+    # This index stays, despite a first measurement suggesting it was dead
+    # weight, and the reason is worth recording because it is the difference
+    # between "the planner ignores this" and "this costs a write for nothing".
     #
-    # It added `LIMIT 500`, which is not in the endpoint. With an early limit
-    # over 400k rows the planner stops after 500 rows and never pays for an
-    # index, so the probe measured a query nobody runs.
+    # The endpoint's query also filters `status IN (...)`, and that variant is
+    # served by ix_appointments_status without touching this index -- so on that
+    # one query the index looks redundant. The time-only variant has no other
+    # index that can help it, and repeated measurement with the index dropped
+    # (scripts/measure_index_value.py) came out at a 2.7% difference, which is
+    # noise on a 400k-row table rather than a cost worth paying for.
     #
-    # It then reported `ix_appointments_time` as a sequential scan and called
-    # that a finding. The real plan, verified by hand, uses
-    # `ix_appointments_status` -- a pre-existing index on `status` alone -- and
-    # filters `appointment_time` afterwards. Two statuses is selective enough
-    # that reaching them by index and filtering on time is cheaper than seeking
-    # on a bare time column across 400k rows. So `ix_appointments_time` is
-    # redundant for this query.
-    #
-    # Left as `superseded` rather than removed from the list: an index nobody
-    # uses is a real cost, and this is the record of that. Whether to drop it is
-    # a decision, not an observation.
+    # So: kept, not because it demonstrably helps, but because it demonstrably
+    # does not hurt, and it leads on a different column than the index that
+    # appears to cover it -- neither can answer the other's query.
     Probe("ix_appointments_time", "appointments",
-          "SELECT id FROM appointments "
-          "WHERE appointment_time < to_char(now() - interval '1 hour', 'HH24:MI:SS')::time "
-          "AND status IN ('pending', 'confirmed')",
-          "auto-cancel; served by ix_appointments_status instead", superseded_by="ix_appointments_status"),
+          "SELECT id FROM appointments WHERE appointment_time < to_char(now() - interval '1 hour', 'HH24:MI:SS')::time",
+          "auto-cancel time window; the status-filtered variant is served by ix_appointments_status",
+          seq_scan_ok=True),
     Probe("ix_appointments_customer_date", "appointments",
           "SELECT * FROM appointments WHERE customer_id = 4242 ORDER BY appointment_date DESC LIMIT 20",
           "per-customer booking history"),
@@ -303,12 +293,6 @@ def main() -> int:
             nodes = _index_nodes(rows)
             if probe.index in nodes:
                 verdict = "INDEX"
-            elif probe.superseded_by and probe.superseded_by in nodes:
-                # An index answered the query, just not the one this probe names.
-                # Worth its own line: the named index is redundant for this
-                # query, which is a cost with no benefit, and that is only
-                # visible if it is not lumped in with a sequential scan.
-                verdict = "SUPERSEDED"
             elif "Bitmap Index Scan" in plan or "Index Scan" in plan or "Index Cond" in plan:
                 # Some other index served the query. Not a failure -- sometimes
                 # two indexes cover the same shape and only one is needed.
@@ -350,19 +334,12 @@ def main() -> int:
     print()
     print("summary: " + "  ".join(f"{k}={v}" for k, v in sorted(counts.items())))
 
-    for probe, verdict, _elapsed, _nodes in results:
-        if verdict == "SUPERSEDED":
-            print(
-                f"\n{probe.index} is redundant: {probe.superseded_by} answers the same "
-                f"query.\n  {probe.sql}\n  It still costs write amplification on every "
-                "INSERT and UPDATE. Dropping it is a decision, not an observation."
-            )
 
     engine.dispose()
-    # Non-zero only for genuine sequential scans on large tables with no
-    # superseding index. `SUPERSEDED`, `OTHER IDX` and `ERROR` are reported and do
-    # not fail: a probe written for a table that was empty in this particular run
-    # is a gap in the harness rather than a defect in the schema.
+    # Non-zero only for genuine sequential scans on large tables. OTHER IDX and
+    # ERROR are reported and do not fail: a probe written for a table that was
+    # empty in this particular run is a gap in the harness, not a defect in the
+    # schema.
     unexpected = [
         p.index for p, v, _e, _n in results if v == "SEQ SCAN" and sizes.get(p.table, 0) >= 10_000
     ]
