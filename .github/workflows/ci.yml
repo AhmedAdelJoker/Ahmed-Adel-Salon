@@ -35,6 +35,14 @@ jobs:
           pip install -r requirements.txt
 
       - name: Audit dependencies
+        # `working-directory`, not `cd`. The `cd backend` in the install step
+        # above does not carry into this one: each `run:` is a fresh shell at
+        # the repository root, so this step was looking for requirements.txt one
+        # directory too high and died with
+        # `invalid requirements input: requirements.txt` -- a file that exists,
+        # just not where it was looking. Every other step that needs to run from
+        # `backend/` says so explicitly; this one now does too.
+        working-directory: backend
         run: |
           python -m pip install pip-audit
           pip-audit -r requirements.txt
