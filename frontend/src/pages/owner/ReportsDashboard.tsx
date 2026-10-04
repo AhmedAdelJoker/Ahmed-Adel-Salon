@@ -22,7 +22,7 @@ import { KpiStats } from "@/features/reports-dashboard";
 import { RevenueChart } from "@/features/reports-dashboard";
 import { ServiceDistribution } from "@/features/reports-dashboard";
 import { SmartInsights } from "@/features/reports-dashboard";
-import { QuickActions } from "@/features/reports-dashboard";
+import { NeedsAttention, QuickActions } from "@/features/reports-dashboard";
 
 export default function ReportsDashboard() {
   const navigate = useNavigate();
@@ -143,6 +143,12 @@ export default function ReportsDashboard() {
 
       {/* KPI Stats */}
       <KpiStats stats={stats} />
+
+      {/* What needs you.
+          Sits directly under the KPIs and above the charts, because it is the
+          reason an owner opens this page. The charts answer "how did we do";
+          this answers "what do I have to deal with". */}
+      <NeedsAttention onNavigate={navigate} />
 
       {/* شريط هوية — انتقال سريع (مرحلة 3) */}
       <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>

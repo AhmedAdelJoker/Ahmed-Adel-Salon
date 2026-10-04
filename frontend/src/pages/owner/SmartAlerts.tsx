@@ -22,24 +22,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import api from "@/services/api";
 import { adaptObject } from "@/services/apiAdapter";
 import { loadErrorMessage } from "@/lib/core/asyncError";
-
-type Priority = "high" | "medium" | "low";
-
-interface OwnerAlert {
-  key: string;
-  source: string;
-  title: string;
-  message: string;
-  priority: Priority;
-  occurred_at: string | null;
-  destination: string;
-}
-
-interface AlertsPayload {
-  alerts: OwnerAlert[];
-  counts: { total: number; high: number; medium: number; low: number };
-  generated_at: string;
-}
+import type { OwnerAlert, OwnerAlertsPayload } from "@/features/owner-alerts/types";
+import type { AlertPriority as Priority } from "@/features/owner-alerts/types";
 
 const PRIORITY_STYLES: Record<Priority, { label: string; className: string }> = {
   high: {
@@ -103,7 +87,7 @@ const SmartAlerts = () => {
       setLoading(true);
       setLoadError(null);
       const res = await api.get("/owner/alerts");
-      const data = adaptObject(res.data) as AlertsPayload;
+      const data = adaptObject(res.data) as OwnerAlertsPayload;
       setAlerts(Array.isArray(data.alerts) ? data.alerts : []);
     } catch (error) {
       // Kept distinct from "loaded successfully, nothing pending". Showing an

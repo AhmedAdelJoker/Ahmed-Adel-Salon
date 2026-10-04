@@ -234,6 +234,43 @@ def _foreign_key_violations(db_path: Path) -> list[tuple]:
         conn.close()
 
 
+def _rewind_first_login_column(db_path: Path) -> bool:
+    """Drop `users.first_login_at` from the copy if it is already there.
+
+    This test's value is entirely in running the migration against a database
+    that is *before* the revision. It used to assume the live database was
+    always unmigrated, so the assertion
+
+        assert "first_login_at" not in _columns(target)
+
+    could only pass on a machine where nobody had ever started the app. Once the
+    local database was migrated -- which is the normal state of any working
+    checkout -- the precondition failed and the test reported a migration
+    problem that did not exist.
+
+    Rewinding the copy makes the test depend on the migration rather than on
+    somebody's local state, and it leaves the live database alone: this operates
+    on the tmp_path copy, which is the only file in this test that gets modified.
+
+    Returns whether a column was actually dropped, so the caller can assert the
+    rewind did something rather than silently passing on a no-op.
+    """
+    if "first_login_at" not in _columns(db_path):
+        return False
+
+    conn = sqlite3.connect(db_path)
+    try:
+        # Safe here because the migration adds a bare nullable column and creates
+        # no index on it; SQLite refuses to drop an indexed column.
+        conn.execute("ALTER TABLE users DROP COLUMN first_login_at")
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert "first_login_at" not in _columns(db_path), "the rewind did not take"
+    return True
+
+
 @pytest.mark.skipif(
     not PRODUCTION_COPY.exists(), reason="production-shaped copy is not available here"
 )
@@ -246,6 +283,7 @@ def test_it_applies_cleanly_to_a_production_shaped_copy(tmp_path):
     """
     target = tmp_path / "production-copy.db"
     shutil.copy2(PRODUCTION_COPY, target)
+    _rewind_first_login_column(target)
     url = f"sqlite:///{target.as_posix()}"
 
     before_users = _user_count(target)
