@@ -90,7 +90,13 @@ def rebuild(conn: sqlite3.Connection, table: str) -> int:
     if not columns:
         raise SystemExit(f"{table} has no columns; refusing to guess")
     quoted_cols = ", ".join(f'"{c}"' for c in columns)
-    rows = list(conn.execute(f'SELECT {quoted_cols} FROM "{table}"'))
+    # The three SQL statements below interpolate identifiers, which SQLite cannot
+    # take as parameters. Every one of them is built from `PRAGMA table_info` on
+    # the table being repaired, or from a module constant -- never from input, and
+    # never from a value read out of a row. The values themselves are always
+    # bound: `executemany` passes them as parameters, so the part that could
+    # carry an injection cannot reach the statement text.
+    rows = list(conn.execute(f'SELECT {quoted_cols} FROM "{table}"'))  # nosec B608
 
     # Take explicit control of the transaction. sqlite3's implicit handling
     # commits before DDL, which would split this rename/create/copy/drop into
@@ -109,7 +115,7 @@ def rebuild(conn: sqlite3.Connection, table: str) -> int:
             if rows:
                 placeholders = ", ".join("?" for _ in columns)
                 conn.executemany(
-                    f'INSERT INTO "{table}" ({quoted_cols}) VALUES ({placeholders})', rows
+                    f'INSERT INTO "{table}" ({quoted_cols}) VALUES ({placeholders})', rows  # nosec B608
                 )
             conn.execute(f'DROP TABLE "{table}__legacy_fk_rebuild"')
             conn.execute("COMMIT")
@@ -150,7 +156,7 @@ def main() -> int:
 
     print(f"database: {path.resolve()}")
     print(f"table:    {TARGET_TABLE}.{TARGET_COLUMN} -> {LEGACY_PARENT} (should be {CORRECT_PARENT})")
-    count = conn.execute(f"SELECT COUNT(*) FROM {TARGET_TABLE}").fetchone()[0]
+    count = conn.execute(f"SELECT COUNT(*) FROM {TARGET_TABLE}").fetchone()[0]  # nosec B608
     print(f"rows:     {count} (all copied to the rebuilt table)")
 
     if not args.yes:
