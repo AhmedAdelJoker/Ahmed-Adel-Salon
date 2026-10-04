@@ -3,7 +3,17 @@ starlette==1.6.0
 uvicorn[standard]==0.30.6
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.11
-PyJWT==2.14.0
+# 2.15.1, not 2.15.0. 2.14.0 trips PYSEC-2026-4141 (CVE-2026-101918, an
+# unauthenticated RecursionError DoS in the pre-verification payload parse), and
+# two more PyJWT advisories landed the same day, 2026-10-01: PYSEC-2026-4146
+# (CVE-2026-103001, a claims-check bypass when an `options` dict is reused
+# across decode calls) and PYSEC-2026-4148 (CVE-2026-102270, ReDoS in
+# `is_pem_format`). Neither reaches this application -- `app/core/security.py`
+# calls `jwt.encode` and `jwt.decode` with no `options` argument and never
+# constructs a `PyJWKClient` -- but 2.15.1 is the version with no open advisory
+# against it, and pinning the newest is cheaper than re-deciding this per
+# advisory.
+PyJWT==2.15.1
 # Argon2id is the current hash. bcrypt is retained on purpose and only to
 # verify hashes that already exist: accounts are upgraded to Argon2id on their
 # next successful sign-in, so no password reset is ever required.
