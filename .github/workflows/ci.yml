@@ -279,8 +279,18 @@ jobs:
   # pre-commit convenience and CI is where the authoritative check belongs.
   security-sast:
     runs-on: ubuntu-latest
+    # `contents: read` is what the scanners need and the most this job should
+    # normally hold. The two write scopes below are for the Gitleaks action
+    # alone: it uploads a SARIF report and comments on the pull request, and it
+    # cannot do either with read-only contents -- which is why it was failing in
+    # five seconds with nothing to say, and why the step that actually gates
+    # never ran. GitHub downgrades GITHUB_TOKEN to read-only on a pull request
+    # from a fork no matter what is declared here, so the CLI step below is still
+    # the one that has to hold.
     permissions:
       contents: read
+      security-events: write
+      pull-requests: write
     services:
       postgres:
         image: postgres:18
@@ -398,8 +408,11 @@ jobs:
           python -m pytest tests/test_index_usage_at_scale.py -q
 
       # The action scans and comments on the pull request. It cannot be the gate:
-      # without a licence it cannot annotate a fork's pull request, so the CLI
-      # step below is what actually holds.
+      # without a licence it cannot annotate a fork's pull request, and GitHub
+      # downgrades GITHUB_TOKEN to read-only on a fork regardless of what this
+      # file asks for, so there is a case -- a pull request from a fork -- where
+      # this step cannot succeed and has nothing to say. The CLI step below is
+      # what holds.
       #
       # Two things were wrong here and the step failed in one second both times.
       #
@@ -415,8 +428,20 @@ jobs:
       # 2026-09-16, and gitleaks-action v2 is a Node 20 action: it will not run
       # again regardless of the token. v3 is a Node 24 build with, per its
       # README, "no changes to inputs, outputs, or behavior".
+      #
+      # `continue-on-error` is what makes the arrangement safe in both
+      # directions, and it is deliberately the opposite of trusting it to fail
+      # loudly. If the action finds a secret, the CLI step two lines below scans
+      # the same history with the same default rules (there is no
+      # `.gitleaks.toml` in this repository, so both use Gitleaks' bundled
+      # config) and fails the job. If the action fails for any other reason --
+      # a token it cannot use, a permission it does not have -- the job carries
+      # on to the step that can actually enforce the rule. What is not acceptable
+      # is the arrangement before this change, where the step that annotates
+      # decides whether the step that gates ever runs at all.
       - name: Gitleaks (entropy-based)
         uses: gitleaks/gitleaks-action@v3
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # GITLEAKS_LICENSE is only required for organization-owned repositories.
