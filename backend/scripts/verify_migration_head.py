@@ -24,15 +24,13 @@ The two directions are checked, and they fail differently on purpose:
 * Model -> database is a hard gate. Every table and every column in
   ``Base.metadata`` must exist in the migrated schema.
 
-* Database -> model is printed, not failed. The chain deliberately retains
-  tables that no model owns: ``barbers`` and the ``barber_*`` tables are
-  documented leftovers in ``e7a2c4d6b8f1``, which explicitly declines to remove
-  them as a side effect of an unrelated fix, and
-  ``invoice_items_legacy_product_refs`` holds product references rescued from a
-  rebuilt table in ``c5d6e7f8a9b0``. Those are cleanup decisions, not migration
-  defects, so failing on them would make this gate unfixable short of deleting
-  data. They are reported so that a *new* orphan table shows up in the log
-  instead of being silently tolerated by the same allow-everything behaviour.
+* Database -> model is printed, not failed. ``invoice_items_legacy_product_refs``
+  holds product references rescued from a rebuilt table in ``c5d6e7f8a9b0``: it
+  is referenced by nothing, and the data in it is the reason the rebuild was
+  safe, so removing it is a decision with consequences rather than a migration
+  defect. Failing on it would make this gate unfixable short of deleting data.
+  It is reported so that a *new* orphan table shows up in the log rather than
+  being tolerated by the same allow-everything behaviour.
 
 Two details that decide whether this gate means anything:
 
