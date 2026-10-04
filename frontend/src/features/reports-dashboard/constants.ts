@@ -39,7 +39,8 @@ export interface DashboardStats {
   netProfit: number;
   todayAppointments: number;
   avgInvoice: number;
-  occupancy: number;
+  /** null when the server could not compute it. Distinct from 0. */
+  occupancy: number | null;
   todayRevenueTrend: number;
   todayExpensesTrend: number;
   netProfitTrend: number;
@@ -47,7 +48,10 @@ export interface DashboardStats {
   avgInvoiceTrend: number;
   occupancyTrend: number;
   newCustomersThisWeek?: number;
-  [key: string]: number | undefined;
+  // Widened to admit `null` for `occupancy`. Every other declared key stays a
+  // plain number, so this only loosens the catch-all rather than making all
+  // seven figures nullable at every call site.
+  [key: string]: number | null | undefined;
 }
 
 export const KPI_CONFIG: KpiConfigEntry[] = [

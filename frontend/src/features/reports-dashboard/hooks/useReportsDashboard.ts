@@ -65,16 +65,31 @@ export function useReportsDashboard() {
       //
       // A missing field is zero, not 18,750. The demo set is used only when the
       // whole period is empty, where it is labelled.
+      // `null` is preserved, not replaced by the default.
+      //
+      // A `null` occupancy means the server could not compute it -- the query
+      // failed. Substituting the default turns "we do not know" into "0%", and
+      // a dashboard that reports an empty salon when the database is
+      // unreachable is worse than one that says nothing. The generic filter
+      // above drops nulls for every other key, which is right for them: a
+      // missing revenue figure genuinely is no revenue. Occupancy is the one
+      // figure whose absence carries information.
+      const rawOccupancy = data.stats?.occupancy;
       const mergedStats = isEmpty
         ? DEMO_STATS
         : ({
             ...DEFAULT_STATS,
             ...Object.fromEntries(
               Object.entries(data.stats || {}).filter(
-                ([_, v]) => v != null && typeof v !== "object" && String(v) !== "" && !Number.isNaN(Number(v as any))
-              )
+                ([key, v]) =>
+                  key !== "occupancy" &&
+                  v != null &&
+                  typeof v !== "object" &&
+                  String(v) !== "" &&
+                  !Number.isNaN(Number(v as any)),
+              ),
             ),
-            occupancy: data.stats?.occupancy != null ? data.stats.occupancy : DEFAULT_STATS.occupancy,
+            occupancy: rawOccupancy ?? null,
           } as DashboardStats);
 
       setStats(mergedStats);
