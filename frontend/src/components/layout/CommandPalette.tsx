@@ -1,15 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Calendar,
-  ChevronRight,
-  Package,
-  Scissors,
-  Search,
-  TrendingUp,
-  Users,
-  Wallet,
-  Zap,
-} from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -17,51 +7,22 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-const QUICK_LINKS = [
-  { icon: Zap, label: "نقطة البيع", to: "/pos", category: "تشغيل" },
-  { icon: Calendar, label: "الحجوزات", to: "/bookings", category: "تشغيل" },
-  {
-    icon: Users,
-    label: "العملاء",
-    to: "/customers",
-    category: "علاقات العملاء",
-  },
-  {
-    icon: Scissors,
-    label: "الخدمات والعروض",
-    to: "/owner/settings?tab=services",
-    category: "الإدارة",
-  },
-  { icon: Package, label: "المخزون", to: "/inventory", category: "الإدارة" },
-  { icon: Wallet, label: "المصروفات", to: "/expenses", category: "المالية" },
-  {
-    icon: TrendingUp,
-    label: "التقارير التشغيلية",
-    to: "/owner/reports",
-    category: "المالية",
-  },
-  {
-    icon: TrendingUp,
-    label: "التقارير المالية",
-    to: "/owner/financial",
-    category: "المالية",
-  },
-  {
-    icon: Wallet,
-    label: "أرشيف الفواتير",
-    to: "/invoices/archive",
-    category: "المالية",
-  },
-];
+import { useAuth } from "@/context/AuthContext";
+import { hasRoleAccess } from "@/lib/access/roles";
+import {
+  getSearchCategories,
+  getSearchEntries,
+  type NavItem,
+} from "@/app/route-registry";
 
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         setOpen((current) => !current);
@@ -83,33 +44,41 @@ export default function CommandPalette() {
     };
   }, []);
 
+  const roleFiltered = useMemo(
+    () =>
+      // The palette used to be a static list with no role filter, so any role
+      // could jump to owner-only pages and get bounced by the guard.
+      getSearchEntries().filter((entry: NavItem) =>
+        hasRoleAccess(user, entry.roles as string[], entry.to),
+      ),
+    [user],
+  );
+
   const filteredLinks = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return QUICK_LINKS;
+    if (!term) return roleFiltered;
 
-    return QUICK_LINKS.filter((link) =>
-      `${link.label} ${link.category}`.toLowerCase().includes(term),
+    return roleFiltered.filter((entry) =>
+      `${entry.label} ${entry.searchCategory ?? ""}`
+        .toLowerCase()
+        .includes(term),
     );
-  }, [query]);
-
-  interface QuickLink {
-    to: string;
-    label: string;
-    category: string;
-    icon?: React.ComponentType<{ size?: number | string; className?: string }>;
-    [key: string]: unknown;
-  }
+  }, [query, roleFiltered]);
 
   const groupedLinks = useMemo(() => {
-    return filteredLinks.reduce<Record<string, QuickLink[]>>((accumulator, link) => {
-      const key = String((link as QuickLink).category || "");
-      accumulator[key] = accumulator[key] || [];
-      accumulator[key].push(link as QuickLink);
-      return accumulator;
-    }, {});
+    const order = getSearchCategories();
+    return filteredLinks.reduce<Record<string, NavItem[]>>(
+      (accumulator, entry) => {
+        const key = entry.searchCategory ?? "";
+        accumulator[key] = accumulator[key] || [];
+        accumulator[key].push(entry);
+        return accumulator;
+      },
+      {},
+    );
   }, [filteredLinks]);
 
-  const handleSelect = (to) => {
+  const handleSelect = (to: string) => {
     navigate(to);
     setOpen(false);
     setQuery("");
@@ -144,37 +113,50 @@ export default function CommandPalette() {
 
           <div className="max-h-96 overflow-y-auto p-2">
             {filteredLinks.length ? (
-              Object.entries(groupedLinks).map(([category, links]) => (
-                <section key={category} className="mb-2 last:mb-0">
-                  <div className="mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-muted/60">
-                    {category}
-                  </div>
-                  <div className="space-y-0.5">
-                    {links.map((link) => (
-                      <button
-                        key={link.to}
-                        type="button"
-                        onClick={() => handleSelect(link.to)}
-                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-right transition hover:bg-soft"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded bg-soft text-muted group-hover:text-primary">
-                            {link.icon ? <link.icon size={16} /> : null}
-                          </div>
-                          <div className="text-left">
-                            <div className="text-sm font-bold text-main">
-                              {link.label}
+              Object.entries(groupedLinks)
+                .sort(
+                  ([a], [b]) =>
+                    getSearchCategories().indexOf(
+                      a as never,
+                    ) - getSearchCategories().indexOf(b as never),
+                )
+                .map(([category, links]) => (
+                  <section key={category} className="mb-2 last:mb-0">
+                    <div className="mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-muted/60">
+                      {category}
+                    </div>
+                    <div className="space-y-0.5">
+                      {links.map((link) => {
+                        const Icon = link.icon;
+                        return (
+                          <button
+                            key={link.to}
+                            type="button"
+                            onClick={() => handleSelect(link.to)}
+                            className="group flex w-full items-center justify-between rounded-lg px-3 py-2 text-right transition hover:bg-soft"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded bg-soft text-muted group-hover:text-primary">
+                                <Icon size={16} />
+                              </div>
+                              <div className="text-left">
+                                <div className="text-sm font-bold text-main">
+                                  {link.label}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                        <ChevronRight size={14} className="text-muted/40" />
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ))
+                            <ChevronRight
+                              size={14}
+                              className="text-muted/40"
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))
             ) : (
-              <div className="flex min-h-40 flex-col items-center justify-center text-center text-muted p-6">
+              <div className="flex min-h-40 flex-col items-center justify-center p-6 text-center text-muted">
                 <Search size={32} className="mb-2 opacity-20" />
                 <p className="text-sm font-bold">لا توجد نتائج مطابقة</p>
               </div>

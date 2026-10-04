@@ -7,12 +7,14 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/PremiumUI";
+import InlineNotice from "@/components/shared/InlineNotice";
+import { PageShell } from "@/components/shared/PageShell";
 import i18n from "@/i18n";
 import { useBarberBookings } from "@/features/barber-bookings/hooks/useBarberBookings";
-import { QuickStats } from "@/features/barber-bookings/components/QuickStats";
-import { BookingsFilters } from "@/features/barber-bookings/components/BookingsFilters";
-import { AppointmentsList } from "@/features/barber-bookings/components/AppointmentsList";
-import { CalendarView } from "@/features/barber-bookings/components/CalendarView";
+import { QuickStats } from "@/features/barber-bookings";
+import { BookingsFilters } from "@/features/barber-bookings";
+import { AppointmentsList } from "@/features/barber-bookings";
+import { CalendarView } from "@/features/barber-bookings";
 
 const BarberBookings = () => {
   const {
@@ -35,11 +37,15 @@ const BarberBookings = () => {
     getCalendarDays,
     statusLabels,
     statusColors,
+    loadError,
   } = useBarberBookings();
 
   return (
-    <div className="min-h-screen pb-12" dir={i18n.dir() as "rtl" | "ltr"}>
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div dir={i18n.dir() as "rtl" | "ltr"}>
+      <PageShell contained>
+        {loadError && !loading && (
+          <InlineNotice tone="error">{loadError}</InlineNotice>
+        )}
         <PageHeader
           title="حجوزاتي"
           subtitle="إدارة مواعيدك ومتابعة حجوزاتك"
@@ -53,7 +59,7 @@ const BarberBookings = () => {
                 className="h-10 rounded-xl px-3"
                 onClick={fetchAppointments}
               >
-                <RefreshCw size={14} className="ml-1.5" />
+                <RefreshCw size={14} className="ms-1.5" />
                 <span className="hidden sm:inline">تحديث</span>
               </Button>
             </div>
@@ -68,13 +74,13 @@ const BarberBookings = () => {
               value="list"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <FileText size={14} className="ml-1.5" /> قائمة المواعيد
+              <FileText size={14} className="ms-1.5" /> قائمة المواعيد
             </TabsTrigger>
             <TabsTrigger
               value="calendar"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Calendar size={14} className="ml-1.5" /> التقويم
+              <Calendar size={14} className="ms-1.5" /> التقويم
             </TabsTrigger>
           </TabsList>
 
@@ -107,12 +113,11 @@ const BarberBookings = () => {
               appointments={appointments}
               statusLabels={statusLabels}
               statusColors={statusColors}
-            />
-          </TabsContent>
-        </Tabs>
-      </div>
+              />
+            </TabsContent>
+          </Tabs>
+      </PageShell>
     </div>
   );
 };
-
 export default BarberBookings;

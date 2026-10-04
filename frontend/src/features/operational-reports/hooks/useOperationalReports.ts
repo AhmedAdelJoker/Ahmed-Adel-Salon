@@ -87,15 +87,22 @@ function totalsOf(rows: any[]): { income: number; expenses: number } {
 
 async function fetchInvoicesRange(from: string, to: string): Promise<any[]> {
   const out: any[] = [];
-  // Bounded paging: at most 3 pages of 1000 — enough for operational reports
-  // without risking an unbounded dump.
-  for (let page = 0; page < 3; page += 1) {
+  // Phase 2: bounded paging using modern page+size style + X-Total-Count short-circuit.
+  const PAGE_SIZE = 1000;
+  const MAX_PAGES = 3;
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
     const res = await api.get("/invoices", {
-      params: { from_date: from, to_date: to, limit: 1000, skip: page * 1000 },
+      params: { from_date: from, to_date: to, page, size: PAGE_SIZE },
     });
     const items = adaptList<any>(res);
     out.push(...items);
-    if (items.length < 1000) break;
+
+    // Short-circuit when X-Total-Count tells us we're done
+    const headers = (res as { headers?: Record<string, unknown> })?.headers ?? {};
+    const totalHeader = headers["x-total-count"] ?? headers["X-Total-Count"];
+    const total = Number(totalHeader);
+    if (Number.isFinite(total) && total > 0 && out.length >= total) break;
+    if (items.length < PAGE_SIZE) break;
   }
   return out;
 }
@@ -119,6 +126,7 @@ export function useOperationalReports() {
   const [endDate, setEndDate] = useState(initial.to);
   const [searchQuery, setSearchQuery] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(OP_HISTORY_PAGE_SIZE);
   const hasLoadedRef = useRef(false);
 
   const fetchData = useCallback(async () => {
@@ -169,7 +177,7 @@ export function useOperationalReports() {
   // Reset history paging whenever the underlying filter changes.
   useEffect(() => {
     setHistoryPage(1);
-  }, [searchQuery, startDate, endDate]);
+  }, [searchQuery, startDate, endDate, historyPageSize]);
 
   const applyPreset = useCallback((id: OpPresetId) => {
     const r = presetRange(id);
@@ -330,15 +338,15 @@ export function useOperationalReports() {
   }, [transactions, searchQuery]);
 
   const historyTotal = filteredHistory.length;
-  const historyTotalPages = Math.max(1, Math.ceil(historyTotal / OP_HISTORY_PAGE_SIZE));
+  const historyTotalPages = Math.max(1, Math.ceil(historyTotal / historyPageSize));
   const safeHistoryPage = Math.min(Math.max(1, historyPage), historyTotalPages);
   const pagedHistory = useMemo(
     () =>
       filteredHistory.slice(
-        (safeHistoryPage - 1) * OP_HISTORY_PAGE_SIZE,
-        safeHistoryPage * OP_HISTORY_PAGE_SIZE,
+        (safeHistoryPage - 1) * historyPageSize,
+        safeHistoryPage * historyPageSize,
       ),
-    [filteredHistory, safeHistoryPage],
+    [filteredHistory, safeHistoryPage, historyPageSize],
   );
 
   const handleExportHistoryCsv = useCallback(() => {
@@ -385,6 +393,8 @@ export function useOperationalReports() {
     setSearchQuery,
     historyPage: safeHistoryPage,
     setHistoryPage,
+    historyPageSize,
+    setHistoryPageSize,
     historyTotal,
     historyTotalPages,
     financialMetrics,

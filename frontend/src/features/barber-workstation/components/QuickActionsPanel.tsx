@@ -114,14 +114,14 @@ export const QuickActionsPanel = ({
             className="w-full h-11 rounded-xl"
             onClick={onComplete}
           >
-            <CheckCircle size={16} className="ml-1.5" /> إنهاء الخدمة
+            <CheckCircle size={16} className="ms-1.5" /> إنهاء الخدمة
           </Button>
           <Button
             variant="outline"
             className="w-full h-11 rounded-xl"
             onClick={onCancel}
           >
-            <XCircle size={16} className="ml-1.5" /> إلغاء الخدمة
+            <XCircle size={16} className="ms-1.5" /> إلغاء الخدمة
           </Button>
         </div>
       </div>

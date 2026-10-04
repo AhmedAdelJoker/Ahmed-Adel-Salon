@@ -463,14 +463,14 @@ function PublicLinkCard({ title, url, qrCode, onCopy }: { title: string; url: st
               a.click();
             }}
           >
-            <Download size={12} className="ml-1" /> تحميل QR
+            <Download size={12} className="ms-1" /> تحميل QR
           </Button>
         </div>
       </div>
 
       <div className="flex gap-2">
         <Button onClick={onCopy} className="flex-1 h-12 rounded-xl text-xs">
-          <Copy size={14} className="ml-2" /> نسخ الرابط
+          <Copy size={14} className="ms-2" /> نسخ الرابط
         </Button>
         <Button
           variant="outline"

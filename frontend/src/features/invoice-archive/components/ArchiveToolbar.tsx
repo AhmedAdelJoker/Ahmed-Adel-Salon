@@ -37,7 +37,7 @@ export function ArchiveToolbar({
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="ابحث عن شهر..."
-          className="h-10 w-full rounded-xl border border-border pr-9 pl-3 text-xs font-bold text-main outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20 bg-card"
+          className="h-10 w-full rounded-xl border border-border pe-9 ps-3 text-xs font-bold text-main outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20 bg-card"
         />
       </div>
       <div className="flex items-center gap-2">

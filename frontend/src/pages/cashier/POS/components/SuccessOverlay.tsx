@@ -328,7 +328,7 @@ const SuccessOverlay = () => {
                 العميل التالي
                 <ArrowRight
                   size={18}
-                  className="mr-2 group-hover:-translate-x-1 transition-transform rotate-180"
+                  className="me-2 group-hover:-translate-x-1 transition-transform rotate-180"
                 />
               </Button>
             </div>

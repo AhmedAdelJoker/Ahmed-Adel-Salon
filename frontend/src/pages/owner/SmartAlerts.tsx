@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { hasRoleAccess } from "@/lib/access/roles";
-import { TableEmptyState } from "@/components/shared/TableEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -163,7 +163,7 @@ const SmartAlerts = () => {
             onClick={() => setShowCriticalOnly((value) => !value)}
             className="h-11 flex-1 rounded-xl border-border px-6 text-[10px] font-black uppercase tracking-widest md:flex-none"
           >
-            <Filter className="mr-2" size={14} />
+            <Filter className="me-2" size={14} />
             {showCriticalOnly ? "كل التنبيهات" : "التنبيهات الحرجة"}
           </Button>
           <Button
@@ -172,7 +172,7 @@ const SmartAlerts = () => {
             onClick={() => navigate(settingsDestination)}
             className="h-11 flex-1 rounded-xl px-8 text-[10px] font-black uppercase tracking-widest shadow-soft md:flex-none"
           >
-            <Settings className="mr-2" size={14} />
+            <Settings className="me-2" size={14} />
             {canManageRules ? "إعدادات الرقابة" : "فتح سجل الرقابة"}
           </Button>
         </div>
@@ -280,7 +280,7 @@ const SmartAlerts = () => {
                     className="h-11 flex-[2] rounded-xl px-8 text-[10px] font-black uppercase tracking-widest shadow-soft transition-all hover:-translate-y-0.5 lg:flex-none"
                   >
                     اتخاذ إجراء{" "}
-                    <ChevronRight className="mr-2 rotate-180" size={14} />
+                    <ChevronRight className="me-2 rotate-180" size={14} />
                   </Button>
                 </div>
               </CardContent>
@@ -290,10 +290,10 @@ const SmartAlerts = () => {
 
         {alertRows.length === 0 && (
           <Card className="rounded-[26px] border border-border bg-card p-8 shadow-soft">
-            <TableEmptyState
+            <EmptyState variant="table"
               icon={ShieldCheck}
               title="لا توجد تنبيهات"
-              description="جميع البنود الحالية تمت مراجعتها أو لا توجد عناصر تطابق الفلتر النشط."
+              message="جميع البنود الحالية تمت مراجعتها أو لا توجد عناصر تطابق الفلتر النشط."
             />
           </Card>
         )}

@@ -18,7 +18,20 @@ class User(Base):
     profile_image_url = Column(String(255), nullable=True)
 
     role = Column(String(30), nullable=False, default="cashier")
-    barber_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
+
+    # `use_alter=True` breaks a mutual dependency that PostgreSQL refuses.
+    #
+    # `users.barber_id -> employees.id` and `employees.user_id -> users.id` form
+    # a cycle: a user can be a barber, and an employee can have a login. SQLite
+    # accepts the cycle because it defers foreign-key enforcement until the
+    # statement commits, so the problem stayed invisible for the whole life of
+    # the project. PostgreSQL does not: `CREATE TABLE` cannot reference a table
+    # that does not exist yet, and a cycle means one of the two never can.
+    #
+    # Declaring this direction as an ALTER emits it after every table exists.
+    # SQLAlchemy still renders it inline for SQLite, which has no
+    # `ALTER TABLE ... ADD CONSTRAINT`, so the desktop build is unaffected.
+    barber_id = Column(Integer, ForeignKey("employees.id", use_alter=True), nullable=True)
 
     is_active = Column(Boolean, nullable=False, default=True)
 
@@ -29,8 +42,16 @@ class User(Base):
 
     # TOTP two-factor auth (Phase 3). ``totp_secret`` is set at setup time but
     # only enforced once ``totp_enabled`` flips on after code verification.
-    totp_secret = Column(String(64), nullable=True)
+    # Encrypted at rest (see app/core/totp_crypto.py) — a Fernet token is ~100
+    # chars, so 64 was too narrow once encryption landed.
+    totp_secret = Column(String(255), nullable=True)
     totp_enabled = Column(Boolean, nullable=False, default=False, server_default="0")
+
+    # First successful sign-in. Anchors the mandatory-2FA grace period, so an
+    # account provisioned by a seed script months ago is not locked out of the
+    # application on its first real use. Distinct from `created_at` on purpose;
+    # see app/core/totp_enforcement.py.
+    first_login_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

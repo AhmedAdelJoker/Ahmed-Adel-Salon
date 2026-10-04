@@ -1,4 +1,4 @@
-import { Activity, LayoutDashboard, Loader2, ShieldCheck, TrendingUp, Users, Wallet } from "lucide-react";
+import { Activity, AlertTriangle, LayoutDashboard, Loader2, RefreshCw, ShieldCheck, TrendingUp, Users, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import i18n from "@/i18n";
 import { Button } from "@/components/ui/button";
@@ -18,11 +18,11 @@ import {
 } from "@/components/shared/PremiumUI";
 import { KPI_CONFIG, PERIODS } from "@/features/reports-dashboard/constants";
 import { useReportsDashboard } from "@/features/reports-dashboard/hooks/useReportsDashboard";
-import { KpiStats } from "@/features/reports-dashboard/components/KpiStats";
-import { RevenueChart } from "@/features/reports-dashboard/components/RevenueChart";
-import { ServiceDistribution } from "@/features/reports-dashboard/components/ServiceDistribution";
-import { SmartInsights } from "@/features/reports-dashboard/components/SmartInsights";
-import { QuickActions } from "@/features/reports-dashboard/components/QuickActions";
+import { KpiStats } from "@/features/reports-dashboard";
+import { RevenueChart } from "@/features/reports-dashboard";
+import { ServiceDistribution } from "@/features/reports-dashboard";
+import { SmartInsights } from "@/features/reports-dashboard";
+import { QuickActions } from "@/features/reports-dashboard";
 
 export default function ReportsDashboard() {
   const navigate = useNavigate();
@@ -34,6 +34,7 @@ export default function ReportsDashboard() {
     period,
     chartType,
     isDemo,
+    loadError,
     employeeId,
     employeeName,
     displayName,
@@ -111,13 +112,26 @@ export default function ReportsDashboard() {
               </Badge>
             )}
             <Button onClick={loadData} variant="outline" className="h-10 rounded-xl" disabled={loading} aria-label="تحديث البيانات">
-              <Loader2 className={cn("ml-2 h-4 w-4", loading ? "animate-spin" : "")} aria-hidden="true" />
+              <Loader2 className={cn("ms-2 h-4 w-4", loading ? "animate-spin" : "")} aria-hidden="true" />
               <span className="hidden sm:inline">تحديث</span>
             </Button>
           </div>
         }
         className={undefined}
       />
+
+      {/* Load failure. The demo banner used to cover this case and claimed
+          "no real data for this period", which reads as a zero-sales day. */}
+      {loadError && !loading && (
+        <div className="rounded-2xl border border-danger/20 bg-danger-soft px-4 py-3 flex flex-wrap items-center gap-3 text-danger">
+          <AlertTriangle size={18} className="shrink-0" />
+          <p className="text-xs font-bold flex-1 min-w-[200px]">{loadError}</p>
+          <Button variant="outline" size="sm" onClick={loadData} className="shrink-0">
+            <RefreshCw size={14} className="ms-1.5" />
+            إعادة المحاولة
+          </Button>
+        </div>
+      )}
 
       {/* Demo Banner — توكنز الثيم */}
       {isDemo && !loading && (
@@ -133,7 +147,7 @@ export default function ReportsDashboard() {
       {/* شريط هوية — انتقال سريع (مرحلة 3) */}
       <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
         <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ml-2">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ms-2">
             <LayoutDashboard size={12} className="text-accent" /> انتقال سريع
           </span>
           {[

@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PremiumCard } from "@/components/shared/PremiumUI";
+import { currencyLabel } from "@/lib/core/currency";
 
 interface ProjectedSalaryMetrics {
   attendance_percent?: number | string | null;
@@ -42,7 +43,7 @@ export const SalaryHighlight = ({ projectedSalary }: SalaryHighlightProps) => {
           <div className="text-center md:text-left">
             <div className="text-4xl font-black text-white tabular-nums">
               {Number(projectedSalary.net_salary || 0).toLocaleString("ar-EG")}
-              <span className="text-sm text-slate-400 mr-2">ج.م</span>
+              <span className="text-sm text-slate-400 me-2">{currencyLabel()}</span>
             </div>
             <div className="mt-2 flex items-center gap-2">
               <Badge

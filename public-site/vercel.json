@@ -23,6 +23,10 @@
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self)" },
         {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://plausible.io https://client.crisp.chat https://www.clarity.ms; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; media-src 'self' https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src https://client.crisp.chat; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        },
+        {
           "key": "Strict-Transport-Security",
           "value": "max-age=63072000; includeSubDomains; preload"
         }
@@ -30,7 +34,6 @@
     }
   ],
   "rewrites": [
-    { "source": "/salon/:slug", "destination": "/salon/:slug/index.html" },
-    { "source": "/salon/:slug/book", "destination": "/salon/:slug/book/index.html" }
+    { "source": "/:path*", "destination": "/index.html" }
   ]
 }

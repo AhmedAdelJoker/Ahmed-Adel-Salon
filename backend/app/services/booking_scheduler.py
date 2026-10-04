@@ -105,6 +105,53 @@ def _build_busy_intervals(
     return busy_intervals, len(appointments)
 
 
+def salon_booking_window(db: Session, booking_date: date) -> tuple[datetime, datetime] | None:
+    """Absolute open/close window of the salon itself on ``booking_date``.
+
+    ``None`` means "the salon has not published hours" and the caller should not
+    restrict anything. A window is keyed by its opening day, so a ``22:00 →
+    02:00`` Saturday closes at 02:00 on the Sunday.
+    """
+    from app.core.working_hours import resolve_window
+    from app.models.business_settings import BusinessSettings
+
+    settings = db.query(BusinessSettings).first()
+    if settings is None or not settings.working_hours:
+        return None
+    window = resolve_window(settings.working_hours, booking_date)
+    if window is None:
+        return None
+    _config, opens, closes = window
+    return opens, closes
+
+
+def _intersect_with_salon(
+    db: Session,
+    schedule: EmployeeDaySchedule,
+    booking_date: date,
+) -> EmployeeDaySchedule | None:
+    """Clamp an employee schedule to the salon's opening hours.
+
+    Every public booking path funnels through ``_build_employee_day_schedule``,
+    so clamping here is what stops a customer from booking 03:00 on a day the
+    salon closed at 22:00 — without duplicating the check in the slot lister,
+    the auto-assigner and the create handler.
+    """
+    window = salon_booking_window(db, booking_date)
+    if window is None:
+        return schedule
+
+    opens, closes = window
+    start_at = max(schedule.start_at, opens)
+    end_at = min(schedule.end_at, closes)
+    if end_at <= start_at:
+        return None
+
+    schedule.start_at = start_at
+    schedule.end_at = end_at
+    return schedule
+
+
 def _build_employee_day_schedule(
     db: Session,
     *,
@@ -141,32 +188,20 @@ def _build_employee_day_schedule(
         end_time = working_hour.end_time
     else:
         from app.models.business_settings import BusinessSettings
+        from app.core.working_hours import (
+            DEFAULT_FALLBACK_HOURS,
+            closing_datetime,
+            day_key,
+            normalize_working_hours,
+            opening_datetime,
+        )
         settings_row = db.query(BusinessSettings).first()
         salon_hours = settings_row.working_hours if settings_row else None
-        
-        fallback_hours = {
-            "saturday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "sunday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "monday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "tuesday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "wednesday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "thursday": {"is_open": True, "open_time": "10:00", "close_time": "22:00"},
-            "friday": {"is_open": False, "open_time": None, "close_time": None}
-        }
-        
-        hours_dict = salon_hours if salon_hours else fallback_hours
-        weekday_map = {
-            0: "monday",
-            1: "tuesday",
-            2: "wednesday",
-            3: "thursday",
-            4: "friday",
-            5: "saturday",
-            6: "sunday"
-        }
-        day_name = weekday_map[booking_date.weekday()]
+
+        hours_dict = normalize_working_hours(salon_hours) if salon_hours else dict(DEFAULT_FALLBACK_HOURS)
+        day_name = day_key(booking_date)
         day_config = hours_dict.get(day_name)
-        
+
         if not day_config or not day_config.get("is_open"):
             if strict_schedule:
                 return None
@@ -174,14 +209,10 @@ def _build_employee_day_schedule(
                 start_time = time(0, 0)
                 end_time = time(23, 59)
         else:
-            open_str = day_config.get("open_time") or "10:00"
-            close_str = day_config.get("close_time") or "22:00"
-            try:
-                start_time = datetime.strptime(open_str, "%H:%M").time()
-                end_time = datetime.strptime(close_str, "%H:%M").time()
-            except ValueError:
-                start_time = time(10, 0)
-                end_time = time(22, 0)
+            start_dt = opening_datetime(booking_date, day_config)
+            end_dt = closing_datetime(booking_date, day_config)
+            start_time = start_dt.time() if start_dt else time(10, 0)
+            end_time = end_dt.time() if end_dt else time(22, 0)
 
     busy_intervals, day_load = _build_busy_intervals(
         db,
@@ -195,12 +226,16 @@ def _build_employee_day_schedule(
     if end_dt <= start_dt:
         end_dt += timedelta(days=1)
 
-    return EmployeeDaySchedule(
-        employee=employee,
-        start_at=start_dt,
-        end_at=end_dt,
-        busy_intervals=busy_intervals,
-        day_load=day_load,
+    return _intersect_with_salon(
+        db,
+        EmployeeDaySchedule(
+            employee=employee,
+            start_at=start_dt,
+            end_at=end_dt,
+            busy_intervals=busy_intervals,
+            day_load=day_load,
+        ),
+        booking_date,
     )
 
 

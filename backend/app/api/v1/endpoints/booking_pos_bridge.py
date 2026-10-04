@@ -1,21 +1,20 @@
 from __future__ import annotations
-from datetime import datetime
+
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
+from app.api.deps import require_cashier_manager_owner
 from app.db.session import get_db
 from app.models.appointment import Appointment
-from app.models.employee import Employee
-from app.api.deps import get_current_active_user
+from app.models.invoice import Invoice
+from app.models.invoice_payment import InvoicePayment
+from app.models.user import User
 
 router = APIRouter()
-
-# Unified statuses
-STATUS_READY = ["completed", "ready_for_payment", "ready_for_pos"]
-STATUS_PAID = ["paid", "invoiced", "closed", "done"]
+STATUS_READY = ["ready_for_payment", "ready_for_pos"]
 
 
 class MarkPaidPayload(BaseModel):
@@ -23,88 +22,122 @@ class MarkPaidPayload(BaseModel):
     invoiceId: Optional[int] = None
 
 
+def _employee_id(current_user: User) -> Optional[int]:
+    return current_user.barber_id or current_user.employee_id
+
+
+def _get_booking(db: Session, booking_id: int, current_user: User) -> Appointment:
+    appointment = db.query(Appointment).filter(Appointment.id == booking_id).first()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="الحجز غير موجود")
+    if current_user.role == "barber" and _employee_id(current_user) != appointment.barber_id:
+        raise HTTPException(status_code=403, detail="ليس لديك صلاحية لهذا الحجز")
+    return appointment
+
+
 @router.get("/bookings/ready-for-pos")
 def ready_for_pos_bookings(
     db: Session = Depends(get_db),
-    current_user: Any = Depends(get_current_active_user)
+    current_user: User = Depends(require_cashier_manager_owner),
 ) -> List[Dict[str, Any]]:
-    """
-    Get appointments that are ready to be paid for in the POS.
-    """
-    appointments = db.query(Appointment).options(
-        joinedload(Appointment.customer),
-        joinedload(Appointment.barber),
-        joinedload(Appointment.services)
-    ).filter(
-        Appointment.status.in_(STATUS_READY)
-    ).order_by(Appointment.id.desc()).all()
+    invoiced_ids = db.query(Invoice.appointment_id).filter(
+        Invoice.appointment_id.isnot(None)
+    )
+    query = (
+        db.query(Appointment)
+        .options(
+            joinedload(Appointment.customer),
+            joinedload(Appointment.barber),
+            joinedload(Appointment.services),
+        )
+        .filter(
+            Appointment.status.in_(STATUS_READY),
+            Appointment.id.notin_(invoiced_ids),
+        )
+    )
+    if current_user.role == "barber":
+        query = query.filter(Appointment.barber_id == _employee_id(current_user))
 
     result = []
-    for appt in appointments:
-        # Get first service name if available
-        service_name = appt.services[0].service_name_snapshot if appt.services else ""
-        service_id = appt.services[0].service_id if appt.services else None
-        
-        result.append({
-            "id": appt.id,
-            "customer_id": appt.customer_id,
-            "customer_name": f"{appt.customer.first_name} {appt.customer.last_name}" if appt.customer else "Unknown",
-            "service_id": service_id,
-            "service_name": service_name,
-            "employee_id": appt.barber_id,
-            "employee_name": appt.barber.display_name if appt.barber else "Unknown",
-            "amount": float(appt.total_estimated_price),
-            "booking_time": f"{appt.appointment_date} {appt.appointment_time}",
-            "status": appt.status
-        })
-    
+    for appointment in query.order_by(Appointment.id.desc()).all():
+        service = appointment.services[0] if appointment.services else None
+        result.append(
+            {
+                "id": appointment.id,
+                "customer_id": appointment.customer_id,
+                "customer_name": (
+                    f"{appointment.customer.first_name} {appointment.customer.last_name}"
+                    if appointment.customer
+                    else "Unknown"
+                ),
+                "service_id": service.service_id if service else None,
+                "service_name": service.service_name_snapshot if service else "",
+                "employee_id": appointment.barber_id,
+                "employee_name": (
+                    appointment.barber.display_name if appointment.barber else "Unknown"
+                ),
+                "amount": float(appointment.total_estimated_price or 0),
+                "booking_time": (
+                    f"{appointment.appointment_date} {appointment.appointment_time}"
+                ),
+                "status": appointment.status,
+            }
+        )
     return result
 
 
 @router.post("/bookings/{booking_id}/start-service")
 def start_service(
-    booking_id: int, 
+    booking_id: int,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(get_current_active_user)
+    current_user: User = Depends(require_cashier_manager_owner),
 ) -> Dict[str, Any]:
-    appt = db.query(Appointment).filter(Appointment.id == booking_id).first()
-    if not appt:
-        raise HTTPException(status_code=404, detail="الحجز غير موجود")
-    
-    appt.status = "in-service"
+    appointment = _get_booking(db, booking_id, current_user)
+    if appointment.status not in {"pending", "confirmed", "waiting", "in_service"}:
+        raise HTTPException(status_code=409, detail="الحجز لا يمكن بدء خدمته في الحالة الحالية")
+    appointment.status = "in-service"
     db.commit()
     return {"status": "success"}
 
 
 @router.post("/bookings/{booking_id}/complete-service")
 def complete_service(
-    booking_id: int, 
+    booking_id: int,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(get_current_active_user)
+    current_user: User = Depends(require_cashier_manager_owner),
 ) -> Dict[str, Any]:
-    appt = db.query(Appointment).filter(Appointment.id == booking_id).first()
-    if not appt:
-        raise HTTPException(status_code=404, detail="الحجز غير موجود")
-    
-    appt.status = "ready_for_payment"
+    appointment = _get_booking(db, booking_id, current_user)
+    if appointment.status not in {"in-service", "in_service"}:
+        raise HTTPException(status_code=409, detail="يجب بدء الخدمة قبل إكمالها")
+    appointment.status = "ready_for_payment"
     db.commit()
     return {"status": "success"}
 
 
 @router.post("/bookings/{booking_id}/mark-paid")
 def mark_paid(
-    booking_id: int, 
-    payload: MarkPaidPayload, 
+    booking_id: int,
+    payload: MarkPaidPayload,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(get_current_active_user)
+    current_user: User = Depends(require_cashier_manager_owner),
 ) -> Dict[str, Any]:
-    appt = db.query(Appointment).filter(Appointment.id == booking_id).first()
-    if not appt:
-        raise HTTPException(status_code=404, detail="الحجز غير موجود")
-    
+    appointment = _get_booking(db, booking_id, current_user)
     invoice_id = payload.invoice_id if payload.invoice_id is not None else payload.invoiceId
-    
-    appt.status = "completed"
-    appt.session_id = invoice_id # Reusing session_id to store invoice reference if needed
+    if not invoice_id:
+        raise HTTPException(status_code=400, detail="invoice_id مطلوب")
+
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not invoice or invoice.appointment_id != booking_id or invoice.is_draft:
+        raise HTTPException(status_code=409, detail="الفاتورة غير مرتبطة بالحجز")
+    paid_amount = (
+        db.query(InvoicePayment)
+        .filter(InvoicePayment.invoice_id == invoice.id)
+        .with_entities(InvoicePayment.amount)
+        .all()
+    )
+    if not paid_amount or sum((row.amount for row in paid_amount), 0) < invoice.total_amount:
+        raise HTTPException(status_code=409, detail="الفاتورة غير مسجلة كمدفوعة")
+
+    appointment.status = "completed"
     db.commit()
-    return {"status": "success"}
+    return {"status": "success", "invoice_id": invoice.id}

@@ -71,6 +71,23 @@ def create_salary_advance(
         created_by_user_id=current_user.id,
     )
     db.add(expense)
+    db.flush()
+
+    from app.crud.core_business import create_cash_transaction
+    create_cash_transaction(
+        db,
+        direction="out",
+        amount=float(payload.amount),
+        transaction_type="salary_advance",
+        payment_method="cash",
+        notes=f"صرف سلفة: {employee.full_name}",
+        user_id=current_user.id,
+        reference_type="salary_advance",
+        reference_id=db_obj.id,
+        reference_no=f"ADV-{db_obj.id}",
+        employee_id=employee.id,
+        commit=False,
+    )
 
     db.commit()
     db.refresh(db_obj)
@@ -104,6 +121,32 @@ def delete_salary_advance(
     )
     if linked_expense:
         db.delete(linked_expense)
+
+    from app.crud.core_business import (
+        create_cash_transaction,
+        find_existing_cash_transaction,
+    )
+    original_transaction = find_existing_cash_transaction(
+        db,
+        reference_type="salary_advance",
+        reference_id=db_obj.id,
+        transaction_type="salary_advance",
+    )
+    if original_transaction:
+        create_cash_transaction(
+            db,
+            direction="in",
+            amount=float(original_transaction.amount),
+            transaction_type="salary_advance_reversal",
+            payment_method=original_transaction.payment_method or "cash",
+            notes=f"عكس سلفة رقم {db_obj.id}",
+            user_id=current_user.id,
+            reference_type="salary_advance",
+            reference_id=db_obj.id,
+            reference_no=f"ADV-REV-{db_obj.id}",
+            employee_id=db_obj.employee_id,
+            commit=False,
+        )
 
     db.delete(db_obj)
     db.commit()

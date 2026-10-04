@@ -10,7 +10,6 @@ export { customerId, getInitials, customerName, secondPhone } from "@/features/c
 export { useCustomersList } from "@/features/customers/hooks/useCustomersList";
 export { useCustomerDialogs } from "@/features/customers/hooks/useCustomerDialogs";
 export { useCustomerDetailPage } from "@/features/customers/hooks/useCustomerDetailPage";
-export { default as CustomerInlineEmptyState } from "@/features/customers/components/CustomerInlineEmptyState";
 export { default as CustomerOverviewTab } from "@/features/customers/components/CustomerOverviewTab";
 export { default as CustomerAppointmentsTab } from "@/features/customers/components/CustomerAppointmentsTab";
 export { default as CustomerInvoicesTab } from "@/features/customers/components/CustomerInvoicesTab";

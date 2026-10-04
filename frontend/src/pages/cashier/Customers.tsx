@@ -2,6 +2,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 import { Card } from "@/components/ui";
+import InlineNotice from "@/components/shared/InlineNotice";
 
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { PageHeader } from "@/components/shared/PremiumUI";
@@ -51,6 +52,7 @@ function CustomersInner() {
     fetchCustomers,
     removeCustomer,
     handleExport,
+    statsError,
   } = useCustomersList();
   const {
     selectedCustomer,
@@ -102,6 +104,10 @@ function CustomersInner() {
         onCreate={openCreateCustomer}
         onImported={fetchCustomers}
       />
+
+      {statsError && !loading && (
+        <InlineNotice tone="warning">{statsError}</InlineNotice>
+      )}
 
       <CustomerKpis stats={stats} />
 

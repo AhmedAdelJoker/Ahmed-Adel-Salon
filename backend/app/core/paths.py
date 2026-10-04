@@ -67,17 +67,11 @@ def get_data_dir() -> Path:
 
 
 def get_uploads_dir() -> Path:
-    """Single canonical uploads location — UPLOADS_DIR env > Docker > external data dir."""
+    """Single canonical uploads location — UPLOADS_DIR env > external data dir."""
     # يحترم UPLOADS_DIR أولاً (يضبطه Electron)
     env = os.getenv("UPLOADS_DIR")
     if env:
         p = Path(env)
-        p.mkdir(parents=True, exist_ok=True)
-        return p
-    # Docker: /app is the container workdir
-    cur = Path(__file__).resolve()
-    if cur.as_posix().startswith("/app/"):
-        p = Path("/app/uploads")
         p.mkdir(parents=True, exist_ok=True)
         return p
     p = get_data_dir() / "uploads"

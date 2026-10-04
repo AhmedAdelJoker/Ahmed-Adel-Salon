@@ -123,7 +123,7 @@ export function ViewInvoiceModal({
             onClick={() => onPrint(viewInvoice.data)}
             className="h-11 rounded-xl px-6 premium-button"
           >
-            <Printer size={16} className="ml-2" /> طباعة إيصال
+            <Printer size={16} className="ms-2" /> طباعة إيصال
           </Button>
         </DialogFooter>
       </DialogContent>

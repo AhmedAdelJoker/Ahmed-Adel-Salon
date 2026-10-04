@@ -341,7 +341,7 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
               existingBookings.length > 0
             }
           >
-            <Plus size={14} className="ml-1.5" /> تأكيد الحجز
+            <Plus size={14} className="ms-1.5" /> تأكيد الحجز
           </Button>
         </DialogFooter>
       </DialogContent>

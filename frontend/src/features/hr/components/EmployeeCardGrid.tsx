@@ -26,11 +26,12 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/core/utils";
 import { EMPLOYMENT_TYPES, JOB_TITLE_BLUEPRINTS } from "@/features/hr/utils/constants";
 import { isCustomJobTitleValue } from "@/features/hr/utils/helpers";
 import type { EmployeeRecord } from "@/types/employee";
+import { currencyLabel } from "@/lib/core/currency";
 
 export default function EmployeeCardGrid({
   employees,
@@ -58,10 +59,10 @@ export default function EmployeeCardGrid({
           <EmptyState
             icon={Users}
             title="لا يوجد كوادر مطابقة"
-            description="جرب تعديل كلمات البحث أو أضف موظفاً جديداً للمنظومة."
+            message="جرب تعديل كلمات البحث أو أضف موظفاً جديداً للمنظومة."
             action={
               <Button onClick={onCreate} className="rounded-xl bg-accent text-white font-black">
-                <Plus size={16} className="ml-2"/> إضافة موظف جديد
+                <Plus size={16} className="ms-2"/> إضافة موظف جديد
               </Button>
             }
           />
@@ -135,20 +136,20 @@ export default function EmployeeCardGrid({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 border-border shadow-premium bg-card">
                     <DropdownMenuItem onClick={() => onEdit(emp)} className="rounded-xl font-bold py-3">
-                      <Pencil size={16} className="ml-3 text-accent" /> تعديل الملف
+                      <Pencil size={16} className="ms-3 text-accent" /> تعديل الملف
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate(`/owner/payroll?employeeId=${emp.id}`)} className="rounded-xl font-bold py-3">
-                      <DollarSign size={16} className="ml-3 text-emerald-600" /> كشف الراتب
+                      <DollarSign size={16} className="ms-3 text-emerald-600" /> كشف الراتب
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate(`/attendance?employeeId=${emp.id}`)} className="rounded-xl font-bold py-3">
-                      <Clock size={16} className="ml-3 text-sky-600" /> سجل الحضور
+                      <Clock size={16} className="ms-3 text-sky-600" /> سجل الحضور
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => openEmployeeQuickView(emp.id as string | number)} className="rounded-xl font-bold py-3">
-                      <Eye size={16} className="ml-3 text-indigo-600" /> عرض سريع
+                      <Eye size={16} className="ms-3 text-indigo-600" /> عرض سريع
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-2" />
                     <DropdownMenuItem onClick={() => onDelete(emp)} className="rounded-xl font-bold py-3 text-rose-600">
-                      <XCircle size={16} className="ml-3" /> {emp.status === "active" ? "تعطيل الملف" : "تفعيل الملف"}
+                      <XCircle size={16} className="ms-3" /> {emp.status === "active" ? "تعطيل الملف" : "تفعيل الملف"}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -165,7 +166,7 @@ export default function EmployeeCardGrid({
                       <span className="text-[9px] font-black text-muted uppercase tracking-widest">الراتب الأساسي</span>
                     </div>
                     <div className="text-[15px] font-black text-main">
-                      {Number(emp.baseSalary).toLocaleString("ar-EG")} <span className="text-[10px] font-bold text-muted">ج.م</span>
+                      {Number(emp.baseSalary).toLocaleString("ar-EG")} <span className="text-[10px] font-bold text-muted">{currencyLabel()}</span>
                     </div>
                   </div>
                   <div className="group/stat rounded-2xl bg-soft border border-border/60 p-3 sm:p-4 hover:border-primary/20 hover:bg-card transition-colors">
@@ -195,10 +196,10 @@ export default function EmployeeCardGrid({
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={() => openEmployeeQuickView(emp.id as string | number)} className="flex-1 h-10 rounded-xl bg-soft hover:bg-accent hover:text-white text-main font-black text-[11px] border border-border transition-all">
-                    <Eye size={14} className="ml-2" /> معاينة
+                    <Eye size={14} className="ms-2" /> معاينة
                   </Button>
                   <Button onClick={() => onEdit(emp)} className="flex-1 h-10 rounded-xl bg-accent text-white font-black text-[11px] shadow-lg shadow-accent/20 hover:bg-accent/90">
-                    <Pencil size={14} className="ml-2" /> تعديل
+                    <Pencil size={14} className="ms-2" /> تعديل
                   </Button>
                 </div>
               </div>

@@ -4,7 +4,7 @@ import api from "@/services/api";
 import {
   SECURITY_SETTINGS_STORAGE_KEY,
   DEFAULT_SECURITY_SYNC_STATUS,
-} from "../constants";
+} from "@/features/security/constants";
 import {
   captureRequest,
   asArray,
@@ -13,7 +13,7 @@ import {
   getUserName,
   getRole,
   riskKeywords,
-} from "../utils";
+} from "@/features/security/utils";
 
 export function useSecurityAccess() {
   const [usersLoading, setUsersLoading] = useState(true);

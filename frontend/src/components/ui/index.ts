@@ -18,10 +18,8 @@ export {
   TableHead as Th,
   TableCell as Td,
 } from "@/components/ui/table";
-export { Sidebar } from "@/components/ui/Sidebar";
-// CommandPalette: use the canonical version from @/components/layout/CommandPalette
-export { EmptyState } from "@/components/ui/EmptyState";
-export { ToastProvider, useToast, useToastHelpers } from "@/components/ui/Toast";
+// EmptyState is the single component for that case and lives with the other
+// page-level primitives: import it from "@/components/shared/EmptyState".
 
 // Legacy shadcn/ui components (keep for backward compatibility)
 export {

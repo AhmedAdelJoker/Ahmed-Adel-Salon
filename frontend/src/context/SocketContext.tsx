@@ -34,14 +34,21 @@ function getUserId(user: AuthUser | null | undefined): ID | null {
 }
 
 function buildSocketUrl(userId: ID): string {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  // على file:// (تطبيق Electron) يكون hostname فارغاً — نرجع للمحلي
-  const host = window.location.hostname || "127.0.0.1";
-  const port = import.meta?.env?.VITE_WS_PORT || "8000";
   const basePath =
-    import.meta?.env?.VITE_WS_NOTIFICATIONS_PATH || "/api/v1/notifications/ws";
+    import.meta.env.VITE_WS_NOTIFICATIONS_PATH || "/api/v1/notifications/ws";
+  const configuredBase = import.meta.env.VITE_WS_URL?.replace(/\/$/, "");
+  if (configuredBase) {
+    return `${configuredBase}${basePath}/${userId}`;
+  }
 
-  return `${protocol}//${host}:${port}${basePath}/${userId}`;
+  const isElectron = window.location.protocol === "file:";
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const host = window.location.hostname || "127.0.0.1";
+  const port =
+    import.meta.env.VITE_WS_PORT || (isElectron ? "8000" : window.location.port);
+  const authority = port ? `${host}:${port}` : host;
+
+  return `${protocol}//${authority}${basePath}/${userId}`;
 }
 
 export const SocketProvider = ({ children }: { children: ReactNode }) => {

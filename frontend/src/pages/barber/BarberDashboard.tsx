@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Zap, Scissors, BarChart3, CalendarDays, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ErrorState } from "@/components/shared/AsyncState";
+import { PageShell } from "@/components/shared/PageShell";
 
 const BarberDashboard = () => {
   const {
@@ -26,11 +28,27 @@ const BarberDashboard = () => {
     completedCount,
     totalRevenue,
     totalServices,
+    loading,
+    loadError,
   } = useBarberDashboard();
 
+  // A failed load used to render an empty queue, which the barber reads as
+  // "no customers waiting" rather than "the request failed".
+  if (loadError && !loading) {
+    return (
+      <div className="mx-auto max-w-7xl px-3 pt-4 sm:px-4 lg:px-6">
+        <ErrorState
+          title="تعذر تحميل لوحة الحلاق"
+          message={loadError}
+          onRetry={fetchDashboardData}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-4">
@@ -68,19 +86,19 @@ const BarberDashboard = () => {
               value="queue"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Zap size={14} className="ml-1.5" /> قائمة الانتظار
+              <Zap size={14} className="ms-1.5" /> قائمة الانتظار
             </TabsTrigger>
             <TabsTrigger
               value="performance"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <BarChart3 size={14} className="ml-1.5" /> الأداء
+              <BarChart3 size={14} className="ms-1.5" /> الأداء
             </TabsTrigger>
             <TabsTrigger
               value="schedule"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <CalendarDays size={14} className="ml-1.5" /> الجدول
+              <CalendarDays size={14} className="ms-1.5" /> الجدول
             </TabsTrigger>
           </TabsList>
 
@@ -106,12 +124,11 @@ const BarberDashboard = () => {
 
           {/* Schedule Tab */}
           <TabsContent value="schedule" className="space-y-4">
-            <BarberSchedule />
-          </TabsContent>
-        </Tabs>
-      </div>
+              <BarberSchedule />
+            </TabsContent>
+          </Tabs>
+      </PageShell>
     </div>
   );
 };
-
 export default BarberDashboard;

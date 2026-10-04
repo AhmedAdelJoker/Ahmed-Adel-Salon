@@ -1,65 +1,13 @@
-import {
-  LayoutDashboard,
-  LayoutGrid,
-  Settings,
-  Users,
-  ShieldCheck,
-  Lock,
-  Zap,
-  FileBarChart2,
-  History,
-  Clock,
-  List,
-  Package,
-  Archive,
-  UserCheck,
-  UserCircle,
-  Banknote,
-  CalendarDays,
-  Receipt,
-  Activity,
-  FileSpreadsheet,
-  Trophy,
-} from "lucide-react";
+import { getPermissionPages } from "@/app/route-registry";
 
-export const PERMISSION_PAGES = [
-  { id: "/owner", label: "لوحة القيادة الرئيسية", category: "نظام", icon: LayoutDashboard },
-  { id: "/owner/settings", label: "إعدادات النظام المتكاملة", category: "نظام", icon: Settings },
-  { id: "/owner/users", label: "إدارة المستخدمين", category: "نظام", icon: Users },
-  { id: "/owner/permissions", label: "صلاحيات الوصول", category: "نظام", icon: ShieldCheck },
-  { id: "/owner/security-access", label: "الأمان والوصول المشفر", category: "نظام", icon: Lock },
-  { id: "/owner/alerts", label: "مركز التنبيهات الذكية", category: "نظام", icon: Zap },
-  { id: "/owner/connected-pages", label: "الصفحات المتصلة", category: "نظام", icon: FileBarChart2 },
-  { id: "/activity-logs", label: "سجلات الرقابة والنشاط", category: "نظام", icon: History },
-  { id: "/pos", label: "نقطة البيع الذكية (POS)", category: "تشغيل", icon: Zap },
-  { id: "/bookings", label: "نظام الحجوزات والمواعيد", category: "تشغيل", icon: Clock },
-  { id: "/reception-board", label: "شاشة الاستقبال والمتابعة", category: "تشغيل", icon: List },
-  { id: "/schedule", label: "مخطط المواعيد", category: "تشغيل", icon: LayoutGrid },
-  { id: "/customers", label: "قاعدة بيانات العملاء", category: "تشغيل", icon: Users },
-  { id: "/customers/:id", label: "تفاصيل العميل", category: "تشغيل", icon: UserCheck },
-  { id: "/owner/customers/archive", label: "أرشيف العملاء", category: "تشغيل", icon: Archive },
-  { id: "/inventory", label: "إدارة المخزن والمستودع", category: "تشغيل", icon: Package },
-  { id: "/inventory/archive", label: "أرشيف المخزن", category: "تشغيل", icon: Archive },
-  { id: "/inventory/bundles", label: "حزم المنتجات", category: "تشغيل", icon: Package },
-  { id: "/invoices", label: "الفواتير", category: "تشغيل", icon: Receipt },
-  { id: "/invoices/archive", label: "أرشيف الفواتير", category: "تشغيل", icon: Archive },
-  { id: "/expenses", label: "المصروفات", category: "مالية", icon: FileSpreadsheet },
-  { id: "/expenses/archive", label: "أرشيف المصروفات", category: "مالية", icon: Archive },
-  { id: "/owner/cashbox", label: "الصراف", category: "مالية", icon: Banknote },
-  { id: "/profile", label: "الملف الشخصي", category: "إدارة", icon: UserCircle },
-  { id: "/settings", label: "الإعدادات", category: "إدارة", icon: Settings },
-  { id: "/owner/hr", label: "إدارة الموظفين", category: "إدارة", icon: Users },
-  { id: "/owner/hr/archive", label: "أرشيف الموظفين", category: "إدارة", icon: Archive },
-  { id: "/owner/working-hours", label: "ساعات العمل", category: "إدارة", icon: CalendarDays },
-  { id: "/owner/loyalty-settings", label: "إعدادات الولاء", category: "إدارة", icon: Trophy },
-  { id: "/owner/reports", label: "التقارير المالية", category: "تقارير", icon: FileSpreadsheet },
-  { id: "/owner/daily-summary", label: "الملخص اليومي", category: "تقارير", icon: Activity },
-  { id: "/owner/employee-reports", label: "تقارير الموظفين", category: "تقارير", icon: FileBarChart2 },
-  { id: "/owner/payroll", label: "كشوف الرواتب", category: "تقارير", icon: Banknote },
-  { id: "/owner/payroll/archive", label: "أرشيف الرواتب", category: "تقارير", icon: Archive },
-  { id: "/owner/adjustment-requests", label: "طلبات التعديل", category: "تقارير", icon: Receipt },
-  { id: "/owner/expenses/archive", label: "أرشيف المصروفات", category: "تقارير", icon: Archive },
-];
+/**
+ * Rows shown in the permissions matrix.
+ *
+ * Derived from the route registry so a new page cannot be added to the router
+ * without also becoming grantable per user. The previous hand-written list had
+ * drifted and was missing seventeen menu pages.
+ */
+export const PERMISSION_PAGES = getPermissionPages();
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, (id: string) => boolean> = {
   OWNER: () => true,

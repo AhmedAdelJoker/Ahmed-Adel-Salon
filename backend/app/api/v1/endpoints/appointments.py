@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from datetime import date, datetime, timedelta, time
 from decimal import Decimal
@@ -5,7 +6,8 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db.session import get_db
 from app.models.user import User
@@ -18,6 +20,8 @@ from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
 from app.models.invoice_payment import InvoicePayment
 from app.models.business_settings import BusinessSettings
+from app.core.clock import salon_now
+from app.core.working_hours import resolve_window
 from app.models.service_session import ServiceSession
 
 from app.schemas.appointment import (
@@ -54,6 +58,9 @@ from app.services.websocket import manager
 
 import json
 
+logger = logging.getLogger("app.appointments")
+
+
 def log_booking_change(db: Session, appointment_id: int, user_id: int | None, action: str, old_val: dict = None, new_val: dict = None):
     from app.models.booking_audit_log import BookingAuditLog
     changes = {}
@@ -76,10 +83,70 @@ def log_booking_change(db: Session, appointment_id: int, user_id: int | None, ac
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
 ACTIVE_BOOKING_STATUSES = {"pending", "confirmed", "waiting"}
+APPOINTMENT_STATUSES = {
+    "pending",
+    "confirmed",
+    "waiting",
+    "in-service",
+    "in_service",
+    "in-progress",
+    "in_progress",
+    "ready_for_payment",
+    "ready_for_pos",
+    "completed",
+    "done",
+    "checked_out",
+    "paid",
+    "cancelled",
+    "auto_cancelled",
+    "no_show",
+}
+
+def appointment_eager_options() -> tuple:
+    """Eager-load options for any query whose rows go through `_appointment_to_read`.
+
+    A function rather than a module-level constant on purpose. Building the
+    options resolves the string-named relationships (`"Customer"`, `"Employee"`),
+    which touches SQLAlchemy's class registry. At import time the registry is
+    only partly populated and this raises `KeyError` for a model that has not
+    been reached yet. Deferring construction to call time means every model is
+    loaded and the lookup cannot fail.
+
+    `selectinload` rather than `joinedload` for the two many-to-one
+    relationships: joinedload would multiply rows by the number of appointments
+    per customer, so the paginated queries would then limit the wrong thing.
+    With selectinload the relationship costs two extra queries for the whole
+    page instead of two per row — a 500-row page goes from 1,001 queries to 3.
+
+    `invoices` is included because callers count it (the per-barber day view
+    reports how many appointments are invoiced). It is a has-many, so it costs
+    one batched query for the page; without it that caller would lazy-load per
+    row, and `.first()` on a has-many raises when more than one exists.
+    """
+    return (
+        joinedload(Appointment.services),
+        selectinload(Appointment.customer),
+        selectinload(Appointment.barber),
+        selectinload(Appointment.invoices),
+    )
+
 
 def _appointment_to_read(db: Session, appointment: Appointment) -> AppointmentRead:
-    customer = db.query(Customer).filter(Customer.customer_id == appointment.customer_id).first()
-    barber = db.query(Employee).filter(Employee.id == appointment.barber_id).first()
+    """Serialises one appointment.
+
+    Reads `customer` and `barber` off the relationship rather than issuing a
+    query per row. The relationships were already declared; the serializer was
+    simply ignoring them, so every list endpoint paid two extra round trips per
+    appointment — up to a thousand on a 500-row page, and repeated at nine call
+    sites.
+
+    `db` is kept in the signature because it is part of a wider call-site
+    contract, and because a caller that has not eager-loaded will fall back to
+    SQLAlchemy's lazy load rather than erroring. List endpoints must use
+    `.options(*appointment_eager_options())` to get the batched behaviour.
+    """
+    customer = appointment.customer
+    barber = appointment.barber
     return AppointmentRead(
         id=appointment.id,
         customer_id=appointment.customer_id,
@@ -107,14 +174,28 @@ def _rebuild_appointment_services(db: Session, appointment: Appointment, items: 
     total_price = Decimal("0.00")
     total_duration = 0
     rows = []
+
+    # Phase 2: this loop ran one Service query per item. Fetching the distinct
+    # service set first turns a 6-service rebooking from 6 queries into 1.
+    service_ids = set()
+    for item in items:
+        sid = item.get("serviceId") if isinstance(item, dict) else getattr(item, "service_id", None)
+        if sid is not None:
+            service_ids.add(sid)
+    services_by_id = {}
+    if service_ids:
+        services_by_id = {
+            s.id: s for s in db.query(Service).filter(Service.id.in_(service_ids)).all()
+        }
+
     for item in items:
         service_id = item.get("serviceId") if isinstance(item, dict) else getattr(item, "service_id", None)
         quantity = item.get("quantity", 1) if isinstance(item, dict) else getattr(item, "quantity", 1)
-        
-        service = db.query(Service).filter(Service.id == service_id).first()
+
+        service = services_by_id.get(service_id)
         if not service:
             continue
-            
+    
         qty = quantity or 1
         price = Decimal(str(service.price or 0))
         duration = int(getattr(service, "duration_minutes", 30) or 30)
@@ -136,36 +217,16 @@ def _is_within_shop_hours(db: Session, appt_date: date, appt_time: time, duratio
     settings = db.query(BusinessSettings).first()
     if not settings or not settings.working_hours:
         return True
-    
-    day_name = appt_date.strftime("%A").lower()
-    day_config = settings.working_hours.get(day_name)
-    
-    if not day_config or not day_config.get("is_open"):
+
+    window = resolve_window(settings.working_hours, appt_date)
+    if window is None:
         return False
-        
-    shop_open_str = day_config.get("open_time")
-    shop_close_str = day_config.get("close_time")
-    
-    if not shop_open_str or not shop_close_str:
-        return True
-        
-    try:
-        shop_open_time = datetime.strptime(shop_open_str, "%H:%M").time()
-        shop_close_time = datetime.strptime(shop_close_str, "%H:%M").time()
-        
-        appt_start_dt = datetime.combine(appt_date, appt_time)
-        appt_end_dt = appt_start_dt + timedelta(minutes=duration_minutes)
-        
-        shop_open_dt = datetime.combine(appt_date, shop_open_time)
-        shop_close_dt = datetime.combine(appt_date, shop_close_time)
-        
-        # Handle overnight shop hours if necessary, but usually shops close same day
-        if shop_close_time < shop_open_time:
-            shop_close_dt += timedelta(days=1)
-            
-        return appt_start_dt >= shop_open_dt and appt_end_dt <= shop_close_dt
-    except Exception:
-        return True
+
+    _day_config, shop_open_dt, shop_close_dt = window
+    appt_start_dt = datetime.combine(appt_date, appt_time)
+    appt_end_dt = appt_start_dt + timedelta(minutes=duration_minutes)
+
+    return appt_start_dt >= shop_open_dt and appt_end_dt <= shop_close_dt
 
 def _validate_future_datetime(appt_date: date, appt_time: time):
     if isinstance(appt_time, str):
@@ -174,8 +235,8 @@ def _validate_future_datetime(appt_date: date, appt_time: time):
         except Exception:
             pass
             
-    now = datetime.now()
-    today = date.today()
+    now = salon_now()
+    today = salon_now().date()
     
     # 1. Block past dates
     if appt_date < today:
@@ -258,7 +319,7 @@ def _get_manageable_appointment(
 ) -> Appointment:
     appointment = (
         db.query(Appointment)
-        .options(joinedload(Appointment.services), joinedload(Appointment.invoices))
+        .options(*appointment_eager_options())
         .filter(Appointment.id == appointment_id)
         .first()
     )
@@ -275,7 +336,7 @@ def _ensure_existing_barber(db: Session, barber_id: int | None):
     return barber
 
 def _generate_invoice_no(db: Session) -> str:
-    today_prefix = datetime.now().strftime("INV-%Y%m%d")
+    today_prefix = salon_now().strftime("INV-%Y%m%d")
     count_today = db.query(Invoice).filter(Invoice.invoice_no.like(f"{today_prefix}%")).count()
     return f"{today_prefix}-{count_today + 1:04d}"
 
@@ -295,7 +356,7 @@ def list_appointments(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    query = db.query(Appointment).options(joinedload(Appointment.services))
+    query = db.query(Appointment).options(*appointment_eager_options())
 
     # Phase 2: explicit sort handling
     if sort:
@@ -308,7 +369,7 @@ def list_appointments(
         query = query.order_by(Appointment.id.desc())
 
     if date_filter == "today":
-        query = query.filter(Appointment.appointment_date == date.today())
+        query = query.filter(Appointment.appointment_date == salon_now().date())
     elif date_filter == "custom" and start_date and end_date:
         query = query.filter(Appointment.appointment_date >= start_date, Appointment.appointment_date <= end_date)
 
@@ -333,8 +394,8 @@ def list_upcoming_appointments(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    today = date.today()
-    query = db.query(Appointment).options(joinedload(Appointment.services)).filter(
+    today = salon_now().date()
+    query = db.query(Appointment).options(*appointment_eager_options()).filter(
         Appointment.appointment_date >= today,
         Appointment.status.in_(["pending", "confirmed", "waiting"])
     ).order_by(Appointment.appointment_date.asc(), Appointment.appointment_time.asc())
@@ -373,13 +434,13 @@ def get_appointments_by_barber(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    query_date = target_date or date.today()
+    query_date = target_date or salon_now().date()
     barbers = db.query(Employee).filter(
         Employee.is_active == True,
         Employee.job_title.ilike("%barber%")
     ).all()
     
-    appointments = db.query(Appointment).options(joinedload(Appointment.services)).filter(
+    appointments = db.query(Appointment).options(*appointment_eager_options()).filter(
         Appointment.appointment_date == query_date
     ).all()
     
@@ -408,7 +469,11 @@ def get_appointments_by_barber(
     for appt in appointments:
         emp_id = appt.barber_id
         if emp_id not in grouped:
-            emp = db.query(Employee).filter(Employee.id == emp_id).first()
+            # Already eager-loaded by `appointment_eager_options()`. This used
+            # to be a per-row query, reached whenever an appointment pointed at
+            # a barber who was inactive or whose job_title did not match the
+            # "%barber%" filter above, which is exactly when the page is busiest.
+            emp = appt.barber
             grouped[emp_id] = {
                 "employee_id": emp_id,
                 "employee_name": emp.display_name if emp else "خبير غير معروف",
@@ -432,8 +497,12 @@ def get_appointments_by_barber(
         elif st in ["completed", "done"]: stats.completed += 1
         elif st == "cancelled": stats.cancelled += 1
         
-        inv = db.query(Invoice).filter(Invoice.appointment_id == appt.id).first()
-        if inv: stats.invoiced += 1
+        # Presence of any invoice, not just the first. `appt.invoices` is a
+        # relationship on the already-loaded row, so this used to be another
+        # query per appointment — and `.first()` on a has-many would also have
+        # thrown if more than one invoice existed for the same appointment.
+        if appt.invoices:
+            stats.invoiced += 1
         
     result = []
     for bid in grouped:
@@ -549,8 +618,8 @@ def auto_cancel_expired_appointments(
     """
     from datetime import datetime, timedelta
     
-    today = date.today()
-    now = datetime.now()
+    today = salon_now().date()
+    now = salon_now()
     one_hour_ago = now - timedelta(hours=1)
     
     # Cancel previous days' bookings
@@ -568,10 +637,25 @@ def auto_cancel_expired_appointments(
     
     all_expired = expired_previous + expired_today
     count = 0
-    
+
+    # Phase 2: this loop queried Customer once per expired appointment. On a
+    # stale database (a shop that was closed for a week) that is 1 query per
+    # un-cancelled booking. Now the distinct customer set is fetched once.
+    #
+    # Correctness note: `cancellation_count` is incremented below, so the
+    # identity map must hand back the same Customer instance for repeated
+    # ids — which it does, since every row came from this one session.
+    customer_ids = {a.customer_id for a in all_expired if a.customer_id is not None}
+    customers_by_id = {}
+    if customer_ids:
+        customers_by_id = {
+            c.customer_id: c
+            for c in db.query(Customer).filter(Customer.customer_id.in_(customer_ids)).all()
+        }
+
     for appt in all_expired:
         appt.status = "auto_cancelled"
-        customer = db.query(Customer).filter(Customer.customer_id == appt.customer_id).first()
+        customer = customers_by_id.get(appt.customer_id)
         if customer:
             current_count = getattr(customer, "cancellation_count", 0) or 0
             customer.cancellation_count = current_count + 1
@@ -582,7 +666,7 @@ def auto_cancel_expired_appointments(
 
 @router.get("/{appointment_id}", response_model=AppointmentRead)
 def get_appointment(appointment_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_any_staff)):
-    appointment = db.query(Appointment).options(joinedload(Appointment.services)).filter(Appointment.id == appointment_id).first()
+    appointment = db.query(Appointment).options(*appointment_eager_options()).filter(Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="الحجز غير موجود")
     
@@ -643,7 +727,7 @@ def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)
     _rebuild_appointment_services(db, appointment, payload.services)
     db.commit()
     db.refresh(appointment)
-    appointment = db.query(Appointment).options(joinedload(Appointment.services)).filter(Appointment.id == appointment.id).first()
+    appointment = db.query(Appointment).options(*appointment_eager_options()).filter(Appointment.id == appointment.id).first()
     
     # Log the creation
     log_booking_change(
@@ -690,18 +774,18 @@ def create_fast_walkin(payload: AppointmentFastWalkinCreate, db: Session = Depen
         try:
             appt_date = datetime.strptime(payload.appointment_date, "%Y-%m-%d").date()
         except ValueError:
-            appt_date = date.today()
+            appt_date = salon_now().date()
     else:
-        appt_date = date.today()
+        appt_date = salon_now().date()
     
     if payload.appointment_time:
         try:
             time_parts = payload.appointment_time.split(":")
             appt_time = time(int(time_parts[0]), int(time_parts[1]))
         except (ValueError, IndexError):
-            appt_time = datetime.now().time()
+            appt_time = salon_now().time()
     else:
-        appt_time = datetime.now().time()
+        appt_time = salon_now().time()
     
     # For fast walk-in, we still check availability if a barber is selected
     total_duration = 0
@@ -846,7 +930,7 @@ def update_appointment(
 
     db.commit()
     db.refresh(appointment)
-    appointment = db.query(Appointment).options(joinedload(Appointment.services)).filter(Appointment.id == appointment.id).first()
+    appointment = db.query(Appointment).options(*appointment_eager_options()).filter(Appointment.id == appointment.id).first()
     return _appointment_to_read(db, appointment)
 
 @router.patch("/{appointment_id}", response_model=AppointmentRead)
@@ -854,10 +938,12 @@ async def patch_appointment(
     appointment_id: int,
     payload: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_staff),
+    current_user: User = Depends(require_cashier_manager_owner),
 ):
     appointment = _get_manageable_appointment(db, appointment_id)
-    
+    if current_user.role == "accountant":
+        raise HTTPException(status_code=403, detail="ليس لديك صلاحية تعديل الحجز")
+
     field_map = {
         "customerId": "customer_id",
         "employeeId": "barber_id",
@@ -874,9 +960,17 @@ async def patch_appointment(
     }
     
     # Check for date/time/barber changes
+    p_customer = payload.get("customerId") or payload.get("customer_id")
+    p_status = payload.get("status")
+    if p_status is not None and str(p_status).lower() not in APPOINTMENT_STATUSES:
+        raise HTTPException(status_code=400, detail="حالة الحجز غير صالحة")
     p_date = payload.get("appointmentDate") or payload.get("appointment_date")
     p_time = payload.get("appointmentTime") or payload.get("appointment_time")
     p_barber = payload.get("employeeId") or payload.get("barber_id")
+    if p_customer and not db.query(Customer).filter(Customer.customer_id == p_customer).first():
+        raise HTTPException(status_code=404, detail="العميل غير موجود")
+    if p_barber:
+        _ensure_existing_barber(db, p_barber)
 
     if p_date or p_time or p_barber or "services" in payload:
         new_date = p_date or appointment.appointment_date
@@ -914,14 +1008,31 @@ async def patch_appointment(
                 exclude_appointment_id=appointment.id
             )
 
+    allowed_fields = {
+        "customer_id",
+        "barber_id",
+        "appointment_date",
+        "appointment_time",
+        "notes",
+        "status",
+        "booking_source",
+    }
+    if p_status is not None:
+        appointment.status = str(p_status).lower()
+
     for key, value in payload.items():
-        if key in ("status", "services"): continue # handled separately
-        db_key = field_map.get(key, key)
-        # Avoid setting relationship attributes directly to prevent SQLAlchemy errors
-        if db_key in ("customer", "barber", "services", "invoices", "sessions"):
+        if key in {"status", "services"}:
             continue
-        if hasattr(appointment, db_key):
-            setattr(appointment, db_key, value)
+        db_key = field_map.get(key, key)
+        if db_key not in allowed_fields:
+            raise HTTPException(status_code=400, detail=f"الحقل غير مسموح: {key}")
+        if db_key == "appointment_date" and isinstance(value, str):
+            value = date.fromisoformat(value)
+        elif db_key == "appointment_time" and isinstance(value, str):
+            value = time.fromisoformat(value[:5])
+        elif db_key == "status" and value is not None:
+            value = str(value).lower()
+        setattr(appointment, db_key, value)
             
     if "services" in payload:
         _rebuild_appointment_services(db, appointment, payload["services"])
@@ -933,7 +1044,7 @@ async def patch_appointment(
 
 @router.patch("/{appointment_id}/status", response_model=AppointmentRead)
 async def update_appointment_status(appointment_id: int, payload: AppointmentStatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_any_staff)):
-    appointment = db.query(Appointment).options(joinedload(Appointment.services)).filter(Appointment.id == appointment_id).first()
+    appointment = db.query(Appointment).options(*appointment_eager_options()).filter(Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="الحجز غير موجود")
     
@@ -943,6 +1054,8 @@ async def update_appointment_status(appointment_id: int, payload: AppointmentSta
     
     old_status = appointment.status
     new_status = payload.status.lower()
+    if new_status not in APPOINTMENT_STATUSES:
+        raise HTTPException(status_code=400, detail="حالة الحجز غير صالحة")
     
     if new_status == "cancelled" and old_status != "cancelled":
         customer = db.query(Customer).filter(Customer.customer_id == appointment.customer_id).first()
@@ -1015,7 +1128,7 @@ def delete_appointment(
 
 @router.post("/{appointment_id}/issue-invoice", response_model=IssueInvoiceResponse, status_code=status.HTTP_201_CREATED)
 def issue_invoice_from_appointment(appointment_id: int, payment_method: str = "cash", db: Session = Depends(get_db), current_user: User = Depends(require_cashier_manager_owner)):
-    appointment = db.query(Appointment).options(joinedload(Appointment.services)).filter(Appointment.id == appointment_id).first()
+    appointment = db.query(Appointment).options(*appointment_eager_options()).filter(Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="الحجز غير موجود")
     existing_invoice = db.query(Invoice).filter(Invoice.appointment_id == appointment_id).first()
@@ -1055,7 +1168,27 @@ def issue_invoice_from_appointment(appointment_id: int, payment_method: str = "c
         created_by_user_id=getattr(current_user, "id", None),
     )
     db.add(invoice)
-    db.flush()
+    try:
+        # The flush is where the `uq_invoices_appointment_id` unique index
+        # actually fires, because that is the first moment this row exists in
+        # the transaction. Everything above -- the services walk, the totals, the
+        # PDF -- is wasted work if the constraint is going to reject the row, so
+        # the constraint is asked here rather than left to fail at `db.commit()`
+        # after the PDF has been generated and the cash leg created.
+        #
+        # Without this, the loser of the race gets a 500 from a unique
+        # violation. With it, the cashier who double-tapped gets the same 409
+        # the pre-check above would have given had the timing been different,
+        # and the message is the one they already know.
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        if "uq_invoices_appointment_id" in str(exc.orig) or "appointment_id" in str(exc.orig):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="تم إصدار فاتورة لهذا الحجز بالفعل",
+            ) from exc
+        raise
     
     invoice_items = []
     for item in appointment_services:
@@ -1097,7 +1230,8 @@ def issue_invoice_from_appointment(appointment_id: int, payment_method: str = "c
         db.add(session)
 
     update_customer_loyalty(db, appointment.customer_id, total_amount)
-    deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=getattr(current_user, "id", None))
+    if session is None:
+        deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=getattr(current_user, "id", None))
 
     if total_amount > 0:
         db.add(
@@ -1142,7 +1276,7 @@ def issue_invoice_from_appointment(appointment_id: int, payment_method: str = "c
                 created_by_user_id=getattr(current_user, "id", None),
             )
         except Exception as exc:
-            print(f"WhatsApp invoice send failed: {exc}")
+            logger.exception("WhatsApp invoice send failed: %s", exc)
 
     return IssueInvoiceResponse(
         message="تم إصدار الفاتورة بنجاح",

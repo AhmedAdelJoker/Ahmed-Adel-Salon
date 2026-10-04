@@ -123,7 +123,7 @@ export const QueueTab = ({
                           className="h-9 rounded-xl px-4 text-[10px] font-black"
                           onClick={() => handleStatusChange(item.id, "in-service")}
                         >
-                          <Play size={12} className="ml-1" /> بدء
+                          <Play size={12} className="ms-1" /> بدء
                         </Button>
                       ) : item.status === "in-service" ? (
                         <Button
@@ -132,11 +132,11 @@ export const QueueTab = ({
                           className="h-9 rounded-xl px-4 text-[10px] font-black"
                           onClick={() => handleStatusChange(item.id, "completed")}
                         >
-                          <CheckCircle size={12} className="ml-1" /> إنهاء
+                          <CheckCircle size={12} className="ms-1" /> إنهاء
                         </Button>
                       ) : (
                         <Badge variant="success" className="h-7 px-3 text-[10px] font-black">
-                          <CheckCircle size={10} className="ml-1" /> مكتمل
+                          <CheckCircle size={10} className="ms-1" /> مكتمل
                         </Badge>
                       )}
                     </div>

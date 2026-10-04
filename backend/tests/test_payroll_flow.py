@@ -1,5 +1,6 @@
 from datetime import date
 
+from app.crud.core_business import create_cash_transaction
 from app.models.employee import Employee
 from app.models.expense import Expense
 from tests.helpers import auth_headers, make_user
@@ -48,6 +49,12 @@ def test_pay_creates_expense_and_locks_double_pay(client, db_session):
     calc = client.post("/api/v1/payroll/calculate", json=_period(), headers=headers)
     assert calc.status_code == 200, calc.text
     payroll_id = calc.json()[0]["id"]
+    create_cash_transaction(
+        db_session,
+        direction="in",
+        amount=100000,
+        transaction_type="opening_balance",
+    )
 
     before = db_session.query(Expense).count()
     paid = client.post(f"/api/v1/payroll/{payroll_id}/pay", headers=headers)

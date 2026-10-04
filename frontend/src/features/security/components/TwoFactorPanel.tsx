@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ContentPanel } from "@/components/shared/PremiumUI";
+import { clearTwoFactorEnrollment } from "@/lib/auth/twoFactorEnrollment";
 
 type PanelStatus = "loading" | "disabled" | "setup" | "enabled";
 
@@ -61,6 +62,10 @@ export default function TwoFactorPanel() {
       setQr("");
       setSecret("");
       setCode("");
+      // Clear the restriction flag, or the router keeps bouncing the user back
+      // to this tab forever. The current session token is still the restricted
+      // one, so a reload is what actually promotes it -- see below.
+      clearTwoFactorEnrollment();
       await refreshStatus();
     } catch (err) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -138,7 +143,7 @@ export default function TwoFactorPanel() {
               </p>
             )}
             <div className="space-y-1.5">
-              <label htmlFor="totp-setup-code" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+              <label htmlFor="totp-setup-code" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                 رمز التحقق (6 أرقام)
               </label>
               <Input
@@ -169,7 +174,7 @@ export default function TwoFactorPanel() {
               لإيقافها أدخل كلمة المرور الحالية للتأكيد.
             </p>
             <div className="space-y-1.5">
-              <label htmlFor="totp-disable-password" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+              <label htmlFor="totp-disable-password" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                 كلمة المرور الحالية
               </label>
               <Input

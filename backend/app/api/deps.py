@@ -13,10 +13,23 @@ def require_roles(*allowed_roles):
         if not is_role_allowed(current_user.role, *allowed_roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="ليس لديك صلاحية للوصول إلى هذا المورد",
+                detail="لا تملك صلاحية للقيام بهذا الإجراء",
             )
         return current_user
 
+    # Name the closure after what it actually enforces.
+    #
+    # Every gate here is a function object returned by this factory, so they all
+    # share the inner name `dependency` and are indistinguishable by
+    # introspection. That is not cosmetic: `scripts/audit_authorization.py`
+    # walks the route dependency graph to find endpoints with no role check, and
+    # it reported 155 unguarded mutations -- including
+    # `DELETE /customers/archive/bulk-permanent`, which does have
+    # `require_owner` and always did. Any future audit, doc generator, or review
+    # tool hits the same wall, because the information is genuinely absent
+    # rather than merely hard to reach.
+    dependency.__name__ = f"require_roles[{'|'.join(allowed_roles)}]"
+    dependency.__qualname__ = dependency.__name__
     return dependency
 
 
@@ -26,8 +39,27 @@ require_manage_employees = require_roles("admin", "owner", "manager")
 require_manage_appointments = require_roles("admin", "owner", "manager")
 require_manage_catalog = require_roles("admin", "owner", "manager")
 require_cashier_manager_owner = require_roles("cashier", "manager", "admin", "owner", "accountant")
+require_shift_operator = require_roles("cashier", "manager", "admin", "owner")
 require_any_staff = require_roles("cashier", "barber", "manager", "admin", "owner", "accountant")
 require_barber_only = require_roles("barber")
+require_barber_or_manager = require_roles("barber", "admin", "owner", "manager")
+
+WORKING_HOURS_EDITOR_ROLES = ("admin", "owner", "manager")
+require_working_hours_editor = require_roles(*WORKING_HOURS_EDITOR_ROLES)
+
+
+def ensure_working_hours_editor(current_user: User) -> None:
+    """Guard for endpoints whose role gate is wider than the hours policy.
+
+    ``require_owner_or_manager`` also admits accountants, who must not reshape
+    the salon-wide schedule, so any handler that accepts a ``working_hours``
+    payload has to call this explicitly.
+    """
+    if not is_role_allowed(current_user.role, *WORKING_HOURS_EDITOR_ROLES):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="تعديل ساعات عمل الصالون متاح للمالك والمدير فقط",
+        )
 
 
 def get_current_active_shift(

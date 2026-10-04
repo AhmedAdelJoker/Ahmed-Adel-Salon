@@ -1,4 +1,5 @@
 from datetime import timedelta, datetime, timezone
+import logging
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm, HTTPAuthorizationCredentials, HTTPBearer
@@ -8,24 +9,38 @@ from jwt.exceptions import ExpiredSignatureError, PyJWTError as JWTError
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+logger = logging.getLogger(__name__)
+
 from app.db.session import get_db
 from app.core.config import settings
 from app.core.security import (
-    DUMMY_PASSWORD_HASH,
+    dummy_hash,
     create_access_token,
     create_refresh_token,
     decode_token,
+    verify_and_maybe_rehash,
     is_jti_revoked,
     revoke_jti,
     token_version_of,
     verify_password,
 )
-from app.core.rate_limit import rate_limit
+from app.core.rate_limit import client_identifier, rate_limit
 from app.core.account_lockout import get_lockout
 from app.core.audit import audit_log
+from app.core import totp_enforcement
+from app.core.totp_crypto import (
+    TotpSecretUnavailable,
+    decrypt_totp_secret,
+    encrypt_totp_secret,
+    is_legacy_plaintext,
+)
 from app.models.user import User
 
-from app.api.deps_auth import get_current_active_user, oauth2_scheme
+from app.api.deps_auth import (
+    get_current_active_user,
+    get_current_user_or_enrolling,
+    oauth2_scheme,
+)
 from app.schemas.profile import ProfileRead
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -245,17 +260,39 @@ class TwoFactorDisable(BaseModel):
     password: str
 
 
+def _resolve_totp_secret(user: User) -> str | None:
+    """Return the plaintext TOTP seed, migrating legacy rows in place.
+
+    Rows written before encryption existed hold a raw base32 seed. They keep
+    verifying, and the value on the user object is upgraded to ciphertext so
+    the caller's existing commit persists the migration.
+    """
+    stored = getattr(user, "totp_secret", None)
+    if not stored:
+        return None
+    if is_legacy_plaintext(stored):
+        user.totp_secret = encrypt_totp_secret(stored)
+        return stored
+    return decrypt_totp_secret(stored)
+
+
 @router.post("/2fa/setup")
 def setup_two_factor(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    # Either a full session (a privileged user enrolling early) or the
+    # restricted enrolment token issued when the grace period expired. Accepting
+    # both is what keeps the account reachable without opening these endpoints
+    # to an unrestricted caller who skipped the decision.
+    current_user: User = Depends(get_current_user_or_enrolling),
 ):
     """Generate a TOTP secret (inactive until verified via /2fa/enable)."""
     if getattr(current_user, "totp_enabled", False):
         raise HTTPException(status_code=400, detail="المصادقة الثنائية مفعّلة بالفعل")
     secret = pyotp.random_base32()
-    current_user.totp_secret = secret
+    # Stored encrypted: a plaintext seed would let anyone with database read
+    # access generate valid codes and skip 2FA entirely.
+    current_user.totp_secret = encrypt_totp_secret(secret)
     current_user.totp_enabled = False
     db.add(current_user)
     db.commit()
@@ -278,7 +315,7 @@ def enable_two_factor(
     payload: TwoFactorCode,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_enrolling),
 ):
     """Verify a TOTP code against the pending secret and activate 2FA."""
     if getattr(current_user, "totp_enabled", False):
@@ -286,8 +323,10 @@ def enable_two_factor(
     if not current_user.totp_secret:
         raise HTTPException(status_code=400, detail="ابدأ الإعداد أولاً عبر /2fa/setup")
     try:
+        pending_secret = _resolve_totp_secret(current_user)
         ok = bool(
-            pyotp.TOTP(current_user.totp_secret).verify(payload.code.strip(), valid_window=1)
+            pending_secret
+            and pyotp.TOTP(pending_secret).verify(payload.code.strip(), valid_window=1)
         )
     except Exception:
         ok = False
@@ -387,7 +426,11 @@ def login(
     # Phase 3: account lockout by username + IP.
     # The check is per-identifier so a single user can't lock out everyone.
     lockout = get_lockout()
-    ip = request.client.host if request.client else "unknown"
+    # Resolved through the proxy-trust policy rather than read straight off
+    # `request.client`. Behind a reverse proxy the socket peer is the proxy
+    # itself, so every visitor would share one "ip:" identity — and five failed
+    # attempts by anyone would lock the entire salon out of its own system.
+    ip = client_identifier(request)
     user_identifier = f"user:{form_data.username}"
     ip_identifier = f"ip:{ip}"
 
@@ -404,7 +447,7 @@ def login(
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user:
         # Constant-time-ish dummy verify to avoid leaking whether the user exists
-        verify_password(form_data.password, DUMMY_PASSWORD_HASH)
+        verify_password(form_data.password, dummy_hash())
         for identifier in (user_identifier, ip_identifier):
             lockout.record_failure(identifier)
         audit_log(
@@ -418,7 +461,16 @@ def login(
             detail="اسم المستخدم أو كلمة المرور غير صحيحة",
         )
 
-    if not verify_password(form_data.password, user.hashed_password):
+    # Verifies, and upgrades the stored hash to Argon2id when it is a legacy
+    # bcrypt one. Doing it here rather than in a batch migration means no
+    # password reset is ever required and no plaintext is handled: the plaintext
+    # is already in hand, and the account is upgraded the moment its owner signs
+    # in. Accounts that never sign in keep their bcrypt hash, which is not a
+    # risk worth a forced reset.
+    verified, upgraded_hash = verify_and_maybe_rehash(
+        form_data.password, user.hashed_password
+    )
+    if not verified:
         for identifier in (user_identifier, ip_identifier):
             lockout.record_failure(identifier)
         audit_log(
@@ -444,6 +496,69 @@ def login(
             detail="المستخدم غير نشط",
         )
 
+    if upgraded_hash:
+        # Written only after the password has been proven correct and the
+        # account is known to be active, so a disabled account cannot be used
+        # to rewrite its own credential.
+        user.hashed_password = upgraded_hash
+        db.commit()
+        logger.info(
+            "Upgraded credential hash to Argon2id for user_id=%s", user.id
+        )
+
+    # First successful sign-in. Stamped before the 2FA decision, because the
+    # grace period is measured from this moment and not from `created_at`; an
+    # account seeded months ago gets its full window starting now rather than
+    # being blocked on the login that first proves the account is real.
+    if getattr(user, "first_login_at", None) is None:
+        user.first_login_at = datetime.now(timezone.utc)
+        db.commit()
+
+    # Mandatory 2FA for privileged roles.
+    #
+    # This runs *after* the password is proven and *after* the active check, and
+    # before any token is minted. Ordering matters in both directions: it must
+    # not tell an anonymous caller whether a privileged account exists, and it
+    # must not upgrade a disabled account's session on the way past.
+    enforcement = totp_enforcement.decide(
+        role=user.role,
+        totp_enabled=bool(getattr(user, "totp_enabled", False)),
+        first_login_at=getattr(user, "first_login_at", None),
+        created_at=getattr(user, "created_at", None),
+    )
+    if enforcement.blocks_full_session:
+        logger.warning(
+            "Blocking full session for user_id=%s role=%s: 2FA enrolment required (%s)",
+            user.id, user.role, enforcement.reason,
+        )
+        audit_log(
+            db, request, user,
+            action="login_2fa_enrollment_blocked",
+            entity_type="auth",
+            description={
+                "username": user.username,
+                "role": user.role,
+                "reason": enforcement.reason,
+            },
+        )
+        # A correctly signed token that opens nothing except the two enrolment
+        # endpoints. The account is not locked out: the user can complete setup
+        # and sign in again with a full session.
+        restricted = create_access_token(
+            user.username,
+            extra_claims={
+                "scope": totp_enforcement.ENROLLMENT_SCOPE,
+                "ver": token_version_of(user),
+            },
+        )
+        return {
+            "access_token": restricted,
+            "token_type": "bearer",
+            "2fa_enrollment_required": True,
+            "2fa_reason": enforcement.reason,
+            "user": {"id": user.id, "username": user.username, "role": user.role},
+        }
+
     # Phase 3 (2FA/TOTP): users with totp_enabled must present a valid code.
     # Machine-readable signal via X-2FA-Required header (detail stays a string).
     if getattr(user, "totp_enabled", False):
@@ -460,9 +575,21 @@ def login(
                 headers={"X-2FA-Required": "totp"},
             )
         try:
+            secret = _resolve_totp_secret(user)
+        except TotpSecretUnavailable:
+            # SECRET_KEY was rotated: the stored seed is unreadable. Fail closed
+            # but log it separately so this is not mistaken for a wrong code.
+            audit_log(
+                db, request, user,
+                action="login_failed",
+                entity_type="auth",
+                description={"username": form_data.username, "reason": "totp_secret_undecryptable"},
+            )
+            secret = None
+        try:
             totp_ok = bool(
-                user.totp_secret
-                and pyotp.TOTP(user.totp_secret).verify(totp_code.strip(), valid_window=1)
+                secret
+                and pyotp.TOTP(secret).verify(totp_code.strip(), valid_window=1)
             )
         except Exception:
             totp_ok = False
@@ -509,6 +636,13 @@ def login(
         "refresh_token": refresh_token_value,
         "token_type": "bearer",
         "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        # Set only for a privileged account still inside its grace period. The
+        # session is fully usable; this is the client being told to prompt before
+        # the prompt becomes a block. Null for everyone else, so the frontend
+        # can test it directly instead of inferring it from the role.
+        "2fa_enrollment_due": (
+            enforcement.deadline.isoformat() if enforcement.should_prompt_enrollment else None
+        ),
         "user": {
             "id": user.id,
             "username": user.username,

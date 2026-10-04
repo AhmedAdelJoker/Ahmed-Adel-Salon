@@ -74,16 +74,16 @@ export const PerformanceTab = ({ performanceData, totalRevenue, totalServices }:
               <Area
                 type="monotone"
                 dataKey="revenue"
-                stroke="#6366f1"
-                fill="#6366f1"
+                stroke="var(--chart-2)"
+                fill="var(--chart-2)"
                 fillOpacity={0.15}
                 strokeWidth={2}
               />
               <Area
                 type="monotone"
                 dataKey="services"
-                stroke="#10b981"
-                fill="#10b981"
+                stroke="var(--chart-3)"
+                fill="var(--chart-3)"
                 fillOpacity={0.15}
                 strokeWidth={2}
               />
@@ -112,7 +112,7 @@ export const PerformanceTab = ({ performanceData, totalRevenue, totalServices }:
               />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip formatter={(value: number | string) => [value, "خدمة"]} />
-              <Bar dataKey="services" fill="#10b981" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="services" fill="var(--chart-3)" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

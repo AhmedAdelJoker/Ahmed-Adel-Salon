@@ -29,15 +29,10 @@ def list_working_hours(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    # Phase 2: prefer Employee, fall back to Barber for backwards compatibility
-    employee = (
-        db.query(Employee).filter(Employee.id == barber_id).first()
-    )
-    if not employee:
-        # Legacy fallback
-        from app.models.barber import Barber
-        if not db.query(Barber).filter(Barber.id == barber_id).first():
-            raise HTTPException(status_code=404, detail="الحلاق غير موجود")
+    # Phase 2: single Employee lookup. The old `Barber` fallback is gone — it
+    # was an alias of Employee, so it could never find a row the first query
+    # had missed. It only cost an extra round-trip on every 404.
+    _ensure_employee(db, barber_id)
     return (
         db.query(EmployeeWorkingHour)
         .filter(EmployeeWorkingHour.employee_id == barber_id)
@@ -73,11 +68,7 @@ def list_time_off(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    employee = db.query(Employee).filter(Employee.id == barber_id).first()
-    if not employee:
-        from app.models.barber import Barber
-        if not db.query(Barber).filter(Barber.id == barber_id).first():
-            raise HTTPException(status_code=404, detail="الحلاق غير موجود")
+    _ensure_employee(db, barber_id)
     return (
         db.query(EmployeeTimeOff)
         .filter(EmployeeTimeOff.employee_id == barber_id)

@@ -47,7 +47,7 @@ export default function BookingsToolbar({
             <Input
               ref={searchInputRef}
               placeholder="بحث باسم العميل أو الهاتف (/)..."
-              className="h-10 sm:h-11 pr-10 text-xs font-bold rounded-xl bg-soft/50 border-border focus:bg-card"
+              className="h-10 sm:h-11 pe-10 text-xs font-bold rounded-xl bg-soft/50 border-border focus:bg-card"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />

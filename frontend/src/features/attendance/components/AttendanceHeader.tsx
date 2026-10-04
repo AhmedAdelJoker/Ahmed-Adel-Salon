@@ -55,7 +55,7 @@ export function AttendancePageHeader({
             className="h-10 rounded-xl px-3"
             onClick={onShowSettings}
           >
-            <Settings size={14} className="ml-1.5" />
+            <Settings size={14} className="ms-1.5" />
             <span className="hidden sm:inline">الإعدادات</span>
           </Button>
           <Button
@@ -63,11 +63,11 @@ export function AttendancePageHeader({
             className="h-10 rounded-xl px-3"
             onClick={onExportPDF}
           >
-            <Download size={14} className="ml-1.5" />
+            <Download size={14} className="ms-1.5" />
             <span className="hidden sm:inline">تصدير PDF</span>
           </Button>
           <Button onClick={onRefresh} className="h-10 rounded-xl px-4">
-            <RefreshCw size={14} className="ml-1.5" />
+            <RefreshCw size={14} className="ms-1.5" />
             <span className="hidden sm:inline">تحديث</span>
           </Button>
         </div>

@@ -219,7 +219,7 @@ export function LogDetailDialog({
                 إغلاق
               </Button>
               <Button onClick={onGoInventory} className="flex-1 h-11 rounded-xl font-black">
-                الذهاب للمخزون <ExternalLink size={14} className="mr-2" />
+                الذهاب للمخزون <ExternalLink size={14} className="me-2" />
               </Button>
             </div>
           </div>

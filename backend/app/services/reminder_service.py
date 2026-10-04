@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
 from app.models.customer import Customer
-from app.models.barber import Barber
+from app.models.employee import Employee
 from app.services.meta_whatsapp_service import send_appointment_reminder_24h_template, send_appointment_reminder_2h_template
 
 
@@ -15,10 +15,28 @@ def send_due_reminders(db: Session):
     target_2h_to = now + timedelta(hours=2, minutes=15)
 
     appointments = db.query(Appointment).all()
+    if not appointments:
+        return
+
+    # Phase 2: prefetch customers + employees once instead of two queries per
+    # appointment. Previously this ran 2N+1 queries on every scheduler tick.
+    customer_ids = {a.customer_id for a in appointments if a.customer_id is not None}
+    barber_ids = {a.barber_id for a in appointments if a.barber_id is not None}
+
+    customers_by_id = {}
+    if customer_ids:
+        for c in db.query(Customer).filter(Customer.customer_id.in_(customer_ids)).all():
+            customers_by_id[c.customer_id] = c
+
+    barbers_by_id = {}
+    if barber_ids:
+        for e in db.query(Employee).filter(Employee.id.in_(barber_ids)).all():
+            barbers_by_id[e.id] = e
+
     for appointment in appointments:
         appointment_dt = datetime.combine(appointment.appointment_date, appointment.appointment_time)
-        customer = db.query(Customer).filter(Customer.customer_id == appointment.customer_id).first()
-        barber = db.query(Barber).filter(Barber.id == appointment.barber_id).first()
+        customer = customers_by_id.get(appointment.customer_id)
+        barber = barbers_by_id.get(appointment.barber_id)
         if not customer or not customer.phone:
             continue
         if not appointment.reminder_24h_sent and target_24h_from <= appointment_dt <= target_24h_to:

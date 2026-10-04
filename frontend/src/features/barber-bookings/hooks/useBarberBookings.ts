@@ -1,6 +1,8 @@
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "react-hot-toast";
 import { barberService } from "@/services/barberService";
+import { loadErrorMessage } from "@/lib/core/asyncError";
 
 export interface BarberAppointment {
   id: string | number;
@@ -54,10 +56,12 @@ export const useBarberBookings = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchAppointments = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
+      setLoadError(null);
       const monthStr: string = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, "0")}`;
       const getCalendar = barberService.getCalendar as unknown as (
         month: string | null,
@@ -65,7 +69,10 @@ export const useBarberBookings = () => {
       const res = await getCalendar(monthStr);
       setAppointments(res?.appointments || []);
     } catch (err) {
+      // Console-only: a failed load showed the barber an empty day with no
+      // indication that the request failed rather than the day being free.
       console.error("Appointments fetch error:", err);
+      setLoadError(loadErrorMessage(err, "الحجوزات"));
     } finally {
       setLoading(false);
     }
@@ -83,7 +90,10 @@ export const useBarberBookings = () => {
       await barberService.updateStatus(id, newStatus);
       await fetchAppointments();
     } catch (err) {
+      // Silent status updates leave the barber's list disagreeing with the
+      // backend, so surface it instead of logging.
       console.error("Status update error:", err);
+      toast.error("تعذر تحديث حالة الحجز. أعد المحاولة.");
     }
   };
 
@@ -150,6 +160,7 @@ export const useBarberBookings = () => {
     setSelectedDate,
     appointments,
     loading,
+    loadError,
     searchTerm,
     setSearchTerm,
     statusFilter,

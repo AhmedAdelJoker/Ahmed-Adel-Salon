@@ -15,6 +15,7 @@ import {
   normalizeUnit,
 } from "@/features/inventory/design-tokens";
 import { FormField } from "@/features/inventory";
+import { currencyLabel } from "@/lib/core/currency";
 import {
   NATIVE_SELECT_CLASS,
   TEXTAREA_CLASS,
@@ -229,11 +230,9 @@ export function ProductFormModal({
                       sell_price: e.target.value,
                     }))
                   }
-                  className="h-10 rounded-xl bg-soft border-border font-black text-success pl-10 sm:h-12 sm:pl-12"
+                  className="h-10 rounded-xl bg-soft border-border font-black text-success ps-10 sm:h-12 sm:ps-12"
                 />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">
-                  ج.م
-                </span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">{currencyLabel()}</span>
               </div>
             </FormField>
             <FormField label="تكلفة العبوة">
@@ -247,11 +246,9 @@ export function ProductFormModal({
                       cost_price: e.target.value,
                     }))
                   }
-                  className="h-10 rounded-xl bg-soft border-border font-black pl-10 sm:h-12 sm:pl-12"
+                  className="h-10 rounded-xl bg-soft border-border font-black ps-10 sm:h-12 sm:ps-12"
                 />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">
-                  ج.م
-                </span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted sm:left-4">{currencyLabel()}</span>
               </div>
             </FormField>
           </div>
@@ -294,7 +291,7 @@ export function ProductFormModal({
             onClick={onSave}
             className="h-10 rounded-xl px-6 text-xs"
           >
-            <Save size={14} className="ml-1.5" />{" "}
+            <Save size={14} className="ms-1.5" />{" "}
             {editingProduct ? "حفظ" : "إدراج"}
           </Button>
         </DialogFooter>

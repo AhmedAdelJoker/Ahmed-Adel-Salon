@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import { cn, formatCurrency, formatNumber } from "@/lib/core/utils";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import {
   PageHeader,
@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/select";
 import { staticURL } from "@/services/api";
 import { useProductBundles } from "@/features/product-bundles";
+import { currencyLabel } from "@/lib/core/currency";
 
 function resolveBundleImage(offer: any): string {
   if (!offer?.image_url) return "";
@@ -194,7 +195,7 @@ export default function ProductBundles() {
               onClick={openCreate}
               className="h-11 rounded-xl px-5 font-black shadow-lg shadow-primary/20"
             >
-              <Gift size={16} className="ml-1.5" /> إنشاء باقة
+              <Gift size={16} className="ms-1.5" /> إنشاء باقة
             </Button>
           </div>
         }
@@ -224,7 +225,7 @@ export default function ProductBundles() {
               variant="ghost"
               size="sm"
               onClick={handleResetFilters}
-              className="mr-auto h-8 gap-1 rounded-xl text-xs font-black"
+              className="me-auto h-8 gap-1 rounded-xl text-xs font-black"
             >
               <RotateCcw size={12} /> إعادة ضبط
             </Button>
@@ -243,7 +244,7 @@ export default function ProductBundles() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="ابحث باسم الحزمة أو الوصف..."
                 aria-label="بحث في الحزم"
-                className="h-11 pr-10 rounded-xl bg-soft border-border font-bold"
+                className="h-11 pe-10 rounded-xl bg-soft border-border font-bold"
               />
             </div>
           </div>
@@ -336,7 +337,7 @@ export default function ProductBundles() {
                   <div className="space-y-2 flex-1">
                     <div className="text-[10px] font-black text-muted uppercase tracking-widest flex items-center gap-1.5">
                       <Package size={12} className="text-primary" /> محتويات الحزمة
-                      <span className="mr-auto tabular-nums text-[10px] bg-soft border border-border rounded-full px-2 py-0.5">
+                      <span className="me-auto tabular-nums text-[10px] bg-soft border border-border rounded-full px-2 py-0.5">
                         {offer.offer_products?.length || 0}
                       </span>
                     </div>
@@ -416,9 +417,9 @@ export default function ProductBundles() {
                       {togglingId === offer.id ? (
                         <RefreshCw size={14} className="animate-spin" />
                       ) : isOffActive ? (
-                        <PowerOff size={14} className="ml-1" />
+                        <PowerOff size={14} className="ms-1" />
                       ) : (
-                        <Power size={14} className="ml-1" />
+                        <Power size={14} className="ms-1" />
                       )}
                       <span className="hidden xs:inline">{isOffActive ? "تعطيل" : "تفعيل"}</span>
                     </Button>
@@ -441,7 +442,7 @@ export default function ProductBundles() {
             {offers.length === 0 ? (
               <EmptyState
                 title="لا توجد عروض منتجات"
-                text="ابدأ بإنشاء أول حزمة منتجات (Bundle) لزيادة مبيعاتك وتفريغ المخزون الراكد."
+                message="ابدأ بإنشاء أول حزمة منتجات (Bundle) لزيادة مبيعاتك وتفريغ المخزون الراكد."
                 icon={Gift}
                 action={
                   <Button onClick={openCreate} className="h-11 rounded-xl px-6 font-black">
@@ -452,11 +453,11 @@ export default function ProductBundles() {
             ) : (
               <EmptyState
                 title="لا نتائج"
-                text="لم نجد حزماً تطابق بحثك — جرب توسيع الفلتر أو مسح البحث."
+                message="لم نجد حزماً تطابق بحثك — جرب توسيع الفلتر أو مسح البحث."
                 icon={Search}
                 action={
                   <Button variant="outline" onClick={handleResetFilters} className="h-10 rounded-xl font-black">
-                    <RotateCcw size={14} className="ml-1.5" /> مسح الفلترة
+                    <RotateCcw size={14} className="ms-1.5" /> مسح الفلترة
                   </Button>
                 }
               />
@@ -489,7 +490,7 @@ export default function ProductBundles() {
               </div>
               <span className="truncate">{editingId ? "تعديل حزمة المنتجات" : "هندسة حزمة منتجات احترافية"}</span>
             </DialogTitle>
-            <DialogDescription className="text-muted font-bold mt-2 mr-[52px] text-xs sm:text-sm">
+            <DialogDescription className="text-muted font-bold mt-2 me-[52px] text-xs sm:text-sm">
               قم بدمج المنتجات وتحديد السعر التنافسي لجذب العملاء.
             </DialogDescription>
           </DialogHeader>
@@ -596,14 +597,12 @@ export default function ProductBundles() {
                       value={formData.offer_price}
                       onChange={(e) => setFormData((p: any) => ({ ...p, offer_price: e.target.value }))}
                       className={cn(
-                        "h-14 rounded-xl font-black text-xl tabular-nums pl-14 pr-4 bg-card",
+                        "h-14 rounded-xl font-black text-xl tabular-nums ps-14 pe-4 bg-card",
                         isPriceInvalid ? "border-danger focus:border-danger text-danger" : "border-border focus:border-primary",
                       )}
                       placeholder="0.00"
                     />
-                    <div className={cn("absolute left-4 top-1/2 -translate-y-1/2 font-black text-sm", isPriceInvalid ? "text-danger" : "text-muted")}>
-                      ج.م
-                    </div>
+                    <div className={cn("absolute left-4 top-1/2 -translate-y-1/2 font-black text-sm", isPriceInvalid ? "text-danger" : "text-muted")}>{currencyLabel()}</div>
                   </div>
                   {isPriceInvalid && <p className="text-[11px] font-bold text-danger">لا يمكن أن يتجاوز {formatCurrency(totalPrice)}</p>}
                   {!isPriceInvalid && !isPriceEmpty && totalPrice === 0 && (

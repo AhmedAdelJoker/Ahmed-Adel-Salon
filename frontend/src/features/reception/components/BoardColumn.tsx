@@ -2,7 +2,7 @@
 import { Badge } from "@/components/ui/badge";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/core/utils";
-import ReceptionEmptyState from "@/features/reception/components/ReceptionEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import AppointmentCard from "@/features/reception/components/AppointmentCard";
 
 export default function BoardColumn({
@@ -89,10 +89,10 @@ export default function BoardColumn({
             <CardSkeleton />
           </>
         ) : items.length === 0 ? (
-          <ReceptionEmptyState
+          <EmptyState variant="board"
             icon={col.icon}
             title="القائمة فارغة"
-            desc="لا يوجد عملاء في هذه المرحلة حالياً."
+            message="لا يوجد عملاء في هذه المرحلة حالياً."
           />
         ) : (
           items.map((appt) => (

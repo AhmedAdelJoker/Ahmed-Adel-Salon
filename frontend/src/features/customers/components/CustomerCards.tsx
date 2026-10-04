@@ -4,7 +4,7 @@ import { History, Trash2 } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
 import { formatCurrency } from "@/lib/core/utils";
 import { customerId, customerName, getInitials } from "@/features/customers/utils/customer";
-import { EmptyState } from "@/components/shared";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function CustomerCards({
   rows,
@@ -94,7 +94,7 @@ export default function CustomerCards({
                         onOpenDetails(customer);
                       }}
                     >
-                      <History className="h-3.5 w-3.5 ml-1.5" /> السجل
+                      <History className="h-3.5 w-3.5 ms-1.5" /> السجل
                     </Button>
                     {isOwner && (
                       <Button

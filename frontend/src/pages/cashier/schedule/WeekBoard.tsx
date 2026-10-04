@@ -101,7 +101,7 @@ const WeekBoard = memo(function WeekBoard({
                 </p>
               </div>
 
-              <div className="flex-1 space-y-2.5 overflow-y-auto custom-scrollbar pr-0.5">
+              <div className="flex-1 space-y-2.5 overflow-y-auto custom-scrollbar pe-0.5">
                 {dayAppts.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center opacity-30">
                     <CalendarDays size={32} className="text-muted" />

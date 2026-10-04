@@ -48,7 +48,7 @@ export function UserFormModal({
         <DialogContent
           className="max-w-[600px] p-0 overflow-hidden border-none bg-card shadow-premium rounded-[2.5rem]"
         >
-          <div className="px-10 py-8 border-b border-border/40 bg-[#020617] relative overflow-hidden text-white">
+          <div className="relative px-10 py-8 border-b border-border/40 bg-neutral-900 text-white overflow-hidden dark:bg-black/40">
             <div className="absolute top-0 right-0 w-full h-full bg-primary/10 blur-[100px] pointer-events-none" />
             <div className="relative z-10 flex items-center gap-6">
               <div className="h-16 w-16 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 flex items-center justify-center text-primary shadow-2xl">
@@ -70,7 +70,7 @@ export function UserFormModal({
           <div className="p-10 space-y-8 bg-card">
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2.5">
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest mr-2">
+                <label className="text-[10px] font-black text-muted uppercase tracking-widest me-2">
                   معرف الدخول
                 </label>
                 <div className="relative group">
@@ -83,13 +83,13 @@ export function UserFormModal({
                     onChange={(e) =>
                       setFormData({ ...formData, username: e.target.value })
                     }
-                    className="h-12 pl-4 pr-12 rounded-xl bg-soft border-border focus:bg-white focus:border-primary font-black shadow-sm"
+                    className="h-12 ps-4 pe-12 rounded-xl bg-soft border-border focus:bg-white focus:border-primary font-black shadow-sm"
                     dir="ltr"
                   />
                 </div>
               </div>
               <div className="space-y-2.5">
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest mr-2">
+                <label className="text-[10px] font-black text-muted uppercase tracking-widest me-2">
                   كلمة المرور
                 </label>
                 <div className="relative group">
@@ -103,7 +103,7 @@ export function UserFormModal({
                     onChange={(e) =>
                       setFormData({ ...formData, password: e.target.value })
                     }
-                    className="h-12 pl-4 pr-12 rounded-xl bg-soft border-border focus:bg-white focus:border-primary font-black shadow-sm"
+                    className="h-12 ps-4 pe-12 rounded-xl bg-soft border-border focus:bg-white focus:border-primary font-black shadow-sm"
                     placeholder={
                       editingUser
                         ? "اتركه فارغاً للاحتفاظ بالقديمة"
@@ -116,7 +116,7 @@ export function UserFormModal({
             </div>
 
             <div className="space-y-2.5">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest mr-2">
+              <label className="text-[10px] font-black text-muted uppercase tracking-widest me-2">
                 الاسم الكامل للموظف
               </label>
               <div className="relative group">
@@ -130,14 +130,14 @@ export function UserFormModal({
                     setFormData({ ...formData, full_name: e.target.value })
                   }
                   placeholder="الاسم كما يظهر في النظام"
-                  className="h-12 pl-4 pr-12 rounded-xl bg-soft border-border focus:bg-white focus:border-primary font-black shadow-sm"
+                  className="h-12 ps-4 pe-12 rounded-xl bg-soft border-border focus:bg-white focus:border-primary font-black shadow-sm"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2.5">
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest mr-2">
+                <label className="text-[10px] font-black text-muted uppercase tracking-widest me-2">
                   الرتبة الوظيفية
                 </label>
                 <select
@@ -156,7 +156,7 @@ export function UserFormModal({
                 </select>
               </div>
               <div className="space-y-2.5">
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest mr-2">
+                <label className="text-[10px] font-black text-muted uppercase tracking-widest me-2">
                   حالة الوصول
                 </label>
                 <div className="h-12 flex items-center justify-between px-5 border border-border rounded-xl bg-soft shadow-sm">

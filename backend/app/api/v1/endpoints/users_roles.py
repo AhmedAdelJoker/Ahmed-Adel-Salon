@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import require_roles
 from app.models.user import User
-from app.models.barber import Barber
 from app.schemas.user_role import UserCreate, UserRead, UserRoleUpdate, UserActiveUpdate, UserUpdate
 from app.core.security import get_password_hash
 from app.core.roles import UserRole, normalize_role

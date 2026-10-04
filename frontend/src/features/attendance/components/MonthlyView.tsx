@@ -1,5 +1,6 @@
 /** Attendance Monthly view (moved from AttendanceManagement page, no logic changes). */
 import { motion } from "framer-motion";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { BarChart3, TrendingUp } from "lucide-react";
 import {
   Bar,
@@ -20,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
 import { cn } from "@/lib/core/utils";
 import type { AttendanceRecord } from "@/features/attendance/types";
+import { currencyLabel } from "@/lib/core/currency";
 
 export default function MonthlyView({ processedData }: { processedData: AttendanceRecord[] }) {
   return (
@@ -62,12 +64,12 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                       <Legend />
                       <Bar
                         dataKey="ساعات"
-                        fill="#10b981"
+                        fill="var(--chart-3)"
                         radius={[8, 8, 0, 0]}
                       />
                       <Bar
                         dataKey="تأخير"
-                        fill="#f59e0b"
+                        fill="var(--chart-4)"
                         radius={[8, 8, 0, 0]}
                       />
                     </BarChart>
@@ -92,7 +94,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                                     100 >=
                                   90,
                               ).length || 1,
-                            color: "#10b981",
+                            color: "var(--chart-3)",
                           },
                           {
                             name: "جيد (70-89%)",
@@ -103,7 +105,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                                   100;
                                 return r >= 70 && r < 90;
                               }).length || 1,
-                            color: "#3b82f6",
+                            color: "var(--chart-2)",
                           },
                           {
                             name: "متوسط (50-69%)",
@@ -114,7 +116,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                                   100;
                                 return r >= 50 && r < 70;
                               }).length || 0,
-                            color: "#f59e0b",
+                            color: "var(--chart-4)",
                           },
                           {
                             name: "ضعيف (<50%)",
@@ -125,7 +127,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                                     100 <
                                   50,
                               ).length || 0,
-                            color: "#ef4444",
+                            color: "var(--chart-7)",
                           },
                         ].filter((d) => d.value > 0)}
                         cx="50%"
@@ -138,10 +140,10 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                         labelLine={false}
                       >
                         {[
-                          { color: "#10b981" },
-                          { color: "#3b82f6" },
-                          { color: "#f59e0b" },
-                          { color: "#ef4444" },
+                          { color: "var(--chart-3)" },
+                          { color: "var(--chart-2)" },
+                          { color: "var(--chart-4)" },
+                          { color: "var(--chart-7)" },
                         ].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
@@ -180,9 +182,9 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                       <Line
                         type="monotone"
                         dataKey="حضور"
-                        stroke="#10b981"
+                        stroke="var(--chart-3)"
                         strokeWidth={3}
-                        dot={{ fill: "#10b981", r: 5 }}
+                        dot={{ fill: "var(--chart-3)", r: 5 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -261,7 +263,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                           </p>
                           <p className="text-xl font-black text-emerald-600">
                             {emp.payroll?.netSalary || 0}
-                            <small className="text-xs"> ج.م</small>
+                            <small className="text-xs">{currencyLabel()}</small>
                           </p>
                         </div>
                       </div>
@@ -289,15 +291,7 @@ export default function MonthlyView({ processedData }: { processedData: Attendan
                   );
                 })
               ) : (
-                <div className="md:col-span-2 flex flex-col items-center justify-center py-16 rounded-2xl border border-dashed border-border bg-card">
-                  <TrendingUp size={60} className="mb-4 text-muted" />
-                  <p className="text-xl font-black text-main">
-                    لا توجد بيانات شهرية
-                  </p>
-                  <p className="mt-1 text-xs font-bold text-muted">
-                    لم يتم تسجيل أي بيانات حضور لهذا الشهر
-                  </p>
-                </div>
+                <EmptyState variant="section" icon={TrendingUp} title="لا توجد بيانات شهرية" message="لم يتم تسجيل أي بيانات حضور لهذا الشهر" />
               )}
             </div>
           </motion.div>

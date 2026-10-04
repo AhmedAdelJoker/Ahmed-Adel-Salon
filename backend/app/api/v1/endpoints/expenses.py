@@ -3,7 +3,7 @@ from uuid import uuid4
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query, Response
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query, Request, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -15,6 +15,7 @@ from app.schemas.expense import ExpenseCreate, ExpenseRead, ExpenseSummary, Expe
 from app.utils.expense_labels import expense_label_ar
 from app.utils.media import process_image_content, get_upload_path
 from app.core.upload_security import validate_image_or_pdf
+from app.core.audit import audit_log
 from app.crud.core_business import create_cash_transaction
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
@@ -267,7 +268,8 @@ def create_expense(
     requiring = {"إيجار", "مشتريات"}
     if payload.category in requiring and not (payload.recipient_name and str(payload.recipient_name).strip()):
         raise HTTPException(status_code=400, detail="اسم المستفيد/المورد مطلوب لفئة الإيجار والمشتريات")
-    status_val = getattr(payload, "status", None) or ("pending_audit" if str(current_user.role).lower() == "cashier" else "approved")
+    role = str(current_user.role or "").strip().lower()
+    status_val = "approved" if role in {"owner", "admin"} else "pending_audit"
     expense = Expense(
         title=payload.title or f"مصروف {payload.category}",
         amount=payload.amount,
@@ -284,37 +286,33 @@ def create_expense(
         created_by_user_id=current_user.id,
     )
     db.add(expense)
-    db.commit()
-    db.refresh(expense)
-    # reload with creator for response
-    expense = db.query(Expense).options(joinedload(Expense.created_by_user)).filter(Expense.id == expense.id).first()
+    db.flush()
 
-    # ديناميكي: أي مصروف معتمد يسجل حركة خزنة تلقائياً (كاش/غير كاش)
     if status_val == "approved" and expense.amount and float(expense.amount) > 0:
-        try:
-            pm = str(expense.payment_method or "cash").strip().lower()
-            create_cash_transaction(
-                db,
-                direction="out",
-                amount=float(expense.amount),
-                transaction_type="expense_payment",
-                payment_method=pm or "cash",
-                notes=f"مصروف: {expense.title} - {expense.category}",
-                user_id=current_user.id,
-                reference_type="expense",
-                reference_id=expense.id,
-                reference_no=f"EXP-{expense.id}",
-                commit=True,
-            )
-        except Exception as _e:
-            print(f"[Cashbox] expense auto-withdraw failed for expense {expense.id}: {_e}")
+        pm = str(expense.payment_method or "cash").strip().lower()
+        create_cash_transaction(
+            db,
+            direction="out",
+            amount=float(expense.amount),
+            transaction_type="expense_payment",
+            payment_method=pm or "cash",
+            notes=f"مصروف: {expense.title} - {expense.category}",
+            user_id=current_user.id,
+            reference_type="expense",
+            reference_id=expense.id,
+            reference_no=f"EXP-{expense.id}",
+            commit=False,
+        )
 
+    db.commit()
+    expense = db.query(Expense).options(joinedload(Expense.created_by_user)).filter(Expense.id == expense.id).first()
     return expense
 
 
 @router.post("/{expense_id}/approve", response_model=ExpenseRead)
 def approve_expense(
     expense_id: int,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
@@ -323,39 +321,64 @@ def approve_expense(
         raise HTTPException(status_code=404, detail="Expense not found")
     
     was_pending = expense.status == "pending_audit"
+    if expense.status not in {"pending_audit", "approved"}:
+        raise HTTPException(status_code=400, detail="لا يمكن اعتماد هذه الحالة")
+    previous_status = expense.status
     expense.status = "approved"
+
+    # Snapshot before the commit: approving an expense is the operation that
+    # actually moves money (it writes a `direction="out"` CashTransaction), so
+    # it is the financial event most worth tracing back to a user + IP.
+    snapshot = {
+        "title": expense.title,
+        "category": expense.category,
+        "amount": float(expense.amount or 0),
+        "payment_method": expense.payment_method,
+        "previous_status": previous_status,
+        "cash_movement_created": False,
+    }
+
+    if was_pending and expense.amount and float(expense.amount) > 0:
+        from app.crud.core_business import find_existing_cash_transaction
+        existing = find_existing_cash_transaction(
+            db,
+            reference_type="expense",
+            reference_id=expense.id,
+            transaction_type="expense_payment",
+        )
+        if not existing:
+            pm = str(expense.payment_method or "cash").strip().lower()
+            create_cash_transaction(
+                db,
+                direction="out",
+                amount=float(expense.amount),
+                transaction_type="expense_payment",
+                payment_method=pm or "cash",
+                notes=f"مصروف معتمد: {expense.title} - {expense.category}",
+                user_id=current_user.id,
+                reference_type="expense",
+                reference_id=expense.id,
+                reference_no=f"EXP-{expense.id}",
+                commit=False,
+            )
+            snapshot["cash_movement_created"] = True
+
     db.commit()
     db.refresh(expense)
-
-    # إذا كان معلق سابقاً، الآن يسمع في الخزنة
-    if was_pending and expense.amount and float(expense.amount) > 0:
-        try:
-            from app.crud.core_business import find_existing_cash_transaction
-            existing = find_existing_cash_transaction(db, reference_type="expense", reference_id=expense.id, transaction_type="expense_payment")
-            if not existing:
-                pm = str(expense.payment_method or "cash").strip().lower()
-                create_cash_transaction(
-                    db,
-                    direction="out",
-                    amount=float(expense.amount),
-                    transaction_type="expense_payment",
-                    payment_method=pm or "cash",
-                    notes=f"مصروف معتمد: {expense.title} - {expense.category}",
-                    user_id=current_user.id,
-                    reference_type="expense",
-                    reference_id=expense.id,
-                    reference_no=f"EXP-{expense.id}",
-                    commit=True,
-                )
-        except Exception as _e:
-            print(f"[Cashbox] approve auto-withdraw failed for expense {expense.id}: {_e}")
-
+    audit_log(
+        db, request, current_user,
+        action="approve_expense",
+        entity_type="expense",
+        entity_id=expense_id,
+        description=snapshot,
+    )
     return expense
 
 
 @router.post("/{expense_id}/reject", response_model=ExpenseRead)
 def reject_expense(
     expense_id: int,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
@@ -363,9 +386,24 @@ def reject_expense(
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
     
+    # Rejecting blocks a payout, so it is the mirror of approve: both move the
+    # expense across the audit boundary and both need a trail.
+    snapshot = {
+        "title": expense.title,
+        "category": expense.category,
+        "amount": float(expense.amount or 0),
+        "previous_status": expense.status,
+    }
     expense.status = "rejected"
     db.commit()
     db.refresh(expense)
+    audit_log(
+        db, request, current_user,
+        action="reject_expense",
+        entity_type="expense",
+        entity_id=expense_id,
+        description=snapshot,
+    )
     return expense
 
 
@@ -435,15 +473,17 @@ def delete_expense(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    # User requested to disable deleting financial records
+    """Hard delete of a financial record — permanently disabled.
+
+    Raising 403 is the whole point of keeping this route: it returns a clear
+    "not allowed" instead of a 404 from a removed path, so the UI can explain
+    the policy instead of looking broken.
+
+    No audit_log call here — the operation cannot happen. The financial events
+    on this router that DO move money (`approve_expense`, which writes a
+    `direction="out"` CashTransaction) are the audited ones.
+    """
     raise HTTPException(
         status_code=403, 
         detail="حذف السجلات المالية غير مسموح به لضمان نزاهة البيانات"
     )
-    
-    # expense = db.query(Expense).filter(Expense.id == expense_id).first()
-    # if not expense:
-    #     raise HTTPException(status_code=404, detail="المصروف غير موجود")
-    # db.delete(expense)
-    # db.commit()
-    # return None

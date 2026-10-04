@@ -28,6 +28,7 @@ from app.models.notification import Notification
 from app.schemas.booking import PublicBookingCreate, PublicBookingResponse
 from app.core.config import settings
 from app.core.rate_limit import rate_limit
+from app.core.working_hours import public_payload
 from app.services import booking_scheduler
 from app.services.meta_whatsapp_service import send_booking_confirmation_template
 
@@ -89,11 +90,6 @@ def _get_or_create_customer(
     last_name = payload.last_name or ""
 
     if customer:
-        customer.first_name = payload.first_name
-        customer.last_name = last_name
-        customer.email = payload.email
-        db.add(customer)
-        db.flush()
         return customer
 
     customer = Customer(
@@ -175,6 +171,13 @@ def get_booking_catalog(
     db: Session = Depends(get_db),
 ):
     settings_row = db.query(BusinessSettings).first()
+    if (
+        settings_row is None
+        or settings_row.public_site_published_at is None
+        or not settings_row.public_site_snapshot
+    ):
+        raise HTTPException(status_code=404, detail="الموقع العام غير منشور بعد")
+    public_settings = settings_row.public_site_snapshot
     services = (
         db.query(Service)
         .filter(Service.is_active == True)
@@ -213,12 +216,13 @@ def get_booking_catalog(
 
     return {
         "business": {
-            "salon_name": settings_row.salon_name if settings_row else "SalonPro",
-            "shop_phone": settings_row.shop_phone if settings_row else None,
-            "shop_whatsapp": settings_row.shop_whatsapp if settings_row else None,
-            "address": settings_row.address if settings_row else None,
-            "logo_url": settings_row.logo_url if settings_row else None,
-            "working_hours": settings_row.working_hours if settings_row else None,
+            "salon_name": public_settings.get("salon_name") or "SalonPro",
+            "shop_phone": public_settings.get("shop_phone"),
+            "shop_whatsapp": public_settings.get("shop_whatsapp"),
+            "address": public_settings.get("address"),
+            "logo_url": public_settings.get("logo_url"),
+            "working_hours": public_payload(public_settings.get("working_hours")),
+            "public_slug": public_settings.get("public_slug"),
         },
         "services": [
             {
@@ -341,6 +345,14 @@ def create_public_booking(
             status_code=400,
             detail="يجب اختيار خدمة واحدة على الأقل",
         )
+
+    published_settings = db.query(BusinessSettings).first()
+    if (
+        published_settings is None
+        or published_settings.public_site_published_at is None
+        or not published_settings.public_site_snapshot
+    ):
+        raise HTTPException(status_code=404, detail="الموقع العام غير منشور بعد")
 
     # احسب مدة الخدمات المختارة
     total_duration = 0

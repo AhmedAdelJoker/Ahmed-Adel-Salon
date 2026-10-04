@@ -135,7 +135,7 @@ const AgendaPanel = memo(function AgendaPanel({
           </Badge>
         </div>
 
-        <div className="space-y-2.5 max-h-[380px] overflow-y-auto custom-scrollbar pl-1">
+        <div className="space-y-2.5 max-h-[380px] overflow-y-auto custom-scrollbar ps-1">
           <AnimatePresence initial={false}>
             {upcoming.length === 0 ? (
               <div className="py-8 flex flex-col items-center gap-3 opacity-40">

@@ -1,5 +1,5 @@
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from typing import List, Optional
@@ -12,6 +12,7 @@ from app.models.employee import Employee
 from app.models.payroll_record import PayrollRecord
 from app.models.salary_advance import SalaryAdvance
 from app.models.expense import Expense
+from app.core.audit import audit_log
 from app.schemas.payroll import (
     PayrollCreate, PayrollRead, PayrollUpdate, 
     PayrollSummary, PayrollArchiveResponse, PayrollCalculateRequest
@@ -372,28 +373,24 @@ def pay_payroll(
         db.add(new_expense)
         db.flush()
         
-        # ديناميكي: حركة خزنة لسحب الراتب (كاش/غير كاش حسب طريقة الدفع)
-        try:
-            from app.crud.core_business import create_cash_transaction
-            pm = str(new_expense.payment_method or "cash").strip().lower()
-            if new_expense.amount and float(new_expense.amount) > 0:
-                create_cash_transaction(
-                    db,
-                    direction="out",
-                    amount=float(new_expense.amount),
-                    transaction_type="payroll_payment",
-                    payment_method=pm or "cash",
-                    notes=f"صرف راتب: {record.employee_name_snapshot} {record.period_month}/{record.period_year}",
-                    user_id=current_user.id,
-                    reference_type="payroll",
-                    reference_id=record.id,
-                    reference_no=f"PAY-{record.id}",
-                    employee_id=record.employee_id,
-                    commit=False,
-                )
-        except Exception as _e:
-            print(f"[Cashbox] payroll auto-withdraw failed: {_e}")
-        
+        from app.crud.core_business import create_cash_transaction
+        pm = str(new_expense.payment_method or "cash").strip().lower()
+        if new_expense.amount and float(new_expense.amount) > 0:
+            create_cash_transaction(
+                db,
+                direction="out",
+                amount=float(new_expense.amount),
+                transaction_type="payroll_payment",
+                payment_method=pm or "cash",
+                notes=f"صرف راتب: {record.employee_name_snapshot} {record.period_month}/{record.period_year}",
+                user_id=current_user.id,
+                reference_type="payroll",
+                reference_id=record.id,
+                reference_no=f"PAY-{record.id}",
+                employee_id=record.employee_id,
+                commit=False,
+            )
+
         record.expense_id = new_expense.id
         
         # Mark advances as deducted
@@ -438,6 +435,7 @@ def cancel_payroll(
 @router.delete("/{payroll_id}")
 def delete_payroll(
     payroll_id: int, 
+    request: Request = None,
     db: Session = Depends(get_db), 
     current_user: User = Depends(require_owner_or_manager)
 ):
@@ -448,8 +446,22 @@ def delete_payroll(
     if record.status == "paid":
         raise HTTPException(status_code=400, detail="Cannot delete paid payroll")
         
+    # Snapshot before delete — after `db.delete()` the ORM state is expunged.
+    snapshot = {
+        "employee_id": getattr(record, "employee_id", None),
+        "period": getattr(record, "period", None) or getattr(record, "month", None),
+        "base_salary": float(getattr(record, "base_salary", 0) or 0),
+        "status": record.status,
+    }
     db.delete(record)
     db.commit()
+    audit_log(
+        db, request, current_user,
+        action="delete_payroll",
+        entity_type="payroll_record",
+        entity_id=payroll_id,
+        description={"deleted": snapshot},
+    )
     return {"message": "Payroll record deleted successfully"}
 
 

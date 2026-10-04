@@ -1,4 +1,6 @@
 import { useAuth } from "@/context/AuthContext";
+import { PageShell } from "@/components/shared/PageShell";
+import { EmptyState } from "@/components/shared/EmptyState";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -118,8 +120,8 @@ const BarberClients = () => {
   );
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <PageHeader
           title="عملائي"
           subtitle="إدارة العملاء وتاريخهم وتفضيلاتهم"
@@ -144,7 +146,7 @@ const BarberClients = () => {
                 setIsModalOpen(true);
               }}
             >
-              <Plus size={14} className="ml-1.5" /> إضافة عميل
+              <Plus size={14} className="ms-1.5" /> إضافة عميل
             </Button>
           }
         />
@@ -160,7 +162,7 @@ const BarberClients = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="بحث بالاسم أو الهاتف..."
-              className="h-10 w-full pr-9 text-sm"
+              className="h-10 w-full pe-9 text-sm"
             />
           </div>
         </div>
@@ -175,13 +177,7 @@ const BarberClients = () => {
               />
             ))
           ) : filteredClients.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-16 text-center">
-              <Users size={40} className="mb-3 text-muted" />
-              <p className="text-base font-black text-main">لا توجد عملاء</p>
-              <p className="mt-1 text-xs font-bold text-muted">
-                ابدأ بإضافة أول عميل
-              </p>
-            </div>
+            <EmptyState variant="section" icon={Users} title="لا توجد عملاء" message="ابدأ بإضافة أول عميل" />
           ) : (
             filteredClients.map((client, i) => (
               <motion.div
@@ -373,11 +369,10 @@ const BarberClients = () => {
                 {isEditing ? "حفظ" : "إضافة"}
               </Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DialogContent>
+          </Dialog>
+      </PageShell>
     </div>
   );
 };
-
 export default BarberClients;

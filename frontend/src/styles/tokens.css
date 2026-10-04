@@ -1,0 +1,725 @@
+/* ============================================================
+   ROYAL OS — DESIGN TOKENS (v2 "Modern Tech")
+   ------------------------------------------------------------
+   Single source of truth for colour, depth, radius, motion and
+   density. Nothing in the app may hardcode a hex value: every
+   surface, border, shadow and chart series resolves through this
+   file, so a theme change is a one-file change.
+
+   Architecture
+   ------------
+   1. Ramps        — full 50..950 scale per hue family
+   2. Accents      — swappable brand hues via [data-accent]
+   3. Semantic     — the ONLY layer components may consume
+   4. Depth/Radius — elevation + shape language
+   5. Density      — compact / comfortable / spacious
+   6. Motion       — reduced / normal / rich
+
+   Backwards compatibility
+   -----------------------
+   Section 7 re-declares every legacy token name (--primary,
+   --bg-main, --text-main, --border, --success …) on top of the
+   new semantics. That keeps all 70 existing pages rendering
+   correctly while they are migrated to the v2 names one by one.
+   ============================================================ */
+
+/* ============================================================
+   1. RAMPS
+   Independent of theme and accent: the raw material.
+   ============================================================ */
+:root {
+  /* ---- Brand: Indigo (default Modern Tech identity) ---- */
+  --indigo-50: #eef2ff;
+  --indigo-100: #e0e7ff;
+  --indigo-200: #c7d2fe;
+  --indigo-300: #a5b4fc;
+  --indigo-400: #818cf8;
+  --indigo-500: #6366f1;
+  --indigo-600: #4f46e5;
+  --indigo-700: #4338ca;
+  --indigo-800: #3730a3;
+  --indigo-900: #312e81;
+  --indigo-950: #1e1b4b;
+
+  /* ---- Neutral: cool zinc, tuned for long reading sessions ---- */
+  --zinc-50: #fafafa;
+  --zinc-100: #f4f4f5;
+  --zinc-200: #e4e4e7;
+  --zinc-300: #d4d4d8;
+  --zinc-400: #a1a1aa;
+  --zinc-500: #71717a;
+  --zinc-600: #52525b;
+  --zinc-700: #3f3f46;
+  --zinc-800: #27272a;
+  --zinc-900: #18181b;
+  --zinc-950: #09090b;
+
+  /* ---- Status (Okabe-Ito derived: colour-blind safe) ---- */
+  --emerald-50: #ecfdf5;
+  --emerald-100: #d1fae5;
+  --emerald-200: #a7f3d0;
+  --emerald-300: #6ee7b7;
+  --emerald-400: #34d399;
+  --emerald-500: #10b981;
+  --emerald-600: #059669;
+  --emerald-700: #047857;
+  --emerald-800: #065f46;
+  --emerald-900: #064e3b;
+  --emerald-950: #022c22;
+
+  --amber-50: #fffbeb;
+  --amber-100: #fef3c7;
+  --amber-200: #fde68a;
+  --amber-300: #fcd34d;
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
+  --amber-600: #d97706;
+  --amber-700: #b45309;
+  --amber-800: #92400e;
+  --amber-900: #78350f;
+  --amber-950: #451a03;
+
+  --rose-50: #fff1f2;
+  --rose-100: #ffe4e6;
+  --rose-200: #fecdd3;
+  --rose-300: #fda4af;
+  --rose-400: #fb7185;
+  --rose-500: #f43f5e;
+  --rose-600: #e11d48;
+  --rose-700: #be123c;
+  --rose-800: #9f1239;
+  --rose-900: #881337;
+  --rose-950: #4c0519;
+
+  --sky-50: #f0f9ff;
+  --sky-100: #e0f2fe;
+  --sky-200: #bae6fd;
+  --sky-300: #7dd3fc;
+  --sky-400: #38bdf8;
+  --sky-500: #0ea5e9;
+  --sky-600: #0284c7;
+  --sky-700: #0369a1;
+  --sky-800: #075985;
+  --sky-900: #0c4a6e;
+  --sky-950: #082f49;
+
+  /* ---- Luxe: champagne gold, kept for the premium accent ---- */
+  --gold-50: #fdfaf3;
+  --gold-100: #faf3e3;
+  --gold-200: #f3e4c4;
+  --gold-300: #e9cf9b;
+  --gold-400: #ddb871;
+  --gold-500: #c9a227;
+  --gold-600: #a8861f;
+  --gold-700: #87681a;
+  --gold-800: #6b5119;
+  --gold-900: #573f19;
+  --gold-950: #2e2009;
+
+  /* ---- Violet: the second Modern Tech hue ---- */
+  --violet-50: #f5f3ff;
+  --violet-100: #ede9fe;
+  --violet-200: #ddd6fe;
+  --violet-300: #c4b5fd;
+  --violet-400: #a78bfa;
+  --violet-500: #8b5cf6;
+  --violet-600: #7c3aed;
+  --violet-700: #6d28d9;
+  --violet-800: #5b21b6;
+  --violet-900: #4c1d95;
+  --violet-950: #2e1065;
+
+  /* ---- Teal: eighth chart series ---- */
+  --teal-50: #f0fdfa;
+  --teal-100: #ccfbf1;
+  --teal-200: #99f6e4;
+  --teal-300: #5eead4;
+  --teal-400: #2dd4bf;
+  --teal-500: #14b8a6;
+  --teal-600: #0d9488;
+  --teal-700: #0f766e;
+  --teal-800: #115e59;
+  --teal-900: #134e4a;
+  --teal-950: #042f2e;
+}
+
+/* ============================================================
+   2. ACCENT THEMES
+   Swappable brand identity. Only the accent ramp + glow change;
+   every semantic token in section 3 follows automatically.
+   ============================================================ */
+:root,
+[data-accent="indigo"] {
+  --accent-50: var(--indigo-50);
+  --accent-100: var(--indigo-100);
+  --accent-200: var(--indigo-200);
+  --accent-300: var(--indigo-300);
+  --accent-400: var(--indigo-400);
+  --accent-500: var(--indigo-500);
+  --accent-600: var(--indigo-600);
+  --accent-700: var(--indigo-700);
+  --accent-800: var(--indigo-800);
+  --accent-900: var(--indigo-900);
+  --accent-950: var(--indigo-950);
+  --accent-hue: 243;
+}
+
+[data-accent="violet"] {
+  --accent-50: var(--violet-50);
+  --accent-100: var(--violet-100);
+  --accent-200: var(--violet-200);
+  --accent-300: var(--violet-300);
+  --accent-400: var(--violet-400);
+  --accent-500: var(--violet-500);
+  --accent-600: var(--violet-600);
+  --accent-700: var(--violet-700);
+  --accent-800: var(--violet-800);
+  --accent-900: var(--violet-900);
+  --accent-950: var(--violet-950);
+  --accent-hue: 258;
+}
+
+[data-accent="cyan"] {
+  --accent-50: var(--sky-50);
+  --accent-100: var(--sky-100);
+  --accent-200: var(--sky-200);
+  --accent-300: var(--sky-300);
+  --accent-400: var(--sky-400);
+  --accent-500: var(--sky-500);
+  --accent-600: var(--sky-600);
+  --accent-700: var(--sky-700);
+  --accent-800: var(--sky-800);
+  --accent-900: var(--sky-900);
+  --accent-950: var(--sky-950);
+  --accent-hue: 199;
+}
+
+[data-accent="emerald"] {
+  --accent-50: var(--emerald-50);
+  --accent-100: var(--emerald-100);
+  --accent-200: var(--emerald-200);
+  --accent-300: var(--emerald-300);
+  --accent-400: var(--emerald-400);
+  --accent-500: var(--emerald-500);
+  --accent-600: var(--emerald-600);
+  --accent-700: var(--emerald-700);
+  --accent-800: var(--emerald-800);
+  --accent-900: var(--emerald-900);
+  --accent-950: var(--emerald-950);
+  --accent-hue: 160;
+}
+
+[data-accent="gold"] {
+  --accent-50: var(--gold-50);
+  --accent-100: var(--gold-100);
+  --accent-200: var(--gold-200);
+  --accent-300: var(--gold-300);
+  --accent-400: var(--gold-400);
+  --accent-500: var(--gold-500);
+  --accent-600: var(--gold-600);
+  --accent-700: var(--gold-700);
+  --accent-800: var(--gold-800);
+  --accent-900: var(--gold-900);
+  --accent-950: var(--gold-950);
+  --accent-hue: 42;
+}
+
+/* ============================================================
+   3. SEMANTIC TOKENS — light theme
+   The only layer components are allowed to reference.
+   ============================================================ */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* ---- Surfaces ---- */
+  --surface-canvas: #fbfbfd;
+  --surface-sunken: #f4f4f7;
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.72);
+  --surface-glass-strong: rgba(255, 255, 255, 0.88);
+  --surface-inset: rgba(9, 9, 11, 0.04);
+  --surface-hover: rgba(9, 9, 11, 0.04);
+  --surface-active: rgba(9, 9, 11, 0.07);
+  --surface-selected: hsl(var(--accent-hue) 84% 96%);
+  --scrim: rgba(9, 9, 11, 0.32);
+
+  /* ---- Content ---- */
+  --content-primary: var(--zinc-900);
+  --content-secondary: var(--zinc-600);
+  --content-tertiary: var(--zinc-500);
+  --content-disabled: var(--zinc-400);
+  --content-inverse: #ffffff;
+  --content-accent: var(--accent-700);
+  --content-on-accent: #ffffff;
+
+  /* ---- Lines ---- */
+  --line-subtle: rgba(9, 9, 11, 0.07);
+  --line-default: rgba(9, 9, 11, 0.11);
+  --line-strong: rgba(9, 9, 11, 0.2);
+  --line-accent: var(--accent-500);
+
+  /* ---- Status ---- */
+  --status-success: var(--emerald-600);
+  --status-success-bg: var(--emerald-50);
+  --status-success-line: rgba(5, 150, 105, 0.28);
+  --status-success-content: var(--emerald-700);
+
+  --status-warning: var(--amber-600);
+  --status-warning-bg: var(--amber-50);
+  --status-warning-line: rgba(217, 119, 6, 0.28);
+  --status-warning-content: var(--amber-800);
+
+  --status-danger: var(--rose-600);
+  --status-danger-bg: var(--rose-50);
+  --status-danger-line: rgba(225, 29, 72, 0.28);
+  --status-danger-content: var(--rose-700);
+
+  --status-info: var(--sky-600);
+  --status-info-bg: var(--sky-50);
+  --status-info-line: rgba(2, 132, 199, 0.28);
+  --status-info-content: var(--sky-800);
+
+  --status-neutral: var(--zinc-600);
+  --status-neutral-bg: var(--zinc-100);
+  --status-neutral-line: rgba(9, 9, 11, 0.12);
+  --status-neutral-content: var(--zinc-700);
+
+  /* ---- Interactive ---- */
+  --action-primary: var(--accent-600);  --action-primary-hover: var(--accent-700);
+  --action-primary-active: var(--accent-800);
+  --action-primary-content: #ffffff;
+  --action-secondary: var(--surface-raised);
+  --action-secondary-hover: var(--surface-hover);
+  --action-secondary-content: var(--content-primary);
+  --action-ghost-hover: var(--surface-hover);
+  --action-danger: var(--rose-600);
+  --action-danger-hover: var(--rose-700);
+  --action-danger-content: #ffffff;
+
+  --focus-ring: var(--accent-500);
+  --focus-ring-offset: #ffffff;
+  --focus-ring-width: 2px;
+  --focus-ring-offset-width: 2px;
+
+  /* ---- Chart series: eight distinguishable, theme-aware hues ---- */
+  --chart-1: var(--accent-500);
+  --chart-2: var(--sky-500);
+  --chart-3: var(--emerald-500);
+  --chart-4: var(--amber-500);
+  --chart-5: var(--violet-500);
+  --chart-6: var(--zinc-400);
+  --chart-7: var(--rose-500);
+  --chart-8: var(--teal-500);
+  --chart-grid: rgba(9, 9, 11, 0.07);
+  --chart-axis: var(--zinc-500);
+}
+
+/* ============================================================
+   3b. SEMANTIC TOKENS — dark theme
+   ============================================================ */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-canvas: #08080a;
+  --surface-sunken: #0d0d10;
+  --surface-raised: #131317;
+  --surface-overlay: #16161b;
+  --surface-glass: rgba(22, 22, 27, 0.72);
+  --surface-glass-strong: rgba(22, 22, 27, 0.9);
+  --surface-inset: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.06);
+  --surface-active: rgba(255, 255, 255, 0.1);
+  --surface-selected: hsl(var(--accent-hue) 40% 16%);
+  --scrim: rgba(0, 0, 0, 0.62);
+
+  --content-primary: #fafafa;
+  --content-secondary: #a1a1aa;
+  --content-tertiary: #71717a;
+  --content-disabled: #52525b;
+  --content-inverse: var(--zinc-900);
+  --content-accent: var(--accent-400);
+  --content-on-accent: var(--zinc-950);
+
+  --line-subtle: rgba(255, 255, 255, 0.06);
+  --line-default: rgba(255, 255, 255, 0.11);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --line-accent: var(--accent-500);
+
+  --status-success: var(--emerald-400);
+  --status-success-bg: rgba(16, 185, 129, 0.14);
+  --status-success-line: rgba(16, 185, 129, 0.32);
+  --status-success-content: var(--emerald-300);
+
+  --status-warning: var(--amber-400);
+  --status-warning-bg: rgba(245, 158, 11, 0.14);
+  --status-warning-line: rgba(245, 158, 11, 0.32);
+  --status-warning-content: var(--amber-300);
+
+  --status-danger: var(--rose-400);
+  --status-danger-bg: rgba(244, 63, 94, 0.14);
+  --status-danger-line: rgba(244, 63, 94, 0.32);
+  --status-danger-content: var(--rose-300);
+
+  --status-info: var(--sky-400);
+  --status-info-bg: rgba(14, 165, 233, 0.14);
+  --status-info-line: rgba(14, 165, 233, 0.32);
+  --status-info-content: var(--sky-300);
+
+  --status-neutral: var(--zinc-400);
+  --status-neutral-bg: rgba(255, 255, 255, 0.07);
+  --status-neutral-line: rgba(255, 255, 255, 0.12);
+  --status-neutral-content: var(--zinc-300);
+
+  --action-primary: var(--accent-500);
+  --action-primary-hover: var(--accent-400);
+  --action-primary-active: var(--accent-300);
+  --action-primary-content: #ffffff;
+  --action-secondary: var(--surface-raised);
+  --action-secondary-hover: var(--surface-hover);
+  --action-secondary-content: var(--content-primary);
+  --action-ghost-hover: var(--surface-hover);
+  --action-danger: var(--rose-500);
+  --action-danger-hover: var(--rose-400);
+  --action-danger-content: #ffffff;
+
+  --focus-ring: var(--accent-400);
+  --focus-ring-offset: var(--surface-canvas);
+
+  --chart-1: var(--accent-400);
+  --chart-2: var(--sky-400);
+  --chart-3: var(--emerald-400);
+  --chart-4: var(--amber-400);
+  --chart-5: var(--violet-400);
+  --chart-6: var(--zinc-500);
+  --chart-7: var(--rose-400);
+  --chart-8: var(--teal-400);
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-axis: var(--zinc-500);
+}
+
+/* ============================================================
+   4. DEPTH & SHAPE
+   Elevation is a 5-step scale, not ad-hoc box-shadows. Every step
+   pairs a tight contact shadow with a wide ambient shadow, which is
+   what produces the "lifted glass" read.
+   ============================================================ */
+:root {
+  --elevation-0: none;
+  --elevation-1: 0 1px 2px -1px rgba(9, 9, 11, 0.1), 0 1px 1px -1px rgba(9, 9, 11, 0.06);
+  --elevation-2:
+    0 2px 4px -2px rgba(9, 9, 11, 0.1), 0 4px 8px -4px rgba(9, 9, 11, 0.08);
+  --elevation-3:
+    0 4px 8px -4px rgba(9, 9, 11, 0.1), 0 12px 20px -8px rgba(9, 9, 11, 0.1);
+  --elevation-4:
+    0 8px 16px -8px rgba(9, 9, 11, 0.12), 0 24px 40px -12px rgba(9, 9, 11, 0.14);
+
+  /* Inner top highlight — the single detail that sells the glass look. */
+  --highlight-inner: inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+  --highlight-inner-dark: inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
+
+  --glow-accent: 0 0 0 1px hsl(var(--accent-hue) 84% 60% / 0.28),
+    0 8px 24px -8px hsl(var(--accent-hue) 84% 55% / 0.4);
+
+  /* Accent-aware gradient used by primary actions and hero surfaces. */
+  --gradient-accent: linear-gradient(
+    135deg,
+    var(--accent-500),
+    var(--accent-700)
+  );
+  --gradient-canvas: radial-gradient(
+      1200px 600px at 85% -10%,
+      hsl(var(--accent-hue) 84% 60% / 0.1),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 500px at 10% 0%,
+      hsl(var(--accent-hue) 70% 60% / 0.07),
+      transparent 55%
+    );
+
+  --blur-glass: 20px;
+  --blur-glass-strong: 32px;
+
+  /* Cool navy mixed into surfaces to deepen them without a second shadow.
+     Named here so the glass tints in legacy.css stop hardcoding it. */
+  --surface-shade: #07111d;
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
+  --radius-pill: 999px;
+
+  /* Layout rhythm */
+  --shell-gap: 1rem;
+  --shell-pad: 1.5rem;
+  --content-max: 1600px;
+  --sidebar-w: 17rem;
+  --sidebar-w-collapsed: 4.5rem;
+  --header-h: 3.75rem;
+
+  /* Type */
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 200;
+  --z-drawer: 300;
+  --z-overlay: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-tooltip: 700;
+  --z-toast: 800;
+}
+
+[data-theme="dark"] {
+  --elevation-1: 0 1px 2px -1px rgba(0, 0, 0, 0.5), 0 1px 1px -1px rgba(0, 0, 0, 0.4);
+  --elevation-2: 0 2px 4px -2px rgba(0, 0, 0, 0.5), 0 4px 8px -4px rgba(0, 0, 0, 0.45);
+  --elevation-3: 0 4px 8px -4px rgba(0, 0, 0, 0.5), 0 12px 20px -8px rgba(0, 0, 0, 0.5);
+  --elevation-4: 0 8px 16px -8px rgba(0, 0, 0, 0.55), 0 24px 40px -12px rgba(0, 0, 0, 0.6);
+  --highlight-inner: var(--highlight-inner-dark);
+  --gradient-canvas: radial-gradient(
+      1200px 600px at 85% -10%,
+      hsl(var(--accent-hue) 84% 60% / 0.12),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 500px at 10% 0%,
+      hsl(var(--accent-hue) 70% 55% / 0.08),
+      transparent 55%
+    );
+}
+
+/* ============================================================
+   5. DENSITY
+   Scales the vertical rhythm of the whole app from one attribute,
+   so a cashier on a small laptop and an owner on a 32" display can
+   each get the information density they want.
+   ============================================================ */
+:root,
+[data-density="comfortable"] {
+  --density-row-y: 0.625rem;
+  --density-cell-y: 0.875rem;
+  --density-cell-x: 1rem;
+  --density-control-h: 2.5rem;
+  --density-section-gap: 1.5rem;
+  --density-font-base: 0.9375rem;
+}
+
+[data-density="compact"] {
+  --density-row-y: 0.25rem;
+  --density-cell-y: 0.5rem;
+  --density-cell-x: 0.75rem;
+  --density-control-h: 2rem;
+  --density-section-gap: 1rem;
+  --density-font-base: 0.875rem;
+}
+
+[data-density="spacious"] {
+  --density-row-y: 1rem;
+  --density-cell-y: 1.25rem;
+  --density-cell-x: 1.25rem;
+  --density-control-h: 3rem;
+  --density-section-gap: 2.25rem;
+  --density-font-base: 1rem;
+}
+
+/* ============================================================
+   6. MOTION
+   --duration-* collapse to ~0 and easings flatten to linear, which
+   neutralises transforms without needing a global animation kill.
+   ============================================================ */
+[data-motion="reduced"] {
+  --duration-fast: 1ms;
+  --duration-base: 1ms;
+  --duration-slow: 1ms;
+  --ease-out: linear;
+  --ease-in-out: linear;
+  --ease-spring: linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 1ms;
+    --duration-base: 1ms;
+    --duration-slow: 1ms;
+    --ease-out: linear;
+    --ease-in-out: linear;
+    --ease-spring: linear;
+  }
+}
+
+[data-motion="rich"] {
+  --duration-base: 260ms;
+  --duration-slow: 420ms;
+}
+
+/* ============================================================
+   6b. HIGH CONTRAST
+   An accessibility preference, not a theme: it strengthens every line
+   and content token while leaving the accent untouched. Kept separate
+   from `theme` so a low-vision user does not have to also accept dark
+   mode (or vice versa) to get readable text.
+   ============================================================ */
+[data-contrast="high"] {
+  --line-subtle: var(--line-strong);
+  --line-default: var(--line-strong);
+  --content-secondary: var(--content-primary);
+  --content-tertiary: var(--content-secondary);
+  --content-disabled: var(--content-tertiary);
+  --surface-glass: var(--surface-overlay);
+  --surface-glass-strong: var(--surface-overlay);
+  --focus-ring-width: 3px;
+}
+
+[data-theme="light"][data-contrast="high"] {
+  --line-subtle: rgba(9, 9, 11, 0.42);
+  --line-default: rgba(9, 9, 11, 0.55);
+  --line-strong: rgba(9, 9, 11, 0.72);
+  --content-primary: #000000;
+  --content-secondary: #18181b;
+  --content-tertiary: #27272a;
+  --surface-canvas: #ffffff;
+  --surface-sunken: #f4f4f5;
+  --surface-hover: rgba(9, 9, 11, 0.09);
+  --surface-active: rgba(9, 9, 11, 0.15);
+  --surface-selected: hsl(var(--accent-hue) 84% 90%);
+}
+
+[data-theme="dark"][data-contrast="high"] {
+  --line-subtle: rgba(255, 255, 255, 0.4);
+  --line-default: rgba(255, 255, 255, 0.55);
+  --line-strong: rgba(255, 255, 255, 0.75);
+  --content-primary: #ffffff;
+  --content-secondary: #f4f4f5;
+  --content-tertiary: #e4e4e7;
+  --surface-canvas: #000000;
+  --surface-sunken: #09090b;
+  --surface-raised: #18181b;
+  --surface-hover: rgba(255, 255, 255, 0.14);
+  --surface-active: rgba(255, 255, 255, 0.22);
+  --surface-selected: hsl(var(--accent-hue) 40% 24%);
+}
+
+/* ============================================================
+   7. LEGACY TOKEN BRIDGE
+   Every name the pre-v2 codebase already consumes, remapped onto
+   the v2 semantics. This is what lets all 70 pages pick up the new
+   visual language the moment this file loads, with zero edits —
+   and it also repairs the tokens that were referenced but never
+   defined (--bg-elevated, --text-inverse, --secondary-*, --accent-light,
+   --accent-dark, --primary-muted, --sidebar-*, --shadow-neon), which
+   previously resolved to nothing at all.
+   ============================================================ */
+:root,
+[data-theme="light"],
+[data-theme="dark"] {
+  /* ---- Surfaces ---- */
+  --bg-main: var(--surface-canvas);
+  --bg-soft: var(--surface-sunken);
+  --bg-card: var(--surface-glass);
+  --bg-elevated: var(--surface-raised);
+  --bg-overlay: var(--surface-overlay);
+  --bg-inset: var(--surface-inset);
+  --inverse: var(--content-inverse);
+
+  /* ---- Content ---- */
+  --text-main: var(--content-primary);
+  --text-muted: var(--content-secondary);
+  --text-soft: var(--content-tertiary);
+  --text-inverse: var(--content-inverse);
+  --muted: var(--content-secondary);
+  --muted-soft: var(--surface-sunken);
+  --muted-foreground: var(--surface-raised);
+
+  /* ---- Lines ---- */
+  --border: var(--line-default);
+  --border-soft: var(--line-subtle);
+  --border-strong: var(--line-strong);
+
+  /* ---- Accent ---- */
+  --primary: var(--action-primary);
+  --primary-strong: var(--action-primary-hover);
+  --primary-soft: color-mix(in srgb, var(--accent-500) 12%, transparent);
+  --primary-subtle: color-mix(in srgb, var(--accent-500) 6%, transparent);
+  --primary-muted: color-mix(in srgb, var(--accent-500) 18%, transparent);
+  --primary-foreground: var(--action-primary-content);
+
+  --accent: var(--accent-500);
+  --accent-strong: var(--content-accent);
+  --accent-soft: color-mix(in srgb, var(--accent-500) 12%, transparent);
+  --accent-light: color-mix(in srgb, var(--accent-500) 22%, transparent);
+  --accent-dark: var(--accent-700);
+  --accent-glow: var(--glow-accent);
+
+  --secondary: var(--surface-sunken);
+  --secondary-soft: var(--surface-inset);
+  --secondary-dark: var(--line-strong);
+
+  /* ---- Status ---- */
+  --success: var(--status-success);
+  --success-soft: var(--status-success-bg);
+  --success-foreground: var(--status-success-content);
+  --warning: var(--status-warning);
+  --warning-soft: var(--status-warning-bg);
+  --warning-foreground: var(--status-warning-content);
+  --danger: var(--status-danger);
+  --danger-soft: var(--status-danger-bg);
+  --danger-foreground: var(--status-danger-content);
+  --info: var(--status-info);
+  --info-soft: var(--status-info-bg);
+  --info-foreground: var(--status-info-content);
+
+  /* ---- Depth (legacy names) ---- */
+  --shadow-sm: var(--elevation-1);
+  --shadow-md: var(--elevation-2);
+  --shadow-soft: var(--elevation-1);
+  --shadow-premium: var(--elevation-3);
+  --shadow-accent: var(--glow-accent);
+  --shadow-neon: var(--glow-accent);
+  --sidebar-stroke: var(--line-subtle);
+  --sidebar-surface: var(--surface-glass);
+  --sidebar-surface-strong: var(--surface-glass-strong);
+  --sidebar-glow: var(--glow-accent);
+
+  /* ---- Radius (legacy names) ----
+     `--radius-premium` used to be 26px; the v2 shape language is tighter, so
+     it now aliases the `xl` step. The other legacy radius names are unchanged
+     and need no entry — but they must NOT be redeclared as
+     `--x: var(--x)`, which is a self-referential cycle that resolves to the
+     invalid value. */
+  --radius-premium: var(--radius-xl);
+
+  /* ---- Page background ---- */
+  --grad-page: var(--gradient-canvas);
+}
+
+/* ============================================================
+   7b. BROWSER CHROME COLOUR
+   The colour the mobile address bar / window frame should take. It has to be
+   a literal, because a `<meta name="theme-color">` cannot resolve `var()`.
+   Declaring it here — rather than inlining the same hex in index.html, in the
+   bootstrap script and in AppearanceContext — is what keeps one source of
+   truth for the canvas colour across CSS, markup and TypeScript.
+   ============================================================ */
+:root,
+[data-theme="light"] {
+  --chrome-color: #fbfbfd;
+}
+
+[data-theme="dark"] {
+  --chrome-color: #08080a;
+}

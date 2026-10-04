@@ -40,7 +40,7 @@ export default function ReceptionToolbar({
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="بحث فوري بالاسم أو الهاتف..."
-          className="h-11 pr-11 pl-4 rounded-xl"
+          className="h-11 pe-11 ps-4 rounded-xl"
           aria-label="بحث في المواعيد"
         />
         {searchTerm && (
@@ -80,7 +80,7 @@ export default function ReceptionToolbar({
           onClick={onToggleDone}
           className="h-11 px-4 rounded-xl font-black text-xs flex-1 lg:flex-none"
         >
-          <History size={15} className="ml-1" />
+          <History size={15} className="ms-1" />
           مكتمل اليوم ({doneCount})
         </Button>
       </div>

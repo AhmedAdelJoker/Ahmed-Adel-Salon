@@ -8,7 +8,6 @@ from datetime import datetime, date, time
 
 from app.db.session import get_db
 from app.api.deps import require_owner_or_manager, require_any_staff
-from app.api.deps_auth import get_current_active_user
 from app.core.rate_limit import rate_limit
 from app.models.employee import Employee
 from app.models.employee_presence_log import EmployeePresenceLog
@@ -44,10 +43,15 @@ def get_attendance_logs(
     result = []
     for log in logs:
         result.append({
+            "id": log.id,
+            "barber_id": log.employee_id,
+            "barber_name": log.employee.full_name if log.employee else "Unknown",
             "employee_id": log.employee_id,
             "employee_name": log.employee.full_name if log.employee else "Unknown",
             "status": log.status,
-            "created_at": log.created_at
+            "is_late": bool(getattr(log, "is_late", False)),
+            "late_reason": getattr(log, "late_reason", None),
+            "created_at": log.created_at,
         })
     return result
 
@@ -130,7 +134,7 @@ def fingerprint_attendance(
     employee_id: int,
     type: str,  # "in" or "out"
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_owner_or_manager),
 ):
     """
     Endpoint for Fingerprint Device Integration - requires authentication

@@ -16,6 +16,7 @@ from app.api.v1.endpoints.reports import router as reports_router
 from app.api.v1.endpoints.preferences import router as preferences_router
 from app.api.v1.endpoints.dashboard import router as dashboard_router
 from app.api.v1.endpoints.activity_logs import router as activity_logs_router
+from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.business_settings import router as business_settings_router
 from app.api.v1.endpoints.users_roles import router as users_roles_router
 from app.api.v1.endpoints.products import router as products_router
@@ -37,7 +38,6 @@ from app.api.v1.endpoints.offers import router as offers_router
 from app.api.v1.endpoints.attendance import router as attendance_router
 from app.api.v1.endpoints.barber_presence import router as barber_presence_router
 from app.api.v1.endpoints.barber_availability import router as barber_availability_router
-from app.api.v1.endpoints.admin import router as admin_router
 from app.api.v1.endpoints.public_seo import router as public_seo_router
 from app.api.v1.endpoints.reminders import router as reminders_router
 from app.api.v1.endpoints.exports import router as exports_router
@@ -104,7 +104,6 @@ api_router.include_router(offers_router)
 api_router.include_router(attendance_router)
 api_router.include_router(barber_presence_router)
 api_router.include_router(barber_availability_router)
-api_router.include_router(admin_router)
 api_router.include_router(public_seo_router)
 api_router.include_router(reminders_router)
 api_router.include_router(exports_router)
@@ -115,3 +114,4 @@ api_router.include_router(financial_rules_router)
 api_router.include_router(exports_runtime_router)
 api_router.include_router(employee_reports_router)
 api_router.include_router(dashboard_core_router)
+api_router.include_router(health_router)

@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_any_staff
+from app.core.config import settings
+from app.core.rate_limit import rate_limit
 from app.models.appointment import Appointment
 from app.models.review import Review
 from app.models.user import User
@@ -60,7 +62,26 @@ def list_public_reviews(db: Session = Depends(get_db), limit: int = 10):
     )
     return [_serialize_review(review) for review in reviews]
 
-@router.post("", response_model=ReviewRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ReviewRead,
+    status_code=status.HTTP_201_CREATED,
+    # Deliberately reachable without a session -- a customer leaves a review from
+    # the public site and has no account to log in with. What that needs is a
+    # quota, not an identity: unauthenticated and unmetered, this endpoint is a
+    # table anyone can grow from the internet, and the audit reports it as
+    # UNPROTECTED by design rather than by oversight. Its own bucket, so the
+    # public-booking quota is not spent by it and vice versa.
+    dependencies=[
+        Depends(
+            rate_limit(
+                "public_review_create",
+                max_requests=settings.PUBLIC_RATE_LIMIT_MAX_REQUESTS,
+                window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+            )
+        )
+    ],
+)
 def create_review(payload: ReviewCreate, db: Session = Depends(get_db)):
     review_data = payload.model_dump(exclude={"barber_id"})
     if payload.appointment_id:

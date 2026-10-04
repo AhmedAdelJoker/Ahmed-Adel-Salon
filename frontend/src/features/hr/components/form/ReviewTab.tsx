@@ -1,6 +1,7 @@
 /** HR ReviewTab (moved from HRManagement page, no logic changes). */
 import type { EmployeeRecord } from "@/types/employee";
 import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/core/utils";
 import { CheckCircle2, ShieldCheck, ShieldAlert } from "lucide-react";
 import { isCustomJobTitleValue } from "@/features/hr";
 
@@ -75,7 +76,7 @@ export default function ReviewTab({
                       الراتب الأساسي:
                     </span>
                     <span className="text-xs font-black text-success">
-                      {Number(formData.baseSalary ?? 0).toLocaleString()} ج.م
+                      {formatCurrency(formData.baseSalary ?? 0)}
                     </span>
                   </div>
                   <div className="flex justify-between">

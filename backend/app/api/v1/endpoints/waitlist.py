@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from pydantic import BaseModel
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db.session import get_db
 from app.models.waitlist_entry import WaitlistEntry
@@ -21,9 +21,31 @@ from app.api.deps import require_cashier_manager_owner
 router = APIRouter(prefix="/waitlist", tags=["Waitlist"])
 
 
+def waitlist_eager_options() -> tuple:
+    """Eager-load options for queries whose rows go through `_waitlist_to_read`.
+
+    A function, not a constant: building the options resolves string-named
+    relationships through SQLAlchemy's class registry, which is only fully
+    populated once every model module has been imported.
+
+    Same reasoning as the appointments list — the relationships were already
+    declared, so two extra queries for the whole page replace two per row. A
+    500-entry waitlist went from 1,001 queries to 3.
+    """
+    return (
+        selectinload(WaitlistEntry.customer),
+        selectinload(WaitlistEntry.barber),
+    )
+
 def _waitlist_to_read(db: Session, entry: WaitlistEntry) -> WaitlistEntryRead:
-    customer = db.query(Customer).filter(Customer.customer_id == entry.customer_id).first()
-    barber = db.query(Employee).filter(Employee.id == entry.barber_id).first() if entry.barber_id else None
+    """Serialises one entry, reading the relationships instead of querying.
+
+    `db` is retained for call-site compatibility. A caller that has not
+    eager-loaded falls back to a lazy load rather than failing; list endpoints
+    should use `.options(*waitlist_eager_options())`.
+    """
+    customer = entry.customer
+    barber = entry.barber
 
     return WaitlistEntryRead(
         id=entry.id,
@@ -62,7 +84,7 @@ def list_waitlist_entries(
     current_user: User = Depends(require_cashier_manager_owner),
 ):
     # Phase 2: was returning ALL entries unbounded
-    query = db.query(WaitlistEntry)
+    query = db.query(WaitlistEntry).options(*waitlist_eager_options())
 
     if target_date:
         query = query.filter(WaitlistEntry.preferred_date == target_date)
@@ -150,7 +172,7 @@ def get_waitlist_entry(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    entry = db.query(WaitlistEntry).filter(WaitlistEntry.id == entry_id).first()
+    entry = db.query(WaitlistEntry).options(*waitlist_eager_options()).filter(WaitlistEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="القيد غير موجود في قائمة الانتظار")
     return _waitlist_to_read(db, entry)
@@ -163,7 +185,7 @@ def update_waitlist_entry(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    entry = db.query(WaitlistEntry).filter(WaitlistEntry.id == entry_id).first()
+    entry = db.query(WaitlistEntry).options(*waitlist_eager_options()).filter(WaitlistEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="القيد غير موجود في قائمة الانتظار")
 
@@ -188,7 +210,7 @@ def delete_waitlist_entry(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    entry = db.query(WaitlistEntry).filter(WaitlistEntry.id == entry_id).first()
+    entry = db.query(WaitlistEntry).options(*waitlist_eager_options()).filter(WaitlistEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="القيد غير موجود في قائمة الانتظار")
 
@@ -210,7 +232,7 @@ def convert_waitlist_to_appointment(
     current_user: User = Depends(require_cashier_manager_owner),
 ):
     """Convert a waitlist entry to an actual appointment."""
-    entry = db.query(WaitlistEntry).filter(WaitlistEntry.id == entry_id).first()
+    entry = db.query(WaitlistEntry).options(*waitlist_eager_options()).filter(WaitlistEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="القيد غير موجود في قائمة الانتظار")
 

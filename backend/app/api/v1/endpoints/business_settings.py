@@ -1,15 +1,18 @@
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.api.deps import require_owner_or_manager, require_any_staff
+from app.api.deps import require_owner_or_manager, require_any_staff, ensure_working_hours_editor
+from app.core.config import settings
+from app.core.rate_limit import rate_limit
 from app.models.user import User
 from app.models.business_settings import BusinessSettings
 from app.schemas.business_settings import BusinessSettingsRead, BusinessSettingsUpdate
+from app.services.activity_log_service import log_activity
 from app.utils.media import process_image_content, get_upload_path
 from app.core.upload_security import validate_image
 
@@ -43,10 +46,38 @@ def _get_or_create_business_settings(db: Session) -> BusinessSettings:
     return row
 
 
-def _row_to_response(row: BusinessSettings):
+def _row_to_response(row: BusinessSettings, etag: bool = False):
     """Serialize the ORM row using camelCase aliases for the React frontend."""
     schema = BusinessSettingsRead.model_validate(row)
-    return JSONResponse(content=schema.model_dump(by_alias=True, mode="json"))
+    published_version = getattr(row, "public_site_published_version", None)
+    payload = schema.model_dump(by_alias=True, mode="json")
+    payload["publicSiteStale"] = bool(
+        published_version is not None
+        and int(published_version) != int(getattr(row, "version", 1) or 1)
+    )
+    out = JSONResponse(content=payload)
+    if etag:
+        # Returning a Response drops FastAPI's `response.headers` merge, so the
+        # validator has to be stamped here instead.
+        out.headers["ETag"] = f'W/"{getattr(row, "version", 1)}"'
+    return out
+
+
+def _changed_fields(before: dict, after: dict) -> list[str]:
+    labels = {
+        "working_hours": "ساعات العمل",
+        "salon_name": "اسم المنشأة",
+        "shop_phone": "رقم التواصل",
+        "shop_whatsapp": "الواتساب",
+        "address": "العنوان",
+        "logo_url": "الشعار",
+        "google_maps_url": "رابط الخريطة",
+        "receipt_footer": "تذييل الإيصال",
+        "currency": "العملة",
+        "monthly_revenue_target": "هدف المبيعات الشهري",
+        "loyalty_settings": "إعدادات الولاء",
+    }
+    return [labels.get(k, k) for k in after if before.get(k) != after.get(k)]
 
 
 @router.get("")
@@ -58,23 +89,78 @@ def read_business_settings(
     return _row_to_response(row)
 
 
-@router.put("")
+@router.put(
+    "",
+    dependencies=[
+        Depends(
+            rate_limit(
+                "business_settings_write",
+                max_requests=settings.SETTINGS_WRITE_RATE_LIMIT_MAX_REQUESTS,
+                window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+            )
+        )
+    ],
+)
 def update_business_settings(
     payload: BusinessSettingsUpdate,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
+    if "working_hours" in payload.model_fields_set:
+        ensure_working_hours_editor(current_user)
+
     row = _get_or_create_business_settings(db)
 
-    # Apply every non-None field from the payload onto the model row
-    for field_name, value in payload.model_dump(exclude_none=True).items():
+    incoming = payload.model_dump(exclude_none=True, exclude={"expected_version"})
+    if not incoming:
+        return _row_to_response(row)
+    expected = payload.expected_version
+    current_version = int(getattr(row, "version", 1) or 1)
+    if expected is not None and int(expected) != current_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "تم تعديل الإعدادات من مستخدم آخر بعد أن فتحتها. "
+                "حدّث الصفحة ثم أعد تطبيق تعديلاتك."
+            ),
+        )
+
+    before = {field: getattr(row, field, None) for field in incoming}
+
+    for field_name, value in incoming.items():
         if hasattr(row, field_name):
             setattr(row, field_name, value)
+
+    row.version = current_version + 1
 
     db.add(row)
     db.commit()
     db.refresh(row)
-    return _row_to_response(row)
+
+    changed = _changed_fields(before, incoming)
+    if changed:
+        labels = {
+            "UPDATE_BUSINESS_SETTINGS": "تعديل الإعدادات",
+            "UPDATE_WORKING_HOURS": "تعديل ساعات العمل",
+        }
+        log_activity(
+            db,
+            user_id=current_user.id,
+            action=(
+                "UPDATE_WORKING_HOURS"
+                if "working_hours" in incoming
+                else "UPDATE_BUSINESS_SETTINGS"
+            ),
+            entity_type="BusinessSettings",
+            entity_id=str(row.id),
+            description=(
+                f"{labels['UPDATE_WORKING_HOURS'] if 'working_hours' in incoming else labels['UPDATE_BUSINESS_SETTINGS']}"
+                f": {', '.join(changed)} (الإصدار {row.version})"
+            ),
+        )
+
+    return _row_to_response(row, etag=True)
 
 
 @router.post("/logo", response_model=BusinessSettingsRead)
@@ -147,6 +233,16 @@ def publish_site(
     ]
     snapshot = {name: getattr(row, name, None) for name in snapshot_fields}
     row.public_site_snapshot = snapshot
+    row.public_site_published_version = int(getattr(row, "version", 1) or 1)
+
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="PUBLISH_PUBLIC_SITE",
+        entity_type="BusinessSettings",
+        entity_id=str(row.id),
+        description=f"نشر الموقع العام (الإصدار {row.public_site_published_version})",
+    )
 
     db.add(row)
     db.commit()

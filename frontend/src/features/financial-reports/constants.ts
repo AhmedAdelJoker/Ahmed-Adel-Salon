@@ -1,15 +1,10 @@
 import { FileSpreadsheet, History, Sparkles } from "lucide-react";
+import { CHART_COLORS } from "@/lib/core/chart";
 
-export const CHART_COLORS = [
-  "#6366F1",
-  "#10B981",
-  "#F59E0B",
-  "#EF4444",
-  "#8B5CF6",
-  "#06B6D4",
-  "#EC4899",
-  "#84CC16",
-];
+// Re-exported so existing feature consumers keep their import path. The
+// canonical definition lives in @/lib/core/chart so that non-financial charts
+// (cashbox, expenses, POS) share one theme-aware palette.
+export { CHART_COLORS };
 
 export const PAYMENT_LABELS: Record<string, string> = {
   cash: "نقدي",
