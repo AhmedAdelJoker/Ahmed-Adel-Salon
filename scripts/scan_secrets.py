@@ -123,6 +123,18 @@ ALLOWED_LITERALS = {
     # one appears in many generated files.
     "b8e3f1a2c4d7",
     "c4d7e9f1a3b5",
+    # The sha256 of gitleaks 8.30.1's published linux_x64 release tarball, pinned
+    # in the workflow so the CLI gate verifies what it downloads. It is a digest
+    # of a file anyone can download from a public release, published in that
+    # release's own checksums.txt and in GitHub's asset metadata -- an integrity
+    # pin, not a credential, and it grants access to nothing.
+    #
+    # Exempted as an exact literal rather than by a line marker or a rule such as
+    # "any value whose variable name ends in _SHA256", because both of those can
+    # be reached by a real secret and neither is reviewable in one place. A
+    # digest that appears in a file is not the problem here; an unverifiable one
+    # would be, and this is the value the gate compares the download against.
+    "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb",
 }
 
 # Lines that are a check *about* a secret rather than a secret.
