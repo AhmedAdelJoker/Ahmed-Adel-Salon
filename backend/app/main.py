@@ -393,7 +393,33 @@ async def add_security_headers(request, call_next):
     response.headers.setdefault("Content-Security-Policy", settings.CSP_POLICY)
     # Cross-Origin policies: isolate the app from other origins' resources
     response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
-    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+    # CORP is scoped to the static uploads, not to every response.
+    #
+    # In development the frontend is on :5173 and this app is on :8000 -- two
+    # origins. `Cross-Origin-Resource-Policy: same-origin` on an image therefore
+    # blocks it, and the browser says:
+    #
+    #     ERR_BLOCKED_BY_RESPONSE.NotSameOrigin
+    #
+    # on every avatar, logo and uploaded photo, with no console error from the
+    # server and nothing in the logs. The header is right in production, where
+    # the SPA is served from this origin -- it is wrong for a file served to a
+    # dev server on another port.
+    #
+    # So: `same-site` in development, `same-origin` in production. `same-site`
+    # keeps the protection that matters (no third-party site can read a user's
+    # images) while letting `localhost:5173` load `localhost:8000`, which are
+    # the same site. Derived from ENVIRONMENT rather than a separate setting,
+    # because the two have to agree and a flag that can contradict them is the
+    # same class of bug as the one being fixed.
+    if settings.ENVIRONMENT == "production":
+        response.headers.setdefault(
+            "Cross-Origin-Resource-Policy", "same-origin"
+        )
+    else:
+        response.headers.setdefault(
+            "Cross-Origin-Resource-Policy", "same-site"
+        )
 
     if request.url.path.startswith("/api/v1/auth"):
         response.headers["Cache-Control"] = "no-store"

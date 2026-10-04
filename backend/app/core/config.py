@@ -145,11 +145,23 @@ class Settings(BaseSettings):
 
     CSP_POLICY: str = (
         "default-src 'self'; "
-        "img-src 'self' data: blob: https:; "
+        # `http://localhost:8000` and `http://127.0.0.1:8000` are here because
+        # in development the SPA is served by Vite on :5173 and this app on
+        # :8000. The profile photo, the logo and every upload are images on the
+        # other port, and `img-src` without them blocks them with no error
+        # visible anywhere -- an `<img>` that silently renders nothing.
+        #
+        # `https:` is kept for uploads served from a CDN, and the two http
+        # origins are development-only in practice because a production
+        # deployment serves the SPA from this origin and `self` covers it.
+        "img-src 'self' data: blob: https: http://localhost:8000 "
+        "http://127.0.0.1:8000; "
         "script-src 'self'; "
         "style-src 'self' 'unsafe-inline'; "
         "font-src 'self' data:; "
-        "connect-src 'self' ws: wss: http://localhost:5173 http://127.0.0.1:5173; "
+        # The API and the WebSocket, including the dev server's HMR socket.
+        "connect-src 'self' ws: wss: http://localhost:5173 http://127.0.0.1:5173 "
+        "http://localhost:8000 http://127.0.0.1:8000; "
         "frame-ancestors 'none'; "
         "base-uri 'self'; "
         "form-action 'self';"

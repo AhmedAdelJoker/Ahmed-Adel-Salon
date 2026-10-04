@@ -17,7 +17,7 @@
  * `variant` picks the size, not the meaning. Keep the number of variants small:
  * each one is a real, distinct footprint in the layouts that exist today.
  */
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import { Inbox, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 
@@ -98,8 +98,25 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   const size = SIZES[variant];
-  const isNode = typeof icon === "object" && icon !== null;
-  const Icon = !isNode && typeof icon === "function" ? icon : null;
+  // Is this a React *element* (render it as-is) or a *component type* (use it
+  // as <Icon/>)?
+  //
+  // The test is `React.isValidElement`, not `typeof icon === "object"`. Every
+  // lucide icon is created with `React.forwardRef`, so it is an object --
+  // literally `{$$typeof, render}` -- which the old typeof check classified as
+  // an element and passed straight into JSX. React then received a component
+  // where it expected a rendered child:
+  //
+  //     Objects are not valid as a React child
+  //     (found: object with keys {$$typeof, render})
+  //
+  // which crashed the whole subtree, not just the empty state: 76 call sites
+  // pass a lucide icon, so every empty board column, table and panel took its
+  // page down with it. `React.forwardRef` returning an object rather than a
+  // function is the whole reason `typeof icon === "function"` on the next line
+  // never fired either -- it excluded every real icon as well.
+  const element = React.isValidElement(icon) ? icon : null;
+  const Icon = !element && typeof icon === "function" ? icon : null;
   return (
     <div
       role="status"
@@ -118,8 +135,8 @@ export function EmptyState({
           size.iconWrap,
         )}
       >
-        {isNode ? (
-          icon
+        {element ? (
+          element
         ) : Icon ? (
           <Icon size={size.icon} strokeWidth={1.5} />
         ) : (
