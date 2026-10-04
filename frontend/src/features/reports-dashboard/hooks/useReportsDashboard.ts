@@ -58,15 +58,24 @@ export function useReportsDashboard() {
       const isEmpty = !hasRealRevenue && !hasRealWeekly;
       setIsDemo(isEmpty);
 
-      const mergedStats = isEmpty ? DEMO_STATS : {
-        ...DEMO_STATS,
-        ...Object.fromEntries(
-          Object.entries(data.stats || {}).filter(
-            ([_, v]) => v != null && typeof v !== "object" && String(v) !== "" && !Number.isNaN(Number(v as any))
-          )
-        ),
-        occupancy: data.stats?.occupancy != null ? data.stats.occupancy : DEMO_STATS.occupancy,
-      };
+      // Over a real response, the demo figures are the *base* and the response
+      // overrides what it provides. That means any field the API does not
+      // return keeps a demo value -- a silent, unlabelled fabrication, because
+      // `isDemo` is false when there was revenue, so no banner appears.
+      //
+      // A missing field is zero, not 18,750. The demo set is used only when the
+      // whole period is empty, where it is labelled.
+      const mergedStats = isEmpty
+        ? DEMO_STATS
+        : ({
+            ...DEFAULT_STATS,
+            ...Object.fromEntries(
+              Object.entries(data.stats || {}).filter(
+                ([_, v]) => v != null && typeof v !== "object" && String(v) !== "" && !Number.isNaN(Number(v as any))
+              )
+            ),
+            occupancy: data.stats?.occupancy != null ? data.stats.occupancy : DEFAULT_STATS.occupancy,
+          } as DashboardStats);
 
       setStats(mergedStats);
       setWeeklyData(hasRealWeekly && Array.isArray(data.weekly_data) ? data.weekly_data : FALLBACK_WEEKLY);
