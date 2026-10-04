@@ -52,6 +52,7 @@ from app.api.v1.endpoints.cashbox import router as cashbox_router
 from app.api.v1.endpoints.search import router as search_router
 from app.api.v1.endpoints.owner import router as owner_router
 from app.api.v1.endpoints.owner_alerts import router as owner_alerts_router
+from app.api.v1.endpoints.owner_operating import router as owner_operating_router
 from app.api.v1.endpoints.audit import router as audit_router
 from app.api.v1.endpoints.shop_settings import router as shop_settings_router
 from app.api.v1.endpoints.dashboard_core import router as dashboard_core_router
@@ -82,6 +83,7 @@ api_router.include_router(preferences_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(owner_router)
 api_router.include_router(owner_alerts_router)
+api_router.include_router(owner_operating_router)
 api_router.include_router(audit_router)
 api_router.include_router(shop_settings_router)
 api_router.include_router(barber_router, prefix="/barber", tags=["barber"])
