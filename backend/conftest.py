@@ -1,5 +1,7 @@
 import os
 
+from stub_env import provision
+
 # Per-process test database: parallel pytest runs (or stale processes) must
 # never share one sqlite file — sharing caused cross-run UNIQUE collisions
 # and ObjectDeletedError when one process wiped another's rows mid-test.
@@ -7,12 +9,21 @@ _PID = os.getpid()
 _TEST_DB_FILE = f"test_{_PID}.db"
 _TEST_DB_URL = f"sqlite:///./{_TEST_DB_FILE}"
 
-os.environ["DATABASE_URL"] = _TEST_DB_URL
-os.environ["TESTING"] = "true"
-os.environ["ALLOWED_HOSTS"] = "localhost,127.0.0.1,testserver"
-os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only"
-os.environ["FIRST_SUPERUSER"] = "admin"
-os.environ["FIRST_SUPERUSER_PASSWORD"] = "TestAdmin123"
+# `overwrite=True`, as the assignments this replaces were: a developer's own
+# `.env` must never decide which database the suite runs against. The required
+# fields themselves come from `stub_env`; only the ones that differ from its
+# defaults are listed here, so a new required field is picked up in one place
+# rather than three.
+provision(
+    {
+        "DATABASE_URL": _TEST_DB_URL,
+        "TESTING": "true",
+        "ALLOWED_HOSTS": "localhost,127.0.0.1,testserver",
+        "SECRET_KEY": "test-secret-key-for-testing-only",
+        "FIRST_SUPERUSER_PASSWORD": "TestAdmin123",
+    },
+    overwrite=True,
+)
 
 import pytest
 from fastapi.testclient import TestClient
