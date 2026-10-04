@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, LayoutDashboard, Loader2, RefreshCw, ShieldCheck, TrendingUp, Users, Wallet } from "lucide-react";
+import { Activity, AlertTriangle, LayoutDashboard, Loader2, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import i18n from "@/i18n";
 import { Button } from "@/components/ui/button";
@@ -149,35 +149,6 @@ export default function ReportsDashboard() {
           reason an owner opens this page. The charts answer "how did we do";
           this answers "what do I have to deal with". */}
       <NeedsAttention onNavigate={navigate} />
-
-      {/* شريط هوية — انتقال سريع (مرحلة 3) */}
-      <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
-        <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ms-2">
-            <LayoutDashboard size={12} className="text-accent" /> انتقال سريع
-          </span>
-          {[
-            { label: "الموارد البشرية", desc: "الكادر والرواتب", icon: Users, href: "/owner/hr", color: "bg-primary text-white" },
-            { label: "الرواتب", desc: "المستحقات والسلف", icon: Wallet, href: "/owner/payroll", color: "bg-success text-white" },
-            { label: "الأمان", desc: "الصلاحيات والجلسات", icon: ShieldCheck, href: "/owner/security-access", color: "bg-info text-white" },
-            { label: "التشغيل", desc: "التقارير اليومية", icon: TrendingUp, href: "/owner/reports", color: "bg-warning text-white" },
-          ].map((l) => (
-            <button
-              key={l.href}
-              onClick={() => navigate(l.href)}
-              className="inline-flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-right hover:border-accent/20 hover:bg-soft transition-colors group"
-            >
-              <span className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", l.color)}>
-                <l.icon size={14} />
-              </span>
-              <span className="text-right">
-                <span className="block text-xs font-black text-main group-hover:text-accent transition-colors">{l.label}</span>
-                <span className="block text-[10px] font-bold text-muted leading-none">{l.desc}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </PremiumCard>
 
       {/* Main Charts & Insights */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">

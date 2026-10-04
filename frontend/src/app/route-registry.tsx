@@ -92,6 +92,17 @@ export interface AppNavSpec {
   mobileOrder?: number;
   /** Hide the label in the mobile bar and rely on the icon only. */
   mobileIconOnly?: boolean;
+  /**
+   * Surface on the dashboard's quick-action grid.
+   *
+   * Declared here rather than in the grid itself so the two cannot drift: a
+   * quick action that lists a path the registry no longer has, or under a label
+   * the sidebar has since renamed, is a dead link wearing a familiar name.
+   *
+   * Omit to keep the route out of the grid. Access is still filtered per user
+   * at render time, so marking a route quick does not grant access to it.
+   */
+  quick?: boolean;
   /** Command-palette grouping. Omit to keep the page out of the palette. */
   searchCategory?: SearchCategory;
 }
@@ -368,6 +379,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
       icon: Calendar,
       group: "operations",
       order: 7,
+      quick: true,
       roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN"],
       mobile: true,
       mobileOrder: 3,
@@ -552,6 +564,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
       icon: UserPlus,
       group: "management",
       order: 1,
+      quick: true,
       roles: ["OWNER", "ADMIN", "MANAGER"],
       searchCategory: "الإدارة",
     },
@@ -581,6 +594,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
       icon: Package,
       group: "management",
       order: 3,
+      quick: true,
       roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN", "ACCOUNTANT"],
       mobile: true,
       mobileOrder: 5,
@@ -641,6 +655,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
       icon: FileBarChart2,
       group: "finance",
       order: 4,
+      quick: true,
       roles: ["OWNER", "ADMIN", "ACCOUNTANT", "MANAGER"],
       searchCategory: "المالية",
     },
@@ -712,6 +727,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
       icon: Settings,
       group: "system",
       order: 1,
+      quick: true,
       roles: ["OWNER", "ADMIN", "MANAGER"],
       searchCategory: "النظام",
     },
@@ -799,6 +815,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
       icon: ShieldCheck,
       group: "system",
       order: 7,
+      quick: true,
       roles: ["OWNER", "ADMIN"],
     },
   },
@@ -856,6 +873,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
       icon: History,
       group: "system",
       order: 10,
+      quick: true,
       roles: ["OWNER", "ADMIN", "MANAGER", "ACCOUNTANT"],
     },
   },
@@ -1101,6 +1119,24 @@ export function getNavGroups(): { id: NavGroupId; title: string; items: NavItem[
 /** Every menu item across all groups, flattened. */
 export function getAllNavItems(): NavItem[] {
   return getNavGroups().flatMap((group) => group.items);
+}
+
+/**
+ * Routes flagged for the dashboard quick-action grid.
+ *
+ * Access is not decided here. Callers filter with `hasRoleAccess` exactly as
+ * the sidebar does, because a grid entry the user cannot open is a dead end
+ * with a shortcut shape.
+ */
+export function getQuickNavItems(): NavItem[] {
+  return NAV_ROUTES.filter((route) => route.nav?.quick).map((route) => ({
+    key: route.path,
+    label: route.nav!.label,
+    to: route.path,
+    icon: route.nav!.icon,
+    roles: route.nav!.roles ?? route.roles ?? ROLES.EVERYONE,
+    searchCategory: route.nav!.searchCategory,
+  }));
 }
 
 /** Mobile bottom-bar items for a role, sorted. */
