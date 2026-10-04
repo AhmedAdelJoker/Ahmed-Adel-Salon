@@ -27,21 +27,29 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
+import re
 import sys
 from collections import Counter
 from pathlib import Path
+
+# The mount prefix `include_router` puts on every versioned route. Stripped from
+# both sides of every comparison below; see `canonical`.
+API_PREFIX_RE = re.compile(r"^/api/v\d+")
 
 # Run as `python scripts/audit_authorization.py` from anywhere, exactly like the
 # other scripts here. The backend root has to be on the path before `app` is
 # importable, and it is not when the script is invoked by its own path.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-os.environ.setdefault("ENVIRONMENT", "development")
-# Must satisfy the 32-character minimum in `Settings`, and must not be the
-# production placeholder the config guards against.
-os.environ.setdefault("SECRET_KEY", "audit-only-not-a-real-secret-0123456789abcdef")
-os.environ.setdefault("DATABASE_URL", "sqlite:///./audit-authorization.db")
+# The settings this needs to import the application with nothing behind it live
+# in one place, `backend/stub_env.py`, because the list used to be hand-copied
+# here and this copy was the one that drifted: it omitted
+# `FIRST_SUPERUSER_PASSWORD`, so the `security-sast` job failed in a step named
+# "Authorisation audit". `tests/test_stub_env.py` pins the list against
+# `Settings` so the next required field fails a local test run instead.
+from stub_env import provision
+
+provision({"DATABASE_URL": "sqlite:///./audit-authorization.db"})
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.routing import APIRoute  # noqa: E402
@@ -53,22 +61,108 @@ MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 # Routes that are meant to be reachable without a session. Each one is a
 # deliberate product decision, so they are named here to be reviewed as a list
 # rather than discovered as a gap.
-EXPECTED_PUBLIC = {
+EXPECTED_PUBLIC_RAW = {
+    # --- authentication, which cannot authenticate anyone -------------------
     ("POST", "/api/v1/auth/login"),
     ("POST", "/api/v1/auth/refresh"),
-    ("POST", "/api/v1/auth/totp/verify"),
+    # --- the public booking site --------------------------------------------
+    ("POST", "/api/v1/public/booking"),
+    ("GET", "/api/v1/public/booking-catalog"),
+    ("GET", "/api/v1/public/time-slots"),
+    # The slug is the capability. There is no session to check, and that is the
+    # design: a customer who has the link can watch their own booking. The risk
+    # here is slug entropy, not authentication, so it is noted rather than gated.
+    ("GET", "/api/v1/public/realtime/booking/{slug}"),
+    ("GET", "/api/v1/public/realtime/booking/{slug}/poll"),
+    # --- member self-service on the public site ------------------------------
     ("POST", "/api/v1/public/member/register"),
     ("POST", "/api/v1/public/member/login"),
-    ("POST", "/api/v1/public/booking"),
-    ("POST", "/api/v1/public/booking/availability"),
+    # --- reviews deliberately written by the public site ---------------------
+    ("GET", "/api/v1/reviews/public"),
+    # Anyone can submit a review; nobody can rate a barber they did not visit
+    # (`barber_id` is stripped from the payload, and the appointment branch binds
+    # the review to the appointment's own customer and employee). What it needed
+    # was a quota, not a login, so it has one -- see `create_review`.
+    ("POST", "/api/v1/reviews"),
+    # --- public marketing pages served from the database ---------------------
+    ("GET", "/api/v1/seo/pages"),
+    ("GET", "/api/v1/seo/pages/{slug}"),
+    # --- the WhatsApp webhook ------------------------------------------------
+    # Meta cannot hold a session, so this has to be unauthenticated at the
+    # dependency level and is authenticated in the body instead:
+    # `GET` compares `hub.verify_token` with `hmac.compare_digest`, and `POST`
+    # verifies the `X-Hub-Signature-256` HMAC-SHA256 over the raw body and
+    # returns 403 without it. This audit only inspects dependencies, so it
+    # cannot see that, and would otherwise report a hole on every run.
+    ("GET", "/api/v1/integrations/whatsapp/webhook"),
+    ("POST", "/api/v1/integrations/whatsapp/webhook"),
+    # --- liveness and the API surface itself ---------------------------------
+    ("GET", "/"),
     ("GET", "/health"),
-    ("GET", "/api/v1/health/live"),
     ("GET", "/api/v1/health/ready"),
-    ("GET", "/api/v1/meta"),
     ("GET", "/docs"),
     ("GET", "/redoc"),
     ("GET", "/openapi.json"),
 }
+
+# Routes this audit cannot see, listed so that their absence from the walk is a
+# known limit rather than a silent one. FastAPI's documentation routes are plain
+# `starlette.routes.Route`, not `APIRoute`, so `walk_routes` never yields them
+# and no entry in `EXPECTED_PUBLIC` can ever match one. They are not a
+# liability: `app/main.py` sets `docs_url`/`redoc_url`/`openapi_url` to None when
+# the environment is production, so the schema is unreachable in a real
+# deployment and exposed only in development, where it is the point.
+#
+# `tests/test_authorization_audit.py` exempts exactly these three from the
+# stale-entry check for that reason. If the app ever mounts them as APIRoutes,
+# the exemption should go with it.
+NOT_WALKABLE = frozenset({("GET", "/docs"), ("GET", "/redoc"), ("GET", "/openapi.json")})
+
+# Mutations that authenticate the caller but need no role check, because they
+# can only ever act on the caller's own account: their own profile, their own
+# password, their own second factor, their own session, their own preferences.
+#
+# These are registered rather than exempted. The distinction that matters is
+# between "authenticate" and "may touch someone else's data": the first is
+# enough for this list, and a role check here would be cargo cult. Registering
+# them keeps the gate honest in both directions -- a new self-service endpoint
+# has to be added deliberately, and a route that stops being self-service (by
+# gaining a body that reaches into another employee's record) no longer matches.
+EXPECTED_SELF_SERVICE_RAW = {
+    ("POST", "/api/v1/auth/2fa/disable"),
+    ("POST", "/api/v1/auth/2fa/enable"),
+    ("POST", "/api/v1/auth/2fa/setup"),
+    ("POST", "/api/v1/auth/change-password"),
+    ("POST", "/api/v1/auth/logout"),
+    ("PUT", "/api/v1/preferences"),
+    ("PUT", "/api/v1/profile"),
+    ("POST", "/api/v1/profile/avatar"),
+    ("POST", "/api/v1/profile/change-password"),
+    ("POST", "/api/v1/public/member/logout"),
+}
+
+
+def canonical(path: str) -> str:
+    """The path as this audit compares it, with the API version prefix removed.
+
+    Both lists above are written in full mounted form (`/api/v1/auth/login`),
+    because that is how a route reads in the OpenAPI document and in the
+    frontend. `classify` sees the router-relative path (`/auth/login`). The two
+    were compared literally, so every prefixed entry was dead and the six routes
+    it claimed to whitelist were reported UNPROTECTED on every single run.
+
+    The four entries that carried no prefix -- `/health`, `/docs`, `/redoc`,
+    `/openapi.json` -- were the only ones that could ever match, and their
+    absence from a report that listed `/health/ready` as unprotected is what
+    gave the mismatch away. Both spellings are accepted from here on, so a route
+    can be registered the way it is written in the app and compared either way.
+    """
+    stripped = API_PREFIX_RE.sub("", path or "")
+    return stripped or "/"
+
+
+EXPECTED_PUBLIC = {(method, canonical(path)) for method, path in EXPECTED_PUBLIC_RAW}
+EXPECTED_SELF_SERVICE = {(method, canonical(path)) for method, path in EXPECTED_SELF_SERVICE_RAW}
 
 
 def dependency_names(route: APIRoute) -> set[str]:
@@ -190,9 +284,11 @@ def classify(app: FastAPI) -> list[dict]:
         authenticated = has_auth(names)
         role_checked = has_role_check(names)
         for method in methods:
-            key = (method, path)
+            key = (method, canonical(path))
             if key in EXPECTED_PUBLIC:
                 kind = "PUBLIC"
+            elif key in EXPECTED_SELF_SERVICE:
+                kind = "SELF_SERVICE"
             elif not authenticated:
                 kind = "UNPROTECTED"
             elif not role_checked:
@@ -235,7 +331,7 @@ def main() -> int:
 
     print("Authorisation audit")
     print("=" * 72)
-    for kind in ("UNPROTECTED", "MUTATING_NO_ROLE", "NO_ROLE_CHECK", "PUBLIC", "OK"):
+    for kind in ("UNPROTECTED", "MUTATING_NO_ROLE", "NO_ROLE_CHECK", "PUBLIC", "SELF_SERVICE", "OK"):
         group = [r for r in rows if r["kind"] == kind]
         if not group:
             continue
@@ -250,7 +346,7 @@ def main() -> int:
             gates = ", ".join(row["deps"]) or "none"
             print(f"  {row['method']:6} {row['path']:52} [{gates}]")
     print("\n" + "=" * 72)
-    for kind in ("UNPROTECTED", "MUTATING_NO_ROLE", "NO_ROLE_CHECK", "PUBLIC", "OK"):
+    for kind in ("UNPROTECTED", "MUTATING_NO_ROLE", "NO_ROLE_CHECK", "PUBLIC", "SELF_SERVICE", "OK"):
         if kind in counts:
             print(f"  {kind:18} {counts[kind]}")
 

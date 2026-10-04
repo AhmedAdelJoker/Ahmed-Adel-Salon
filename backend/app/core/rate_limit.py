@@ -90,6 +90,16 @@ def rate_limit(key: str, *, max_requests: int, window_seconds: int):
                 headers={"Retry-After": str(retry_after)},
             )
 
+    # Named after the bucket, for the same reason `require_roles` names its
+    # closure: the authorisation audit reads dependency names, and an unnamed
+    # closure is called `dependency` by every one of them, so a throttled route
+    # and an unprotected one are indistinguishable in its report. The name is
+    # deliberately not an auth marker, because a quota is not an identity --
+    # `AUTH_MARKERS` does not match it, and a rate-limited public endpoint still
+    # has to be registered as deliberately public.
+    dependency.__name__ = f"rate_limit[{key}]"
+    dependency.__qualname__ = dependency.__name__
+
     return dependency
 
 

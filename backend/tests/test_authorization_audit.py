@@ -28,7 +28,6 @@ suddenly examined one route.
 """
 
 import importlib.util
-import os
 import sys
 from pathlib import Path
 
@@ -37,9 +36,9 @@ import pytest
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_ROOT))
 
-os.environ.setdefault("ENVIRONMENT", "development")
-os.environ.setdefault("SECRET_KEY", "audit-only-not-a-real-secret-0123456789abcdef")
-os.environ.setdefault("DATABASE_URL", "sqlite:///./test-authorization-audit.db")
+# No environment is staged here. `load_audit()` executes the script, which
+# provisions its own stubs before it imports the application, and duplicating
+# that list in this file is how the two copies drifted apart in the first place.
 
 
 def load_audit():
@@ -105,7 +104,7 @@ def test_every_classified_route_is_accounted_for(rows):
     An unclassified route would mean the walk found it and could not decide what
     it is, which is the same failure as not finding it.
     """
-    assert all(row["kind"] in {"OK", "PUBLIC", "UNPROTECTED", "MUTATING_NO_ROLE", "NO_ROLE_CHECK"} for row in rows)
+    assert all(row["kind"] in {"OK", "PUBLIC", "SELF_SERVICE", "UNPROTECTED", "MUTATING_NO_ROLE", "NO_ROLE_CHECK"} for row in rows)
     assert all(row["method"] and row["path"] for row in rows)
 
 
@@ -172,45 +171,78 @@ def test_the_audit_detects_several_different_gates(rows):
 
 
 def test_no_endpoint_is_entirely_unauthenticated(rows):
-    """Every route must authenticate or be on the deliberate public list."""
+    """Every route must authenticate or be on the deliberate public list.
+
+    The previous version of this test allowed any path beginning with `/` or
+    `/health`, which is every path in the application -- `"/auth/login"
+    .startswith("/")` is true. It therefore could not fail, and it sat here
+    looking like the backstop for exactly the defect it was hiding: 17
+    deliberately public routes, six of them listed in `EXPECTED_PUBLIC` with an
+    `/api/v1` prefix the classifier's paths never carry, all reported as
+    UNPROTECTED on every run of the gate.
+
+    There is no allowlist here now. A route that is genuinely public has to be
+    registered in the script, and that registration is itself checked against the
+    real route table by `test_no_registered_route_is_stale`. Root and health are
+    registered there like everything else.
+    """
     unlisted = [
         f"{row['method']} {row['path']}"
         for row in rows
         if row["kind"] == "UNPROTECTED"
     ]
-    # `/` and `/health` are mounted outside the v1 prefix so they do not match
-    # the tuples in EXPECTED_PUBLIC.
-    allowed_prefixes = ("/", "/health")
-    remaining = [u for u in unlisted if not u.split(" ", 1)[1].startswith(allowed_prefixes)]
-    assert not remaining, f"unauthenticated endpoints: {remaining}"
+    assert not unlisted, (
+        f"unauthenticated endpoints: {unlisted}\n"
+        "If one of these is meant to be public, register it in "
+        "scripts/audit_authorization.py with a comment saying why it is safe."
+    )
 
 
-def test_every_mutating_endpoint_either_has_a_role_or_is_self_service(rows):
+def test_no_registered_route_is_stale(rows, audit):
+    """A whitelist entry that matches no route is a claim, not a protection.
+
+    Six entries in `EXPECTED_PUBLIC` named routes that do not exist
+    (`/health/live`, `/meta`, `/auth/totp/verify`,
+    `/public/booking/availability`), and the four that did match were the ones
+    written without a prefix. Nobody noticed, because an entry that matches
+    nothing and an entry that matches everything look identical in a report that
+    only prints the ones that failed.
+
+    A typo here is the dangerous direction: registering `/review/public` instead
+    of `/reviews/public` would look like the public review list had been reviewed
+    while `POST /reviews` sat unauthenticated and unrated in the same file.
+    """
+    real = {(row["method"], row["path"]) for row in rows}
+    registered = (audit.EXPECTED_PUBLIC | audit.EXPECTED_SELF_SERVICE) - audit.NOT_WALKABLE
+    stale = sorted(f"{method} {path}" for method, path in registered - real)
+    assert not stale, (
+        f"registered but not a real route: {stale}\n"
+        "Either the route was renamed or removed, or the path is misspelled."
+    )
+
+
+def test_every_mutating_endpoint_either_has_a_role_or_is_self_service(rows, audit):
     """The remaining ungated mutations must all be self-service.
 
     Own profile, own password, own 2FA and own logout belong to whoever is signed
     in and need no role. Anything that touches another person's data, money, or
     configuration does.
+
+    The list lives in the audit script, not here, and this asserts against the
+    same set the gate does. It used to be a private tuple of path *suffixes*
+    living only in this file, which meant the script could not tell self-service
+    from a hole -- the two lists were describing the same ten routes and neither
+    could see the other. Exact (method, path) pairs now, in one place, so a route
+    that stops being self-service no longer matches by accident.
     """
-    self_service_suffixes = (
-        "/auth/2fa/disable",
-        "/auth/2fa/enable",
-        "/auth/2fa/setup",
-        "/auth/change-password",
-        "/auth/logout",
-        "/preferences",
-        "/profile",
-        "/profile/avatar",
-        "/profile/change-password",
-        "/public/member/logout",
-    )
     offending = [
         f"{row['method']} {row['path']}"
         for row in rows
         if row["kind"] == "MUTATING_NO_ROLE"
-        and not row["path"].endswith(self_service_suffixes)
+        and (row["method"], row["path"]) not in audit.EXPECTED_SELF_SERVICE
     ]
     assert not offending, (
         "mutating endpoints with no role check that are not self-service: "
         f"{offending}"
     )
+
