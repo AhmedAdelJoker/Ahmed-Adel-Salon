@@ -397,22 +397,55 @@ jobs:
           python scripts/seed_million_rows.py --confirm
           python -m pytest tests/test_index_usage_at_scale.py -q
 
+      # The action scans and comments on the pull request. It cannot be the gate:
+      # without a licence it cannot annotate a fork's pull request, so the CLI
+      # step below is what actually holds.
+      #
+      # Two things were wrong here and the step failed in one second both times.
+      #
+      # `GITHUB_TOKEN` was set from `secrets.GITLEAKS_LICENSE`. Those are two
+      # different secrets that the documentation lists on two different lines, and
+      # this is a personal account, where the licence is not required and is
+      # almost certainly not configured -- so GITHUB_TOKEN resolved to an empty
+      # string, overriding the token GitHub injects automatically. The action
+      # requires a valid token to call the API and exits immediately without one.
+      # A scan cannot fail that fast; the step was never scanning anything.
+      #
+      # And v2 was pinned. GitHub removed Node 20 from hosted runners on
+      # 2026-09-16, and gitleaks-action v2 is a Node 20 action: it will not run
+      # again regardless of the token. v3 is a Node 24 build with, per its
+      # README, "no changes to inputs, outputs, or behavior".
       - name: Gitleaks (entropy-based)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
-          # Without a token the action runs in report-only mode and cannot
-          # annotate or fail a pull request from a fork. Failing on the exit code
-          # below covers both cases.
-          GITHUB_TOKEN: ${{ secrets.GITLEAKS_LICENSE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE is only required for organization-owned repositories.
+          # This one is a personal account, where gitleaks.io issues no licence.
         with:
           args: --redact --verbose --no-banner
 
-      # Belt and braces. gitleaks-action already fails on a finding, but it needs
-      # a licence to annotate a pull request and is report-only without one, so
-      # this step is what makes the gate hold on a fork. `detect` exits non-zero
-      # when it finds anything, which is the whole mechanism -- no parsing.
+      # Belt and braces, and the step that makes the gate hold on a fork. It
+      # installs the CLI itself rather than assuming the action above left a
+      # usable binary on PATH: nothing in the workflow promised that, the action's
+      # own version controls it, and a security gate that fails with "command not
+      # found" is indistinguishable from a security gate that found a secret.
+      #
+      # The checksum is pinned to the value in the upstream
+      # `gitleaks_8.30.1_checksums.txt`, which was cross-checked against GitHub's
+      # own asset digest before being written here. Bump both together.
       - name: Fail on any Gitleaks finding
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
         run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
+          tar -xzf "$archive" gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
           gitleaks detect --source . --redact --no-banner --verbose
           echo "If this step fails, a secret is in the history. Rotate it first: deleting the file does not remove it from git."
 
