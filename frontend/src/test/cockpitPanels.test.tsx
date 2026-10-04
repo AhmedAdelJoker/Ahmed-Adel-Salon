@@ -1,5 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+
+// Imported once, statically.
+//
+// The first version of this file did `await import("@/features/reports-dashboard")`
+// inside `beforeEach`, so every one of the eighteen tests re-imported the whole
+// feature barrel -- recharts, every sibling component, and their modules. Alone
+// that is a few hundred milliseconds; under the full suite with twenty-six files
+// competing it crossed vitest's 10s hook timeout and failed roughly one run in
+// three, in a test that had nothing to do with timing.
+//
+// `vi.mock` is hoisted above this import, so the api mock still applies.
+import {
+  DayStatusBar,
+  Delta,
+  RankingTable,
+  RevenueSparkline,
+  useOperatingSummary,
+} from "@/features/reports-dashboard";
 
 /**
  * The rebuilt cockpit adds three panels. Each one is a place where a number can
@@ -26,15 +44,9 @@ vi.mock("@/services/api", () => ({
   },
 }));
 
-const importFeature = async () => import("@/features/reports-dashboard");
-
-let feature: any;
-
 describe("cockpit panels", () => {
-  beforeEach(async () => {
-    vi.resetModules();
+  beforeEach(() => {
     mockGet.mockReset();
-    feature = await importFeature();
   });
 
   describe("RankingTable", () => {
@@ -46,24 +58,27 @@ describe("cockpit panels", () => {
     });
 
     it("distinguishes an empty ranking from an unavailable one", () => {
-      const { RankingTable } = feature;
-
-      const { unmount } = render(
+      // Container-scoped rather than `screen`, which searches the whole
+      // document. This test renders twice in one body, and under parallel load
+      // the global query intermittently matched markup that was not this
+      // component's -- a flake that only appeared in the full suite, never when
+      // the file ran alone.
+      const empty = render(
         <RankingTable title="الأعلى" rows={[]} unavailable={false} />,
       );
-      expect(screen.getByText(/لا توجد بيانات/)).toBeTruthy();
-      unmount();
+      expect(within(empty.container).getByText(/لا توجد بيانات/)).toBeTruthy();
+      empty.unmount();
 
-      render(<RankingTable title="الأعلى" rows={null} unavailable />);
+      const failed = render(
+        <RankingTable title="الأعلى" rows={null} unavailable />,
+      );
       // Not the same sentence. One says "checked, nothing there", the other
       // says "could not check".
-      expect(screen.getByText(/تعذّر تحميل/)).toBeTruthy();
-      expect(screen.queryByText(/لا توجد بيانات/)).toBeNull();
+      expect(within(failed.container).getByText(/تعذّر تحميل/)).toBeTruthy();
+      expect(within(failed.container).queryByText(/لا توجد بيانات/)).toBeNull();
     });
 
     it("names every row and scales bars against the leader", () => {
-      const { RankingTable } = feature;
-
       const { container } = render(
         <RankingTable
           title="الأعلى"
@@ -84,8 +99,6 @@ describe("cockpit panels", () => {
     });
 
     it("gives a zero-revenue row no bar", () => {
-      const { RankingTable } = feature;
-
       const { container } = render(
         <RankingTable
           title="الأعلى"
@@ -99,8 +112,6 @@ describe("cockpit panels", () => {
     });
 
     it("uses a table so the ranking is readable by assistive tech", () => {
-      const { RankingTable } = feature;
-
       render(<RankingTable title="الأعلى إيراداً" rows={[row("سالم", 1000)]} />);
 
       expect(screen.getByRole("table")).toBeTruthy();
@@ -110,8 +121,6 @@ describe("cockpit panels", () => {
 
   describe("Delta", () => {
     it("says there is no comparison rather than inventing one", () => {
-      const { Delta } = feature;
-
       // The single most misleading thing a delta can do: report +100% against a
       // baseline that was never measured.
       render(<Delta value={null} />);
@@ -119,8 +128,6 @@ describe("cockpit panels", () => {
     });
 
     it("renders a real delta with its direction", () => {
-      const { Delta } = feature;
-
       const up = render(<Delta value={12.4} />);
       expect(screen.getByText("+12%")).toBeTruthy();
       up.unmount();
@@ -130,8 +137,6 @@ describe("cockpit panels", () => {
     });
 
     it("calls a zero change flat rather than positive", () => {
-      const { Delta } = feature;
-
       render(<Delta value={0} />);
       expect(screen.getByText("ثابت")).toBeTruthy();
     });
@@ -146,15 +151,11 @@ describe("cockpit panels", () => {
       }));
 
     it("says so when the series is unavailable", () => {
-      const { RevenueSparkline } = feature;
-
       render(<RevenueSparkline data={[]} baseline={null} unavailable />);
       expect(screen.getByText(/لا يتوفر رسم بياني/)).toBeTruthy();
     });
 
     it("draws an honest flat line for a window with no revenue", () => {
-      const { RevenueSparkline } = feature;
-
       const { container } = render(
         <RevenueSparkline data={series([0, 0, 0])} baseline={0} />,
       );
@@ -169,8 +170,6 @@ describe("cockpit panels", () => {
     });
 
     it("describes itself for screen readers", () => {
-      const { RevenueSparkline } = feature;
-
       const { container } = render(
         <RevenueSparkline data={series([100, 200, 300])} baseline={150} />,
       );
@@ -184,8 +183,6 @@ describe("cockpit panels", () => {
     });
 
     it("says plainly when the window holds no revenue at all", () => {
-      const { RevenueSparkline } = feature;
-
       const { container } = render(
         <RevenueSparkline data={series([0, 0, 0])} baseline={0} />,
       );
@@ -198,8 +195,6 @@ describe("cockpit panels", () => {
     });
 
     it("omits the baseline line when there is no baseline", () => {
-      const { RevenueSparkline } = feature;
-
       const { container } = render(
         <RevenueSparkline data={series([100, 200])} baseline={null} />,
       );
@@ -210,8 +205,6 @@ describe("cockpit panels", () => {
 
   describe("DayStatusBar", () => {
     it("reports a closed salon", () => {
-      const { DayStatusBar } = feature;
-
       render(
         <DayStatusBar
           status={{
@@ -229,8 +222,6 @@ describe("cockpit panels", () => {
     });
 
     it("flags an overdue shift instead of calling it merely open", () => {
-      const { DayStatusBar } = feature;
-
       render(
         <DayStatusBar
           status={{
@@ -255,8 +246,6 @@ describe("cockpit panels", () => {
     });
 
     it("says it could not determine the shift state", () => {
-      const { DayStatusBar } = feature;
-
       render(<DayStatusBar status={null} unavailable />);
       expect(screen.getByText(/تعذّر تحديد حالة الوردية/)).toBeTruthy();
     });
@@ -264,8 +253,6 @@ describe("cockpit panels", () => {
 
   describe("useOperatingSummary", () => {
     it("marks each section separately when one fails", async () => {
-      const { useOperatingSummary } = feature;
-
       mockGet.mockResolvedValue({
         data: {
           // The server answered, but could not build the staff ranking.
@@ -299,8 +286,6 @@ describe("cockpit panels", () => {
     });
 
     it("reports every section unavailable when the request fails", async () => {
-      const { useOperatingSummary } = feature;
-
       mockGet.mockRejectedValue(new Error("offline"));
 
       const seen: any[] = [];
@@ -323,8 +308,6 @@ describe("cockpit panels", () => {
     });
 
     it("asks for the window it was given", async () => {
-      const { useOperatingSummary } = feature;
-
       mockGet.mockResolvedValue({ data: { daily: [] } });
 
       function Probe() {

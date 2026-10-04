@@ -925,8 +925,17 @@ export const APP_ROUTES: readonly AppRoute[] = [
     permissionCategory: "مالية",
   },
   {
+    // Was a second live route rendering `ExpensesArchive` under the old
+    // `/owner/*` prefix, alongside `/expenses/archive`. Nothing linked to it --
+    // no nav block, no button anywhere -- yet it appeared in the permission
+    // lists in `features/users/constants.ts`, so it was reachable and
+    // grantable while invisible. Two addresses for one page, one of them a
+    // dead end nobody could find.
+    //
+    // Now a redirect, so any bookmark or stored permission still resolves, and
+    // the page has exactly one address to maintain.
     path: "/owner/expenses/archive",
-    component: ExpensesArchive,
+    redirectTo: "/expenses/archive",
     roles: [...ROLES.MANAGEMENT, "CASHIER", "ACCOUNTANT"],
     title: "أرشيف المصروفات",
   },
