@@ -146,7 +146,7 @@ export function ExpenseDetailsPanel({
             <div className="space-y-2">
               <div className="text-[10px] font-black text-muted uppercase tracking-widest">صورة الفاتورة</div>
               <a href={String(viewItem.invoice_image_url).startsWith("http") ? String(viewItem.invoice_image_url) : `${staticURL}${String(viewItem.invoice_image_url)}`} target="_blank" rel="noreferrer" className="block rounded-2xl overflow-hidden border border-border hover:opacity-90 transition-opacity">
-                <img src={String(viewItem.invoice_image_url).startsWith("http") ? String(viewItem.invoice_image_url) : `${staticURL}${String(viewItem.invoice_image_url)}`} alt="فاتورة" className="w-full max-h-64 object-contain bg-soft" />
+                <img src={String(viewItem.invoice_image_url).startsWith("http") ? String(viewItem.invoice_image_url) : `${staticURL}${String(viewItem.invoice_image_url)}`} alt="فاتورة" className="w-full max-h-64 object-contain bg-soft" onError={(e) => { e.currentTarget.style.display = "none"; }} />
               </a>
             </div>
           ) : null}

@@ -93,6 +93,7 @@ export function LogDetailDialog({
                     src={image}
                     alt={product?.name || `صنف #${log.product_id}`}
                     className="h-full w-full object-cover"
+    onError={(e) => { e.currentTarget.style.display = "none"; }}
                   />
                 ) : (
                   <Package size={20} className="text-muted" />

@@ -145,7 +145,7 @@ export function ExpenseFormSections({
          >
 
           {formData.invoice_image_url ? (
-            <img src={formData.invoice_image_url.startsWith("http") ? formData.invoice_image_url : `${staticURL}${formData.invoice_image_url}`} alt="" className="h-16 w-16 rounded-xl object-cover border border-border" />
+            <img src={formData.invoice_image_url.startsWith("http") ? formData.invoice_image_url : `${staticURL}${formData.invoice_image_url}`} alt="" className="h-16 w-16 rounded-xl object-cover border border-border" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           ) : (
             <div className="h-16 w-16 rounded-xl border border-border bg-soft flex items-center justify-center">
               <ImageIcon size={20} className="text-muted/40" />

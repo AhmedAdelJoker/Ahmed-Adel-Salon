@@ -61,6 +61,8 @@ export default function Header({
   const role = normalizeRole(user?.role);
   const displayName = user?.full_name || user?.username || "المستخدم";
 
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
   const getAvatarUrl = (): string | null => {
     const profileImage = user?.profile_image_url as string | undefined;
     if (!profileImage) return null;
@@ -214,13 +216,19 @@ export default function Header({
                 <div className="relative">
                   <div className="absolute inset-0 rounded-xl bg-accent/20 blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="relative h-10 w-10 overflow-hidden rounded-xl bg-gradient-to-br from-bg-card to-bg-soft text-accent font-black border border-accent/30 shadow-md">
-                    {getAvatarUrl() ? (
+                    {getAvatarUrl() && !avatarFailed ? (
                       <img
                         src={getAvatarUrl() ?? ""}
                         alt={displayName}
                         loading="lazy"
                         decoding="async"
                         className="h-full w-full object-cover"
+                        // Same reason as the sidebar: a stored path can name a
+                        // file that no longer exists, and an <img> with no
+                        // onError renders a broken placeholder forever. See
+                        // EmployeeAvatar, which has handled it since it was
+                        // written.
+                        onError={() => setAvatarFailed(true)}
                       />
                     ) : (
                       <span className="flex h-full w-full items-center justify-center text-xs">

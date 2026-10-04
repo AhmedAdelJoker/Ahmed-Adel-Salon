@@ -39,14 +39,12 @@ export const ProfileTab = ({
                   <img
                     src={avatarPreview}
                     alt="Avatar"
-                    className="w-full h-full object-cover"
-                  />
+                    className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                 ) : profile.avatar_url ? (
                   <img
                     src={profile.avatar_url}
                     alt="Avatar"
-                    className="w-full h-full object-cover"
-                  />
+                    className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                 ) : (
                   <div className="w-full h-full bg-primary/10 flex items-center justify-center">
                     <User size={32} className="text-primary" />

@@ -97,6 +97,7 @@ const DailySummary = ({ todayRecords, employees }) => {
                       src={item.empImage}
                       alt={item.empName}
                       className="w-full h-full rounded-xl object-cover"
+    onError={(e) => { e.currentTarget.style.display = "none"; }}
                     />
                   ) : (
                     <span className="text-xs font-black text-muted">

@@ -360,9 +360,12 @@ export default function Inventory() {
                                     ? product.image_url
                                     : `${STATIC_BASE_URL}${product.image_url}`
                                 }
-                                alt={product.name}
-                                className="h-full w-full object-cover"
-                              />
+alt={product.name}
+                                  className="h-full w-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                  }}
+                                />
                             ) : (
                               <>
                                 <tone.Icon size={16} className="sm:hidden" />

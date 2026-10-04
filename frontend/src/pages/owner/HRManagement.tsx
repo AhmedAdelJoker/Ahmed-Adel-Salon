@@ -490,7 +490,7 @@ const HRManagement = () => {
                 <div className="mt-4 rounded-2xl border border-border bg-card p-4 flex items-center gap-4">
                   <div className="h-14 w-14 rounded-xl overflow-hidden bg-soft flex items-center justify-center shrink-0 ring-1 ring-border">
                     {imagePreview || formData.profileImageUrl ? (
-                      <img src={imagePreview || (formData.profileImageUrl?.startsWith("http") ? formData.profileImageUrl : `${staticURL}${formData.profileImageUrl}`)} alt="preview" className="h-full w-full object-cover" />
+                      <img src={imagePreview || (formData.profileImageUrl?.startsWith("http") ? formData.profileImageUrl : `${staticURL}${formData.profileImageUrl}`)} alt="preview" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                     ) : (
                       <User size={20} className="text-muted/40" />
                     )}

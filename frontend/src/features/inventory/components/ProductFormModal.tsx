@@ -149,6 +149,9 @@ export function ProductFormModal({
                     }
                     alt="Preview"
                     className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
                   />
                   <button
                     type="button"

@@ -501,7 +501,7 @@ export default function Cashbox() {
                     <div className="rounded-xl border bg-soft/50 p-3 flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-white border flex items-center justify-center overflow-hidden shrink-0">
                         {creator.avatar ? (
-                          <img src={creator.avatar.startsWith("http") ? creator.avatar : `${staticURL}${creator.avatar}`} alt="" className="h-full w-full object-cover" />
+                          <img src={creator.avatar.startsWith("http") ? creator.avatar : `${staticURL}${creator.avatar}`} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                         ) : (
                           <User size={16} className="text-muted" />
                         )}

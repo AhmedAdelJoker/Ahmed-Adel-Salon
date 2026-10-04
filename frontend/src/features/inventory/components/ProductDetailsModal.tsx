@@ -49,9 +49,12 @@ export function ProductDetailsModal({
                         ? viewProduct.image_url
                         : `${staticBaseUrl}${viewProduct.image_url}`
                     }
-                    alt={viewProduct.name}
-                    className="h-full w-full object-cover"
-                  />
+alt={viewProduct.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
                 ) : (
                   <Package size={22} className="text-white" />
                 )}

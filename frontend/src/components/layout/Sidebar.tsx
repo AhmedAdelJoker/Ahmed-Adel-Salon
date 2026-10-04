@@ -151,6 +151,8 @@ export default function Sidebar({
     }));
   };
 
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
   const getAvatarUrl = (): string | null => {
     const profileImage = user?.profile_image_url as string | undefined;
     if (!profileImage) return null;
@@ -296,11 +298,22 @@ export default function Sidebar({
                 <div className="relative h-12 w-12 shrink-0">
                   <div className="absolute inset-0 rounded-xl bg-accent/30 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-bg-card to-bg-soft text-accent font-bold border border-accent/20 shadow-lg">
-                    {getAvatarUrl() ? (
+                    {getAvatarUrl() && !avatarFailed ? (
                       <img
                         src={getAvatarUrl() ?? ""}
                         alt="User"
                         className="h-full w-full object-cover"
+                        // A stored path is a promise, not a fact: the row can
+                        // name a file that was never written, moved with the
+                        // data directory, or cleaned up. Without this the
+                        // browser shows a broken-image placeholder forever and
+                        // the only symptom is a console line nobody reads --
+                        // which is exactly how two accounts ended up pointing
+                        // at uploads that do not exist.
+                        //
+                        // `EmployeeAvatar` has had this since it was written.
+                        // The two places that build an <img> by hand did not.
+                        onError={() => setAvatarFailed(true)}
                       />
                     ) : (
                       <span className="text-base">{getInitials()}</span>
