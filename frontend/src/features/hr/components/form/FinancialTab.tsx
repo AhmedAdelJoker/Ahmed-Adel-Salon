@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DollarSign, TrendingUp, Plus, Trash2, Wallet } from "lucide-react";
+import { currencyLabel } from "@/lib/core/currency";
 import {
   FIELD_LABEL_CLASS,
   FIELD_INPUT_CLASS,
@@ -40,11 +41,9 @@ export default function FinancialTab({
                         baseSalary: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className={`${FIELD_INPUT_CLASS} pr-12`}
+                    className={"${FIELD_INPUT_CLASS} pe-12"}
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-muted">
-                    ج.م
-                  </span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-muted">{currencyLabel()}</span>
                 </div>
               </div>
               <div className="space-y-2">
@@ -61,7 +60,7 @@ export default function FinancialTab({
                         commissionRate: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className={`${FIELD_INPUT_CLASS} pr-12`}
+                    className={"${FIELD_INPUT_CLASS} pe-12"}
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-muted">
                     %

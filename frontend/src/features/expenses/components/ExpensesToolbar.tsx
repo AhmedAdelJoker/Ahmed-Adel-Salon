@@ -55,7 +55,7 @@ export function ExpensesToolbar({
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative flex-1">
             <Search size={16} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted" />
-            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="بحث بالعنوان، الوصف أو الفئة..." className="h-11 w-full pr-10 rounded-xl bg-soft border-border font-bold focus:border-slate-900 focus:ring-slate-900/10 text-sm" />
+            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="بحث بالعنوان، الوصف أو الفئة..." className="h-11 w-full pe-10 rounded-xl bg-soft border-border font-bold focus:border-slate-900 focus:ring-slate-900/10 text-sm" />
             {searchTerm && <button onClick={() => setSearchTerm("")} className="absolute left-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg bg-card border border-border flex items-center justify-center"><X size={12} /></button>}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -84,7 +84,7 @@ export function ExpensesToolbar({
               </Button>
             )}
             <Button variant="outline" className="h-11 rounded-xl font-black hidden sm:flex" onClick={onRefresh}>
-              <RefreshCw size={14} className="ml-1.5" /> تحديث
+              <RefreshCw size={14} className="ms-1.5" /> تحديث
             </Button>
           </div>
         </div>

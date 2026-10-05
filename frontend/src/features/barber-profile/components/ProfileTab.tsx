@@ -39,14 +39,12 @@ export const ProfileTab = ({
                   <img
                     src={avatarPreview}
                     alt="Avatar"
-                    className="w-full h-full object-cover"
-                  />
+                    className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                 ) : profile.avatar_url ? (
                   <img
                     src={profile.avatar_url}
                     alt="Avatar"
-                    className="w-full h-full object-cover"
-                  />
+                    className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                 ) : (
                   <div className="w-full h-full bg-primary/10 flex items-center justify-center">
                     <User size={32} className="text-primary" />
@@ -189,10 +187,10 @@ export const ProfileTab = ({
 
           <div className="flex gap-2 justify-end">
             <Button variant="outline" className="h-10 rounded-xl px-6" onClick={onLoadProfile}>
-              <ArrowLeft size={14} className="ml-1.5" /> استعادة
+              <ArrowLeft size={14} className="ms-1.5" /> استعادة
             </Button>
             <Button onClick={onSaveProfile} loading={loading} className="h-10 rounded-xl px-6">
-              <Save size={14} className="ml-1.5" /> حفظ التغييرات
+              <Save size={14} className="ms-1.5" /> حفظ التغييرات
             </Button>
           </div>
         </div>

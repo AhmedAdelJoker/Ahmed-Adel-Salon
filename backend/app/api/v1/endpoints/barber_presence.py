@@ -8,19 +8,75 @@ import io
 import json
 
 from app.db.session import get_db
-from app.api.deps import require_any_staff, require_cashier_manager_owner
+from app.api.deps import (
+    require_any_staff,
+    require_cashier_manager_owner,
+    require_owner_or_manager,
+    require_working_hours_editor,
+)
 from app.models.user import User
 from app.models.employee import Employee
 from app.models.employee_presence_log import EmployeePresenceLog, AttendanceArchive, AttendancePenalty
 from app.models.leave_request import LeaveRequest
 from app.models.business_settings import BusinessSettings
 from app.core.upload_security import validate_data_sheet
+from app.core.config import settings as app_settings
+from app.core.rate_limit import rate_limit
+from app.services.activity_log_service import log_activity
+from app.core.clock import salon_now, utc_now
+from app.core.working_hours import (
+    WorkingHoursError,
+    day_key,
+    normalize_working_hours,
+    current_window,
+    validate_working_hours,
+)
 from app.services.websocket import manager
 
 router = APIRouter(prefix="/barber-presence", tags=["Attendance"])
 
+
+def _working_hours_diff(before: dict, after: dict) -> str:
+    """Human-readable per-day diff, so the audit log says what actually changed."""
+    from app.core.working_hours import DAYS_AR
+
+    parts: list[str] = []
+    for day, label in DAYS_AR.items():
+        left = before.get(day) or {}
+        right = after.get(day) or {}
+        if left == right:
+            continue
+        if left.get("is_open") and not right.get("is_open"):
+            parts.append(f"{label}: مغلق")
+        elif not left.get("is_open") and right.get("is_open"):
+            parts.append(f"{label}: مفتوح {right.get('open_time')}–{right.get('close_time')}")
+        else:
+            parts.append(
+                f"{label}: {left.get('open_time')}–{left.get('close_time')} ← "
+                f"{right.get('open_time')}–{right.get('close_time')}"
+            )
+    return "تعديل ساعات العمل: " + ("، ".join(parts) if parts else "بدون تغيير فعلي")
+
 LATE_THRESHOLD_MINUTES = 15
 PENALTY_PER_LATE_MINUTE = 0.5  # Currency per minute late
+
+# Staff allowed to view/manage leave requests on behalf of any employee.
+# Cashier (front desk) is included because the router exposes /attendance
+# (which hosts the Leaves UI) to CASHIER; barbers are scoped to themselves
+# only, and approve/reject stays restricted to require_owner_or_manager.
+LEAVE_MANAGE_ROLES = {"admin", "owner", "manager", "accountant", "cashier"}
+
+
+def _employee_id_for_user(current_user: User) -> Optional[int]:
+    return current_user.barber_id or current_user.employee_id
+
+
+def _require_employee_scope(current_user: User, employee_id: int) -> None:
+    if current_user.role in LEAVE_MANAGE_ROLES:
+        return
+    if current_user.role == "barber" and _employee_id_for_user(current_user) == employee_id:
+        return
+    raise HTTPException(status_code=403, detail="ليس لديك صلاحية لهذا الموظف")
 
 
 def _is_late_for_shift(db: Session, dt: datetime) -> tuple:
@@ -28,13 +84,13 @@ def _is_late_for_shift(db: Session, dt: datetime) -> tuple:
     settings = db.query(BusinessSettings).first()
     if not settings or not settings.working_hours:
         return False, None, 0
-    
-    day_name = dt.strftime("%A").lower()
-    day_config = settings.working_hours.get(day_name, {})
-    
-    if not day_config.get("is_open", True) or not day_config.get("open_time"):
+
+    hours = normalize_working_hours(settings.working_hours)
+    day_config = hours.get(day_key(dt), {})
+
+    if not day_config.get("is_open") or not day_config.get("open_time"):
         return False, None, 0
-    
+
     try:
         start_str = day_config["open_time"]
         start_time = datetime.strptime(start_str, "%H:%M").time()
@@ -42,7 +98,7 @@ def _is_late_for_shift(db: Session, dt: datetime) -> tuple:
         start_minutes = start_time.hour * 60 + start_time.minute
         current_minutes = current_time.hour * 60 + current_time.minute
         diff = current_minutes - start_minutes
-        
+
         if diff > LATE_THRESHOLD_MINUTES:
             return True, start_str, diff
         return False, start_str, 0
@@ -52,7 +108,7 @@ def _is_late_for_shift(db: Session, dt: datetime) -> tuple:
 
 def _get_employee_status(db: Session, employee_id: int) -> dict:
     """Get current employee status based on today's logs."""
-    today = date.today()
+    today = salon_now().date()
     logs = (
         db.query(EmployeePresenceLog)
         .filter(EmployeePresenceLog.employee_id == employee_id)
@@ -153,22 +209,17 @@ def get_employee_details(employee_id: int, db: Session = Depends(get_db), curren
     remaining_shift = None
     settings = db.query(BusinessSettings).first()
     if settings and settings.working_hours:
-        day_name = datetime.now().strftime("%A").lower()
-        day_config = settings.working_hours.get(day_name, {})
-        if day_config.get("is_open") and day_config.get("close_time"):
-            close_str = day_config["close_time"]
-            now = datetime.now()
-            try:
-                close_h, close_m = map(int, close_str.split(":"))
-                close_dt = now.replace(hour=close_h, minute=close_m, second=0)
-                diff = int((close_dt - now).total_seconds() / 60)
-                if diff > 0:
-                    h, m = divmod(diff, 60)
-                    remaining_shift = f"{h}س {m}د"
-                else:
-                    remaining_shift = "انتهت"
-            except Exception:
-                pass
+        now = salon_now()
+        hours = normalize_working_hours(settings.working_hours)
+        window = current_window(hours, now)
+        if window:
+            closes_at = window[2]
+            diff = int((closes_at - now).total_seconds() / 60)
+            if diff > 0:
+                h, m = divmod(diff, 60)
+                remaining_shift = f"{h}س {m}د"
+            else:
+                remaining_shift = "انتهت"
     
     return {
         "employee": {
@@ -205,7 +256,7 @@ async def manual_register(
         except ValueError:
             raise HTTPException(status_code=400, detail="تنسيق الوقت غير صحيح")
     else:
-        dt = datetime.now()
+        dt = salon_now()
     
     # Check current status
     emp_status = _get_employee_status(db, employee_id)
@@ -312,9 +363,9 @@ async def import_biometric(
                     try:
                         dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
                     except ValueError:
-                        dt = datetime.now()
+                        dt = salon_now()
             else:
-                dt = datetime.now()
+                dt = salon_now()
             
             # Normalize status
             status_lower = str(status).lower().strip()
@@ -370,7 +421,7 @@ def get_analytics(
     from 101 queries to 1.
     """
     if not year_month:
-        year_month = datetime.now().strftime("%Y-%m")
+        year_month = salon_now().strftime("%Y-%m")
 
     year, month = map(int, year_month.split("-"))
 
@@ -450,22 +501,52 @@ def get_analytics(
 @router.get("/working-hours")
 def get_working_hours(db: Session = Depends(get_db), current_user: User = Depends(require_any_staff)):
     settings = db.query(BusinessSettings).first()
-    return {"working_hours": settings.working_hours if settings else {}}
+    return {"working_hours": normalize_working_hours(settings.working_hours if settings else None)}
 
 
-@router.post("/working-hours")
+@router.post(
+    "/working-hours",
+    dependencies=[
+        Depends(
+            rate_limit(
+                "working_hours_write",
+                max_requests=app_settings.SETTINGS_WRITE_RATE_LIMIT_MAX_REQUESTS,
+                window_seconds=app_settings.RATE_LIMIT_WINDOW_SECONDS,
+            )
+        )
+    ],
+)
 def update_working_hours(
     payload: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner),
+    current_user: User = Depends(require_working_hours_editor),
 ):
+    try:
+        validated = validate_working_hours(payload.get("working_hours", {}))
+    except WorkingHoursError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     settings = db.query(BusinessSettings).first()
     if not settings:
-        settings = BusinessSettings()
+        settings = BusinessSettings(salon_name="SalonPro", currency="EGP")
         db.add(settings)
-    settings.working_hours = payload.get("working_hours", {})
+        db.commit()
+        db.refresh(settings)
+
+    previous = normalize_working_hours(settings.working_hours)
+    settings.working_hours = validated
     db.commit()
     db.refresh(settings)
+
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="UPDATE_WORKING_HOURS",
+        entity_type="BusinessSettings",
+        entity_id=str(settings.id),
+        description=_working_hours_diff(previous, normalize_working_hours(validated)),
+    )
+
     return {"working_hours": settings.working_hours, "message": "تم حفظ الإعدادات بنجاح"}
 
 
@@ -478,6 +559,12 @@ def get_leaves(
     current_user: User = Depends(require_any_staff),
 ):
     query = db.query(LeaveRequest).options(joinedload(LeaveRequest.employee))
+    if current_user.role == "barber":
+        query = query.filter(
+            LeaveRequest.employee_id == _employee_id_for_user(current_user)
+        )
+    elif current_user.role not in LEAVE_MANAGE_ROLES:
+        raise HTTPException(status_code=403, detail="ليس لديك صلاحية لعرض الإجازات")
     if status:
         query = query.filter(LeaveRequest.status == status)
     leaves = query.order_by(LeaveRequest.created_at.desc()).all()
@@ -509,6 +596,7 @@ def create_leave(
             status_code=400,
             detail="employee_id and start_date and end_date are required",
         )
+    _require_employee_scope(current_user, int(payload["employee_id"]))
     # NOTE: Date columns need real date objects — raw strings 500 on sqlite.
     try:
         start_date = payload["start_date"] if isinstance(payload["start_date"], date) else date.fromisoformat(str(payload["start_date"]))
@@ -545,7 +633,7 @@ def update_leave_status(
     leave_id: int,
     payload: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner),
+    current_user: User = Depends(require_owner_or_manager),
 ):
     leave = db.query(LeaveRequest).filter(LeaveRequest.id == leave_id).first()
     if not leave:

@@ -4,7 +4,7 @@ import { CheckCheck, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/core/utils";
 import DoneCard from "@/features/reception/components/DoneCard";
-import ReceptionEmptyState from "@/features/reception/components/ReceptionEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function DonePanel({
   show,
@@ -41,10 +41,10 @@ export default function DonePanel({
             </Badge>
           </div>
           {list.length === 0 ? (
-            <ReceptionEmptyState
+            <EmptyState variant="board"
               icon={CheckCheck}
               title="لا مكتملة اليوم"
-              desc="لم يتم إنهاء أي خدمة حتى الآن."
+              message="لم يتم إنهاء أي خدمة حتى الآن."
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">

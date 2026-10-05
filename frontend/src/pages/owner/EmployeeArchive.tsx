@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/shared/EmptyState";
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -186,7 +187,7 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="بحث بالاسم أو رقم الجوال..."
-            className="h-12 pl-4 pr-12 rounded-xl bg-white border-border focus:border-primary shadow-sm transition-all font-bold text-sm"
+            className="h-12 ps-4 pe-12 rounded-xl bg-white border-border focus:border-primary shadow-sm transition-all font-bold text-sm"
           />
         </div>
         <StatCard
@@ -210,16 +211,12 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
           ))}
         </div>
       ) : filteredEmployees.length === 0 ? (
-        <PremiumCard className="p-12 rounded-[32px] border-dashed border-2 border-border/60 bg-card/50 flex flex-col items-center justify-center text-center">
-          <div className="w-20 h-20 bg-soft rounded-full flex items-center justify-center mb-4 text-muted-foreground shadow-inner">
-            <Archive size={40} strokeWidth={1.5} />
-          </div>
-          <h3 className="text-xl font-black text-main mb-2">الأرشيف فارغ</h3>
-          <p className="text-sm font-bold text-muted-foreground max-w-md">
-            لا يوجد موظفون موقوفون أو مستقيلون في الأرشيف حالياً، أو لا توجد
-            نتائج تطابق بحثك.
-          </p>
-        </PremiumCard>
+        <EmptyState
+          variant="page"
+          icon={Archive}
+          title="الأرشيف فارغ"
+          message="لا يوجد موظفون موقوفون أو مستقيلون في الأرشيف حالياً، أو لا توجد نتائج تطابق بحثك."
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredEmployees.map((employee) => (
@@ -273,7 +270,7 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
                   onClick={() => setConfirmTarget(employee)}
                   className="w-full h-12 rounded-xl font-black text-sm uppercase tracking-widest bg-white border border-border hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm"
                 >
-                  <RotateCcw size={18} className="ml-2" /> استعادة للعمل
+                  <RotateCcw size={18} className="ms-2" /> استعادة للعمل
                 </Button>
               </div>
             </PremiumCard>

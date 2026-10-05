@@ -1,3 +1,4 @@
+from app.crud.core_business import create_cash_transaction
 from app.models.employee import Employee
 from app.models.expense import Expense
 from tests.helpers import auth_headers, make_user
@@ -23,7 +24,7 @@ def test_list_payroll_empty_for_owner(client, db_session):
 
 
 def test_create_salary_advance_creates_linked_expense(client, db_session):
-    make_user(db_session, username="owner1", role="owner")
+    owner = make_user(db_session, username="owner1", role="owner")
     headers = auth_headers(client, username="owner1")
     employee = Employee(
         full_name="Advance Employee",
@@ -33,6 +34,13 @@ def test_create_salary_advance_creates_linked_expense(client, db_session):
     db_session.add(employee)
     db_session.commit()
     db_session.refresh(employee)
+    create_cash_transaction(
+        db_session,
+        direction="in",
+        amount=1000,
+        transaction_type="opening_balance",
+        user_id=owner.id,
+    )
 
     response = client.post(
         "/api/v1/salary-advances",

@@ -457,7 +457,7 @@ def _query_invoices(
         db.query(Invoice)
         .options(
             joinedload(Invoice.customer),
-            joinedload(Invoice.employee),
+            joinedload(Invoice.barber),
             joinedload(Invoice.appointment),
             joinedload(Invoice.created_by_user),
             joinedload(Invoice.items),
@@ -607,7 +607,7 @@ def _query_bookings(
         db.query(Appointment)
         .options(
             joinedload(Appointment.customer),
-            joinedload(Appointment.employee),
+            joinedload(Appointment.barber),
             joinedload(Appointment.services),
         )
         .order_by(Appointment.id.desc())
@@ -1575,7 +1575,7 @@ def export_invoice_pdf(
         db.query(Invoice)
         .options(
             joinedload(Invoice.customer),
-            joinedload(Invoice.employee),
+            joinedload(Invoice.barber),
             joinedload(Invoice.items),
         )
         .filter(Invoice.id == invoice_id)

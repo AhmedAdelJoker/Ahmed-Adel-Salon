@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { cn, formatNumber } from "@/lib/core/utils";
 import type { InventoryProductAny } from "@/features/inventory/hooks/useInventoryForm";
 
@@ -100,7 +100,7 @@ export function HistoryModal({
           ) : (
             <EmptyState
               title="لا توجد حركات"
-              text="لم يتم تسجيل أي عمليات لهذا الصنف."
+              message="لم يتم تسجيل أي عمليات لهذا الصنف."
               icon={History}
             />
           )}

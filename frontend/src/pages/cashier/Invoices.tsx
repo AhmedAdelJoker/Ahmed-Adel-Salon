@@ -17,6 +17,8 @@ import { printThermalReceipt } from "@/lib/print/receipt";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/core/utils";
 import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";
+import { PageShell } from "@/components/shared/PageShell";
+import InlineNotice from "@/components/shared/InlineNotice";
 import {
   useInvoicesData,
   formatCurrency,
@@ -77,11 +79,11 @@ export default function Invoices() {
     pendingAdjustments,
     openInvoicePdf,
     submitAdjustmentRequest,
+    adjustmentsError,
   } = useInvoicesData();
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-5 px-3 pt-4 sm:px-4 lg:px-6 lg:space-y-6">
+    <PageShell contained>
         <PageHeader className={undefined}
           title="الفواتير"
           subtitle="تتبع المبيعات وإدارة الفواتير والمدفوعات"
@@ -95,7 +97,7 @@ export default function Invoices() {
                   className="h-10 rounded-xl px-3"
                   onClick={() => navigate("/owner/adjustment-requests")}
                 >
-                  <ShieldCheck size={14} className="ml-1.5" />
+                  <ShieldCheck size={14} className="ms-1.5" />
                   <span className="hidden sm:inline">طلبات التعديل</span>
                 </Button>
               )}
@@ -104,7 +106,7 @@ export default function Invoices() {
                 className="h-10 rounded-xl px-3"
                 onClick={() => navigate("/invoices/archive")}
               >
-                <Archive size={14} className="ml-1.5" />
+                <Archive size={14} className="ms-1.5" />
                 <span className="hidden sm:inline">الأرشيف</span>
               </Button>
               <Button
@@ -114,7 +116,7 @@ export default function Invoices() {
               >
                 <RefreshCw
                   size={14}
-                  className={cn("ml-1.5", loading && "animate-spin")}
+                  className={cn("ms-1.5", loading && "animate-spin")}
                 />
                 <span className="hidden sm:inline">تحديث</span>
               </Button>
@@ -196,6 +198,10 @@ export default function Invoices() {
           </PremiumCard>
         </div>
 
+        {adjustmentsError && !loading && (
+          <InlineNotice tone="warning">{adjustmentsError}</InlineNotice>
+        )}
+
         <InvoicesToolbar
           query={query}
           setQuery={setQuery}
@@ -272,7 +278,6 @@ export default function Invoices() {
           adjustmentSubmitting={adjustmentSubmitting}
           onSubmit={submitAdjustmentRequest}
         />
-      </div>
-    </div>
+    </PageShell>
   );
 }

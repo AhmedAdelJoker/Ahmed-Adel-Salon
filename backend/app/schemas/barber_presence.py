@@ -7,6 +7,8 @@ class BarberPresenceRead(BaseModel):
     id: int
     barber_id: int
     barber_name: str | None = None
+    employee_id: int | None = None
+    employee_name: str | None = None
     status: str
     is_late: bool = False
     late_reason: str | None = None

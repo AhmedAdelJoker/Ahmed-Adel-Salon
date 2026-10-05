@@ -1,5 +1,7 @@
 /** Catalog OffersPanel (moved from ServicesManagement page, no logic changes). */
 import { Gift, Percent, Pencil, Trash2 } from "lucide-react";
+import { formatCurrency } from "@/lib/core/utils";
+import { currencyLabel } from "@/lib/core/currency";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ContentPanel } from "@/components/shared/PremiumUI";
@@ -84,10 +86,13 @@ export default function OffersPanel({
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
                             <div className="text-sm font-black tabular-nums text-emerald-600">
-                              {offer.offer_price} <span className="text-[10px] font-bold">ج.م</span>
+                              {offer.offer_price}{" "}
+                              <span className="text-[10px] font-bold">
+                                {currencyLabel()}
+                              </span>
                               {offer.original_price && (
-                                <span className="text-[11px] font-bold text-muted line-through mr-2">
-                                  {offer.original_price} ج.م
+                                <span className="text-[11px] font-bold text-muted line-through me-2">
+                                  {formatCurrency(offer.original_price)}
                                 </span>
                               )}
                             </div>
@@ -162,7 +167,7 @@ export default function OffersPanel({
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-black tabular-nums text-emerald-600">
-                          {offer.offer_price} ج.م
+                          {formatCurrency(offer.offer_price)}
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-200 px-2 py-1 text-xs font-black text-emerald-700">
                           <Percent size={11} /> {offer.discount_percentage || 0}%
@@ -170,7 +175,7 @@ export default function OffersPanel({
                       </div>
                       <div className="flex items-center justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => onEdit(offer)} className="h-9 rounded-xl px-4 text-xs font-black">
-                          <Pencil size={14} className="ml-1" /> تعديل
+                          <Pencil size={14} className="ms-1" /> تعديل
                         </Button>
                         <Button
                           variant="ghost"

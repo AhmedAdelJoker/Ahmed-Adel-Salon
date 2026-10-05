@@ -4,10 +4,10 @@ import { Card } from "@/components/ui/card";
 import api from "@/services/api";
 import { toast } from "react-hot-toast";
 import { triggerSuccessEffect } from "@/features/pos/utils";
-import { BarberSelector } from "@/features/pos/components/BarberSelector";
-import { CartItemsList } from "@/features/pos/components/CartItemsList";
-import { ReceiptPreview } from "@/features/pos/components/ReceiptPreview";
-import { CheckoutTotals } from "@/features/pos/components/CheckoutTotals";
+import { BarberSelector } from "@/features/pos";
+import { CartItemsList } from "@/features/pos";
+import { ReceiptPreview } from "@/features/pos";
+import { CheckoutTotals } from "@/features/pos";
 
 const CheckoutBar = () => {
   const {

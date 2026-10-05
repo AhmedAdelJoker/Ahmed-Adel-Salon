@@ -15,25 +15,25 @@ export default function CustomerKpis({
           label="إجمالي المنظومة"
           value={stats.total || ""}
           icon={Users}
-          color="bg-[#6D28D9]"
+          color="bg-primary"
         />
         <CustomerKpi
           label="نخبة VIP"
           value={stats.vip_count || ""}
           icon={Star}
-          color="bg-amber-500"
+          color="bg-warning"
         />
         <CustomerKpi
           label="العملاء الجدد"
           value={stats.new_count || ""}
           icon={UserPlus}
-          color="bg-emerald-600"
+          color="bg-success"
         />
         <CustomerKpi
           label="متوسط الإنفاق"
           value={formatCurrency(stats.avg_spend) || ""}
           icon={TrendingUp}
-          color="bg-blue-600"
+          color="bg-info"
         />
       </div>
   );

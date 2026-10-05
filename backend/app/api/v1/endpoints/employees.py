@@ -1,6 +1,6 @@
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import os
@@ -18,6 +18,7 @@ from app.core.security import get_password_hash, validate_password_strength
 from app.core.rbac import can_access
 from app.core.roles import UserRole, normalize_role
 from app.core.upload_security import validate_image
+from app.core.audit import audit_log
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
@@ -375,6 +376,7 @@ def update_employee(
 @router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_employee(
     employee_id: int,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_manage_employees),
 ):
@@ -383,6 +385,19 @@ def delete_employee(
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
     _ensure_employee_mutable(db, employee, current_user)
 
+    # Snapshot before delete — after `db.delete()` the ORM state is expunged.
+    snapshot = {
+        "full_name": employee.full_name,
+        "job_title": employee.job_title,
+        "phone": employee.phone_primary,
+    }
     db.delete(employee)
     db.commit()
+    audit_log(
+        db, request, current_user,
+        action="delete_employee",
+        entity_type="employee",
+        entity_id=employee_id,
+        description={"deleted": snapshot},
+    )
     return None

@@ -19,7 +19,7 @@ import { toast } from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   PageHeader,
   PremiumCard,
@@ -96,14 +96,14 @@ const DailySummaryReport = () => {
                 disabled={!shifts.length && !expenses.length}
                 className="h-11 rounded-xl px-4 font-black border-border bg-card"
               >
-                <Download size={16} className="ml-1.5" /> تصدير CSV
+                <Download size={16} className="ms-1.5" /> تصدير CSV
               </Button>
               <Button
                 onClick={handlePrint}
                 variant="outline"
                 className="h-11 rounded-xl px-4 font-black border-border bg-card"
               >
-                <Printer size={16} className="ml-1.5" /> طباعة
+                <Printer size={16} className="ms-1.5" /> طباعة
               </Button>
               <Button
                 onClick={() => refetch()}
@@ -141,7 +141,7 @@ const DailySummaryReport = () => {
                 كل رقم هنا مصدره وحدة تشغيلية — راجع المصدر من هنا
               </p>
             </div>
-            <Badge className="mr-auto hidden sm:flex rounded-full border-primary/20 bg-primary-soft text-primary text-[10px] font-black">
+            <Badge className="me-auto hidden sm:flex rounded-full border-primary/20 bg-primary-soft text-primary text-[10px] font-black">
               تكامل لحظي
             </Badge>
           </div>
@@ -233,7 +233,7 @@ const DailySummaryReport = () => {
           {shifts.length === 0 ? (
             <EmptyState
               title="لا توجد ورديات"
-              text="لا توجد ورديات مسجلة لهذا اليوم."
+              message="لا توجد ورديات مسجلة لهذا اليوم."
               icon={Clock}
             />
           ) : (
@@ -241,7 +241,7 @@ const DailySummaryReport = () => {
               {shifts.map((shift) => (
                 <div
                   key={shift.id}
-                  className="group relative pr-8 pb-4 border-r-2 border-border last:pb-0 last:border-0"
+                  className="group relative pe-8 pb-4 border-e-2 border-border last:pb-0 last:border-0"
                 >
                   <div className="absolute top-1 -right-2 h-4 w-4 rounded-full bg-primary border-4 border-card shadow-md group-hover:scale-125 transition-transform" />
 
@@ -315,7 +315,7 @@ const DailySummaryReport = () => {
           {expenses.length === 0 ? (
             <EmptyState
               title="لا توجد مصروفات"
-              text="لا توجد مصروفات مسجلة لهذا اليوم."
+              message="لا توجد مصروفات مسجلة لهذا اليوم."
               icon={ShoppingBag}
             />
           ) : (

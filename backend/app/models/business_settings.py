@@ -88,6 +88,11 @@ class BusinessSettings(Base):
     
     public_site_snapshot = Column(JSON, nullable=True)
     public_site_published_at = Column(DateTime(timezone=True), nullable=True)
+    # Settings revision counter. Bumped on every accepted write so concurrent
+    # editors can detect a lost update instead of clobbering each other.
+    version = Column(Integer, nullable=False, default=1, server_default="1")
+    # Which settings.version the public_site_snapshot was captured from.
+    public_site_published_version = Column(Integer, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

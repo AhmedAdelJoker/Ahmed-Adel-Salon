@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
+import { loadErrorMessage } from "@/lib/core/asyncError";
 import api from "@/services/api";
 import { normalizeListResponse } from "@/services/apiAdapter";
 import { exportService } from "@/services/exportService";
@@ -77,6 +78,7 @@ export function useCustomersList() {
   /** Filtered total for the current query (drives pagination). */
   const [totalCount, setTotalCount] = useState(0);
   const [stats, setStats] = useState<CustomerStats>(EMPTY_CUSTOMER_STATS);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   async function handleExport(type = "excel") {
     const filename = `customers_${new Date().toISOString().split("T")[0]}`;
@@ -110,10 +112,14 @@ export function useCustomersList() {
 
   const fetchStats = useCallback(async () => {
     try {
+      setStatsError(null);
       const res = await api.get("/customers/stats");
       setStats(readStats(res));
     } catch (error) {
+      // The KPI row above the list was silently zero, which reads as "you have no
+      // customers" rather than "the totals could not be loaded".
       console.error("Customers stats error:", error);
+      setStatsError(loadErrorMessage(error, "إحصائيات العملاء"));
     }
   }, []);
 
@@ -164,6 +170,7 @@ export function useCustomersList() {
     totalCount,
     totalPages,
     stats,
+    statsError,
     fetchCustomers,
     removeCustomer,
     handleExport,

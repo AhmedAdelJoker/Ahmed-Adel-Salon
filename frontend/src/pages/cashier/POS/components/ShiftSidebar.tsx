@@ -29,6 +29,7 @@ import { printReceiptNative } from "@/lib/print/thermal";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { currencyLabel } from "@/lib/core/currency";
 
 const ShiftSidebar = () => {
   const {
@@ -282,7 +283,7 @@ const ShiftSidebar = () => {
 
         {hasOpenShift && (
           <div className="mb-3 sm:mb-4 p-2 sm:p-2.5 rounded-xl bg-slate-50/50 dark:bg-white/5 border border-slate-100 dark:border-white/10 relative z-10">
-            <div className="flex items-center gap-1.5 text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5 pr-1">
+            <div className="flex items-center gap-1.5 text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5 pe-1">
               <User size={8} className="text-primary" /> المسؤول
             </div>
             <div className="text-[11px] sm:text-xs font-black text-slate-700 dark:text-slate-200 truncate">
@@ -310,7 +311,7 @@ const ShiftSidebar = () => {
             <div className="space-y-1.5 sm:space-y-2">
               <label
                 htmlFor="opening-cash"
-                className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-widest mr-1"
+                className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-widest me-1"
               >
                 الرصيد الافتتاحي
               </label>
@@ -323,9 +324,7 @@ const ShiftSidebar = () => {
                   disabled={!isShopOpen}
                   className="h-10 sm:h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 font-black text-base sm:text-lg px-3 focus:border-primary/40 transition-all shadow-sm disabled:opacity-50 touch-target"
                 />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] sm:text-[9px] font-black text-slate-300">
-                  ج.م
-                </span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] sm:text-[9px] font-black text-slate-300">{currencyLabel()}</span>
               </div>
             </div>
             <Button
@@ -440,7 +439,7 @@ const ShiftSidebar = () => {
             />
 
             <div className="relative z-10 min-w-0">
-              <p className="text-[7px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 pr-1 truncate">
+              <p className="text-[7px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 pe-1 truncate">
                 {tile.label}
               </p>
               <p
@@ -490,7 +489,7 @@ const ShiftSidebar = () => {
               </div>
 
               <div className="space-y-3">
-                <label className="text-xs font-black text-main uppercase tracking-widest mr-1">
+                <label className="text-xs font-black text-main uppercase tracking-widest me-1">
                   رصيد الإغلاق الفعلي
                 </label>
                 <div className="relative">
@@ -499,11 +498,9 @@ const ShiftSidebar = () => {
                     value={closingCash}
                     onChange={(e) => setClosingCash(e.target.value)}
                     placeholder="0.00"
-                    className="h-16 rounded-2xl font-black text-2xl border-2 border-primary/10 focus:border-primary/40 bg-white dark:bg-white/5 pr-4 pl-12 transition-all shadow-sm touch-target"
+                    className="h-16 rounded-2xl font-black text-2xl border-2 border-primary/10 focus:border-primary/40 bg-white dark:bg-white/5 pe-4 ps-12 transition-all shadow-sm touch-target"
                   />
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-bold text-sm">
-                    ج.م
-                  </div>
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-bold text-sm">{currencyLabel()}</div>
                 </div>
               </div>
 
@@ -542,7 +539,7 @@ const ShiftSidebar = () => {
               onClick={handleCloseShift}
               loading={isClosingShift}
             >
-              <Printer size={20} className="ml-2" />
+              <Printer size={20} className="ms-2" />
               إنهاء الوردية والطباعة
             </Button>
             <Button

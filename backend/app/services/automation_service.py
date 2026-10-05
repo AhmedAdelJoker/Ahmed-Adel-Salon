@@ -1,3 +1,4 @@
+import logging
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
@@ -11,6 +12,33 @@ from app.services.meta_whatsapp_service import (
     send_text_message,
     is_meta_whatsapp_configured
 )
+
+logger = logging.getLogger("app.automation_service")
+
+
+def _appointments_in_window(
+    db: Session,
+    window_start: datetime,
+    window_end: datetime,
+    reminder_field: str,
+):
+    candidates = db.query(Appointment).filter(
+        Appointment.status == "confirmed",
+        Appointment.appointment_date >= window_start.date(),
+        Appointment.appointment_date <= window_end.date(),
+        getattr(Appointment, reminder_field) == False,
+    ).all()
+    return [
+        appointment
+        for appointment in candidates
+        if window_start
+        <= datetime.combine(
+            appointment.appointment_date,
+            appointment.appointment_time,
+        )
+        <= window_end
+    ]
+
 
 def run_automated_reminders(db: Session):
     """
@@ -29,12 +57,12 @@ def run_automated_reminders(db: Session):
     target_24h_start = now + timedelta(hours=23)
     target_24h_end = now + timedelta(hours=25)
     
-    appointments_24h = db.query(Appointment).filter(
-        Appointment.status == "confirmed",
-        Appointment.start_at >= target_24h_start,
-        Appointment.start_at <= target_24h_end,
-        Appointment.reminder_24h_sent == False
-    ).all()
+    appointments_24h = _appointments_in_window(
+        db,
+        target_24h_start,
+        target_24h_end,
+        "reminder_24h_sent",
+    )
     
     sent_24h = 0
     for appt in appointments_24h:
@@ -52,19 +80,19 @@ def run_automated_reminders(db: Session):
                 appt.reminder_24h_sent = True
                 sent_24h += 1
         except Exception as e:
-            print(f"Error sending 24h reminder for appt {appt.id}: {e}")
+            logger.exception("Error sending 24h reminder for appt %s: %s", appt.id, e)
 
     # 2. 2h Reminders
     # Target appointments between 1h and 3h from now
     target_2h_start = now + timedelta(hours=1)
     target_2h_end = now + timedelta(hours=3)
     
-    appointments_2h = db.query(Appointment).filter(
-        Appointment.status == "confirmed",
-        Appointment.start_at >= target_2h_start,
-        Appointment.start_at <= target_2h_end,
-        Appointment.reminder_2h_sent == False
-    ).all()
+    appointments_2h = _appointments_in_window(
+        db,
+        target_2h_start,
+        target_2h_end,
+        "reminder_2h_sent",
+    )
     
     sent_2h = 0
     for appt in appointments_2h:
@@ -80,7 +108,7 @@ def run_automated_reminders(db: Session):
                 appt.reminder_2h_sent = True
                 sent_2h += 1
         except Exception as e:
-            print(f"Error sending 2h reminder for appt {appt.id}: {e}")
+            logger.exception("Error sending 2h reminder for appt %s: %s", appt.id, e)
 
     db.commit()
     return {"sent_24h": sent_24h, "sent_2h": sent_2h}
@@ -117,7 +145,7 @@ def send_post_visit_feedback(db: Session, appointment_id: int):
             appointment_id=appt.id
         )
     except Exception as e:
-        print(f"Error sending feedback request for appt {appt.id}: {e}")
+        logger.exception("Error sending feedback request for appt %s: %s", appt.id, e)
 
 
 

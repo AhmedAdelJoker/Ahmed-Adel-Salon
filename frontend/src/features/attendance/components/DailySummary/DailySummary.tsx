@@ -97,6 +97,7 @@ const DailySummary = ({ todayRecords, employees }) => {
                       src={item.empImage}
                       alt={item.empName}
                       className="w-full h-full rounded-xl object-cover"
+    onError={(e) => { e.currentTarget.style.display = "none"; }}
                     />
                   ) : (
                     <span className="text-xs font-black text-muted">
@@ -119,7 +120,7 @@ const DailySummary = ({ todayRecords, employees }) => {
                     )}
                   >
                     {item.aiInfo.icon && (
-                      <item.aiInfo.icon size={8} className="ml-0.5" />
+                      <item.aiInfo.icon size={8} className="ms-0.5" />
                     )}
                     {item.ai.label}
                   </Badge>
@@ -186,7 +187,7 @@ const DailySummary = ({ todayRecords, employees }) => {
                     item.statusInfo.textColor,
                   )}
                 >
-                  <item.statusInfo.icon size={12} className="ml-1" />{" "}
+                  <item.statusInfo.icon size={12} className="ms-1" />{" "}
                   {item.statusInfo.label}
                 </Badge>
               </div>

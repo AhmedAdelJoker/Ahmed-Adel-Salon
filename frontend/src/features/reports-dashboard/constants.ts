@@ -39,7 +39,8 @@ export interface DashboardStats {
   netProfit: number;
   todayAppointments: number;
   avgInvoice: number;
-  occupancy: number;
+  /** null when the server could not compute it. Distinct from 0. */
+  occupancy: number | null;
   todayRevenueTrend: number;
   todayExpensesTrend: number;
   netProfitTrend: number;
@@ -47,7 +48,10 @@ export interface DashboardStats {
   avgInvoiceTrend: number;
   occupancyTrend: number;
   newCustomersThisWeek?: number;
-  [key: string]: number | undefined;
+  // Widened to admit `null` for `occupancy`. Every other declared key stays a
+  // plain number, so this only loosens the catch-all rather than making all
+  // seven figures nullable at every call site.
+  [key: string]: number | null | undefined;
 }
 
 export const KPI_CONFIG: KpiConfigEntry[] = [
@@ -99,4 +103,31 @@ export const DEMO_STATS: DashboardStats = {
   occupancyTrend: -2,
 };
 
-export const DEFAULT_STATS: DashboardStats = { ...DEMO_STATS };
+/**
+ * What the dashboard shows before the request has answered.
+ *
+ * All zeros, and deliberately not a copy of `DEMO_STATS`. This was
+ * `{ ...DEMO_STATS }`, which meant that opening /owner rendered 18,750 EGP of
+ * revenue and 72% occupancy before the server replied -- invented numbers,
+ * presented exactly like real ones, for as long as the request took. On a
+ * connection that is slow, that is a day of revenue the owner believes they
+ * earned.
+ *
+ * `DEMO_STATS` is for the honest case: the request succeeded and the period
+ * genuinely has no figures. That state is labelled on screen. This one is not
+ * labelled because nothing about it should look like a figure at all.
+ */
+export const DEFAULT_STATS: DashboardStats = {
+  todayRevenue: 0,
+  todayExpenses: 0,
+  netProfit: 0,
+  todayAppointments: 0,
+  avgInvoice: 0,
+  occupancy: 0,
+  todayRevenueTrend: 0,
+  todayExpensesTrend: 0,
+  netProfitTrend: 0,
+  todayAppointmentsTrend: 0,
+  avgInvoiceTrend: 0,
+  occupancyTrend: 0,
+};

@@ -153,7 +153,7 @@ export const BarberSchedule = () => {
                     {statusLabels[apt.status] || apt.status}
                   </Badge>
                 </div>
-                {apt.notes && <p className="mt-2 text-[10px] font-bold text-muted mr-13">{apt.notes}</p>}
+                {apt.notes && <p className="mt-2 text-[10px] font-bold text-muted me-13">{apt.notes}</p>}
               </motion.div>
             ))
           ) : (

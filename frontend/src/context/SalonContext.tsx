@@ -9,6 +9,7 @@ import {
 import { useAuth, type AuthUser } from "@/context/AuthContext";
 import { SocketContext } from "@/context/SocketContext";
 import { generatePublicQR } from "@/lib/media/qr";
+import { setCurrency } from "@/lib/core/currency";
 import { customerService } from "@/services/customerService";
 import { serviceService } from "@/services/serviceService";
 import { barberService } from "@/services/barberService";
@@ -95,6 +96,18 @@ export function SalonProvider({ children }: { children: ReactNode }) {
       if (settingsRes.status === "fulfilled") {
         const s = (settingsRes.value || {}) as SalonRecord;
         setSettings(s);
+        // Publish the salon's currency to `formatCurrency`.
+        //
+        // Both `currency` and `currencyCode` are accepted because the column is
+        // `currency` and nothing has ever read it, so no adapter has had a
+        // reason to normalise the name -- and a formatter that silently stays
+        // on EGP because the key was spelled differently is the same bug this
+        // is fixing. The label is left alone on failure: a failed settings
+        // fetch should not reset a correctly configured currency to the
+        // default.
+        setCurrency(
+          (s.currency as string) || (s.currencyCode as string) || undefined
+        );
         const slug =
           (s.public_slug as string) ||
           (s.publicSlug as string) ||

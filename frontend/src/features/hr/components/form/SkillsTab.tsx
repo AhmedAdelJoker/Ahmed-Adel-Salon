@@ -3,7 +3,10 @@ import type { Dispatch, SetStateAction } from "react";
 import type { EmployeeRecord } from "@/types/employee";
 import type { ServiceRecord } from "@/types/catalog";
 import { Scissors } from "lucide-react";
-import { cn } from "@/lib/core/utils";
+import {
+  cn,
+  formatCurrency,
+} from "@/lib/core/utils";
 
 export default function SkillsTab({
   allServices,
@@ -68,7 +71,7 @@ export default function SkillsTab({
                         : "text-muted",
                     )}
                   >
-                    {service.category} • {service.price} ج.م
+                    {service.category} • {formatCurrency(service.price)}
                   </div>
                 </button>
               ))}

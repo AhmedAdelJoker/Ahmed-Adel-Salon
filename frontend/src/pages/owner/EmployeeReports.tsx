@@ -5,7 +5,6 @@ import {
   BadgeDollarSign,
   Briefcase,
   CalendarDays,
-  ChevronRight,
   Download,
   Receipt,
   RefreshCw,
@@ -33,6 +32,7 @@ import { cn, formatCurrency, formatNumber } from "@/lib/core/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PremiumCard, StatCard } from "@/components/shared/PremiumUI";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import { useEmployeePerformance } from "@/hooks/useApi";
 import {
   Podium,
@@ -185,9 +185,9 @@ export default function EmployeeReports() {
                 className="h-11 rounded-xl px-4 font-black bg-white text-primary hover:bg-white/90"
               >
                 {exporting ? (
-                  <RefreshCw size={16} className="ml-1.5 animate-spin" />
+                  <RefreshCw size={16} className="ms-1.5 animate-spin" />
                 ) : (
-                  <Download size={16} className="ml-1.5" />
+                  <Download size={16} className="ms-1.5" />
                 )}
                 تصدير CSV
               </Button>
@@ -239,7 +239,7 @@ export default function EmployeeReports() {
               size="sm"
               className="shrink-0 rounded-xl"
             >
-              <RefreshCw size={14} className="ml-1" /> إعادة المحاولة
+              <RefreshCw size={14} className="ms-1" /> إعادة المحاولة
             </Button>
           </div>
         </PremiumCard>
@@ -301,7 +301,7 @@ export default function EmployeeReports() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="مثال: أحمد - قص شعر..."
-                className="h-11 pr-10 rounded-xl bg-soft border-border font-bold"
+                className="h-11 pe-10 rounded-xl bg-soft border-border font-bold"
               />
             </div>
           </div>
@@ -549,32 +549,27 @@ export default function EmployeeReports() {
                 })}
               </AnimatePresence>
             </div>
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
-                <span className="text-sm font-bold text-muted">
-                  صفحة {page} من {totalPages} — إجمالي {data?.total || 0} موظف
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1 || isFetching}
-                  >
-                    <ChevronRight size={16} className="rotate-180" /> السابق
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages || isFetching}
-                  >
-                    التالي <ChevronRight size={16} />
-                  </Button>
+            {/* Phase 2: unified pagination */}
+            {totalPages > 1 && (() => {
+              const paginator = createPaginationState({
+                page,
+                size: PAGE_SIZE,
+                total: data?.total || 0,
+              });
+              return (
+                <div className="border-t border-border px-2 py-3">
+                  <Pagination
+                    paginator={paginator}
+                    onPageChange={(p) => setPage(p)}
+                    showSizeChanger={false}
+                    locale="ar"
+                  />
+                  <p className="text-center text-[10px] font-bold text-muted">
+                    صفحة {page} من {totalPages} — إجمالي {data?.total || 0} موظف
+                  </p>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </>
         )}
       </PremiumCard>
@@ -589,7 +584,7 @@ export default function EmployeeReports() {
             <button
               key={l.label}
               onClick={() => navigate(l.href)}
-              className="group flex items-center gap-2 rounded-full border border-border bg-card py-1.5 pr-1.5 pl-4 hover:border-primary/40 hover:shadow-sm transition-all"
+              className="group flex items-center gap-2 rounded-full border border-border bg-card py-1.5 pe-1.5 ps-4 hover:border-primary/40 hover:shadow-sm transition-all"
             >
               <span
                 className={cn(

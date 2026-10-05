@@ -107,7 +107,7 @@ export function InvoicesTable({
             className="h-10 rounded-xl"
             onClick={onResetFilters}
           >
-            <RefreshCw size={14} className="ml-1.5" /> إعادة تعيين الفلاتر
+            <RefreshCw size={14} className="ms-1.5" /> إعادة تعيين الفلاتر
           </Button>
         </div>
       ) : (

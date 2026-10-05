@@ -1,37 +1,11 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  LayoutDashboard,
-  Users,
-  Scissors,
-  Receipt,
-  LogOut,
-  Package,
-  Calendar,
-  Settings,
-  ShieldCheck,
-  TrendingUp,
-  Wallet,
-  History,
-  Zap,
-  UserPlus,
-  UserCheck,
-  FileBarChart2,
-  ChevronRight,
-  ChevronDown,
-  LayoutGrid,
-  Activity,
-  Clock,
-  Users2,
-  Banknote,
-  CalendarDays,
-  UserCircle,
-  Globe,
-} from "lucide-react";
+import { LogOut, Scissors, ChevronRight, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { filterByRole, normalizeRole } from "@/lib/access/roles";
+import { hasRoleAccess, normalizeRole } from "@/lib/access/roles";
+import { getNavGroups } from "@/app/route-registry";
 
 const roleLabel = (role) =>
   ({
@@ -45,272 +19,6 @@ const roleLabel = (role) =>
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
 import { AnimatePresence } from "framer-motion";
-
-const MENU_GROUPS = [
-  {
-    title: "التشغيل",
-    items: [
-      {
-        key: "owner-dash",
-        label: "لوحة القيادة",
-        to: "/owner",
-        icon: LayoutDashboard,
-        roles: ["OWNER", "ADMIN"],
-      },
-      {
-        key: "manager-dash",
-        label: "لوحة المدير",
-        to: "/manager",
-        icon: LayoutDashboard,
-        roles: ["MANAGER"],
-      },
-      {
-        key: "cashier-dash",
-        label: "لوحة الكاشير",
-        to: "/cashier",
-        icon: LayoutDashboard,
-        roles: ["CASHIER"],
-      },
-      {
-        key: "accountant-dash",
-        label: "المركز المالي",
-        to: "/accountant",
-        icon: LayoutDashboard,
-        roles: ["ACCOUNTANT"],
-      },
-      {
-        key: "pos",
-        label: "نقطة البيع",
-        to: "/pos",
-        icon: Zap,
-        roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN"],
-      },
-      {
-        key: "reception-board",
-        label: "لوحة الاستقبال",
-        to: "/reception-board",
-        icon: LayoutGrid,
-        roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN"],
-      },
-      {
-        key: "bookings",
-        label: "الحجوزات",
-        to: "/bookings",
-        icon: Calendar,
-        roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN"],
-      },
-      {
-        key: "schedule",
-        label: "مخطط المواعيد",
-        to: "/schedule",
-        icon: LayoutGrid,
-        roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN"],
-      },
-      {
-        key: "customers",
-        label: "العملاء",
-        to: "/customers",
-        icon: Users,
-        roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN"],
-      },
-      {
-        key: "invoices",
-        label: "الفواتير",
-        to: "/invoices",
-        icon: Receipt,
-        roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN"],
-      },
-      {
-        key: "adjustment-requests",
-        label: "مركز القيادة والتحكم",
-        to: "/owner/adjustment-requests",
-        icon: ShieldCheck,
-        roles: ["OWNER", "ADMIN", "ACCOUNTANT", "MANAGER"],
-      },
-    ],
-  },
-  {
-    title: "قسم الحلاق",
-    items: [
-      {
-        key: "barber-dashboard",
-        label: "لوحة الحلاق",
-        to: "/barber",
-        icon: Scissors,
-        roles: ["BARBER"],
-      },
-      {
-        key: "barber-station",
-        label: "محطة العمل",
-        to: "/barber/workstation",
-        icon: Clock,
-        roles: ["BARBER"],
-      },
-      {
-        key: "barber-clients",
-        label: "عملائي",
-        to: "/barber/clients",
-        icon: Users2,
-        roles: ["BARBER"],
-      },
-      {
-        key: "barber-earnings",
-        label: "أرباحي",
-        to: "/barber/earnings",
-        icon: Banknote,
-        roles: ["BARBER"],
-      },
-      {
-        key: "barber-availability",
-        label: "جدولي",
-        to: "/barber/availability",
-        icon: CalendarDays,
-        roles: ["BARBER"],
-      },
-      {
-        key: "barber-profile",
-        label: "ملفي الشخصي",
-        to: "/barber/profile",
-        icon: UserCircle,
-        roles: ["BARBER"],
-      },
-    ],
-  },
-  {
-    title: "الإدارة",
-    items: [
-      {
-        key: "hr",
-        label: "إدارة الموظفين",
-        to: "/owner/hr",
-        icon: UserPlus,
-        roles: ["OWNER", "ADMIN", "MANAGER"],
-      },
-      {
-        key: "attendance",
-        label: "الحضور والانضباط",
-        to: "/attendance",
-        icon: UserCheck,
-        roles: ["OWNER", "ADMIN", "MANAGER", "ACCOUNTANT", "CASHIER"],
-      },
-      {
-        key: "inventory",
-        label: "المخزن",
-        to: "/inventory",
-        icon: Package,
-        roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN", "ACCOUNTANT"],
-      },
-    ],
-  },
-  {
-    title: "المالية والتقارير",
-    items: [
-      {
-        key: "expenses",
-        label: "المصروفات",
-        to: "/expenses",
-        icon: TrendingUp,
-        roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN", "ACCOUNTANT"],
-      },
-      {
-        key: "cashbox",
-        label: "خزينة المحل",
-        to: "/owner/cashbox",
-        icon: Wallet,
-        roles: ["OWNER", "ADMIN", "CASHIER", "ACCOUNTANT"],
-      },
-      {
-        key: "payroll",
-        label: "الرواتب",
-        to: "/owner/payroll",
-        icon: Wallet,
-        roles: ["OWNER", "ADMIN", "ACCOUNTANT", "MANAGER"],
-      },
-      {
-        key: "reports",
-        label: "التقارير التشغيلية",
-        to: "/owner/reports",
-        icon: FileBarChart2,
-        roles: ["OWNER", "ADMIN", "ACCOUNTANT", "MANAGER"],
-      },
-      {
-        key: "employee-reports",
-        label: "تقارير الموظفين",
-        to: "/owner/employee-reports",
-        icon: Users,
-        roles: ["OWNER", "ADMIN", "ACCOUNTANT"],
-      },
-      {
-        key: "financial-reports",
-        label: "التقارير المالية",
-        to: "/owner/financial",
-        icon: TrendingUp,
-        roles: ["OWNER", "ADMIN", "ACCOUNTANT"],
-      },
-      {
-        key: "daily-summary",
-        label: "الملخص اليومي",
-        to: "/owner/daily-summary",
-        icon: Activity,
-        roles: ["OWNER", "ADMIN", "ACCOUNTANT"],
-      },
-      {
-        key: "financial-rules",
-        label: "القواعد المالية",
-        to: "/owner/financial-rules",
-        icon: ShieldCheck,
-        roles: ["OWNER", "ADMIN"],
-      },
-    ],
-  },
-  {
-    title: "النظام",
-    items: [
-      {
-        key: "settings",
-        label: "إعدادات المحل",
-        to: "/owner/settings",
-        icon: Settings,
-        roles: ["OWNER", "ADMIN", "MANAGER"],
-      },
-      {
-        key: "website-settings",
-        label: "إعدادات الموقع",
-        to: "/owner/website-settings",
-        icon: Globe,
-        roles: ["OWNER", "ADMIN"],
-      },
-      {
-        key: "personal-settings",
-        label: "الإعدادات الشخصية",
-        to: "/settings",
-        icon: UserCheck,
-        roles: ["OWNER", "ADMIN", "MANAGER", "CASHIER", "ACCOUNTANT"],
-      },
-      {
-        key: "security-access",
-        label: "الأمان والوصول",
-        to: "/owner/security-access",
-        icon: ShieldCheck,
-        roles: ["OWNER", "ADMIN"],
-      },
-      {
-        key: "alerts",
-        label: "التنبيهات الذكية",
-        to: "/owner/alerts",
-        icon: Zap,
-        roles: ["OWNER", "ADMIN"],
-      },
-      {
-        key: "activity",
-        label: "سجلات الرقابة",
-        to: "/activity-logs",
-        icon: History,
-        roles: ["OWNER", "ADMIN", "MANAGER", "ACCOUNTANT"],
-      },
-    ],
-  },
-];
 
 const isRouteActive = (location, path) => {
   if (path === "/") return location.pathname === "/";
@@ -365,7 +73,7 @@ function SidebarLink({ item, active, collapsed, onNavigate }) {
       ) : null}
 
       {!collapsed && active && (
-        <div className="mr-auto h-1 w-1 rounded-full bg-accent animate-pulse" />
+        <div className="me-auto h-1 w-1 rounded-full bg-accent animate-pulse" />
       )}
     </NavLink>
   );
@@ -398,7 +106,7 @@ export default function Sidebar({
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(() => {
     const initialState = {};
-    MENU_GROUPS.forEach((group) => {
+    getNavGroups().forEach((group) => {
       if (group.items.some((item) => isRouteActive(location, item.to))) {
         initialState[group.title] = true;
       }
@@ -410,10 +118,16 @@ export default function Sidebar({
 
   const visibleGroups = useMemo(
     () =>
-      MENU_GROUPS.map((group) => ({
-        ...group,
-        items: filterByRole(group.items, user),
-      })).filter((group) => group.items.length > 0),
+      getNavGroups()
+        .map((group) => ({
+          ...group,
+          // A menu entry the user cannot open is a dead end, so the registry
+          // roles and any per-user permission override both apply here.
+          items: group.items.filter((item) =>
+            hasRoleAccess(user, item.roles as string[], item.to),
+          ),
+        }))
+        .filter((group) => group.items.length > 0),
     [user],
   );
 
@@ -436,6 +150,8 @@ export default function Sidebar({
       [title]: !prev[title],
     }));
   };
+
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const getAvatarUrl = (): string | null => {
     const profileImage = user?.profile_image_url as string | undefined;
@@ -582,11 +298,22 @@ export default function Sidebar({
                 <div className="relative h-12 w-12 shrink-0">
                   <div className="absolute inset-0 rounded-xl bg-accent/30 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-bg-card to-bg-soft text-accent font-bold border border-accent/20 shadow-lg">
-                    {getAvatarUrl() ? (
+                    {getAvatarUrl() && !avatarFailed ? (
                       <img
                         src={getAvatarUrl() ?? ""}
                         alt="User"
                         className="h-full w-full object-cover"
+                        // A stored path is a promise, not a fact: the row can
+                        // name a file that was never written, moved with the
+                        // data directory, or cleaned up. Without this the
+                        // browser shows a broken-image placeholder forever and
+                        // the only symptom is a console line nobody reads --
+                        // which is exactly how two accounts ended up pointing
+                        // at uploads that do not exist.
+                        //
+                        // `EmployeeAvatar` has had this since it was written.
+                        // The two places that build an <img> by hand did not.
+                        onError={() => setAvatarFailed(true)}
                       />
                     ) : (
                       <span className="text-base">{getInitials()}</span>

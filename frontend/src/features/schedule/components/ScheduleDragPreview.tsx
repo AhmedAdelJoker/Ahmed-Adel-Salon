@@ -11,7 +11,7 @@ export function ScheduleDragPreview({
 }: ScheduleDragPreviewProps) {
   if (!appointment) return null;
   return (
-    <div className="w-[260px] rounded-2xl p-4 shadow-2xl rotate-2 bg-white/95 dark:bg-[#171717]/95 opacity-95 backdrop-blur-sm ring-1 ring-accent/30">
+    <div className="w-[260px] rounded-2xl p-4 shadow-2xl rotate-2 bg-card/95 opacity-95 backdrop-blur-sm ring-1 ring-accent/30">
       <div className="flex items-center justify-between gap-2">
         <Badge className="text-[9px] px-2.5 h-5 font-black uppercase tracking-widest rounded-lg shadow-sm border-none text-indigo-500 bg-indigo-500/10">
           جاري النقل...

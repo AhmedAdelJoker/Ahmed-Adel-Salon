@@ -31,7 +31,7 @@ export const BookingsFilters = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="بحث بالعميل أو الخدمة..."
-            className="h-10 w-full pr-9 text-sm"
+            className="h-10 w-full pe-9 text-sm"
           />
         </div>
         <div className="flex gap-2">

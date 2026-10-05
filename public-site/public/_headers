@@ -35,4 +35,4 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(self)
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://plausible.io https://client.crisp.chat https://www.clarity.ms; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; media-src 'self' https:; connect-src 'self' https: wss:; frame-src https://client.crisp.chat
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://plausible.io https://client.crisp.chat https://www.clarity.ms; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; media-src 'self' https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src https://client.crisp.chat

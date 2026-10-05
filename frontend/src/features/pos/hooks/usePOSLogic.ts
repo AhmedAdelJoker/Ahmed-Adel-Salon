@@ -5,6 +5,7 @@ import { adaptList } from "@/services/apiAdapter";
 import { toast } from "react-hot-toast";
 import { useSocket } from "@/context/SocketContext";
 import { useSalon } from "@/context/SalonContext";
+import { loadErrorMessage } from "@/lib/core/asyncError";
 import type { ID } from "@/types/common";
 import type { POSRecord, CartItem, POSContextValue } from "@/features/pos/types";
 
@@ -28,6 +29,14 @@ export function usePOSLogic(): POSContextValue {
     useState(false);
   const [currentShift, setCurrentShift] = useState<POSRecord | null>(null);
   const [shiftLoading, setShiftLoading] = useState(true);
+
+  // Load failures. The POS used to swallow these, so a dead API looked exactly
+  // like an empty catalogue and a closed till.
+  const [shiftError, setShiftError] = useState<string | null>(null);
+  const [readyAppointmentsError, setReadyAppointmentsError] = useState<
+    string | null
+  >(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [businessSettings, setBusinessSettings] =
     useState<POSRecord | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
@@ -261,7 +270,10 @@ export function usePOSLogic(): POSContextValue {
       const response = await api.get("/appointments/ready-for-payment");
       setReadyAppointments(response.data || []);
     } catch (error) {
+      // Was console-only, so a failed fetch left the queue simply empty and the
+      // cashier could not tell "nobody waiting" from "the request failed".
       console.error("Fetch ready appointments error:", error);
+      setReadyAppointmentsError(loadErrorMessage(error, "قائمة الانتظار"));
     } finally {
       setReadyAppointmentsLoading(false);
     }
@@ -272,9 +284,15 @@ export function usePOSLogic(): POSContextValue {
       setShiftLoading(true);
       const shift = await posShiftService.current();
       setCurrentShift(shift);
+      setShiftError(null);
     } catch (error) {
+      // Previously this set currentShift to null, which is indistinguishable
+      // from "no shift is open". A failed check must not read as a closed till.
       console.error("Shift check failed:", error);
       setCurrentShift(null);
+      setShiftError(
+        `${loadErrorMessage(error, "حالة الوردية")} لم يتم تأكيد أن الوردية مفتوحة.`,
+      );
     } finally {
       setShiftLoading(false);
     }
@@ -283,8 +301,13 @@ export function usePOSLogic(): POSContextValue {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      setCatalogError(null);
 
-      // Phase 1: Load critical data needed for basic UI structure
+      // Phase 1: Load critical data needed for basic UI structure.
+      // Categories and shop settings degrade to empty on failure, which is
+      // fine visually. A dead services or employees call is fatal: the till
+      // would render with nothing to sell and nothing to sell it to, and an
+      // empty catalogue is indistinguishable from a stocked-but-quiet day.
       const [servicesRes, employeesRes, categoriesRes, settingsRes] =
         await Promise.all([
           api.get("/services", { params: { limit: 1000 } }),
@@ -320,6 +343,7 @@ export function usePOSLogic(): POSContextValue {
       setOffers(adaptList(offersRes));
     } catch (error) {
       console.error("POS data error:", error);
+      setCatalogError(loadErrorMessage(error, "بيانات نقطة البيع"));
       toast.error("فشل مزامنة محطة العمل");
     } finally {
       setLoading(false);
@@ -459,6 +483,9 @@ export function usePOSLogic(): POSContextValue {
     loading,
     readyAppointmentsLoading,
     shiftLoading,
+    shiftError,
+    readyAppointmentsError,
+    catalogError,
     showApprovalModal,
     setShowApprovalModal,
     isSubmitting,

@@ -1,5 +1,6 @@
 /** Attendance Leaves view (moved from AttendanceManagement page, no logic changes). */
 import { motion } from "framer-motion";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { CheckCircle2, Plane, Plus, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,12 +13,14 @@ export default function LeavesView({
   setLeaveFilter,
   onNewLeave,
   onLeaveAction,
+  canApprove,
 }: {
   leaves: LeaveRecord[];
   leaveFilter: string;
   setLeaveFilter: (v: string) => void;
   onNewLeave: () => void;
   onLeaveAction: (leaveId: string | number | undefined, action: string) => void;
+  canApprove: boolean;
 }) {
   return (
           <motion.div
@@ -45,17 +48,12 @@ export default function LeavesView({
                   className="h-9 rounded-xl text-xs"
                   onClick={onNewLeave}
                 >
-                  <Plus size={14} className="ml-1" /> طلب جديد
+                  <Plus size={14} className="ms-1" /> طلب جديد
                 </Button>
               </div>
             </div>
             {leaves.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16">
-                <Plane size={40} className="mb-3 text-muted" />
-                <p className="text-base font-black text-main">
-                  لا توجد طلبات إجازات
-                </p>
-              </div>
+              <EmptyState variant="section" icon={Plane} title="لا توجد طلبات إجازات" />
             ) : (
               <div className="space-y-2">
                 {leaves.map((leave) => (
@@ -101,7 +99,7 @@ export default function LeavesView({
                             ? "مرفوض"
                             : "قيد الانتظار"}
                       </Badge>
-                      {leave.status === "pending" && (
+                      {leave.status === "pending" && canApprove && (
                         <>
                           <Button
                             variant="success"
@@ -111,7 +109,7 @@ export default function LeavesView({
                               onLeaveAction(leave.id, "approved")
                             }
                           >
-                            <CheckCircle2 size={12} className="ml-1" /> قبول
+                            <CheckCircle2 size={12} className="ms-1" /> قبول
                           </Button>
                           <Button
                             variant="danger"
@@ -121,7 +119,7 @@ export default function LeavesView({
                               onLeaveAction(leave.id, "rejected")
                             }
                           >
-                            <XCircle size={12} className="ml-1" /> رفض
+                            <XCircle size={12} className="ms-1" /> رفض
                           </Button>
                         </>
                       )}

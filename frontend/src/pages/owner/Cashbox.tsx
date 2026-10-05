@@ -33,8 +33,8 @@ import { StatCard as StatCardDisplay } from "@/components/shared/DisplayComponen
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCashbox, type CashDirectionTab } from "@/features/cashbox/hooks/useCashbox";
-import { CashboxCharts } from "@/features/cashbox/components/CashboxCharts";
-import { CashboxTable } from "@/features/cashbox/components/CashboxTable";
+import { CashboxCharts } from "@/features/cashbox";
+import { CashboxTable } from "@/features/cashbox";
 import {
   formatDateTimeLocal,
   getTypeLabel,
@@ -49,6 +49,7 @@ import {
 import type { Transaction } from "@/types/cashbox";
 import cashboxService from "@/services/cashboxService";
 import { staticURL } from "@/services/api";
+import { currencyLabel } from "@/lib/core/currency";
 
 const SYSTEM_LINKS = [
   { label: "نقطة البيع", icon: Receipt, href: "/pos" },
@@ -291,7 +292,7 @@ export default function Cashbox() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <button onClick={() => setPaymentMethod("cash")} className="text-right">
-          <PremiumCard className={cn("p-5 border-l-4 hover:shadow-md transition-all text-right", paymentMethod === "cash" ? "border-l-emerald-500 bg-emerald-50/40" : "border-l-emerald-500")}>
+          <PremiumCard className={cn("p-5 border-s-4 hover:shadow-md transition-all text-right", paymentMethod === "cash" ? "border-s-emerald-500 bg-emerald-50/40" : "border-s-emerald-500")}>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold tracking-widest uppercase text-muted flex items-center gap-1.5">
                 <Banknote size={12} className="text-emerald-600" /> نقدي
@@ -307,7 +308,7 @@ export default function Cashbox() {
         </button>
 
         <button onClick={() => setPaymentMethod("non_cash")} className="text-right">
-          <PremiumCard className={cn("p-5 border-l-4 hover:shadow-md transition-all text-right", paymentMethod === "non_cash" ? "border-l-indigo-500 bg-indigo-50/40" : "border-l-indigo-500")}>
+          <PremiumCard className={cn("p-5 border-s-4 hover:shadow-md transition-all text-right", paymentMethod === "non_cash" ? "border-s-indigo-500 bg-indigo-50/40" : "border-s-indigo-500")}>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold tracking-widest uppercase text-muted flex items-center gap-1.5">
                 <CreditCard size={12} className="text-indigo-600" /> رقمي
@@ -328,7 +329,7 @@ export default function Cashbox() {
           </PremiumCard>
         </button>
 
-        <PremiumCard className="p-5 border-l-4 border-l-slate-900 bg-slate-900 text-white text-right">
+        <PremiumCard className="p-5 border-s-4 border-s-slate-900 bg-slate-900 text-white text-right">
           <div className="text-[11px] font-bold tracking-widest uppercase text-white/60">الإجمالي</div>
           <div className="text-2xl font-black tracking-tight mt-2 tabular-nums">{formatCurrency(totalMain)}</div>
           <div className="text-xs font-medium text-white/60 mt-1 truncate">
@@ -344,7 +345,7 @@ export default function Cashbox() {
             <l.icon size={12} /> {l.label}
           </button>
         ))}
-        <span className="text-xs text-muted mr-2 hidden sm:inline-flex items-center">المبيعات • المصروفات • الرواتب • المشتريات ← الخزنة</span>
+        <span className="text-xs text-muted me-2 hidden sm:inline-flex items-center">المبيعات • المصروفات • الرواتب • المشتريات ← الخزنة</span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -364,7 +365,7 @@ export default function Cashbox() {
           <PremiumCard noPadding className="overflow-hidden">
             <div className="p-4 space-y-3">
               <div className="relative">
-                <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="بحث برقم العملية، ملاحظات..." className="h-9 pr-9 rounded-xl text-sm" />
+                <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="بحث برقم العملية، ملاحظات..." className="h-9 pe-9 rounded-xl text-sm" />
                 <ArrowRightLeft size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted" />
               </div>
               <div className="flex gap-2">
@@ -443,7 +444,7 @@ export default function Cashbox() {
                 {m.label}
               </button>
             ))}
-            <button onClick={() => { setDirection("out"); setPaymentMethod("cash"); }} className="mr-auto text-xs font-bold text-rose-600 hover:underline hidden sm:block">
+            <button onClick={() => { setDirection("out"); setPaymentMethod("cash"); }} className="me-auto text-xs font-bold text-rose-600 hover:underline hidden sm:block">
               سحب نقدي فقط
             </button>
           </div>
@@ -500,7 +501,7 @@ export default function Cashbox() {
                     <div className="rounded-xl border bg-soft/50 p-3 flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-white border flex items-center justify-center overflow-hidden shrink-0">
                         {creator.avatar ? (
-                          <img src={creator.avatar.startsWith("http") ? creator.avatar : `${staticURL}${creator.avatar}`} alt="" className="h-full w-full object-cover" />
+                          <img src={creator.avatar.startsWith("http") ? creator.avatar : `${staticURL}${creator.avatar}`} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                         ) : (
                           <User size={16} className="text-muted" />
                         )}
@@ -589,8 +590,8 @@ export default function Cashbox() {
               </button>
             </div>
             <div className="relative">
-              <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} placeholder="0.00" className="h-12 text-xl font-black text-center pr-4 pl-10 rounded-xl" autoFocus />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted">ج.م</span>
+              <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} placeholder="0.00" className="h-12 text-xl font-black text-center pe-4 ps-10 rounded-xl" autoFocus />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted">{currencyLabel()}</span>
             </div>
             <div className="text-xs text-muted">رصيد النقدي: <b className="text-main">{formatCurrency(summary.cash_balance_detail)}</b> • الرقمي: <b className="text-main">{formatCurrency(summary.non_cash_balance)}</b></div>
 

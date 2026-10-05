@@ -16,7 +16,7 @@ export function SmartInsights({ newCustomersThisWeek, onNavigate }: SmartInsight
           <Target size={20} />
         </div>
         <Badge variant="primary" className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5">
-          <Activity size={10} className="ml-1 animate-pulse" /> رؤى ذكية
+          <Activity size={10} className="ms-1 animate-pulse" /> رؤى ذكية
         </Badge>
       </div>
       <div className="space-y-4">

@@ -83,7 +83,7 @@ export function ExpenseDetailsPanel({
             <div className="rounded-2xl bg-soft border border-border p-4">
               <div className="text-[9px] font-black text-muted uppercase tracking-widest mb-1">التصنيف</div>
               <div className="text-sm font-black text-main flex items-center gap-2">
-                <span className="h-7 w-7 rounded-lg flex items-center justify-center text-white text-xs" style={{ backgroundColor: CATEGORY_COLORS[viewItem.category ?? ""] || "#6b7280" }}>{String(viewItem.category || "?")[0]}</span>
+                <span className="h-7 w-7 rounded-lg flex items-center justify-center text-white text-xs" style={{ backgroundColor: CATEGORY_COLORS[viewItem.category ?? ""] || "var(--text-muted)" }}>{String(viewItem.category || "?")[0]}</span>
                 {String(viewItem.category || "—")}
               </div>
               {viewItem.recipient_name ? <div className="text-[11px] font-bold text-muted mt-1 truncate">المستفيد: {String(viewItem.recipient_name)}</div> : null}
@@ -115,7 +115,7 @@ export function ExpenseDetailsPanel({
                   else if (t === "invoice") onNavigate(`/invoices`);
                   else if (t === "product") onNavigate(`/inventory`);
                   else if (t === "booking") onNavigate(`/bookings`);
-                }} className="mr-auto text-xs font-black text-indigo-600 hover:underline">فتح المرجع</button>
+                }} className="me-auto text-xs font-black text-indigo-600 hover:underline">فتح المرجع</button>
               </div>
             </div>
           )}
@@ -123,7 +123,7 @@ export function ExpenseDetailsPanel({
             <Wallet size={14} className="text-muted" />
             <span className="text-xs font-bold text-muted">حركة الخزنة:</span>
             <span className="font-black text-xs">EXP-{String(viewItem.id)}</span>
-            <button onClick={() => onNavigate("/owner/cashbox")} className="mr-auto text-xs font-black text-primary hover:underline">عرض في الخزنة</button>
+            <button onClick={() => onNavigate("/owner/cashbox")} className="me-auto text-xs font-black text-primary hover:underline">عرض في الخزنة</button>
           </div>
 
           {viewItem.description ? (
@@ -146,7 +146,7 @@ export function ExpenseDetailsPanel({
             <div className="space-y-2">
               <div className="text-[10px] font-black text-muted uppercase tracking-widest">صورة الفاتورة</div>
               <a href={String(viewItem.invoice_image_url).startsWith("http") ? String(viewItem.invoice_image_url) : `${staticURL}${String(viewItem.invoice_image_url)}`} target="_blank" rel="noreferrer" className="block rounded-2xl overflow-hidden border border-border hover:opacity-90 transition-opacity">
-                <img src={String(viewItem.invoice_image_url).startsWith("http") ? String(viewItem.invoice_image_url) : `${staticURL}${String(viewItem.invoice_image_url)}`} alt="فاتورة" className="w-full max-h-64 object-contain bg-soft" />
+                <img src={String(viewItem.invoice_image_url).startsWith("http") ? String(viewItem.invoice_image_url) : `${staticURL}${String(viewItem.invoice_image_url)}`} alt="فاتورة" className="w-full max-h-64 object-contain bg-soft" onError={(e) => { e.currentTarget.style.display = "none"; }} />
               </a>
             </div>
           ) : null}
@@ -156,7 +156,7 @@ export function ExpenseDetailsPanel({
           </div>
           <div className="flex gap-2 pt-2">
             <Button variant="outline" className="flex-1 h-11 rounded-xl font-black" onClick={onClose}>إغلاق</Button>
-            {isOwner && <Button className="flex-1 h-11 rounded-xl bg-slate-900 text-white font-black" onClick={() => { onClose(); onEdit(viewItem); }}>تعديل <FileText size={14} className="mr-2" /></Button>}
+            {isOwner && <Button className="flex-1 h-11 rounded-xl bg-slate-900 text-white font-black" onClick={() => { onClose(); onEdit(viewItem); }}>تعديل <FileText size={14} className="me-2" /></Button>}
           </div>
         </div>
       ) : null}

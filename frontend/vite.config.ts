@@ -53,7 +53,7 @@ function resolveManualChunk(id: string) {
 }
 
 export default defineConfig({
-  base: "./",
+  base: process.env.ELECTRON_BUILD === "1" ? "./" : "/",
   plugins: [
     react(),
     tailwindcss(),
@@ -103,6 +103,7 @@ export default defineConfig({
         target: "http://localhost:8000",
         changeOrigin: true,
         secure: false,
+        ws: true,
       },
     },
   },

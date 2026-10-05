@@ -80,7 +80,7 @@ export default function FastClientDialog({
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2.5">
-                  <label className="text-[10px] font-black text-muted uppercase tracking-widest mr-2 flex items-center gap-2">
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest me-2 flex items-center gap-2">
                     <Phone size={12} className="text-accent" /> رقم الهاتف
                   </label>
                   <div className="relative group">
@@ -93,7 +93,7 @@ export default function FastClientDialog({
                           phone: e.target.value,
                         })
                       }
-                      className="h-11 bg-soft border-border focus:bg-white rounded-xl text-right pr-11 font-black transition-all"
+                      className="h-11 bg-soft border-border focus:bg-white rounded-xl text-right pe-11 font-black transition-all"
                       required
                     />
                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-muted">
@@ -110,7 +110,7 @@ export default function FastClientDialog({
                 </div>
 
                 <div className="space-y-2.5">
-                  <label className="text-[10px] font-black text-muted uppercase tracking-widest mr-2 flex items-center gap-2">
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest me-2 flex items-center gap-2">
                     <User size={12} className="text-accent" /> اسم العميل
                   </label>
                   <Input
@@ -155,7 +155,7 @@ export default function FastClientDialog({
 
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black text-muted uppercase tracking-widest mr-2 flex items-center gap-2">
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest me-2 flex items-center gap-2">
                     <Scissors size={12} className="text-accent" /> اختيار
                     الخدمات المطلوبة
                   </label>
@@ -185,7 +185,7 @@ export default function FastClientDialog({
                   ))}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pe-2 custom-scrollbar">
                   {filteredServices.map((srv) => {
                     const isSelected = fastClientData.serviceIds.includes(
                       srv.id,
@@ -289,7 +289,7 @@ export default function FastClientDialog({
 
                 <div className="space-y-5 pt-5 border-t border-border relative z-10">
                   <div className="space-y-2.5">
-                    <label className="text-[10px] font-black text-muted uppercase tracking-widest mr-1">
+                    <label className="text-[10px] font-black text-muted uppercase tracking-widest me-1">
                       اختيار الخبير
                     </label>
                     <Select
@@ -322,7 +322,7 @@ export default function FastClientDialog({
                   </div>
 
                   <div className="space-y-2.5">
-                    <label className="text-[10px] font-black text-muted uppercase tracking-widest mr-1">
+                    <label className="text-[10px] font-black text-muted uppercase tracking-widest me-1">
                       ملاحظات الكاشير
                     </label>
                     <Input

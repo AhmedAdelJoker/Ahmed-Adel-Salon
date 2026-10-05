@@ -102,7 +102,7 @@ export function EmployeeCardDetailsDialog({
                       statusInfo.textColor,
                     )}
                   >
-                    <statusInfo.icon size={12} className="ml-1" />{" "}
+                    <statusInfo.icon size={12} className="ms-1" />{" "}
                     {statusInfo.label}
                   </Badge>
                 </div>

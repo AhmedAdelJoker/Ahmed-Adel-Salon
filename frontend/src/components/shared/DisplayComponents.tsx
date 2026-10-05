@@ -419,8 +419,7 @@ export function AvatarCircle({
         <img
           src={imageUrl}
           alt={name || ""}
-          className="h-full w-full object-cover"
-        />
+          className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
       ) : (
         <div className="flex flex-col items-center gap-0.5 text-muted">
           <svg

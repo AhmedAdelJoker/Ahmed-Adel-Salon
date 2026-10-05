@@ -1,3 +1,4 @@
+from app.crud.core_business import create_cash_transaction
 from tests.helpers import auth_headers, make_user
 from tests.test_invoice_create import _seed_service
 
@@ -16,8 +17,15 @@ def test_create_expense_as_cashier_pending_audit(client, db_session):
 
 
 def test_create_expense_as_owner_approved(client, db_session):
-    make_user(db_session, username="owner1", role="owner")
+    owner = make_user(db_session, username="owner1", role="owner")
     headers = auth_headers(client, username="owner1")
+    create_cash_transaction(
+        db_session,
+        direction="in",
+        amount=1000,
+        transaction_type="opening_balance",
+        user_id=owner.id,
+    )
     resp = client.post(
         "/api/v1/expenses",
         json={"amount": 200, "category": "rent", "title": "Shop rent"},
@@ -25,6 +33,18 @@ def test_create_expense_as_owner_approved(client, db_session):
     )
     assert resp.status_code == 201, resp.text
     assert resp.json()["status"] == "approved"
+
+
+def test_cashier_cannot_self_approve_expense(client, db_session):
+    make_user(db_session, role="cashier")
+    response = client.post(
+        "/api/v1/expenses",
+        json={"amount": 120, "category": "supplies", "status": "approved"},
+        headers=auth_headers(client),
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["status"] == "pending_audit"
 
 
 def test_create_expense_validation(client, db_session):
@@ -38,8 +58,15 @@ def test_create_expense_validation(client, db_session):
 
 
 def test_approve_expense(client, db_session):
-    make_user(db_session, username="owner1", role="owner")
+    owner = make_user(db_session, username="owner1", role="owner")
     headers = auth_headers(client, username="owner1")
+    create_cash_transaction(
+        db_session,
+        direction="in",
+        amount=1000,
+        transaction_type="opening_balance",
+        user_id=owner.id,
+    )
     created = client.post(
         "/api/v1/expenses",
         json={"amount": 75, "category": "supplies"},

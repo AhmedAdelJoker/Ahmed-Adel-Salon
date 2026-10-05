@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status, Body
 from fastapi.responses import JSONResponse
 from sqlalchemy import or_
 from sqlalchemy.sql import func
@@ -10,8 +10,8 @@ from app.db.session import get_db
 from app.api.deps import require_any_staff, require_owner, require_owner_or_manager
 from app.models.user import User
 from app.models.customer import Customer
+from app.models.member_account import MemberAccount
 from app.models.appointment import Appointment
-from app.models.barber import Barber
 from app.models.activity_log import ActivityLog
 from app.models.invoice import Invoice
 from app.models.service_session import ServiceSession
@@ -27,6 +27,7 @@ from app.schemas.customer import (
 )
 from app.services.loyalty_service import sweep_expired_points
 from app.core.pagination import PageParams, paginate
+from app.core.audit import audit_log
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
 
@@ -90,7 +91,11 @@ def list_customers(
         return list(result.items)
 
     # Legacy path — preserve original behavior
-    total = query.count()
+    # `Query.count()` compiles to `SELECT count(*) FROM (SELECT <every mapped
+    # column> ...) AS anon_1`, so it drags the whole row through a derived table
+    # on every request. Replacing the projection with a bare count and dropping
+    # the ORDER BY keeps the same filters without the subquery.
+    total = query.with_entities(func.count()).order_by(None).scalar() or 0
     eff_offset = skip if skip is not None else max(offset, 0)
     eff_limit = max(1, min(limit, 1000))
     customers = (
@@ -264,6 +269,7 @@ def update_customer(
 def delete_customer(
     customer_id: int,
     archive_reason: str = Body(..., embed=True),
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner),
 ):
@@ -278,7 +284,18 @@ def delete_customer(
     customer.deleted_at = func.now()
     customer.deleted_by_user_id = current_user.id
     customer.archive_reason = archive_reason
-    
+
+    # Archiving must also close the public-booking login. Rotating token_version
+    # invalidates every member session that is already in the wild, so an
+    # archived customer cannot keep using an access token they saved earlier.
+    account = db.query(MemberAccount).filter(
+        MemberAccount.customer_id == customer_id
+    ).first()
+    if account is not None:
+        account.is_active = False
+        account.token_version = int(account.token_version or 0) + 1
+        db.add(account)
+
     # Log soft delete
     log = ActivityLog(
         user_id=current_user.id,
@@ -288,8 +305,28 @@ def delete_customer(
         description=f"حذف ناعم للعميل: {customer.first_name} {customer.last_name} (رقم: {customer.phone}) - السبب: {archive_reason}"
     )
     db.add(log)
-    
+
+    if account is not None:
+        db.add(
+            ActivityLog(
+                user_id=current_user.id,
+                action="deactivate_member_account",
+                entity_type="member_account",
+                entity_id=customer.customer_id,
+                description=f"تعطيل حساب العميل العام رقم {customer.customer_id} بسبب الأرشفة",
+            )
+        )
+
     db.commit()
+    # Phase 2: the ActivityLog above has no IP/UA, so a leak can't be traced.
+    # audit_log appends the forensic context as a separate, IP-stamped record.
+    audit_log(
+        db, request, current_user,
+        action="soft_delete_customer",
+        entity_type="customer",
+        entity_id=customer_id,
+        description={"archive_reason": archive_reason},
+    )
     return None
 
 
@@ -309,7 +346,25 @@ def restore_customer(
     
     customer.is_deleted = False
     customer.deleted_at = None
-    
+
+    # Restoring is an explicit owner decision, so the public login comes back too.
+    account = db.query(MemberAccount).filter(
+        MemberAccount.customer_id == customer_id
+    ).first()
+    if account is not None and not account.is_active:
+        account.is_active = True
+        account.token_version = int(account.token_version or 0) + 1
+        db.add(account)
+        db.add(
+            ActivityLog(
+                user_id=current_user.id,
+                action="activate_member_account",
+                entity_type="member_account",
+                entity_id=customer.customer_id,
+                description=f"إعادة تفعيل حساب العميل العام رقم {customer.customer_id} بعد الاستعادة",
+            )
+        )
+
     # Log restoration
     log = ActivityLog(
         user_id=current_user.id,
@@ -328,6 +383,7 @@ def restore_customer(
 @router.delete("/{customer_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
 def permanent_delete_customer(
     customer_id: int,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner),
 ):
@@ -337,6 +393,13 @@ def permanent_delete_customer(
     customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="العميل غير موجود")
+
+    # Snapshot before delete — after `db.delete()` the ORM state is expunged,
+    # so this is the last chance to record what was destroyed.
+    snapshot = {
+        "name": f"{customer.first_name} {customer.last_name}".strip(),
+        "phone": customer.phone,
+    }
 
     # Log permanent deletion before deleting
     log = ActivityLog(
@@ -361,6 +424,13 @@ def permanent_delete_customer(
                 "احتفظ به في الأرشيف أو احذف السجلات المرتبطة أولاً."
             ),
         )
+    audit_log(
+        db, request, current_user,
+        action="permanent_delete_customer",
+        entity_type="customer",
+        entity_id=customer_id,
+        description={"destroyed": snapshot},
+    )
     return None
 
 
@@ -403,9 +473,41 @@ def bulk_restore_customers(
     return restored
 
 
+# Every table that keeps a customer alive. A customer with a row in any of them
+# cannot be hard-deleted, so the bulk delete has to count all six.
+RELATED_COUNT_SOURCES = (
+    (Appointment, Appointment.customer_id),
+    (Invoice, Invoice.customer_id),
+    (ServiceSession, ServiceSession.customer_id),
+    (CustomerCancellationLog, CustomerCancellationLog.customer_id),
+    (WaitlistEntry, WaitlistEntry.customer_id),
+    (WalkInQueue, WalkInQueue.customer_id),
+)
+
+
+def counts_by_customer(db, model, column, customer_ids: list[int]) -> dict[int, int]:
+    """One grouped query for a whole set of customers.
+
+    The alternative is a `count()` per customer per table, which is six times
+    the number of customers. Deleting fifty customers meant three hundred round
+    trips before the delete began — and the answer was the same shape of
+    question every time.
+    """
+    if not customer_ids:
+        return {}
+    rows = (
+        db.query(column, func.count(model.id))
+        .filter(column.in_(customer_ids))
+        .group_by(column)
+        .all()
+    )
+    return {key: count for key, count in rows}
+
+
 @router.delete("/archive/bulk-permanent", status_code=status.HTTP_204_NO_CONTENT)
 def bulk_permanent_delete_customers(
     customer_ids: list[int] = Body(..., embed=True),
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner),
 ):
@@ -423,20 +525,21 @@ def bulk_permanent_delete_customers(
 
     # Pre-check: detect which customers have related records so the user gets
     # a precise, actionable error instead of an opaque 500 IntegrityError.
+    #
+    # One grouped query per table rather than six counts per customer. The
+    # original loop issued 6 × N queries, so deleting 50 customers meant 300
+    # round trips before the delete even started, and the answer was the same
+    # shape of question for every table.
+    related_by_customer: dict[int, int] = {c.customer_id: 0 for c in customers}
+
+    for model, column in RELATED_COUNT_SOURCES:
+        for key, count in counts_by_customer(db, model, column, [c.customer_id for c in customers]).items():
+            related_by_customer[key] = related_by_customer.get(key, 0) + count
+
     blocked = []
     safe_to_delete = []
     for customer in customers:
-        related_count = (
-            db.query(Appointment).filter(Appointment.customer_id == customer.customer_id).count()
-            + db.query(Invoice).filter(Invoice.customer_id == customer.customer_id).count()
-        )
-        # Also check other non-null FKs (ServiceSession, CustomerCancellationLog, WaitlistEntry, WalkInQueue)
-        related_count += (
-            db.query(ServiceSession).filter(ServiceSession.customer_id == customer.customer_id).count()
-            + db.query(CustomerCancellationLog).filter(CustomerCancellationLog.customer_id == customer.customer_id).count()
-            + db.query(WaitlistEntry).filter(WaitlistEntry.customer_id == customer.customer_id).count()
-            + db.query(WalkInQueue).filter(WalkInQueue.customer_id == customer.customer_id).count()
-        )
+        related_count = related_by_customer.get(customer.customer_id, 0)
         if related_count > 0:
             blocked.append((customer, related_count))
         else:
@@ -466,6 +569,12 @@ def bulk_permanent_delete_customers(
         db.add(log)
         db.delete(customer)
 
+    # Snapshot of what was actually destroyed — `safe_to_delete` rows are
+    # expunged after commit, so the names must be captured first.
+    destroyed = [
+        {"id": c.customer_id, "name": f"{c.first_name} {c.last_name}".strip(), "phone": c.phone}
+        for c in safe_to_delete
+    ]
     try:
         db.commit()
     except IntegrityError:
@@ -478,6 +587,17 @@ def bulk_permanent_delete_customers(
                 "احتفظ بهم في الأرشيف أو احذف السجلات المرتبطة أولاً."
             ),
         )
+
+    audit_log(
+        db, request, current_user,
+        action="bulk_permanent_delete_customers",
+        entity_type="customer",
+        description={
+            "deleted_count": len(destroyed),
+            "blocked_count": len(blocked),
+            "destroyed": destroyed,
+        },
+    )
 
     # If we deleted some but not all, surface a clear partial-success message.
     if blocked:

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { adaptObject } from "@/services/apiAdapter";
 import { useAuth } from "@/context/AuthContext";
+import { loadErrorMessage } from "@/lib/core/asyncError";
 import {
   DEFAULT_STATS,
   DEMO_STATS,
@@ -39,10 +39,15 @@ export function useReportsDashboard() {
   const [period, setPeriod] = useState("week");
   const [chartType, setChartType] = useState("area");
   const [isDemo, setIsDemo] = useState(false);
+  // Kept separate from isDemo: "the request failed" and "the period genuinely
+  // has no numbers" are different facts, and only one of them justifies
+  // showing illustrative figures.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const res = await api.get("/owner/dashboard-stats", {
         params: { scope: reportScope, employee_id: employeeId, period },
       });
@@ -53,15 +58,39 @@ export function useReportsDashboard() {
       const isEmpty = !hasRealRevenue && !hasRealWeekly;
       setIsDemo(isEmpty);
 
-      const mergedStats = isEmpty ? DEMO_STATS : {
-        ...DEMO_STATS,
-        ...Object.fromEntries(
-          Object.entries(data.stats || {}).filter(
-            ([_, v]) => v != null && typeof v !== "object" && String(v) !== "" && !Number.isNaN(Number(v as any))
-          )
-        ),
-        occupancy: data.stats?.occupancy != null ? data.stats.occupancy : DEMO_STATS.occupancy,
-      };
+      // Over a real response, the demo figures are the *base* and the response
+      // overrides what it provides. That means any field the API does not
+      // return keeps a demo value -- a silent, unlabelled fabrication, because
+      // `isDemo` is false when there was revenue, so no banner appears.
+      //
+      // A missing field is zero, not 18,750. The demo set is used only when the
+      // whole period is empty, where it is labelled.
+      // `null` is preserved, not replaced by the default.
+      //
+      // A `null` occupancy means the server could not compute it -- the query
+      // failed. Substituting the default turns "we do not know" into "0%", and
+      // a dashboard that reports an empty salon when the database is
+      // unreachable is worse than one that says nothing. The generic filter
+      // above drops nulls for every other key, which is right for them: a
+      // missing revenue figure genuinely is no revenue. Occupancy is the one
+      // figure whose absence carries information.
+      const rawOccupancy = data.stats?.occupancy;
+      const mergedStats = isEmpty
+        ? DEMO_STATS
+        : ({
+            ...DEFAULT_STATS,
+            ...Object.fromEntries(
+              Object.entries(data.stats || {}).filter(
+                ([key, v]) =>
+                  key !== "occupancy" &&
+                  v != null &&
+                  typeof v !== "object" &&
+                  String(v) !== "" &&
+                  !Number.isNaN(Number(v as any)),
+              ),
+            ),
+            occupancy: rawOccupancy ?? null,
+          } as DashboardStats);
 
       setStats(mergedStats);
       setWeeklyData(hasRealWeekly && Array.isArray(data.weekly_data) ? data.weekly_data : FALLBACK_WEEKLY);
@@ -73,13 +102,13 @@ export function useReportsDashboard() {
       } else {
         setServiceDistribution(FALLBACK_SERVICES);
       }
-    } catch (_err) {
-      console.error("Dashboard load error:", _err);
-      setStats(DEMO_STATS);
-      setWeeklyData(FALLBACK_WEEKLY);
-      setServiceDistribution(FALLBACK_SERVICES);
-      setIsDemo(true);
-      toast.error("تعذر تحميل البيانات - يتم عرض بيانات توضيحية");
+    } catch (err) {
+      // Previously this fell back to DEMO_STATS and told the owner "no real
+      // data for this period", which reads as a silent zero-sales day when the
+      // truth is the request failed. Keep the numbers off the screen instead.
+      console.error("Dashboard load error:", err);
+      setLoadError(loadErrorMessage(err, "بيانات لوحة التقارير"));
+      setIsDemo(false);
     } finally {
       setLoading(false);
     }
@@ -107,6 +136,7 @@ export function useReportsDashboard() {
     period,
     chartType,
     isDemo,
+    loadError,
     reportScope,
     employeeId,
     employeeName,

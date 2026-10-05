@@ -87,7 +87,7 @@ export default function UsersPanel({ embedded = false }: { embedded?: boolean })
             }}
             className="h-10 rounded-xl px-5 font-black shrink-0"
           >
-            <Plus size={16} className="ml-1.5" /> إصدار هوية
+            <Plus size={16} className="ms-1.5" /> إصدار هوية
           </Button>
         </div>
       )}

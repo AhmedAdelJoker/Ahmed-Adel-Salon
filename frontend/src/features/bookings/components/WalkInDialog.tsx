@@ -245,7 +245,7 @@ export default function WalkInDialog({
             }
             className="h-10 flex-1 rounded-xl text-xs bg-emerald-600 hover:bg-emerald-700"
           >
-            <UserPlus size={14} className="ml-1.5" /> تسجيل ودخول الاستقبال
+            <UserPlus size={14} className="ms-1.5" /> تسجيل ودخول الاستقبال
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { formatCurrency } from "@/lib/core/utils";
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUI } from "@/context/UIContext";
@@ -42,6 +43,7 @@ import {
 } from "@/components/shared/PremiumUI";
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
+import { currencyLabel } from "@/lib/core/currency";
 
 import {
   PersonalTab,
@@ -234,7 +236,7 @@ const HRManagement = () => {
               onClick={openCreate}
               className="h-11 rounded-2xl bg-accent px-8 text-sm font-black shadow-xl shadow-accent/20 transition-all active:scale-95"
             >
-              <Plus className="ml-2" size={20} strokeWidth={3} /> إضافة موظف
+              <Plus className="ms-2" size={20} strokeWidth={3} /> إضافة موظف
               جديد
             </Button>
             <Button
@@ -242,7 +244,7 @@ const HRManagement = () => {
               onClick={() => navigate("/owner/hr/archive")}
               className="h-9 rounded-xl border-border bg-card/50 px-5 text-xs font-black text-muted transition-all hover:border-accent/20 hover:text-main"
             >
-              <Archive className="ml-2" size={16} /> الأرشيف
+              <Archive className="ms-2" size={16} /> الأرشيف
             </Button>
           </>
         }
@@ -253,7 +255,7 @@ const HRManagement = () => {
       {/* ═══ RELATED NAV — هوية HR (مرحلة 3) ═══ */}
       <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
         <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ml-2">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ms-2">
             <Sparkles size={12} className="text-accent" /> انتقال سريع
           </span>
           {[
@@ -419,7 +421,7 @@ const HRManagement = () => {
                     </div>
                     <div className="rounded-2xl bg-soft border border-border/50 p-3 text-center">
                       <div className="text-[8px] font-black text-muted uppercase tracking-widest mb-1">الراتب</div>
-                      <div className="text-[11px] font-black text-main">{Number(formData.baseSalary||0).toLocaleString("ar-EG")} <span className="text-[9px] text-muted">ج.م</span></div>
+                      <div className="text-[11px] font-black text-main">{Number(formData.baseSalary||0).toLocaleString("ar-EG")} <span className="text-[9px] text-muted">{currencyLabel()}</span></div>
                     </div>
                   </div>
 
@@ -488,7 +490,7 @@ const HRManagement = () => {
                 <div className="mt-4 rounded-2xl border border-border bg-card p-4 flex items-center gap-4">
                   <div className="h-14 w-14 rounded-xl overflow-hidden bg-soft flex items-center justify-center shrink-0 ring-1 ring-border">
                     {imagePreview || formData.profileImageUrl ? (
-                      <img src={imagePreview || (formData.profileImageUrl?.startsWith("http") ? formData.profileImageUrl : `${staticURL}${formData.profileImageUrl}`)} alt="preview" className="h-full w-full object-cover" />
+                      <img src={imagePreview || (formData.profileImageUrl?.startsWith("http") ? formData.profileImageUrl : `${staticURL}${formData.profileImageUrl}`)} alt="preview" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                     ) : (
                       <User size={20} className="text-muted/40" />
                     )}
@@ -498,7 +500,7 @@ const HRManagement = () => {
                     <div className="text-[10px] font-bold text-accent">{currentBlueprint.title}</div>
                     <div className="flex gap-1 mt-1">
                       <span className={cn("text-[8px] px-1.5 py-0.5 rounded-full font-black border", formData.status==="active"?"bg-success text-white border-success":"bg-danger text-white border-danger")}>{formData.status==="active"?"نشط":"معلّق"}</span>
-                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-soft border border-border font-bold text-muted">{Number(formData.baseSalary||0).toLocaleString("ar-EG")} ج.م</span>
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-soft border border-border font-bold text-muted">{formatCurrency(formData.baseSalary || 0)}</span>
                     </div>
                   </div>
                   <div className="text-[9px] font-black text-muted">{Math.round(((DYNAMIC_TABS.findIndex(t=>t.id===activeTab)+1)/DYNAMIC_TABS.length)*100)}%</div>
@@ -530,7 +532,7 @@ const HRManagement = () => {
                   disabled={DYNAMIC_TABS.findIndex((t) => t.id === activeTab) === 0}
                   className="h-11 sm:h-12 px-6 sm:px-8 rounded-xl font-black text-[11px] uppercase tracking-widest order-2 sm:order-1"
                 >
-                  <ArrowRight size={16} className="ml-2" /> السابق
+                  <ArrowRight size={16} className="ms-2" /> السابق
                 </Button>
                 <div className="hidden sm:flex items-center gap-2 order-2">
                   {DYNAMIC_TABS.map((tab) => (
@@ -545,7 +547,7 @@ const HRManagement = () => {
                     }}
                     className="h-11 sm:h-12 px-6 sm:px-8 rounded-xl bg-accent text-white font-black text-[11px] uppercase tracking-widest order-1 sm:order-3"
                   >
-                    التالي <ArrowLeft size={16} className="mr-2" />
+                    التالي <ArrowLeft size={16} className="me-2" />
                   </Button>
                 ) : (
                   <div className="hidden sm:block w-[100px] order-3" />
@@ -554,7 +556,7 @@ const HRManagement = () => {
               {/* Mobile Save Button */}
               <div className="xl:hidden mt-6">
                 <Button onClick={handleSubmit} disabled={isActionLoading || activeTab !== "review"} className={cn("h-12 w-full rounded-xl font-black text-white shadow-lg", activeTab==="review" ? "bg-accent hover:bg-accent/90 shadow-accent/20" : "bg-soft text-muted opacity-60 cursor-not-allowed")}>
-                  <Save size={18} className="ml-2" /> {editingEmp ? "تحديث البيانات" : "حفظ الموظف"}
+                  <Save size={18} className="ms-2" /> {editingEmp ? "تحديث البيانات" : "حفظ الموظف"}
                 </Button>
                 {activeTab !== "review" && <p className="mt-2 text-center text-[10px] font-bold text-muted">أكمل الخطوات للوصول للمراجعة ثم الحفظ</p>}
               </div>
@@ -649,7 +651,7 @@ const HRManagement = () => {
                       : "bg-soft cursor-not-allowed opacity-50",
                   )}
                 >
-                  <Save size={20} className="ml-2" />
+                  <Save size={20} className="ms-2" />
                   {editingEmp ? "تحديث البيانات" : "حفظ الموظف الجديد"}
                 </Button>
                 {activeTab !== "review" && (

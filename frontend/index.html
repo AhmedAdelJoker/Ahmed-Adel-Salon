@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ar" dir="rtl" data-theme="light" class="">
+<html lang="ar" dir="rtl" data-theme="light" data-accent="indigo" data-density="comfortable" data-motion="normal" class="">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -7,20 +7,74 @@
       name="description"
       content="Barber Luxe - نظام احترافي لإدارة محلات الحلاقة، المبيعات، الحجوزات، الموظفين، المخزون، والتقارير."
     />
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F9FAFB" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212" />
     <meta name="color-scheme" content="light dark" />
+    <!-- Rewritten by the bootstrap below so the mobile browser chrome always
+         matches the active theme instead of only following the OS setting. -->
+    <meta name="theme-color" content="#fbfbfd" />
 
+    <!--
+      Appearance + direction bootstrap.
+
+      Runs before first paint so there is no light-mode flash on a dark
+      desktop, and no frame of mirrored Arabic layout for an English user.
+      Reads the persisted preferences; anything missing or corrupt falls back
+      to the system preference. Kept inline and dependency-free on purpose: it
+      must work in the Electron build, where the origin is file:// and no
+      external request is guaranteed.
+
+      `data-theme` and the `dark` class are both set because the token layer
+      keys off the attribute while Tailwind's `dark:` variants key off the
+      class — they must never diverge. `dir`/`lang` are set here for the same
+      reason: i18next is a runtime dependency and cannot be consulted in time.
+    -->
     <script>
       (function () {
+        var root = document.documentElement;
+        var ACCENTS = ["indigo", "violet", "cyan", "emerald", "gold"];
+        var DENSITIES = ["compact", "comfortable", "spacious"];
+        var MOTIONS = ["reduced", "normal", "rich"];
+
+        function read(key, allowed, fallback) {
+          try {
+            var value = localStorage.getItem(key);
+            return allowed.indexOf(value) !== -1 ? value : fallback;
+          } catch (error) {
+            return fallback;
+          }
+        }
+
+        var storedTheme = read("theme", ["light", "dark"], null);
+        var prefersDark =
+          window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var theme = storedTheme || (prefersDark ? "dark" : "light");
+
+        root.dataset.theme = theme;
+        root.classList.toggle("dark", theme === "dark");
+        root.dataset.accent = read("accent", ACCENTS, "indigo");
+        root.dataset.density = read("density", DENSITIES, "comfortable");
+        root.dataset.motion = read("motion", MOTIONS, "normal");
+
+        // Direction has to match the resolved language exactly, including the
+        // regional-tag reduction (`en-GB` → `en`), or the layout mirrors wrongly.
+        var storedLang = read("language", ["ar", "en"], null);
+        var lang = storedLang || (root.getAttribute("lang") === "en" ? "en" : "ar");
+        root.setAttribute("lang", lang);
+        root.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
+
+        // High-contrast is an accessibility preference, not a theme: it
+        // strengthens every line token without changing the accent.
         try {
-          var storedTheme = localStorage.getItem("theme");
-          var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-          var theme = storedTheme === "dark" || storedTheme === "light" ? storedTheme : prefersDark ? "dark" : "light";
-          document.documentElement.dataset.theme = theme;
-          document.documentElement.classList.toggle("dark", theme === "dark");
+          if (localStorage.getItem("highContrast") === "true") {
+            root.dataset.contrast = "high";
+          }
         } catch (error) {
-          document.documentElement.dataset.theme = "light";
+          /* storage blocked — keep the default */
+        }
+
+        // Keep the mobile browser chrome in step with the app canvas.
+        var meta = document.querySelector('meta[name="theme-color"]:not([media])');
+        if (meta) {
+          meta.setAttribute("content", theme === "dark" ? "#08080a" : "#fbfbfd");
         }
       })();
     </script>
@@ -31,7 +85,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Alexandria:wght@100..900&family=IBM+Plex+Sans+Arabic:wght@100..700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Alexandria:wght@100..900&family=IBM+Plex+Sans+Arabic:wght@100..700&family=Inter:wght@100..900&family=JetBrains+Mono:wght@400..600&display=swap"
       rel="stylesheet"
     />
 

@@ -13,7 +13,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { toast } from "react-hot-toast";
-import { scheduleService } from "@/features/bookings/services/scheduleService";
+import { scheduleService } from "@/features/bookings";
 import { businessSettingsService } from "@/services/businessSettingsService";
 import { useSocket } from "@/context/SocketContext";
 import { useDebounce, shiftDate } from "@/pages/cashier/schedule/Toolbar";

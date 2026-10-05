@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/shared/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -110,13 +111,13 @@ const ExpensesPage = () => {
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" className="h-11 rounded-xl px-3 text-xs border-border bg-card font-black hover:border-primary/20" onClick={exportToCSV}>
-              <Download size={14} className="ml-1.5" /> <span className="hidden sm:inline">تصدير CSV</span>
+              <Download size={14} className="ms-1.5" /> <span className="hidden sm:inline">تصدير CSV</span>
             </Button>
             <Button variant="outline" className="h-11 rounded-xl px-3 text-xs border-border bg-card font-black" onClick={() => navigate("/expenses/archive")}>
-              <Archive size={14} className="ml-1.5" /> <span className="hidden sm:inline">الأرشيف</span>
+              <Archive size={14} className="ms-1.5" /> <span className="hidden sm:inline">الأرشيف</span>
             </Button>
             <Button className="h-11 rounded-xl px-5 text-xs bg-slate-900 hover:bg-slate-800 text-white font-black shadow-lg" onClick={() => { resetForm(); setIsModalOpen(true); }}>
-              <Plus size={14} className="ml-1.5" /> إضافة مصروف
+              <Plus size={14} className="ms-1.5" /> إضافة مصروف
             </Button>
           </div>
         }
@@ -166,34 +167,53 @@ const ExpensesPage = () => {
           ))}
         </div>
       ) : expenseRows.length === 0 ? (
-        <PremiumCard className="py-16 text-center border-dashed">
-          <div className="flex flex-col items-center">
-            <div className="h-16 w-16 rounded-2xl bg-soft border border-border flex items-center justify-center">
-              <FileText size={28} className="text-muted" />
-            </div>
-            <p className="mt-4 text-base font-black text-main">لا توجد مصاريف</p>
-            <p className="mt-1 text-sm font-bold text-muted">لم نعثر على سجلات مطابقة للفلتر الحالي</p>
-            <div className="flex gap-2 mt-4">
-              <Button onClick={() => { resetForm(); setIsModalOpen(true); }} className="h-11 rounded-xl px-6 bg-slate-900 text-white font-black">
-                <Plus size={14} className="ml-1.5" /> إضافة مصروف
+        <EmptyState
+          variant="section"
+          icon={FileText}
+          title="لا توجد مصاريف"
+          message="لم نعثر على سجلات مطابقة للفلتر الحالي"
+          action={
+            <div className="flex gap-2 mt-2">
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsModalOpen(true);
+                }}
+                className="h-11 rounded-xl px-6 font-black"
+              >
+                <Plus size={14} className="ms-1.5" /> إضافة مصروف
               </Button>
-              {hasActiveFilters && <Button variant="outline" onClick={() => { setCategoryFilter("all"); setPaymentFilter("all"); setDateFrom(""); setDateTo(""); setSearchTerm(""); }} className="h-11 rounded-xl">مسح الفلاتر</Button>}
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setCategoryFilter("all");
+                    setPaymentFilter("all");
+                    setDateFrom("");
+                    setDateTo("");
+                    setSearchTerm("");
+                  }}
+                  className="h-11 rounded-xl"
+                >
+                  مسح الفلاتر
+                </Button>
+              )}
             </div>
-          </div>
-        </PremiumCard>
+          }
+        />
       ) : (
         <div className="space-y-3">
           <AnimatePresence>
             {expenseRows.map((exp, i) => {
               const CatIcon = CATEGORY_ICONS[exp.category ?? ""] || FileText;
-              const catColor = CATEGORY_COLORS[exp.category ?? ""] || "#6b7280";
+              const catColor = CATEGORY_COLORS[exp.category ?? ""] || "var(--text-muted)";
               const isPending = exp.status === "pending_audit";
               const isCancelled = exp.status === "cancelled" || exp.status === "rejected";
               return (
                 <motion.div key={exp.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: i * 0.02 }}>
                   <PremiumCard className="group p-4 sm:p-5 hover:shadow-premium transition-all">
                     <div className="flex items-start gap-4">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/50 shadow-sm" style={{ backgroundColor: `${catColor}12`, color: catColor }}>
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/50 shadow-sm" style={{ backgroundColor: `color-mix(in srgb, ${catColor} 10%, transparent)`, color: catColor }}>
                         <CatIcon size={18} />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -228,7 +248,7 @@ const ExpensesPage = () => {
                           </Button>
                           {isPending && isOwner && exp.id && (
                             <Button size="sm" className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] px-3" onClick={() => exp.id != null && handleApprove(exp.id)}>
-                              <CheckCircle2 size={12} className="ml-1" /> اعتماد
+                              <CheckCircle2 size={12} className="ms-1" /> اعتماد
                             </Button>
                           )}
                           {isOwner ? (
@@ -309,7 +329,7 @@ const ExpensesPage = () => {
             <Button variant="outline" onClick={() => { resetForm(); setIsModalOpen(false); }} className="h-11 flex-1 rounded-xl font-black">إلغاء</Button>
             {(!isEditing || isOwner) && (
               <Button onClick={handleSubmit} disabled={isSubmitting || uploading} className="h-11 flex-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black">
-                {isSubmitting ? <RefreshCw size={14} className="ml-1.5 animate-spin" /> : <Save size={14} className="ml-1.5" />} {isEditing ? "حفظ التعديل" : "إضافة"}
+                {isSubmitting ? <RefreshCw size={14} className="ms-1.5 animate-spin" /> : <Save size={14} className="ms-1.5" />} {isEditing ? "حفظ التعديل" : "إضافة"}
               </Button>
             )}
           </DialogFooter>

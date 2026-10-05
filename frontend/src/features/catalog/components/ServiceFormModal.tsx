@@ -62,7 +62,7 @@ export default function ServiceFormModal({
               قم بملء تفاصيل الخدمة والأسعار والمواد المستهلكة من المخزون بدقة.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-4 max-h-[60vh] overflow-y-auto pl-2 custom-scrollbar">
+          <div className="grid gap-5 py-4 max-h-[60vh] overflow-y-auto ps-2 custom-scrollbar">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-xs font-black text-main">
@@ -154,7 +154,7 @@ export default function ServiceFormModal({
                   onClick={onAddIngredient}
                   className="h-9 rounded-xl px-3 font-bold text-xs"
                 >
-                  <Plus size={14} className="ml-1.5" /> إضافة منتج مستهلك
+                  <Plus size={14} className="ms-1.5" /> إضافة منتج مستهلك
                 </Button>
               </div>
 

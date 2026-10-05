@@ -108,7 +108,7 @@ export default function AppointmentCard({
                     : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
               )}
             >
-              <Timer size={10} className="ml-1" />
+              <Timer size={10} className="ms-1" />
               {waitLabel}
             </Badge>
           )}
@@ -152,7 +152,7 @@ export default function AppointmentCard({
                   onClick={() => onUpdateStatus(appt.id, "in_progress")}
                   className="w-full h-11 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 font-black text-xs hover:scale-[1.02] transition-all"
                 >
-                  <Play size={15} className="ml-2" fill="currentColor" /> توجيه
+                  <Play size={15} className="ms-2" fill="currentColor" /> توجيه
                   للخبير
                 </Button>
               ) : (
@@ -160,7 +160,7 @@ export default function AppointmentCard({
                   onClick={() => onUpdateStatus(appt.id, "waiting")}
                   className="w-full h-11 rounded-xl bg-amber-500 text-white shadow-lg shadow-amber-500/20 font-black text-xs hover:scale-[1.02] transition-all"
                 >
-                  <UserCheck size={15} className="ml-2" /> تأكيد الوصول
+                  <UserCheck size={15} className="ms-2" /> تأكيد الوصول
                 </Button>
               )}
 
@@ -188,7 +188,7 @@ export default function AppointmentCard({
             onClick={() => onUpdateStatus(appt.id, "completed")}
             className="w-full h-11 rounded-xl bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 font-black text-xs hover:scale-[1.02] transition-all"
           >
-            <CheckCircle2 size={15} className="ml-2" /> إنهاء وإرسال للاستقبال
+            <CheckCircle2 size={15} className="ms-2" /> إنهاء وإرسال للاستقبال
           </Button>
         )}
 
@@ -197,7 +197,7 @@ export default function AppointmentCard({
             onClick={() => onUpdateStatus(appt.id, "ready_for_payment")}
             className="w-full h-11 rounded-xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 font-black text-xs hover:scale-[1.02] transition-all"
           >
-            تأكيد جاهزية الدفع <ArrowUpRight size={15} className="mr-2" />
+            تأكيد جاهزية الدفع <ArrowUpRight size={15} className="me-2" />
           </Button>
         )}
 
@@ -215,7 +215,7 @@ export default function AppointmentCard({
           onClick={onReassign}
           className="w-full h-10 text-[11px] font-black text-muted hover:text-accent hover:bg-white/5 rounded-xl border border-dashed border-border/40 hover:border-accent/40 transition-all"
         >
-          <RefreshCw size={13} className="ml-2" /> تغيير خبير الخدمة
+          <RefreshCw size={13} className="ms-2" /> تغيير خبير الخدمة
         </Button>
       </div>
     </motion.div>
