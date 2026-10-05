@@ -30,17 +30,10 @@ vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({ user: mockUser.current }),
 }));
 
-const importQuickActions = async () => {
-  const mod = await import("@/features/reports-dashboard/components/QuickActions");
-  return mod.QuickActions;
-};
-
-let QuickActions: any;
+import { QuickActions } from "@/features/reports-dashboard";
 
 describe("quick actions come from the route registry", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    QuickActions = await importQuickActions();
+  beforeEach(() => {
     mockUser.current = { full_name: "Owner", role: "OWNER" };
   });
 

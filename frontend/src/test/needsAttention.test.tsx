@@ -1,3 +1,4 @@
+import { NeedsAttention } from "@/features/reports-dashboard";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 
@@ -54,20 +55,10 @@ const alert = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const importCard = async () => {
-  const mod = await import(
-    "@/features/reports-dashboard/components/NeedsAttention"
-  );
-  return mod.NeedsAttention;
-};
-
-let NeedsAttention: any;
 
 describe("needs-attention card", () => {
-  beforeEach(async () => {
-    vi.resetModules();
+  beforeEach(() => {
     mockGet.mockReset();
-    NeedsAttention = await importCard();
   });
 
   afterEach(() => {
