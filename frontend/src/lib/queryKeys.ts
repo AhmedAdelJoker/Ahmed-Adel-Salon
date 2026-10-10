@@ -55,17 +55,72 @@ const EVENT_ALIASES: Record<string, QueryKey[]> = {
   expense_approved: [["expenses"], ["cashbox"], ["reports"]],
 };
 
-const KEYWORD_FALLBACKS: Array<{ words: string[]; keys: QueryKey[] }> = [
-  { words: ["invoice", "bill", "payment"], keys: [["invoices"], ["dashboard"]] },
-  { words: ["appointment", "booking"], keys: [["appointments"], ["schedule"]] },
-  { words: ["shift", "drawer"], keys: [["pos-shifts"], ["pos"]] },
-  { words: ["cash", "vault", "cashbox"], keys: [["cashbox"], ["reports"]] },
-  { words: ["stock", "inventory", "product"], keys: [["inventory"], ["products"]] },
-  { words: ["customer", "loyalty"], keys: [["customers"]] },
-  { words: ["payroll", "salary"], keys: [["payroll"]] },
-  { words: ["expense"], keys: [["expenses"]] },
-  { words: ["attendance", "presence"], keys: [["attendance"]] },
-  { words: ["employee", "staff"], keys: [["employees"], ["hr"]] },
+/**
+ * Keyword fallbacks for events whose name we do not recognise.
+ *
+ * Both Latin and Arabic spellings are listed because the backend emits the
+ * Latin `event` names, but a `message` arriving on an unrecognised shape is
+ * frequently the human-readable Arabic one.
+ *
+ * `strong` marks a term that only ever appears in one domain's vocabulary
+ * ("وردية", "مخزون"), so a single hit is already enough to refetch that slice.
+ * Generic terms ("فاتورة" also shows up in shift and expense copy) require a
+ * second independent group to agree, which keeps an unrelated notification
+ * from triggering a broad refetch.
+ */
+const KEYWORD_FALLBACKS: Array<{
+  words: string[];
+  keys: QueryKey[];
+  strong?: boolean;
+}> = [
+  {
+    words: ["invoice", "bill", "payment", "فاتورة", "دفعة", "سداد"],
+    keys: [["invoices"], ["dashboard"]],
+  },
+  {
+    words: ["appointment", "booking", "موعد", "حجز"],
+    keys: [["appointments"], ["schedule"]],
+    strong: true,
+  },
+  {
+    words: ["shift", "drawer", "وردية", "درج"],
+    keys: [["pos-shifts"], ["pos"]],
+    strong: true,
+  },
+  {
+    words: ["cash", "vault", "cashbox", "خزنة", "خزينة", "نقدية"],
+    keys: [["cashbox"], ["reports"]],
+    strong: true,
+  },
+  {
+    words: ["stock", "inventory", "product", "مخزون", "منتج", "صنف"],
+    keys: [["inventory"], ["products"]],
+    strong: true,
+  },
+  {
+    words: ["customer", "loyalty", "عميل", "ولاء"],
+    keys: [["customers"]],
+  },
+  {
+    words: ["payroll", "salary", "راتب", "مستحقات"],
+    keys: [["payroll"]],
+    strong: true,
+  },
+  {
+    words: ["expense", "مصروف", "مصروفات"],
+    keys: [["expenses"]],
+    strong: true,
+  },
+  {
+    words: ["attendance", "presence", "حضور", "انصراف"],
+    keys: [["attendance"]],
+    strong: true,
+  },
+  {
+    words: ["employee", "staff", "موظف", "عامل"],
+    keys: [["employees"], ["hr"]],
+    strong: true,
+  },
 ];
 
 function normalise(value: unknown): string {
@@ -102,8 +157,11 @@ export function keysForSocketEvent(payload: Record<string, unknown>): QueryKey[]
     words.some((word) => haystack.includes(word)),
   );
 
-  // Two independent keyword hits is enough signal; one is too noisy.
-  if (matches.length < 2) return [];
+  if (matches.length === 0) return [];
+
+  // A single strong hit (a term unique to one domain) is enough; otherwise two
+  // independent groups must agree before anything is refetched.
+  if (matches.length < 2 && !matches.some((match) => match.strong)) return [];
 
   return matches.flatMap((match) => match.keys);
 }
