@@ -1,4 +1,5 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import AppRouter from "@/app/router";
 import { AppearanceProvider } from "@/context/AppearanceContext";
 import { AuthProvider } from "@/context/AuthContext";
@@ -8,6 +9,7 @@ import { SocketProvider } from "@/context/SocketContext";
 import { UIProvider } from "@/context/UIContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "react-hot-toast";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,9 +21,21 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Refetches every mounted react-query on a fixed interval (no state loss). */
+function AutoRefresh() {
+  const queryClient = useQueryClient();
+  const refreshAll = useCallback(() => {
+    queryClient.invalidateQueries();
+  }, [queryClient]);
+
+  useAutoRefresh(refreshAll, 30_000);
+  return null;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <AutoRefresh />
       {/* Appearance sits outermost: it only writes attributes on <html>, and it
           must be able to re-theme the tree regardless of auth or socket state.
           Auth sits above Socket so the WebSocket always has a token to send. */}

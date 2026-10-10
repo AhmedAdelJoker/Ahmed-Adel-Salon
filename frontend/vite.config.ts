@@ -1,7 +1,12 @@
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import checker from "vite-plugin-checker";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const chunkGroups = [
   {
@@ -63,6 +68,32 @@ export default defineConfig({
       // ESLint v9 options (extensions, useEslintrc...) and crashes dev server.
       // Run lint separately via `npm run lint`.
     }),
+    /**
+     * Stamps a per-build id into `public/sw.js` as `__BUILD_ID__`.
+     *
+     * The service worker uses it as its cache name, so every deploy produces a
+     * fresh cache and the `activate` handler drops the previous one. Without
+     * it the worker would keep serving a stale `index.html` that references
+     * hashed assets which no longer exist — an empty page on every reload.
+     */
+    {
+      name: "sw-build-id",
+      apply: "build",
+      generateBundle() {
+        // Intentionally empty: the stamp is applied in closeBundle, because
+        // files from `public/` are copied after bundle finalisation.
+      },
+      closeBundle() {
+        // `public/` files are copied verbatim, so patch the emitted file too.
+        const outDir = resolve(__dirname, "dist");
+        const swPath = resolve(outDir, "sw.js");
+        if (!existsSync(swPath)) return;
+        const source = readFileSync(swPath, "utf8");
+        if (!source.includes("__BUILD_ID__")) return;
+        const buildId = Date.now().toString(36);
+        writeFileSync(swPath, source.replace("__BUILD_ID__", JSON.stringify(buildId)), "utf8");
+      },
+    },
   ],
 
   resolve: {
