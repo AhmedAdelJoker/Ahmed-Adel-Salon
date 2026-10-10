@@ -9,15 +9,37 @@ import {
   type ReactNode,
 } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
+
 import { useAuth } from "@/context/AuthContext";
 import type { AuthUser } from "@/context/AuthContext";
 import api from "@/services/api";
+import { keysForSocketEvent } from "@/lib/queryKeys";
 import type { ID } from "@/types/common";
 
 export interface NotificationItem {
   id?: ID;
   message?: string;
   [key: string]: unknown;
+}
+
+/**
+ * Maps a socket event to the query keys it invalidates.
+ *
+ * The 30s auto-refresh in `App.tsx` deliberately invalidates *everything*, so
+ * this is an optimisation for responsiveness, not for correctness: a live
+ * event refreshes only the affected slices immediately, and the periodic sweep
+ * still acts as the safety net if an event is missed or dropped.
+ */
+function invalidateForEvent(
+  queryClient: ReturnType<typeof useQueryClient>,
+  data: NotificationItem,
+): void {
+  const keys = keysForSocketEvent(data);
+  if (keys.length === 0) return;
+  for (const key of keys) {
+    void queryClient.invalidateQueries({ queryKey: key });
+  }
 }
 
 export interface SocketContextValue {
@@ -53,6 +75,7 @@ function buildSocketUrl(userId: ID): string {
 
 export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const { user, currentUser, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const activeUser = currentUser || user;
   const userId = getUserId(activeUser);
 
@@ -142,6 +165,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         try {
           const data = JSON.parse(event.data);
           setNotifications((prev) => [data, ...prev]);
+          invalidateForEvent(queryClient, data);
 
           if (
             typeof Notification !== "undefined" &&

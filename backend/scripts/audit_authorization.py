@@ -139,6 +139,22 @@ EXPECTED_SELF_SERVICE_RAW = {
     ("POST", "/api/v1/profile/avatar"),
     ("POST", "/api/v1/profile/change-password"),
     ("POST", "/api/v1/public/member/logout"),
+    # A member acting on their own booking. Safe without a role check because
+    # ownership is part of the query, not a check afterwards: the id of someone
+    # else's appointment is a 404, not a 403, so the endpoint never confirms it
+    # exists. Cancelling a finished visit or moving into the past is refused.
+    ("POST", "/api/v1/public/member/bookings/{appointment_id}/cancel"),
+    # The new slot goes through the same `booking_scheduler._slot_fits` engine the
+    # public booking flow uses, so rescheduling cannot create a double booking.
+    ("POST", "/api/v1/public/member/bookings/{appointment_id}/reschedule"),
+    # Browser crash reports. Public on purpose: the SPA loses its session
+    # *because* it crashed, so requiring a token here would suppress the report
+    # in the only case it exists to capture. The route grants no access and
+    # reads nothing -- it appends one audit row, with `user_id` filled in when a
+    # valid token happens to be present. The payload is size-capped at the schema,
+    # credentials are redacted client-side, and a failure inside is swallowed so
+    # telemetry can never escalate into a second outage.
+    ("POST", "/api/v1/telemetry/client-errors"),
 }
 
 

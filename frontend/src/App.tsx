@@ -11,24 +11,35 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "react-hot-toast";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
+const AUTO_REFRESH_MS = 30_000;
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
-      staleTime: 30_000,
+      // Matches AUTO_REFRESH_MS on purpose: a query is refetched at most once
+      // per cycle, so the timer never doubles up on the in-flight request.
+      staleTime: AUTO_REFRESH_MS,
     },
   },
 });
 
-/** Refetches every mounted react-query on a fixed interval (no state loss). */
+/**
+ * Refetches every mounted query on a fixed interval.
+ *
+ * `refetchType: "active"` skips queries whose components are unmounted, and
+ * `invalidateQueries` (rather than `refetchQueries`) means a query that is
+ * already in flight is marked stale and refetched once when it settles,
+ * instead of a second request being fired alongside it.
+ */
 function AutoRefresh() {
   const queryClient = useQueryClient();
   const refreshAll = useCallback(() => {
-    queryClient.invalidateQueries();
+    void queryClient.invalidateQueries({ refetchType: "active" });
   }, [queryClient]);
 
-  useAutoRefresh(refreshAll, 30_000);
+  useAutoRefresh(refreshAll, AUTO_REFRESH_MS);
   return null;
 }
 

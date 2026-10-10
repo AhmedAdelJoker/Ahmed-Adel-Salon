@@ -10,6 +10,11 @@ from app.db.session import get_db
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+# Same scheme with auto_error off: an absent header becomes `None` instead of
+# an immediate 401, which is what `get_current_user_optional` needs.
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/login", auto_error=False
+)
 
 
 def _credentials_exception() -> HTTPException:
@@ -71,6 +76,30 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
 ) -> User:
     return authenticate_access_token(db, token)
+
+
+def get_current_user_optional(
+    db: Session = Depends(get_db),
+    token: str | None = Depends(oauth2_scheme_optional),
+) -> User | None:
+    """Resolve the caller if a valid token is present, else ``None``.
+
+    For endpoints that must stay reachable precisely when things are broken --
+    client-error telemetry, for instance. The browser can lose its session
+    *because* the app crashed, so requiring a token there would suppress the
+    report in the exact case it exists to capture.
+
+    A malformed or revoked token resolves to ``None`` rather than raising: an
+    invalid credential is indistinguishable from no credential here, and neither
+    grants anything. The dependency is still declared, so the authorization
+    audit classifies the route as authenticated rather than unprotected.
+    """
+    if not token:
+        return None
+    try:
+        return authenticate_access_token(db, token)
+    except HTTPException:
+        return None
 
 
 def get_current_active_user(
