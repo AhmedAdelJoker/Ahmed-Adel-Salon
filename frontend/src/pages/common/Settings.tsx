@@ -33,6 +33,7 @@ import { cn } from "@/lib/core/utils";
 import { validateImageSize } from "@/lib/media/upload";
 import { PageHeader, PremiumCard, ContentPanel, SkeletonCard } from "@/components/shared/PremiumUI";
 import { TwoFactorPanel } from "@/features/security";
+import { needsTwoFactorEnrollment } from "@/lib/auth/twoFactorEnrollment";
 import { AnimatePresence } from "framer-motion";
 
 const SETTINGS_TABS = [
@@ -122,6 +123,13 @@ export default function Settings() {
   }, [profileData, isBarber]);
 
   const fetchProfile = async () => {
+    // Nothing to fetch while enrolling: /profile is one of the endpoints the
+    // restricted session cannot read, and the panel that unblocks the account
+    // does not depend on any of it.
+    if (needsTwoFactorEnrollment()) {
+      setInitialLoading(false);
+      return;
+    }
     try {
       setInitialLoading(true);
       setLoadError(null);
@@ -136,6 +144,13 @@ export default function Settings() {
         profileImageUrl: String(data.profile_image_url || (data as Record<string, unknown>).profileImageUrl || ""),
       });
     } catch {
+      // An enrolment-only session cannot read /profile, and this page is where
+      // the enrolment panel lives. Treating that 403 as a fatal load error
+      // replaced the whole page with "could not load your account", so the user
+      // was shown a retry button for the one endpoint that can never succeed --
+      // and never got to the panel that would unblock them. The rest of the page
+      // renders fine without profile data; the 2FA tab is self-contained.
+      if (needsTwoFactorEnrollment()) return;
       setLoadError("تعذر تحميل بيانات الحساب. تحقق من الاتصال ثم أعد المحاولة.");
     } finally {
       setInitialLoading(false);
@@ -179,14 +194,17 @@ export default function Settings() {
     }
     setLoading(true);
     try {
-      await api.put("/profile", {
-        full_name: profileData.fullName.trim(),
-        email: profileData.email.trim(),
-        ...(isBarber && {
-          display_name: profileData.displayName.trim() || null,
-          bio_ar: profileData.bioAr.trim() || null,
-        }),
-      });
+          await api.put("/profile", {
+            // `|| null` matches the two fields below: an optional field left
+            // blank must be sent as null, because `""` is not a valid email
+            // and the backend answered 422 for an untouched optional field.
+            full_name: profileData.fullName.trim() || null,
+            email: profileData.email.trim() || null,
+            ...(isBarber && {
+              display_name: profileData.displayName.trim() || null,
+              bio_ar: profileData.bioAr.trim() || null,
+            }),
+          });
       await refreshUser();
       toast.success("تم تحديث الملف الشخصي بنجاح");
     } catch (err) {

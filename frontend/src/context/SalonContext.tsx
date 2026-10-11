@@ -10,6 +10,7 @@ import { useAuth, type AuthUser } from "@/context/AuthContext";
 import { SocketContext } from "@/context/SocketContext";
 import { generatePublicQR } from "@/lib/media/qr";
 import { setCurrency } from "@/lib/core/currency";
+import { needsTwoFactorEnrollment } from "@/lib/auth/twoFactorEnrollment";
 import { customerService } from "@/services/customerService";
 import { serviceService } from "@/services/serviceService";
 import { barberService } from "@/services/barberService";
@@ -61,6 +62,24 @@ const toArray = (value: unknown): SalonRecord[] => {
   return [];
 };
 
+/**
+ * Roles each of these endpoints accepts on the backend.
+ *
+ * `loadAll` used to fire every one of them for every signed-in user, so a
+ * barber — who cannot read a single one of them — produced five 403s on every
+ * login, all from `SalonContext`, and paid for requests that could only fail.
+ * These mirror `app/api/deps.py`, which is the authority; the frontend cannot
+ * see it, so the two are kept in step by hand and this is the one place they
+ * are written down.
+ */
+const CASH_DESK_ROLES = ["cashier", "manager", "admin", "owner", "accountant"];
+const REPORTS_ROLES = ["admin", "manager", "owner"];
+
+const can = (user: AuthUser | null, allowed: string[]): boolean => {
+  const role = String(user?.role ?? "").toLowerCase();
+  return allowed.includes(role);
+};
+
 export function SalonProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
   const socket = useContext(SocketContext);
@@ -86,6 +105,13 @@ export function SalonProvider({ children }: { children: ReactNode }) {
 
   async function loadAll() {
     if (!isAuthenticated) return;
+    // An enrolment-only session is authenticated but authorised to reach the
+    // 2FA setup endpoints and nothing else. Every request below would come back
+    // 403, so the salon data would stay empty regardless; firing them anyway
+    // only produced a wall of failed requests in the console on the one screen
+    // the user has to get through. Skipping is not a workaround -- the backend
+    // answer is the same either way.
+    if (needsTwoFactorEnrollment()) return;
     setLoading(true);
     try {
       const [settingsRes, servicesRes, barbersRes] = await Promise.allSettled([
@@ -119,36 +145,63 @@ export function SalonProvider({ children }: { children: ReactNode }) {
       if (barbersRes.status === "fulfilled")
         setBarbers(toArray(barbersRes.value));
       setLoading(false);
-      const [customersRes, sessionsRes, invoicesRes, reportsRes] =
-        await Promise.allSettled([
-          customerService.list?.(),
-          sessionService.list?.(),
-          invoiceService.list?.(),
-          reportService.overview?.(),
-        ]);
-      if (customersRes.status === "fulfilled")
-        setCustomers(toArray(customersRes.value));
-      if (sessionsRes.status === "fulfilled")
-        setSessions(toArray(sessionsRes.value));
-      if (invoicesRes.status === "fulfilled")
-        setInvoices(toArray(invoicesRes.value));
-      if (reportsRes.status === "fulfilled")
-        setReportOverview(reportsRes.value || null);
-      try {
-        const summary = await cashboxService.getSummary();
-        const cashBal = Number(summary?.cash_balance_detail ?? summary?.cash_balance ?? 0);
-        const digitalBal = Number(summary?.non_cash_balance ?? 0);
-        const totalBal = Number(summary?.cash_balance ?? cashBal + digitalBal);
-        setVaultCashBalance(cashBal);
-        setVaultDigitalBalance(digitalBal);
-        setValutBalance(totalBal);
-        setDrawerBalance(cashBal);
-      } catch (_e) {
+      // Cash-desk reads, then the reports overview. A barber is outside every
+      // one of them, so `Promise.allSettled` would otherwise resolve five
+      // rejections and spend a round-trip each to learn that. The two lists
+      // are collected rather than destructured because which one ran depends
+      // on the role, and their positions must not shift when they do.
+      const jobs: { key: string; run: () => Promise<unknown> }[] = [];
+      if (can(currentUser, CASH_DESK_ROLES)) {
+        jobs.push(
+          { key: "customers", run: () => customerService.list?.() },
+          { key: "sessions", run: () => sessionService.list?.() },
+          { key: "invoices", run: () => invoiceService.list?.() },
+        );
+      }
+      if (can(currentUser, REPORTS_ROLES)) {
+        jobs.push({ key: "reports", run: () => reportService.overview?.() });
+      }
+
+      if (jobs.length > 0) {
+        const settled = await Promise.allSettled(jobs.map((job) => job.run()));
+        jobs.forEach((job, index) => {
+          const outcome = settled[index];
+          if (outcome?.status !== "fulfilled") return;
+          const value = outcome.value;
+          switch (job.key) {
+            case "customers":
+              setCustomers(toArray(value));
+              break;
+            case "sessions":
+              setSessions(toArray(value));
+              break;
+            case "invoices":
+              setInvoices(toArray(value));
+              break;
+            case "reports":
+              setReportOverview((value as SalonRecord | null) || null);
+              break;
+          }
+        });
+      }
+
+      if (can(currentUser, CASH_DESK_ROLES)) {
         try {
-          const b = await posShiftService.getBalance();
-          setDrawerBalance(Number(b ?? 0));
-          setValutBalance(Number(b ?? 0));
-        } catch {}
+          const summary = await cashboxService.getSummary();
+          const cashBal = Number(summary?.cash_balance_detail ?? summary?.cash_balance ?? 0);
+          const digitalBal = Number(summary?.non_cash_balance ?? 0);
+          const totalBal = Number(summary?.cash_balance ?? cashBal + digitalBal);
+          setVaultCashBalance(cashBal);
+          setVaultDigitalBalance(digitalBal);
+          setValutBalance(totalBal);
+          setDrawerBalance(cashBal);
+        } catch (_e) {
+          try {
+            const b = await posShiftService.getBalance();
+            setDrawerBalance(Number(b ?? 0));
+            setValutBalance(Number(b ?? 0));
+          } catch {}
+        }
       }
     } catch (err) {
       console.error("SalonProvider loadAll error:", err);

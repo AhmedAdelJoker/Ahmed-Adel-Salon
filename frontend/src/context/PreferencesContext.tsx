@@ -3,10 +3,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import api from "@/services/api";
+import { needsTwoFactorEnrollment } from "@/lib/auth/twoFactorEnrollment";
 import { useAuth } from "@/context/AuthContext";
 import { SocketContext } from "@/context/SocketContext";
 import i18n, { applyDocumentDirection } from "@/i18n";
@@ -168,6 +170,13 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Track whether the initial theme hydration has completed. The inline script
+  // in index.html already sets data-theme on <html> before first paint, so we
+  // must not call applyTheme() again on mount — doing so can trigger a style
+  // recalculation that reads as a flash. We only apply on *user-initiated*
+  // changes (setPreferences, setTheme, loadPreferences after login).
+  const themeHydrated = useRef(false);
+
   const darkMode = preferences.theme === "dark";
 
   // The document direction has to track the initial language too, not just
@@ -191,6 +200,25 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem("token");
     const storedLanguage = getStoredLanguage();
     if (!token || !isAuthenticated) {
+      const localPreferences = {
+        ...DEFAULT_PREFERENCES,
+        theme: getStoredTheme(),
+        language: storedLanguage ?? DEFAULT_PREFERENCES.language,
+      };
+      setPreferencesState(localPreferences);
+      applyTheme(localPreferences.theme);
+      applyDocumentDirection(localPreferences.language);
+      setLoading(false);
+      return;
+    }
+
+    // An enrolment-only session cannot read preferences (the endpoint answers
+    // 403 like every other one), and the local values above are the same ones
+    // the request would return for a user who has not overridden anything.
+    // Falling back to them keeps the theme and direction correct on the one
+    // screen a blocked user has to reach, instead of logging a failed request
+    // and rendering with default preferences.
+    if (needsTwoFactorEnrollment()) {
       const localPreferences = {
         ...DEFAULT_PREFERENCES,
         theme: getStoredTheme(),
@@ -324,7 +352,14 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   // the socket meant a dropped or still-connecting websocket left the document
   // showing whatever the previous render had, which is how a user ends up
   // staring at a light dashboard after choosing dark.
+  // Only apply theme *after* the initial hydration — the inline script in
+  // index.html already set data-theme before first paint. Re-applying on mount
+  // triggers a redundant style recalculation that can flash.
   useEffect(() => {
+    if (!themeHydrated.current) {
+      themeHydrated.current = true;
+      return;
+    }
     applyTheme(preferences.theme);
   }, [preferences.theme]);
 

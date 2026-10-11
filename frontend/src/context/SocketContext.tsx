@@ -15,6 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { AuthUser } from "@/context/AuthContext";
 import api from "@/services/api";
 import { keysForSocketEvent } from "@/lib/queryKeys";
+import { needsTwoFactorEnrollment } from "@/lib/auth/twoFactorEnrollment";
 import type { ID } from "@/types/common";
 
 export interface NotificationItem {
@@ -89,6 +90,10 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   // Fallback polling for notifications
   const pollNotifications = useCallback(async () => {
     if (!isAuthenticated || !userId || wsEnabledRef.current) return;
+    // Notifications are not reachable from an enrolment-only session; asking
+    // for them just produces a 403 every cycle. No notification the user has to
+    // act on can arrive before they have finished enrolling anyway.
+    if (needsTwoFactorEnrollment()) return;
     try {
       const res = await api.get("/notifications", {
         params: { page: 1, page_size: 20, unread_only: true },
@@ -113,6 +118,16 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         socketRef.current = null;
       }
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      setConnected(false);
+      return undefined;
+    }
+
+    // A blocked session cannot open the notification socket, and the backend
+    // rejects the handshake just as it rejects the REST calls. Connecting anyway
+    // produced a failed handshake plus a retry loop; and the poll fallback that
+    // took over from it then 403'd on a 30-second timer. Nothing is lost by not
+    // connecting: the user has no notifications to receive until they enrol.
+    if (needsTwoFactorEnrollment()) {
       setConnected(false);
       return undefined;
     }

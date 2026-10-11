@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import api from "@/services/api";
+import { needsTwoFactorEnrollment } from "@/lib/auth/twoFactorEnrollment";
 import { toast } from "react-hot-toast";
 import type { ID } from "@/types/common";
 
@@ -72,10 +73,10 @@ const readStoredUser = (): AuthUser | null => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(() => readStoredUser());
   const [loading, setLoading] = useState<boolean>(() => {
-    // Optimistic loading: if we have a stored user, don't block initial render
-    const storedUser = readStoredUser();
-    const token = localStorage.getItem("token");
-    return Boolean(token && !storedUser);
+    // Always start loading when a token exists — the stored user may be stale,
+    // and we must complete the server round-trip before rendering protected UI.
+    // This prevents a flash of stale data followed by a re-render.
+    return Boolean(localStorage.getItem("token"));
   });
 
   const logout = useCallback(({ silent = false, redirect = true }: LogoutOptions = {}) => {
@@ -128,11 +129,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       return profile;
     } catch (err) {
+      // An enrolment-only session is refused by /auth/me exactly like an expired
+      // token is -- both answer 403 -- but they are opposites: this session is
+      // valid, it just may not read the profile yet. Logging out here cleared
+      // the very flag RequireAuth redirects on, so the user was bounced to
+      // /login with no route to the panel that would unblock them, and every
+      // reload repeated it. Trust the stored user and let the guard route; the
+      // enrolment tab is the only page reachable in this state.
+      if (needsTwoFactorEnrollment()) {
+        const stored = readStoredUser();
+        if (stored) {
+          setUser(stored);
+          return stored;
+        }
+      }
       console.error("Failed to fetch user profile", err);
       logout({ silent: true });
       return null;
     }
-  }, [logout]);
+  }, [logout, needsTwoFactorEnrollment]);
 
   useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {
@@ -154,13 +169,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (token) {
-      fetchUserProfile().finally(() => setLoading(false));
-    } else {
+    if (!token) {
       setUser(null);
       setLoading(false);
+      return;
     }
-  }, [fetchUserProfile]);
+    // The restricted session cannot read /auth/me, so the refresh at mount is
+    // a guaranteed 403 that used to trigger logout and bounce the user to
+    // /login. The stored user is authoritative enough to render the enrolment
+    // tab, and the real refresh happens after they enroll.
+    if (needsTwoFactorEnrollment()) {
+      const stored = readStoredUser();
+      if (stored) {
+        setUser(stored);
+        setLoading(false);
+        return;
+      }
+    }
+    fetchUserProfile().finally(() => setLoading(false));
+  }, [fetchUserProfile, needsTwoFactorEnrollment]);
 
   const login = useCallback(
     async (username: string, password: string, totpCode?: string): Promise<AuthUser> => {
