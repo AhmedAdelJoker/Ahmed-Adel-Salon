@@ -17,6 +17,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import {
   clearTwoFactorEnrollment,
   ENROLLMENT_DUE_KEY,
+  ENROLLMENT_PATH,
   ENROLLMENT_REQUIRED_KEY,
   ENROLLMENT_ROUTE,
   isWithinEnrollmentGracePeriod,
@@ -89,6 +90,25 @@ afterAll(() => {
 describe("two-factor enrolment state", () => {
   beforeEach(() => {
     realStorage.clear();
+  });
+
+  describe("the enrolment redirect target", () => {
+    it("exposes a pathname comparable with location.pathname", () => {
+      // The guard compares the current location against a redirect target to
+      // avoid bouncing off the enrolment screen forever. `location.pathname`
+      // never carries a query string, so a target that includes one can never
+      // equal it -- which is precisely how this shipped as an infinite
+      // "Maximum update depth exceeded" loop on a user who could not proceed.
+      expect(ENROLLMENT_ROUTE).toContain("?");
+      expect(ENROLLMENT_PATH).not.toContain("?");
+      expect(new URL(ENROLLMENT_ROUTE, "http://x").pathname).toBe(ENROLLMENT_PATH);
+    });
+
+    it("points at settings, which is the tab that hosts the panel", () => {
+      // Not cosmetic: if the guard redirects to a path it does not itself
+      // render, the user lands on a 404 instead of the setup they need.
+      expect(ENROLLMENT_ROUTE.startsWith(`${ENROLLMENT_PATH}?`)).toBe(true);
+    });
   });
 
   describe("needsTwoFactorEnrollment", () => {

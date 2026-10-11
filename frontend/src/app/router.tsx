@@ -32,7 +32,11 @@ import MobileNav from "@/components/layout/MobileNav";
 import CommandPalette from "@/components/layout/CommandPalette";
 import DynamicBackground from "@/components/layout/DynamicBackground";
 import { cn } from "@/lib/core/utils";
-import { needsTwoFactorEnrollment } from "@/lib/auth/twoFactorEnrollment";
+import {
+  ENROLLMENT_PATH,
+  ENROLLMENT_ROUTE,
+  needsTwoFactorEnrollment,
+} from "@/lib/auth/twoFactorEnrollment";
 
 // Electron يشغّل الواجهة عبر file:// — BrowserRouter يعتمد على history API
 // الخاص بالسيرفر ويفشل هناك، لذلك نستخدم HashRouter داخل تطبيق الويندوز.
@@ -116,13 +120,21 @@ function RequireAuth({
   // and shows a wall of errors. Redirecting here turns that into one clear
   // instruction. Placed after the `is_active` check, because a disabled account
   // must reach the login screen and nothing else.
-  if (needsTwoFactorEnrollment()) {
-    // The 2FA panel is the "security" tab of Settings, not a page of its own --
-    // which is why this is a query parameter and not a route. Guessing a
-    // `/settings/two-factor` path here would redirect to a 404 on the one
-    // screen the user cannot get past.
+  //
+  // The enrolment screen is the "security" tab of Settings, which sits behind
+  // this same guard -- every route does. Redirecting unconditionally therefore
+  // made the guard send the user to a path it then refused, over and over:
+  // "Maximum update depth exceeded" plus "Throttling navigation to prevent the
+  // browser from hanging", on the one screen the user cannot get past. Stopping
+  // once already there breaks the cycle without weakening the gate, since the
+  // backend 403 still holds on every other route.
+  if (needsTwoFactorEnrollment() && location.pathname !== ENROLLMENT_PATH) {
+    // Compared on the pathname only: ENROLLMENT_ROUTE carries `?tab=security`,
+    // and the query string is what selects the panel, so it must not be part of
+    // the equality test or a user who opened the tab directly would be bounced
+    // back into the loop.
     return (
-      <Navigate to="/settings?tab=security" replace state={{ from: location }} />
+      <Navigate to={ENROLLMENT_ROUTE} replace state={{ from: location }} />
     );
   }
 

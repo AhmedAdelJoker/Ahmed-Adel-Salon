@@ -27,6 +27,15 @@ export const ENROLLMENT_DUE_KEY = "2fa_enrollment_due";
 /** The settings tab that hosts the enrolment panel. */
 export const ENROLLMENT_ROUTE = "/settings?tab=security";
 
+/**
+ * The same destination as a bare pathname.
+ *
+ * A redirect target is compared against `location.pathname`, which never
+ * includes the query string. Comparing the full route would therefore never
+ * match and the guard would redirect on every render.
+ */
+export const ENROLLMENT_PATH = "/settings";
+
 /** True when the session is restricted to the two enrolment endpoints. */
 export function needsTwoFactorEnrollment(): boolean {
   if (typeof window === "undefined") return false;
