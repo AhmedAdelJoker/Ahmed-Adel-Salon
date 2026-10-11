@@ -27,6 +27,9 @@
 .PARAMETER Install
     Install backend requirements and frontend node_modules if missing.
 
+.PARAMETER NoBrowser
+    Do not open the browser once both servers answer.
+
 .EXAMPLE
     .\run.ps1
 
@@ -42,7 +45,8 @@ param(
     [switch]$FrontendOnly,
     [switch]$Seed,
     [switch]$Fresh,
-    [switch]$Install
+    [switch]$Install,
+    [switch]$NoBrowser
 )
 
 $ErrorActionPreference = 'Stop'
@@ -204,10 +208,12 @@ if (-not $BackendOnly) {
     Assert-PortFree $FRONTEND_PORT 'Frontend'
     Write-Step "Starting frontend on :$FRONTEND_PORT"
 
-    # npm needs the shim resolved through cmd on Windows, and vite needs the
-    # project directory as its cwd.
-    $frontendProc = Start-Process -FilePath 'npm.cmd' `
-        -ArgumentList 'run', 'dev', '--', '--port', "$FRONTEND_PORT", '--strictPort' `
+    # npm must run through cmd on Windows (npm.cmd is a batch shim). Starting
+    # it detached from this shell is deliberate: vite would otherwise be killed
+    # with the parent, which showed up as "VITE ready" in the log followed by
+    # nothing listening on the port.
+    $frontendProc = Start-Process -FilePath 'cmd.exe' `
+        -ArgumentList '/c', 'npm.cmd run dev -- --port', "$FRONTEND_PORT", '--strictPort' `
         -WorkingDirectory $frontend `
         -PassThru `
         -RedirectStandardOutput (Join-Path $frontend 'run-frontend.out.log') `
@@ -244,11 +250,17 @@ Write-Host '  Both servers keep running; close them from the terminal' -Foregrou
 Write-Host '  or run .\stop.ps1' -ForegroundColor DarkGray
 Write-Host ''
 
+# Opened only after both answers, so the browser never lands on a page whose
+# API is not up yet (that is what produced ERR_CONNECTION_REFUSED).
+if (-not $BackendOnly -and -not $NoBrowser) {
+    Start-Process "http://localhost:$FRONTEND_PORT"
+}
+
 # Keeps the script alive so the child processes are not orphaned silently;
 # Ctrl+C reaches here and the finally block tears both down.
 try {
     while ($true) {
-        foreach ($proc in @($backendProc, $frontendProc)) {
+        foreach ($proc in @($frontendProc, $backendProc)) {
             if ($proc -and $proc.HasExited) {
                 Write-Warn "a server exited (PID $($proc.Id)); shutting the other down."
                 throw 'child exited'
@@ -264,12 +276,10 @@ try {
     foreach ($proc in @($frontendProc, $backendProc)) {
         if ($proc -and -not $proc.HasExited) {
             try {
-                # vite spawns a child; kill the tree so the port is really free.
-                if ($proc.ProcessName -eq 'npm') {
-                    taskkill /PID $proc.Id /T /F | Out-Null
-                } else {
-                    Stop-Process -Id $proc.Id -Force
-                }
+                # Always kill the tree: npm.cmd and vite are parent-child
+                # chains, and stopping only the parent leaves the child
+                # holding the port.
+                taskkill /PID $proc.Id /T /F 2>&1 | Out-Null
                 Write-Ok "stopped $($proc.ProcessName) (PID $($proc.Id))"
             } catch {
                 Write-Warn "could not stop PID $($proc.Id): $_"
