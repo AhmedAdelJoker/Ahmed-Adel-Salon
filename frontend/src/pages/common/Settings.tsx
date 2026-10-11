@@ -66,14 +66,31 @@ export default function Settings() {
   } = usePreferences();
 
   const requestedTab = searchParams.get("tab") as TabId | null;
-  const activeTab: TabId = (SETTINGS_TABS as readonly { id: string }[]).some((t) => t.id === requestedTab)
-    ? (requestedTab as TabId)
-    : "profile";
+  // Default differs by state: normally the profile tab, but an enrolment-only
+  // session cannot open it, so falling back to "profile" would render a tab the
+  // user is not allowed to use. Resolve the fallback against what is reachable.
+  const defaultTab: TabId = needsTwoFactorEnrollment() ? "security" : "profile";
+  const isVisible = (id: string | null): id is TabId =>
+    (SETTINGS_TABS as readonly { id: string }[]).some((t) => t.id === id) &&
+    (needsTwoFactorEnrollment() ? id === "security" : true);
+  // Falls back for a missing tab *and* for one this session may not open -- a
+  // stale `?tab=profile` in the URL, or a bookmark from before the block.
+  const activeTab: TabId = isVisible(requestedTab) ? requestedTab : defaultTab;
 
   const [loading, setLoading] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // While enrolment is pending the session may read nothing but the two 2FA
+  // endpoints, so every other tab is a form that submits into a guaranteed 403
+  // -- uploading an avatar, saving a name, changing a password. Showing them
+  // would invite the user into failures that look like bugs. Restricting the
+  // list is the honest rendering of what the account can actually do.
+  const enrollmentPending = needsTwoFactorEnrollment();
+  const visibleTabs = enrollmentPending
+    ? SETTINGS_TABS.filter((t) => t.id === "security")
+    : SETTINGS_TABS;
 
   const [profileData, setProfileData] = useState({
     fullName: "",
@@ -165,7 +182,12 @@ export default function Settings() {
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !validateImageSize(file)) return;
+    // The input is hidden behind a tab that is not rendered while enrolling, so
+    // this cannot normally be reached -- but a stale file input can survive a
+    // state change, and a guaranteed 403 plus a misleading toast is worse than
+    // saying why.
+    if (!file || needsTwoFactorEnrollment()) return;
+    if (!validateImageSize(file)) return;
     const fd = new FormData();
     fd.append("file", file);
     setAvatarLoading(true);
@@ -362,7 +384,7 @@ export default function Settings() {
             aria-label="أقسام الحساب"
             className="sticky top-24 space-y-1.5 flex lg:flex-col overflow-x-auto p-2 rounded-2xl border border-border/40 bg-card/40 lg:bg-transparent lg:border-none lg:p-0 gap-2 lg:gap-1.5 no-scrollbar snap-x"
           >
-            {SETTINGS_TABS.map((tab) => {
+            {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
@@ -408,8 +430,26 @@ export default function Settings() {
         </aside>
 
         <main className="flex-1 min-w-0">
+          {enrollmentPending && (
+            <div
+              role="status"
+              className="mb-5 flex items-start gap-3 rounded-2xl border border-warning/40 bg-warning/10 p-4"
+            >
+              <Lock size={18} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+              <div className="space-y-1">
+                <p className="text-sm font-black text-main">
+                  يجب تفعيل المصادقة الثنائية قبل استخدام بقية الإعدادات
+                </p>
+                <p className="text-xs font-bold text-muted">
+                  حسابك في فترة إلزامية لتفعيل التحقق بخطوتين. حتى يتم التفعيل، بقية
+                  الأقسام غير متاحة. فعّلها من قسم الأمان بالأسفل وسيتم تفعيلها
+                  تلقائياً.
+                </p>
+              </div>
+            </div>
+          )}
           <AnimatePresence mode="wait">
-            {activeTab === "profile" && (
+            {activeTab === "profile" && !enrollmentPending && (
               <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
                 <ContentPanel title="الملف الشخصي" subtitle="اسمك، بريدك، وصورتك — تُحفظ لكل حساب على حدة.">
                   <form onSubmit={handleProfileSubmit} className="space-y-5">
