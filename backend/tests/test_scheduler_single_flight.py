@@ -147,7 +147,15 @@ def test_every_job_is_registered_with_a_bounded_misfire_grace():
     from app.main import scheduler
 
     ids = {job.id for job in scheduler.get_jobs()}
-    assert ids == {"auto_close_shifts", "scheduled_report_delivery", "cleanup_scheduled_pdfs"}
+    # Listed exhaustively on purpose: a job that reaches `scheduler.add_job`
+    # without appearing here is a job nobody checked for overlap, coalescing,
+    # or a misfire bound. Adding one means adding it here in the same commit.
+    assert ids == {
+        "auto_close_shifts",
+        "scheduled_report_delivery",
+        "cleanup_scheduled_pdfs",
+        "send_due_reminders",
+    }
 
     for job in scheduler.get_jobs():
         assert job.max_instances == 1, f"{job.id} allows overlapping runs"
