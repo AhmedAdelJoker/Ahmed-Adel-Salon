@@ -102,6 +102,55 @@
         background: #08080a;
         color-scheme: dark;
       }
+
+      /*
+        The splash is positioned fixed over the whole viewport, so the first
+        frame is never a bare canvas. It is visible from its very first paint
+        rather than fading in from zero opacity: a fade that starts at 0 means
+        the frame that matters — the one before the animation starts — is
+        transparent, which is the black flash this element exists to prevent.
+        The mark's own pulse supplies the sense of activity instead.
+      */
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+      }
+      #boot-splash .boot-splash__mark {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 0.75rem;
+        border: 2px solid currentColor;
+        opacity: 0.25;
+        animation: boot-pulse 1.4s ease-in-out infinite;
+      }
+      :root[data-theme="dark"] #boot-splash {
+        color: #f4f4f7;
+      }
+      :root:not([data-theme="dark"]) #boot-splash {
+        color: #18181b;
+      }
+      @keyframes boot-pulse {
+        0%,
+        100% {
+          opacity: 0.25;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.06);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot-splash .boot-splash__mark {
+          animation: none;
+          opacity: 0.35;
+        }
+      }
     </style>
 
     <link rel="icon" href="/favicon.ico" />
@@ -131,6 +180,19 @@
     <meta property="twitter:image" content="/og-image.jpg" />
   </head>
   <body>
+    <!--
+      Boot splash.
+
+      The app stylesheet is imported from `main.tsx`, and in dev Vite has to
+      transform every module before React mounts — long enough that the page
+      sits blank. On a dark theme that blank canvas is near-black, so the
+      reload reads as a black screen that "closes again". This markup is
+      inline, so it is on screen at the first frame; `main.tsx` removes it as
+      soon as React has taken over.
+    -->
+    <div id="boot-splash" aria-hidden="true">
+      <div class="boot-splash__mark"></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

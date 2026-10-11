@@ -305,6 +305,50 @@ test.describe("v2 appearance system", () => {
     }
   });
 
+  test("the splash is on screen before the bundle boots and leaves after", async ({ page }) => {
+    // Guards the reported "black for a second, then the app" reload.
+    //
+    // The canvas guard already pins the background colour, but a bare canvas is
+    // still a bare canvas: on a dark theme the first second of a dev reload
+    // (Vite has to transform every module first) was a silent near-black plate.
+    // #boot-splash is inline markup, so it is present at the first frame
+    // regardless of what the bundle is doing.
+    await page.route("**/*", (route) => {
+      if (route.request().resourceType() === "document") return route.continue();
+      return route.abort();
+    });
+
+    await page.goto("/login", { waitUntil: "commit" });
+
+    const splash = await page.evaluate(() => {
+      const el = document.getElementById("boot-splash");
+      if (!el) return null;
+      const style = getComputedStyle(el);
+      return {
+        position: style.position,
+        coversViewport: style.position === "fixed" && style.inset === "0px",
+        opacity: Number(style.opacity),
+      };
+    });
+
+    expect(splash, "#boot-splash must be inline in index.html").not.toBeNull();
+    expect(splash!.coversViewport, "splash must cover the viewport").toBe(true);
+    // Opaque from the very first paint. A fade-in that starts at opacity 0 is
+    // transparent in exactly the frame this element exists to cover.
+    expect(splash!.opacity, "splash must not paint transparent").toBe(1);
+
+    await page.unroute("**/*");
+
+    // And it must not survive into the running app, or it would sit on top of
+    // every page forever.
+    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.waitForTimeout(400);
+    expect(
+      await page.evaluate(() => Boolean(document.getElementById("boot-splash"))),
+      "splash must be removed once React has mounted",
+    ).toBe(false);
+  });
+
   test("the canvas is painted before the bundle boots, in both themes", async ({ page }) => {
     // Regression guard for the "black for a second, then the app" report.
     //
