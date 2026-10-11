@@ -50,6 +50,9 @@
 
         root.dataset.theme = theme;
         root.classList.toggle("dark", theme === "dark");
+        // Must match the inline canvas guard above: without this the browser
+        // keeps painting with the OS preference until the bundle boots.
+        root.style.setProperty("color-scheme", theme);
         root.dataset.accent = read("accent", ACCENTS, "indigo");
         root.dataset.density = read("density", DENSITIES, "comfortable");
         root.dataset.motion = read("motion", MOTIONS, "normal");
@@ -78,6 +81,28 @@
         }
       })();
     </script>
+
+    <!--
+      Canvas paint guard.
+
+      The stylesheet is imported from `main.tsx`, so in dev it is not applied
+      until React has booted. `color-scheme: light dark` below makes the browser
+      paint the empty canvas using the *OS* preference during that gap — which
+      is a black frame on a dark machine followed by the light app, i.e. the
+      "black for a second then back" report. These rules pin the canvas to the
+      stored theme before first paint, and `color-scheme` is declared per
+      theme below so the browser stops second-guessing the OS.
+    -->
+    <style>
+      :root {
+        background: #fbfbfd;
+        color-scheme: light;
+      }
+      :root[data-theme="dark"] {
+        background: #08080a;
+        color-scheme: dark;
+      }
+    </style>
 
     <link rel="icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/favicon.ico" />

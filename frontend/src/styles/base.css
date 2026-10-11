@@ -41,6 +41,13 @@
   #root {
     min-height: 100dvh;
     isolation: isolate;
+    /* The canvas colour lives on the root, not just on `body`: every transient
+       state during boot (module loading, Suspense, an error boundary) replaces
+       #root's children but not #root itself, so the page never falls back to a
+       bare dark body between them. */
+    background-color: var(--surface-canvas);
+    background-image: var(--gradient-canvas);
+    background-attachment: fixed;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -590,6 +597,14 @@
      ============================================================ */
   .mobile-bottom-safe {
     padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+
+  /* The floating mobile nav (~76px + 16px offset) overlays the page end;
+     keep the last content clear of it. lg+ the nav is hidden. */
+  @media (max-width: 1023px) {
+    .mobile-bottom-safe {
+      padding-bottom: calc(6.5rem + max(env(safe-area-inset-bottom), 0px));
+    }
   }
 
   .touch-target {

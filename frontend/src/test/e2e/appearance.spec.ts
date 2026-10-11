@@ -305,6 +305,63 @@ test.describe("v2 appearance system", () => {
     }
   });
 
+  test("the canvas is painted before the bundle boots, in both themes", async ({ page }) => {
+    // Regression guard for the "black for a second, then the app" report.
+    //
+    // The app stylesheet is imported from `main.tsx`, so nothing paints it
+    // until React has booted. The inline canvas guard in index.html exists to
+    // cover that gap using the *stored* theme rather than the OS one — without
+    // it the browser paints from `color-scheme: light dark`, so an app set to
+    // dark on a light machine flashes white (and the inverse flashes black).
+    //
+    // The cross-theme combination is the whole point: pinning the test to
+    // "OS dark, app dark" would pass with or without the guard, because the OS
+    // preference happens to agree with the app.
+    for (const [osScheme, appTheme] of [
+      ["light", "dark"],
+      ["dark", "light"],
+    ] as const) {
+      await page.emulateMedia({ colorScheme: osScheme });
+      await page.addInitScript((value) => {
+        window.localStorage.setItem("theme", value);
+      }, appTheme);
+
+      // Abort every request: the document is parsed, the inline <style> has
+      // applied, and no CSS or JS can run. Exactly the frame that flashed.
+      await page.route("**/*", (route) => {
+        if (route.request().resourceType() === "document") return route.continue();
+        return route.abort();
+      });
+
+      await page.goto("/login", { waitUntil: "commit" });
+
+      const painted = await page.evaluate(() => {
+        const root = document.documentElement;
+        const style = getComputedStyle(root);
+        return {
+          theme: root.dataset.theme ?? null,
+          colorScheme: style.getPropertyValue("color-scheme").trim(),
+          background: style.backgroundColor,
+        };
+      });
+
+      // The guard must key off the stored preference, not the OS one.
+      expect(painted.theme, `data-theme should resolve to ${appTheme} pre-boot`).toBe(appTheme);
+      expect(painted.colorScheme).toBe(appTheme);
+
+      const [r, g, b] = painted.background.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      if (appTheme === "dark") {
+        expect(luminance, `OS ${osScheme} + app dark must not paint a light frame`).toBeLessThan(0.2);
+      } else {
+        expect(luminance, `OS ${osScheme} + app light must not paint a dark frame`).toBeGreaterThan(0.8);
+      }
+
+      await page.unroute("**/*");
+      await page.addInitScript(() => window.localStorage.clear());
+    }
+  });
+
   test("the rendered Arabic copy is not corrupted", async ({ page }) => {
     // Reading the DOM instead of the screenshot: a garbled glyph in a rendered
     // image is ambiguous between corrupt data and a misread 12px font, and only

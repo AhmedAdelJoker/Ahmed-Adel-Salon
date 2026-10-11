@@ -57,8 +57,17 @@ function isElectronEnv(): boolean {
 }
 
 function RouteLoader() {
+  // `min-h-[60vh]` left the lower 40% of the viewport showing only the
+  // `body` canvas — which is near-black in dark mode. During a lazy chunk load
+  // that read as a black flash before the page appeared, so the loader now
+  // paints the full viewport and sits on the app surface, not on the raw body.
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center animate-fade-in">
+    <div
+      className="flex min-h-[calc(100dvh-4rem)] w-full flex-col items-center justify-center bg-card animate-fade-in"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
       <div className="flex flex-col items-center gap-4 text-accent">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card shadow-soft">
           <Scissors className="h-8 w-8 animate-pulse" />
