@@ -47,3 +47,9 @@ release/
 frontend/release/
 *.private.pem
 *.key
+
+# run.ps1 / stop.ps1 logs
+run-backend.out.log
+run-backend.err.log
+run-frontend.out.log
+run-frontend.err.log
