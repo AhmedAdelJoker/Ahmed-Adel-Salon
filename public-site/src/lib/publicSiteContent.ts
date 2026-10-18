@@ -1,160 +1,290 @@
-export const DEFAULT_LANDING_STATS = [
-  {
-    value: "15k+",
-    label: "عميل سعيد",
-    description: "قاعدة عملاء تثق في التجربة والجودة.",
-  },
-  {
-    value: "20+",
-    label: "خبير حلاقة",
-    description: "فريق جاهز لتقديم ستايل يناسبك بدقة.",
-  },
-  {
-    value: "4.9/5",
-    label: "تقييم العملاء",
-    description: "انطباع ممتاز وتجربة تتكرر بثقة.",
-  },
-];
+/**
+ * publicSiteContent.ts — normalises the owner's website settings for the
+ * landing page.
+ *
+ * Design rule: **nothing here invents content.**
+ *
+ * This file used to ship three fake customer testimonials with invented names
+ * ("أحمد كمال", "محمد السيد"), a "15k+ happy customers" stat, a "4.9/5 rating"
+ * stat and a set of marketing claims, used as fallbacks for any salon that had
+ * not filled the fields in. Those strings reached the page, and the aggregate
+ * rating also reached the JSON-LD, so a salon with no reviews was publishing a
+ * fabricated review score.
+ *
+ * Every list is therefore empty until the owner supplies it, and a section with
+ * no content is not rendered at all. An empty salon page is honest; an empty
+ * salon page wearing made-up numbers is not.
+ */
 
-export const DEFAULT_LANDING_FEATURES = [
-  {
-    title: "فريق محترف",
-    description:
-      "نخبة من الحلاقين المهرة ذوي الخبرة الطويلة في أحدث صيحات القص والعناية.",
-  },
-  {
-    title: "جودة ممتازة",
-    description:
-      "نستخدم أفضل منتجات العناية بالشعر والبشرة العالمية لضمان أفضل النتائج.",
-  },
-  {
-    title: "سهولة الحجز",
-    description:
-      "نظام حجز إلكتروني متطور يسمح لك باختيار موعدك المفضل وحلاقك الخاص بضغطة زر.",
-  },
-];
+import { resolveAssetUrl } from "./imageOptimizer";
+import { listSetting } from "./listSetting";
 
-export const DEFAULT_TRUST_BADGES = [
-  "خدمة آمنة",
-  "5 نجوم",
-  "تجربة عائلية",
-];
-
-export const DEFAULT_LANDING_TESTIMONIALS = [
-  {
-    name: "أحمد",
-    role: "عميل دائم",
-    quote: "التجربة مرتبة جدًا والحجز سهل، والنتيجة كل مرة أفضل من اللي قبلها.",
-  },
-  {
-    name: "كريم",
-    role: "زيارة أسبوعية",
-    quote: "أكثر شيء يعجبني هو الاهتمام بالتفاصيل والنظافة والالتزام بالموعد.",
-  },
-  {
-    name: "محمود",
-    role: "عميل جديد",
-    quote: "أول زيارة وكانت ممتازة، الاستقبال محترم واللوك النهائي فعلاً فرق معي.",
-  },
-];
-
-export const DEFAULT_LANDING_COPY = {
-  landingHeroBadge: "",
-  landingServicesEyebrow: "خدماتنا",
-  landingServicesTitle: "ماذا نقدم لك؟",
-  landingServicesSubtitle:
-    "مجموعة متكاملة من الخدمات المصممة لتلبية احتياجاتك الرجالية بأعلى المعايير.",
-  landingPortfolioEyebrow: "معرض الأعمال",
-  landingPortfolioTitle: "إبداعاتنا",
-  landingBookingEyebrow: "الحجز",
-  landingBookingTitle: "احجز من نفس الصفحة",
-  landingBookingSubtitle:
-    "اختر الخدمة، الحلاق، الموعد، ثم أكمل بياناتك بدون الانتقال إلى صفحة منفصلة.",
-  landingLocationEyebrow: "موقعنا",
-  landingLocationTitle: "تجدنا هنا",
-  landingLocationDescription:
-    "نحن ننتظرك في موقعنا الرئيسي. صالون مجهز بأعلى مستويات الراحة والرفاهية لضمان تجربة لا تُنسى.",
-  landingLocationOpenLabel: "متاحون الآن",
-  landingLocationClosedLabel: "مغلق حالياً",
-  landingLocationStatusText: "تفضل بزيارتنا",
-  landingContactEyebrow: "اتصل بنا",
-  landingContactTitle: "يسعدنا سماع صوتك",
-  landingContactSubtitle:
-    "لديك استفسار أو ترغب في تقديم ملاحظة؟ فريقنا جاهز للرد عليك في أي وقت.",
-  landingQuickActionsEyebrow: "الإجراءات السريعة",
-  landingQuickActionsTitle: "اختر أسرع طريقة للوصول إلينا",
-  landingQuickActionsSubtitle:
-    "بدلاً من نموذج تواصل تقليدي، وفرنا لك أزرارًا مباشرة للحجز الفوري أو التواصل أو الوصول للموقع.",
-  landingFinalTitle: "جاهز لتجربة حلاقة لا تُنسى؟",
-  landingFinalSubtitle:
-    "انضم إلى آلاف العملاء الراضين واحجز موعدك اليوم لتكتشف الفرق بنفسك.",
-  landingFinalButtonLabel: "احجز موعدك الآن",
-  landingHeroHighlightTitle: "خدمة استثنائية",
-  landingHeroHighlightSubtitle: "نحن نهتم بأدق التفاصيل",
-  landingHeroHighlightBadge: "حجز سريع",
-  landingHeroVideoUrl: "",
-  landingHeroImageAlt: "",
-  landingPublicHeaderBadge: "الصفحة العامة",
-  landingThemeId: "gold",
-  landingShowStaff: true,
-  landingShowStaffBio: true,
-  landingTestimonialsEyebrow: "آراء العملاء",
-  landingTestimonialsTitle: "ماذا يقول عملاؤنا",
-  landingTestimonialsSubtitle:
-    "انطباعات حقيقية تعكس جودة التجربة داخل المحل من الحجز حتى النتيجة النهائية.",
-};
-
-function normalizeList<T, D>(
-  values: unknown,
-  defaults: D[],
-  mapper: (item: Record<string, unknown>, fallback: D, index: number) => T,
-): T[] {
-  return defaults.map((defaultItem, index) => {
-    const current = Array.isArray(values) ? values[index] || {} : {};
-    return mapper(current, defaultItem, index);
-  });
+export interface LandingStat {
+  value: string;
+  label: string;
 }
 
-export function buildLandingSiteContent(settings: Record<string, unknown> = {}) {
-  const stats = normalizeList(
-    settings.landingStats,
-    DEFAULT_LANDING_STATS,
-    (item, fallback) => ({
-      value: item?.value || fallback.value,
-      label: item?.label || fallback.label,
-      description: item?.description || fallback.description,
+
+export interface LandingFeature {
+  title: string;
+  description: string;
+}
+
+export interface LandingTrustBadge {
+  label: string;
+}
+
+export interface LandingTestimonial {
+  name: string;
+  role: string;
+  quote: string;
+}
+
+export interface LandingContent {
+  /** Owner-uploaded gallery images, resolved to absolute URLs. */
+  portfolio: string[];
+  stats: LandingStat[];
+  features: LandingFeature[];
+  trustBadges: LandingTrustBadge[];
+  testimonials: LandingTestimonial[];
+  copy: Record<string, string>;
+  /**
+   * Hero video. Optional at every level: a salon that never uploaded a clip
+   * must render the exact page it rendered before, with the image only.
+   *
+   * `poster` is resolved separately from `src` because it is not decoration —
+   * it is the permanent fallback whenever the clip cannot play (unsupported
+   * codec, autoplay blocked, reduced motion, or a visitor on a metered
+   * connection). A hero that waits on a video to show its background shows a
+   * blank box to exactly the people with the slowest connections.
+   */
+  heroVideo?: {
+    src: string;
+    poster: string;
+    autoplay: boolean;
+    muted: boolean;
+  };
+  /**
+   * Owner-controlled master switch for scroll-reveal and hover motion.
+   *
+   * Distinct from `prefers-reduced-motion`: that is the visitor's OS-level
+   * request and is always honoured regardless of this flag, while this is the
+   * owner's editorial choice. The two are ANDed — motion is off if either says
+   * so.
+   */
+  motionEnabled: boolean;
+}
+
+const DEFAULT_COPY: Record<string, string> = {
+  landingHeroBadge: "",
+  landingHeroTitle: "",
+  landingHeroSubtitle: "",
+
+  landingServicesEyebrow: "",
+  landingServicesTitle: "",
+  landingServicesSubtitle: "",
+
+  landingPortfolioEyebrow: "",
+  landingPortfolioTitle: "",
+
+  landingBookingEyebrow: "",
+  landingBookingTitle: "",
+  landingBookingSubtitle: "",
+
+  landingLocationEyebrow: "",
+  landingLocationTitle: "",
+  landingLocationDescription: "",
+  landingLocationOpenLabel: "",
+  landingLocationClosedLabel: "",
+  landingLocationStatusText: "",
+
+  landingContactEyebrow: "",
+  landingContactTitle: "",
+  landingContactSubtitle: "",
+
+  landingQuickActionsEyebrow: "",
+  landingQuickActionsTitle: "",
+  landingQuickActionsSubtitle: "",
+
+  landingFinalTitle: "",
+  landingFinalSubtitle: "",
+  landingFinalButtonLabel: "",
+
+  landingHeroHighlightTitle: "",
+  landingHeroHighlightSubtitle: "",
+  landingHeroHighlightBadge: "",
+
+  landingPublicHeaderBadge: "",
+
+  landingAboutTitle: "",
+  landingAboutContent: "",
+  landingAboutEyebrow: "",
+  /**
+   * Owner's about photograph, and the alt text for it.
+   *
+   * `landingAboutImageAlt` is separate rather than derived from the title: the
+   * title says what the section is called, the alt says what is in the picture.
+   * A decorative photograph takes `alt=""` and a meaningful one needs a sentence
+   * the owner writes, and neither is the section heading.
+   */
+  landingAboutImageUrl: "",
+  landingAboutImageAlt: "",
+  /**
+   * Years in business, shown on the floating badge over the photograph.
+   *
+   * A free-text field rather than a number: the owner may write "since 1998" or
+   * "أكثر من 12 سنة". The component renders it verbatim and omits the badge
+   * entirely when it is empty, so an unset badge is not a visible "0".
+   */
+  landingAboutYearsExperience: "",
+
+  landingTestimonialsEyebrow: "",
+  landingTestimonialsTitle: "",
+  landingTestimonialsSubtitle: "",
+};
+
+/** Keys that are booleans or otherwise non-string in the settings payload. */
+const NON_COPY_KEYS = new Set(["landingShowStaff", "landingShowStaffBio", "landingThemeId"]);
+
+function asText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
+/**
+ * Map the owner's lists onto the shape the page renders, dropping empty rows.
+ *
+ * Rows with no text are dropped rather than rendered blank, because a grid of
+ * empty cards looks like a bug rather than an absence.
+ */
+function mapList<T>(
+  value: unknown,
+  fields: readonly (keyof T)[],
+  mapper: (row: Record<string, unknown>, index: number) => T,
+): T[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row, index) => mapper((row ?? {}) as Record<string, unknown>, index))
+    .filter((item) => fields.every((field) => asText(item[field])));
+}
+
+/**
+ * Read a list-valued setting under either spelling.
+ *
+ * The admin panel writes these in camelCase (`landingStats`) and
+ * `booking-catalog` forwards them snake_cased (`landing_stats`), matching every
+ * other key it sends. Reading only the camelCase form is why an owner who filled
+ * in their stats, features, trust badges, testimonials and gallery saw none of
+ * them: the value arrived and was dropped on the floor, one `??` away from
+ * working.
+ *
+ * `asText` on an array would return `""`, so the check has to be `Array.isArray`
+ * rather than truthiness — a populated list is truthy, an empty one is too.
+ */
+export function buildLandingSiteContent(settings: Record<string, unknown> = {}): LandingContent {
+  const stats = mapList<LandingStat>(
+    listSetting(settings, "landingStats"),
+    ["value", "label"] as const,
+    (row) => ({ value: asText(row.value), label: asText(row.label) }),
+  );
+
+  const features = mapList<LandingFeature>(
+    listSetting(settings, "landingFeatures"),
+    ["title", "description"] as const,
+    (row) => ({
+      title: asText(row.title),
+      description: asText(row.description) || asText(row.desc),
     }),
   );
 
-  const features = normalizeList(
-    settings.landingFeatures,
-    DEFAULT_LANDING_FEATURES,
-    (item, fallback) => ({
-      title: item?.title || fallback.title,
-      description: item?.description || fallback.description,
+  const trustBadges = mapList<LandingTrustBadge>(
+    listSetting(settings, "landingTrustBadges"),
+    ["label"] as const,
+    (row) => ({ label: asText(row.label) || asText(row.text) || asText(row.title) }),
+  );
+
+  /**
+   * The admin's testimonial rows use `author`, the API has historically used
+   * `name`, and `publicSitePreview` drafts use `name_ar`/`quote_ar`. All three
+   * are accepted so an owner is not locked out by a field rename.
+   */
+  const testimonials = mapList<LandingTestimonial>(
+    listSetting(settings, "landingTestimonials"),
+    ["name", "quote"] as const,
+    (row) => ({
+      name: asText(row.name) || asText(row.name_ar) || asText(row.author),
+      role: asText(row.role) || asText(row.role_ar),
+      quote: asText(row.quote) || asText(row.quote_ar) || asText(row.text),
     }),
   );
 
-  const trustBadges = normalizeList(
-    settings.landingTrustBadges,
-    DEFAULT_TRUST_BADGES.map((label) => ({ label })),
-    (item, fallback) => item?.label || fallback.label,
+  const copy: Record<string, string> = {};
+  for (const key of Object.keys(DEFAULT_COPY)) {
+    copy[key] = asText(settings[key]) || DEFAULT_COPY[key];
+  }
+  // Any copy key the owner adds later still passes through, so the page does not
+  // need a code change to pick up a new field.
+  for (const [key, value] of Object.entries(settings)) {
+    if (key.startsWith("landing") && !NON_COPY_KEYS.has(key) && !copy[key]) {
+      const text = asText(value);
+      if (text) copy[key] = text;
+    }
+  }
+
+  /**
+   * Portfolio images. `landingPortfolio` is a list of paths or URLs; entries
+   * that are neither a string nor resolvable are dropped rather than rendered
+   * as a broken image.
+   */
+  const portfolio = Array.isArray(listSetting(settings, "landingPortfolio"))
+    ? (listSetting(settings, "landingPortfolio") as unknown[])
+        .map((entry) => asText(entry))
+        .filter(Boolean)
+        .map((entry) => resolveAssetUrl(entry))
+        .filter((entry): entry is string => Boolean(entry))
+    : [];
+
+  /**
+   * The hero clip is only offered when there is something to play *and* a
+   * poster to fall back to. A video with no poster would leave the hero blank
+   * on every browser that refuses to autoplay, which is the common case, not
+   * the edge case — so a posterless clip is treated as "no video configured"
+   * rather than shipping a hero that can render blank.
+   *
+   * Both casings are accepted, matching how `LandingPage` reads the cover
+   * image: the public catalog endpoint emits snake_case while preview drafts
+   * and the admin API use camelCase, so reading only one silently drops the
+   * clip depending on which source the page was populated from.
+   */
+  const pick = (camel: string, snake: string): string =>
+    asText(settings[camel]) || asText(settings[snake]);
+
+  const videoSrc = resolveAssetUrl(
+    pick("landingHeroVideoUrl", "landing_hero_video_url"),
   );
-
-  const testimonials = normalizeList(
-    settings.landingTestimonials,
-    DEFAULT_LANDING_TESTIMONIALS,
-    (item, fallback) => ({
-      name: item?.name || fallback.name,
-      role: item?.role || fallback.role,
-      quote: item?.quote || fallback.quote,
-    }),
+  const videoPoster = resolveAssetUrl(
+    pick("landingVideoPosterUrl", "landing_video_poster_url"),
   );
+  const flag = (camel: string, snake: string): boolean =>
+    settings[camel] === false || settings[snake] === false ? false : true;
 
-  const copy = Object.keys(DEFAULT_LANDING_COPY).reduce<Record<string, string>>((acc, key) => {
-    acc[key] = String(settings?.[key] || DEFAULT_LANDING_COPY[key as keyof typeof DEFAULT_LANDING_COPY] || "");
-    return acc;
-  }, {});
+  const heroVideo =
+    videoSrc && videoPoster
+      ? {
+          src: videoSrc,
+          poster: videoPoster,
+          // Default to on when the column is absent entirely, which is the case
+          // for every snapshot published before this feature existed. An
+          // explicit `false` from the owner is respected.
+          autoplay: flag("landingVideoAutoplay", "landing_video_autoplay"),
+          muted: flag("landingVideoMuted", "landing_video_muted"),
+        }
+      : undefined;
 
-  return { stats, features, trustBadges, testimonials, copy };
+  // Same reasoning for motion: absent means "on" (preserves today's behaviour
+  // for existing snapshots), explicit false means the owner turned it off.
+  const motionEnabled = flag("landingMotionEnabled", "landing_motion_enabled");
+
+  return { portfolio, stats, features, trustBadges, testimonials, copy, heroVideo, motionEnabled };
 }

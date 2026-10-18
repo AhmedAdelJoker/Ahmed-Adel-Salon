@@ -45,6 +45,7 @@ import FaqSection from "../components/landing/FaqSection";
 import OwnerSections from "../components/landing/OwnerSections";
 import ScrollProgress from "../components/landing/ScrollProgress";
 import ScrollReveal from "../components/landing/ScrollReveal";
+import GallerySection from "../components/landing/GallerySection";
 import { useMotionEnabled } from "../hooks/useMotionEnabled";
 import { ServiceRowSkeleton } from "../components/landing/Skeleton";
 
@@ -505,7 +506,9 @@ export default function LandingPage() {
   /** Salon photos for the footer strip. */
   const portfolioPhotos = useMemo(
     () =>
-      (Array.isArray(settings.landingPortfolio) ? settings.landingPortfolio : [])
+      (Array.isArray(settings.landing_portfolio)
+        ? settings.landing_portfolio
+        : [])
         .map((entry: any) =>
           resolveAssetUrl(typeof entry === "string" ? entry : entry?.url),
         )
@@ -794,10 +797,27 @@ export default function LandingPage() {
         />
 
         <AboutSection
-          theme={theme}
+          t={t}
           eyebrow={content.copy.landingAboutEyebrow}
           title={settings.landingAboutTitle || settings.landing_about_title}
           content={settings.landingAboutContent || settings.landing_about_content}
+          image={resolveAssetUrl(
+            content.copy.landingAboutImageUrl ||
+              settings.landing_about_image_url ||
+              settings.landingAboutImageUrl,
+          )}
+          imageAlt={
+            content.copy.landingAboutImageAlt ||
+            settings.landing_about_image_alt ||
+            ""
+          }
+          features={content.features}
+          yearsExperience={
+            content.copy.landingAboutYearsExperience ||
+            settings.landing_about_years_experience ||
+            ""
+          }
+          ownerMotionEnabled={content.motionEnabled}
         />
 
         {/* ── Offers ─────────────────────────────────────────────────── */}
@@ -853,6 +873,21 @@ export default function LandingPage() {
           t={t}
           locale={locale}
           reviews={reviews}
+        />
+
+        {/* ── Gallery ────────────────────────────────────────────────── */}
+        {/*
+          Owner-uploaded images from `landingPortfolio`. Renders nothing when
+          no images are configured.
+        */}
+        <GallerySection
+          eyebrow={content.copy.landingPortfolioEyebrow}
+          title={content.copy.landingPortfolioTitle || t("landing.galleryTitle")}
+          images={content.portfolio.map((img, i) => ({
+            id: img,
+            src: img,
+            alt: `صورة رقم ${i + 1}`,
+          }))}
         />
 
         {/*
