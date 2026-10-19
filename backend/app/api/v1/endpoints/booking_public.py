@@ -379,11 +379,12 @@ def get_booking_catalog(
             "landing_show_staff": _as_bool(public_settings.get("landing_show_staff")),
             "landing_show_staff_bio": _as_bool(public_settings.get("landing_show_staff_bio")),
             # Structured content the public site renders directly.
+            # (`landing_features` and `landing_portfolio` were also declared
+            # above, beside their section's copy keys — declaring them twice
+            # here made the dict's real value depend on reading order.)
             "landing_stats": _json_safe(public_settings.get("landing_stats"), []),
-            "landing_features": _json_safe(public_settings.get("landing_features"), []),
             "landing_trust_badges": _json_safe(public_settings.get("landing_trust_badges"), []),
             "landing_testimonials": _json_safe(public_settings.get("landing_testimonials"), []),
-            "landing_portfolio": _json_safe(public_settings.get("landing_portfolio"), []),
         },
         "services": [
             {
