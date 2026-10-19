@@ -323,34 +323,38 @@ export default function LandingPage() {
 
   const serviceItems = useMemo(
     () =>
-      (catalog?.services ?? []).slice(0, 12).map((service: any) => ({
-        id: service.id,
-        name: service.name_ar || service.name || t("landing.serviceFallbackName"),
-        description:
-          service.description_ar ||
-          service.description ||
-          t("landing.serviceFallbackDescription"),
-        image: resolveAssetUrl(service.image_url),
-        duration:
-          service.duration_minutes || service.duration
-            ? `${service.duration_minutes || service.duration} ${t("common.minutes")}`
-            : undefined,
-        price: Number(service.price || 0),
-        featured: Boolean(service.is_featured),
-        /*
-          Carried through so `ServicesList` can filter without a second lookup.
-          The category's own name is resolved lazily in that component from the
-          list it was given, so a category the owner renamed still labels
-          correctly instead of showing a stale id.
-        */
-        categoryId: service.category_id ?? service.categoryId ?? null,
+      (catalog?.services ?? []).slice(0, 12).map((service: any) => {
+        // Thumb sized in the card list; the large version lives on the service page.
+        const thumb = resolveAssetUrl(service.image_url);
+        return {
+          id: service.id,
+          name: service.name_ar || service.name || t("landing.serviceFallbackName"),
+          description:
+            service.description_ar ||
+            service.description ||
+            t("landing.serviceFallbackDescription"),
+          image: thumb ? `${thumb}${thumb.includes("?") ? "&" : "?"}w=160` : null,
+          duration:
+            service.duration_minutes || service.duration
+              ? `${service.duration_minutes || service.duration} ${t("common.minutes")}`
+              : undefined,
+          price: Number(service.price || 0),
+          featured: Boolean(service.is_featured),
+          /*
+            Carried through so `ServicesList` can filter without a second lookup.
+            The category's own name is resolved lazily in that component from the
+            list it was given, so a category the owner renamed still labels
+            correctly instead of showing a stale id.
+          */
+          categoryId: service.category_id ?? service.categoryId ?? null,
         categoryName:
           service.category_name_ar ||
           service.category_name ||
           service.category?.name_ar ||
           service.category?.name ||
           null,
-      })),
+        };
+      }),
     [catalog, t],
   );
 

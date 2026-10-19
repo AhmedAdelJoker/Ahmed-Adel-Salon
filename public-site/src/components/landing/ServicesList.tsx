@@ -1,15 +1,11 @@
 /**
- * ServicesList.tsx — services as an editorial price list.
+ * ServicesList.tsx — services as the mockup's card grid.
  *
- * The card grid this replaces was the single most templated thing on the page:
- * three identical rounded rectangles, name on one line, price on another, no
- * hierarchy, repeated for every row.
- *
- * What premium salons, restaurants and barbers actually publish is a menu:
- * a numbered list with hairline rules, the name and description on the start
- * side, the duration and price aligned to the end side. It handles variable
- * name lengths far better than cards do, it scans in one pass, and it reads as
- * confident rather than assembled.
+ * Each service is a `mk-svc` card: name (linked to its own page) with the
+ * price on the top band, description underneath, and a meta footer with the
+ * duration, one tier chip and the booking action. The tier chip is assigned
+ * by price band, not stored — one chip per card, `featured` wins when the
+ * owner has flagged the service.
  */
 
 import { useMemo, useState } from "react";
@@ -57,7 +53,6 @@ export interface ServicesListProps {
 }
 
 export default function ServicesList({
-  theme,
   t,
   eyebrow,
   title,
@@ -88,17 +83,14 @@ export default function ServicesList({
 
   /**
    * Filtering is a projection of the full list, never a second source of truth.
-   * The numbering is computed against the *filtered* list so the visible rows
-   * read 01, 02, 03 — a filter that leaves the first visible row numbered "04"
-   * because three were hidden reads as broken, not filtered.
    */
   const visible = useMemo(() => {
-    const list = !activeCategory
+    return (!activeCategory
       ? services
       : services.filter(
           (service) => service.categoryId != null && String(service.categoryId) === activeCategory,
-        );
-    return list.map((service) => ({
+        )
+    ).map((service) => ({
       ...service,
       tier:
         service.price > 0 && service.price >= premiumCutoff
@@ -109,253 +101,126 @@ export default function ServicesList({
 
   if (services.length === 0) {
     return (
-      <section id="services" className="shell py-[length:var(--section-y)]">
-        <div
-          className="rounded-[var(--r-lg)] border border-dashed px-8 py-16 text-center"
-          style={{ borderColor: theme.border }}
-        >
-          <p className="text-[length:var(--step-0)] font-semibold" style={{ color: theme.muted }}>
-            {t("landing.noServices")}
-          </p>
-        </div>
+      <section id="services" className="mk-shell py-[length:var(--section-y)]">
+        <p className="mk-empty">{t("landing.noServices")}</p>
       </section>
     );
   }
 
+  const filterRow = categories && categories.length > 1;
+
   return (
-    <section id="services" className="shell py-[length:var(--section-y)]">
-      <header className="reveal mb-14 w-full max-w-3xl">
-        {eyebrow ? (
-          <p
-            className="mb-4 text-[length:var(--step--1)] font-semibold uppercase text-[color:var(--c-accent)]"
-            style={{ letterSpacing: "var(--tracking-eyebrow)" }}
-          >
-            {eyebrow}
-          </p>
-        ) : null}
-        <h2
-          className="text-[length:var(--step-4)] font-bold text-[color:var(--c-text)]"
-          style={{ letterSpacing: "var(--tracking-display)" }}
-        >
-          {title}
-        </h2>
-        {subtitle ? (
-          <p
-            className="measure mx-auto mt-5 w-full text-[length:var(--step-0)] font-medium leading-[1.8] text-[color:var(--c-muted)]"
-            style={{ letterSpacing: "var(--tracking-body)" }}
-          >
-            {subtitle}
-          </p>
+    <section id="services" className="mk-shell py-[length:var(--section-y)]">
+      <header className="mk-svc-head">
+        <div>
+          {eyebrow ? <p className="mk-eyebrow">{eyebrow}</p> : null}
+          <h2 className="mk-h2" style={{ marginTop: eyebrow ? "0.75rem" : undefined }}>
+            {title}
+          </h2>
+          {subtitle ? (
+            <p className="mk-lead" style={{ marginTop: "1.25rem" }}>
+              {subtitle}
+            </p>
+          ) : null}
+        </div>
+
+        {/* Filter row. Hidden when the catalogue has fewer than two categories —
+            "All" alone is a control with nothing to do. */}
+        {filterRow ? (
+          <div role="group" aria-label={t("landing.filtersTitle")} className="mk-filters">
+            <button
+              type="button"
+              aria-pressed={activeCategory === null}
+              onClick={() => setActiveCategory(null)}
+            >
+              {t("landing.filtersAll")}
+            </button>
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                aria-pressed={activeCategory === category.id}
+                onClick={() => setActiveCategory(category.id)}
+              >
+                {category.name}
+              </button>
+            ))}
+          </div>
         ) : null}
       </header>
 
-      {/* Filter row. Hidden when the catalogue has fewer than two categories —
-          "All" alone is a control with nothing to do. */}
-      {categories && categories.length > 1 ? (
-        <div
-          role="group"
-          aria-label={t("landing.filtersTitle")}
-          className="reveal mb-10 flex flex-wrap gap-2"
-        >
-          <FilterChip
-            label={t("landing.filtersAll")}
-            active={activeCategory === null}
-            onClick={() => setActiveCategory(null)}
-            theme={theme}
-          />
-          {categories.map((category) => (
-            <FilterChip
-              key={category.id}
-              label={category.name}
-              active={activeCategory === category.id}
-              onClick={() => setActiveCategory(category.id)}
-              theme={theme}
-            />
-          ))}
-        </div>
-      ) : null}
-
-      {/*
-        A definition list, not a set of divs: the service name is a term and its
-        price and duration are the description, which is what they are.
-      */}
       {visible.length === 0 ? (
-        <p
-          className="rounded-[var(--r-lg)] border border-dashed px-8 py-14 text-center"
-          style={{ borderColor: theme.border, color: theme.muted }}
-        >
-          {t("landing.noMatches")}
-        </p>
+        <p className="mk-empty">{t("landing.noMatches")}</p>
       ) : (
-      <dl className="reveal border-t" style={{ borderColor: theme.border }}>
-        {visible.map((service, index) => (
-          <div
-            key={service.id ?? `${service.name}-${index}`}
-            className="group grid grid-cols-[auto_1fr] items-start gap-x-5 gap-y-3 border-b py-7 transition-colors duration-300 sm:grid-cols-[3rem_4rem_1fr_auto] sm:gap-x-6"
-            style={{ borderColor: theme.border }}
-          >
-            <span
-              aria-hidden="true"
-              className="numeric pt-1 text-[length:var(--step--1)] font-bold tabular-nums"
-              style={{ color: theme.accent }}
-            >
-              {String(index + 1).padStart(2, "0")}
-            </span>
+        <div className="mk-svc-grid">
+          {visible.map((service, index) => (
+            <article key={service.id ?? `${service.name}-${index}`} className="mk-svc">
+              <div className="mk-svc-top">
+                {/*
+                  The service photo. Real data shown small so the cards stay
+                  cards; the large version lives on the service's own page.
+                  `alt=""` because the name is the adjacent heading —
+                  announcing both would double-read it.
+                */}
+                {service.image ? (
+                  <img
+                    src={service.image}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="mk-svc-thumb"
+                  />
+                ) : null}
 
-            {/*
-              The service photo. `Service.image_url` has always been in the
-              catalog payload and the detail page has always rendered it, but
-              this list ignored it — so a salon that uploaded a photo for every
-              service still saw a text-only price list here.
-
-              A square thumb keeps the list a list; the large version lives on
-              the service's own page. Hidden below `sm` because the row is
-              already two bands deep at that width. `alt=""` because the name is
-              the adjacent term — announcing both would double-read it.
-            */}
-            {service.image ? (
-              <span className="hidden pt-0.5 sm:block sm:col-start-2">
-                <img
-                  src={service.image}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  className="aspect-square w-full rounded-[var(--r-sm)] border object-cover"
-                  style={{ borderColor: theme.border }}
-                />
-              </span>
-            ) : null}
-
-            <div className="min-w-0 sm:col-start-3">
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 {/*
                   The service name links to its own page. A `Service` with an
                   `Offer` at a stable URL is what lets a search result show a
-                  price instead of making the visitor click through, and it is the
-                  page a stylist's regular client bookmarks.
+                  price instead of making the visitor click through, and it is
+                  the page a stylist's regular client bookmarks.
                 */}
-                <dt className="text-[length:var(--step-1)] font-bold text-[color:var(--c-text)]">
+                <h4>
                   {salonSlug ? (
-                    <a
-                      href={`/salon/${salonSlug}/service/${service.id}`}
-                      className="transition hover:text-[color:var(--c-accent-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-accent)] focus-visible:ring-offset-4 focus-visible:ring-offset-transparent"
-                    >
-                      {service.name}
-                    </a>
+                    <a href={`/salon/${salonSlug}/service/${service.id}`}>{service.name}</a>
                   ) : (
                     service.name
                   )}
-                </dt>
-                {service.featured ? (
-                  <span
-                    className="rounded-full px-2.5 py-0.5 text-[length:var(--step--2)] font-bold uppercase"
-                    style={{ backgroundColor: theme.accent, color: "#0b0b0d" }}
-                  >
-                    {t("landing.featured")}
-                  </span>
-                ) : null}
-                {service.tier === "premium" ? (
-                  <span
-                    className="rounded-full px-2.5 py-0.5 text-[length:var(--step--2)] font-bold uppercase"
-                    style={{
-                      borderWidth: 1,
-                      borderColor: theme.accent,
-                      color: theme.accent2,
-                    }}
-                  >
-                    {t("landing.tierPremium")}
-                  </span>
-                ) : null}
+                </h4>
+
+                <span className="mk-price numeric">
+                  {service.price} {currency}
+                </span>
               </div>
 
-              {service.description ? (
-                <dd
-                  className="measure-tight mt-2 w-full text-[length:var(--step-0)] font-medium leading-[1.75] text-[color:var(--c-muted)]"
-                  style={{ letterSpacing: "var(--tracking-body)" }}
-                >
-                  {service.description}
-                </dd>
-              ) : null}
+              {service.description ? <p className="mk-svc-desc">{service.description}</p> : null}
 
-              {/* On narrow screens the price drops below the name rather than
-                  squeezing the description into a sliver. */}
-              <p className="flex items-baseline gap-3 sm:hidden">
-                <span className="numeric text-[length:var(--step-1)] font-bold text-[color:var(--c-accent-2)]">
-                  {service.price}
-                </span>
-                <span className="text-[length:var(--step--1)] text-[color:var(--c-faint)]">
-                  {currency}
-                </span>
+              <div className="mk-svc-meta">
+                {/* `duration` arrives fully localized ("30 دقيقة") from the page. */}
                 {service.duration ? (
-                  <span className="text-[length:var(--step--1)] text-[color:var(--c-faint)]">
-                    · {service.duration} {t("common.minutes")}
-                  </span>
+                  <span className="numeric">{service.duration}</span>
                 ) : null}
-              </p>
-            </div>
 
-            <div className="col-start-2 flex items-baseline gap-4 sm:col-start-auto sm:flex-col sm:items-end sm:gap-1">
-              <p className="flex items-baseline gap-2">
-                <span className="numeric text-[length:var(--step-2)] font-bold text-[color:var(--c-text)]">
-                  {service.price}
-                </span>
-                <span className="text-[length:var(--step--1)] font-semibold text-[color:var(--c-faint)]">
-                  {currency}
-                </span>
-              </p>
+                {/*
+                  One chip per card: the owner's `featured` flag wins, then the
+                  computed premium band.
+                */}
+                {service.featured ? (
+                  <span className="mk-tag">{t("landing.featured")}</span>
+                ) : service.tier === "premium" ? (
+                  <span className="mk-tier mk-tier-premium">{t("landing.tierPremium")}</span>
+                ) : (
+                  <span className="mk-tier mk-tier-basic">{t("landing.tierBasic")}</span>
+                )}
 
-              {service.duration ? (
-                <p className="numeric text-[length:var(--step--1)] text-[color:var(--c-faint)]">
-                  {service.duration} {t("common.minutes")}
-                </p>
-              ) : null}
-
-              <button
-                type="button"
-                onClick={() => onBook(service)}
-                className="mt-1 inline-flex items-center gap-1.5 text-[length:var(--step--1)] font-bold text-[color:var(--c-accent-2)] underline-offset-4 transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-accent)] focus-visible:ring-offset-4 focus-visible:ring-offset-transparent"
-              >
-                {t("landing.bookService")}
-                <ArrowUpLeft
-                  size={14}
-                  aria-hidden="true"
-                  className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:-translate-x-0.5 rtl:rotate-180"
-                />
-              </button>
-            </div>
-          </div>
-        ))}
-      </dl>
+                <button type="button" onClick={() => onBook(service)} className="mk-book-link">
+                  {t("landing.bookService")}
+                  <ArrowUpLeft size={14} aria-hidden="true" className="rtl:rotate-180" />
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
       )}
     </section>
-  );
-}
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-  theme,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  theme: BrandTheme;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className="rounded-full border px-5 py-2.5 text-[length:var(--step--1)] font-bold transition"
-      style={
-        active
-          ? { backgroundColor: theme.accent, borderColor: theme.accent, color: "#0b0b0d" }
-          : { borderColor: theme.borderStrong, color: theme.muted }
-      }
-    >
-      {label}
-    </button>
   );
 }
 

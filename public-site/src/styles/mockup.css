@@ -570,6 +570,76 @@
     font-weight: 700;
   }
 
+  .mk-svc-top h4 {
+    min-width: 0;
+    font-size: var(--step-0);
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--c-text);
+  }
+
+  .mk-svc-top h4 a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  @media (hover: hover) {
+    .mk-svc-top h4 a:hover {
+      color: var(--c-accent-2);
+    }
+  }
+
+  .mk-svc-thumb {
+    width: 3rem;
+    height: 3rem;
+    flex: none;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--c-border);
+    object-fit: cover;
+  }
+
+  .mk-svc-desc {
+    font-size: var(--step--1);
+    line-height: 1.8;
+    color: var(--c-muted);
+  }
+
+  .mk-svc-meta .mk-book-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-inline-start: auto;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--c-accent-2);
+  }
+
+  @media (hover: hover) {
+    .mk-svc-meta .mk-book-link:hover {
+      color: var(--c-accent);
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .mk-svc-top {
+      flex-wrap: wrap;
+    }
+  }
+
+  .mk-empty {
+    border: 1px dashed var(--c-border-strong);
+    border-radius: var(--r-lg);
+    padding: 3.5rem 2rem;
+    text-align: center;
+    color: var(--c-muted);
+    font-weight: 600;
+  }
+
   /* ── Offers band ─────────────────────────────────────────────────────── */
   .mk-offers {
     margin-top: 4.5rem;
@@ -598,6 +668,47 @@
     font-size: var(--step-1);
     font-weight: 900;
     color: var(--c-ok);
+  }
+
+  /* Rendered standalone between page sections, so the band must not also
+     carry the mockup's 4.5rem top margin on top of the section padding. */
+  .mk-offers--section {
+    margin-top: 0;
+  }
+
+  .mk-offer__prices {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .mk-offer h4,
+  .mk-offer h2 {
+    min-width: 0;
+    font-size: var(--step-0);
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--c-text);
+  }
+
+  .mk-offer a,
+  .mk-offer h4 a,
+  .mk-offer h2 a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  @media (hover: hover) {
+    .mk-offer a:hover {
+      color: var(--c-accent-2);
+    }
+  }
+
+  .mk-offer__desc {
+    font-size: var(--step--1);
+    line-height: 1.8;
+    color: var(--c-muted);
   }
 
   /* ── Team ────────────────────────────────────────────────────────────── */

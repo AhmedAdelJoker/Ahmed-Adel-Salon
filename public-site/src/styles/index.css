@@ -30,17 +30,28 @@
     "Cairo", system-ui, -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
   --font-mono: "JetBrains Mono", "Cascadia Code", monospace;
 
-  /* ── Spacing scale (4px base, golden ratio progression) ── */
-  --spacing-xs: 0.25rem; /*  4px */
-  --spacing-sm: 0.5rem; /*   8px */
-  --spacing-md: 0.75rem; /*  12px */
-  --spacing-base: 1rem; /*    16px */
-  --spacing-lg: 1.5rem; /*   24px */
-  --spacing-xl: 2rem; /*     32px */
-  --spacing-2xl: 3rem; /*    48px */
-  --spacing-3xl: 4rem; /*    64px */
-  --spacing-4xl: 6rem; /*    96px */
-  --spacing-5xl: 8rem; /*   128px */
+  /*
+    ── Container scale (Tailwind v4 named sizes) ──
+
+    Declared explicitly. A previous revision defined semantic spacing tokens
+    (`--spacing-xs…5xl`) in this @theme block, and Tailwind v4 resolves
+    `max-w-*` against the spacing namespace before the container one — so
+    `max-w-3xl` compiled to `var(--spacing-3xl)` and clamped to 4rem (64px),
+    collapsing every centred section header and measured block on the page.
+    Nothing consumed the spacing tokens, so they were removed rather than
+    renamed; the container scale is what `max-w-*` should resolve against.
+  */
+  --container-xs: 20rem; /*   320px */
+  --container-sm: 24rem; /*   384px */
+  --container-md: 28rem; /*   448px */
+  --container-lg: 32rem; /*   512px */
+  --container-xl: 36rem; /*   576px */
+  --container-2xl: 42rem; /*  672px */
+  --container-3xl: 48rem; /*  768px */
+  --container-4xl: 56rem; /*  896px */
+  --container-5xl: 64rem; /* 1024px */
+  --container-6xl: 72rem; /* 1152px */
+  --container-7xl: 80rem; /* 1280px */
 
   /* ── Border radius scale (smooth progression) ───────────── */
   --radius-sm: 0.5rem;
