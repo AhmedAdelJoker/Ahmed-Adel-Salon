@@ -74,17 +74,4 @@ describe("a missing occupancy is not a number", () => {
       expect(text).toMatch(/occupancy:\s*rawOccupancy\s*\?\?\s*null/);
     });
   });
-
-  describe("the registry-free default", () => {
-    it("keeps the demo occupancy labelled as a demo figure", async () => {
-      const mod = await import("@/features/reports-dashboard/constants");
-
-      // DEMO_STATS.occupancy is 72, the same number the exception handler used
-      // to invent. That is fine here precisely because DEMO_STATS is only ever
-      // shown behind the demo banner, and it is worth pinning that the two are
-      // still deliberately distinct.
-      expect(mod.DEMO_STATS.occupancy).toBe(72);
-      expect(mod.DEFAULT_STATS.occupancy).not.toBe(72);
-    });
-  });
 });

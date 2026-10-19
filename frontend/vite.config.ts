@@ -136,6 +136,19 @@ export default defineConfig({
         secure: false,
         ws: true,
       },
+      /**
+       * Uploaded media — employee and offer photos, logos, gallery images — is
+       * served by the backend on `/uploads`, not by this dev server.
+       *
+       * Without this entry a relative `/uploads/foo.jpg` (which is what
+       * `staticURL` now yields) fell through to the SPA's index.html, so every
+       * photo rendered as a broken image locally even though the file existed.
+       */
+      "/uploads": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });

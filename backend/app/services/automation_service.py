@@ -131,9 +131,21 @@ def send_post_visit_feedback(db: Session, appointment_id: int):
     if existing:
         return
 
-    # In a real scenario, we might use a template. For now, a text message.
-    # Using the slug from the appointment or a general review route
-    feedback_url = f"https://barbershop.com/review?appt={appt.id}" 
+    # Build the review URL from the salon's public slug (if published) or
+    # fall back to an environment variable. The public site's review flow
+    # will be at /review?appt=<id> once implemented.
+    base_url = os.getenv("PUBLIC_SITE_URL", "https://salon-pro.com")
+    slug = None
+    try:
+        from app.models.business_settings import BusinessSettings
+        settings = db.query(BusinessSettings).first()
+        slug = getattr(settings, "public_slug", None)
+    except Exception:
+        pass
+    if slug:
+        feedback_url = f"{base_url}/salon/{slug}/review?appt={appt.id}"
+    else:
+        feedback_url = f"{base_url}/review?appt={appt.id}"
     message = f"شكراً لزيارتك لصالون المحترفين يا {appt.customer.first_name}! نود معرفة رأيك في الخدمة لتطوير أنفسنا دائماً. يمكنك التقييم من هنا: {feedback_url}"
     
     try:

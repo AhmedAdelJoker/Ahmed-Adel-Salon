@@ -30,8 +30,10 @@ ReactDOM.createRoot(container).render(
   </React.StrictMode>,
 );
 
-// One frame after mount, so the swap cannot land between paint and commit and
-// briefly show the bare canvas the splash was covering.
-requestAnimationFrame(() => requestAnimationFrame(dismissBootSplash));
+// Remove the boot splash after React has committed the first render.
+// `setTimeout(..., 0)` runs after the current task (including React's commit)
+// and the microtask queue, which is more reliable than double rAF in React 18
+// concurrent mode where the first commit may not align with paint frames.
+setTimeout(dismissBootSplash, 0);
 
 registerServiceWorker();

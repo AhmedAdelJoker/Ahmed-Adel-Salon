@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { allowedTransitions } from "@/lib/barberStatus";
 import {
   CheckCircle,
   XCircle,
@@ -23,6 +24,8 @@ interface QuickActionsPanelProps {
   setAudioEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   onComplete: () => void;
   onCancel: () => void;
+  /** The appointment's real status, so actions can respect the transition table. */
+  status?: string | null;
 }
 
 export const QuickActionsPanel = ({
@@ -36,7 +39,25 @@ export const QuickActionsPanel = ({
   setAudioEnabled,
   onComplete,
   onCancel,
+  status,
 }: QuickActionsPanelProps) => {
+  /**
+   * These two buttons were rendered unconditionally.
+   *
+   * `onComplete` commits `ready_for_payment`, which is a *terminal* status: the
+   * backend's transition table gives it no outgoing moves. So on an appointment
+   * that was already finished -- one the cashier had already taken payment for,
+   * or one this barber had completed and then re-opened -- the button still
+   * rendered, still opened the tip dialog, collected a tip amount, and then the
+   * write was rejected with 409. The barber typed a number, clicked confirm,
+   * and nothing happened.
+   *
+   * Gating on the same table the API enforces means the control is only
+   * offered when it will actually work.
+   */
+  const canComplete = allowedTransitions(status).includes("ready_for_payment");
+  const canCancel = allowedTransitions(status).includes("cancelled");
+
   return (
     <div className="space-y-4">
       {/* Quick Stats */}
@@ -110,19 +131,30 @@ export const QuickActionsPanel = ({
           <Zap size={16} className="text-accent" /> إجراءات سريعة
         </h3>
         <div className="space-y-2">
-          <Button
-            className="w-full h-11 rounded-xl"
-            onClick={onComplete}
-          >
-            <CheckCircle size={16} className="ms-1.5" /> إنهاء الخدمة
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full h-11 rounded-xl"
-            onClick={onCancel}
-          >
-            <XCircle size={16} className="ms-1.5" /> إلغاء الخدمة
-          </Button>
+          {canComplete && (
+            <Button
+              className="w-full h-11 rounded-xl"
+              onClick={onComplete}
+            >
+              <CheckCircle size={16} className="ms-1.5" /> إنهاء الخدمة
+            </Button>
+          )}
+          {canCancel && (
+            <Button
+              variant="outline"
+              className="w-full h-11 rounded-xl"
+              onClick={onCancel}
+            >
+              <XCircle size={16} className="ms-1.5" /> إلغاء الخدمة
+            </Button>
+          )}
+          {!canComplete && !canCancel && (
+            <p className="text-[11px] font-bold text-muted text-center py-2">
+              {status === "ready_for_payment"
+                ? "تم إنهاء الخدمة — بانتظار الدفع"
+                : "لا توجد إجراءات متاحة على هذا الحجز"}
+            </p>
+          )}
         </div>
       </div>
 

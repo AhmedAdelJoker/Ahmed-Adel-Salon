@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
+import { employeeInitials } from "./EmployeePhoto";
 
 interface EmployeeAvatarProps {
   imageUrl?: string | null;
@@ -36,15 +37,7 @@ export function EmployeeAvatar({
     return `${staticURL}${imageUrl}`;
   };
 
-  const getInitials = () => {
-    if (!name) return "??";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .substring(0, 2);
-  };
+  const getInitials = () => employeeInitials(name);
 
   const sizeClasses: Record<string, string> = {
     xs: "h-6 w-6 text-[8px]",

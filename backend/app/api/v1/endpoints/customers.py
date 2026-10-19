@@ -25,7 +25,7 @@ from app.schemas.customer import (
     CustomerUpdate,
     CustomerArchiveRead,
 )
-from app.services.loyalty_service import sweep_expired_points
+from app.services.loyalty_service import refresh_customer_tier, sweep_expired_points
 from app.core.pagination import PageParams, paginate
 from app.core.audit import audit_log
 
@@ -57,6 +57,7 @@ def list_customers(
                 Customer.first_name.ilike(like),
                 Customer.last_name.ilike(like),
                 Customer.phone.ilike(like),
+                Customer.second_phone.ilike(like),
                 Customer.email.ilike(like),
             )
         )
@@ -145,6 +146,156 @@ def customers_stats(
     }
 
 
+@router.get("/duplicates")
+def duplicate_customer_groups(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_staff),
+    max_groups: int = Query(50, ge=1, le=200),
+    max_group_size: int = Query(6, ge=2, le=20),
+):
+    """Active customers sharing one phone number, grouped for the merge UI."""
+    phones = [
+        row[0]
+        for row in (
+            db.query(Customer.phone)
+            .filter(Customer.is_deleted == False, Customer.phone.isnot(None))
+            .group_by(Customer.phone)
+            .having(func.count(Customer.customer_id) > 1)
+            .order_by(func.count(Customer.customer_id).desc())
+            .limit(max_groups)
+            .all()
+        )
+    ]
+    if not phones:
+        return {"groups": [], "truncated": False}
+
+    members = (
+        db.query(Customer)
+        .filter(Customer.is_deleted == False, Customer.phone.in_(phones))
+        .order_by(Customer.phone.asc(), Customer.customer_id.asc())
+        .all()
+    )
+    by_phone: dict[str, list] = {}
+    for member in members:
+        by_phone.setdefault(member.phone, []).append(member)
+
+    groups = []
+    for phone in phones:
+        rows = by_phone.get(phone, [])
+        if len(rows) < 2:
+            continue
+        groups.append({
+            "phone": phone,
+            "customers": [
+                {
+                    "customer_id": c.customer_id,
+                    "first_name": c.first_name,
+                    "last_name": c.last_name,
+                    "phone": c.phone,
+                    "second_phone": c.second_phone,
+                    "visits_count": int(c.visits_count or 0),
+                    "lifetime_spend": float(c.lifetime_spend or 0),
+                    "current_tier": c.current_tier,
+                    "created_at": c.created_at,
+                }
+                for c in rows[:max_group_size]
+            ],
+        })
+        if len(groups) >= max_groups:
+            break
+
+    return {"groups": groups, "truncated": len(groups) >= max_groups}
+
+
+@router.post("/{customer_id}/merge", response_model=CustomerRead)
+def merge_customer(
+    customer_id: int,
+    target_customer_id: int = Body(..., embed=True),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner),
+):
+    """Merge `customer_id` (source) into `target_customer_id` (kept).
+
+    Every related record (appointments, invoices, sessions, cancellations,
+    waitlist, walk-in queue) is repointed to the target; loyalty aggregates
+    are summed; blank target fields are completed from the source; and the
+    source is archived with a reason that records the merge.
+    """
+    if customer_id == target_customer_id:
+        raise HTTPException(status_code=400, detail="لا يمكن دمج العميل مع نفسه")
+
+    source = db.query(Customer).filter(Customer.customer_id == customer_id).first()
+    target = db.query(Customer).filter(Customer.customer_id == target_customer_id).first()
+    if not source or not target or source.is_deleted or target.is_deleted:
+        raise HTTPException(status_code=404, detail="العميل المصدر أو المستهدف غير موجود")
+
+    moved = {}
+    for model, column in RELATED_COUNT_SOURCES:
+        moved[model.__tablename__] = (
+            db.query(model)
+            .filter(column == source.customer_id)
+            .update({column: target.customer_id}, synchronize_session=False)
+        )
+
+    target.visits_count = int(target.visits_count or 0) + int(source.visits_count or 0)
+    target.lifetime_spend = (target.lifetime_spend or 0) + (source.lifetime_spend or 0)
+    target.cancellation_count = int(target.cancellation_count or 0) + int(source.cancellation_count or 0)
+    target.loyalty_points = (target.loyalty_points or 0) + (source.loyalty_points or 0)
+    refresh_customer_tier(db, target)
+
+    if not target.email:
+        target.email = source.email
+    if not target.second_phone:
+        target.second_phone = source.second_phone
+    if not target.notes:
+        target.notes = source.notes
+
+    source_acc = (
+        db.query(MemberAccount).filter(MemberAccount.customer_id == source.customer_id).first()
+    )
+    target_acc = (
+        db.query(MemberAccount).filter(MemberAccount.customer_id == target.customer_id).first()
+    )
+    if source_acc is not None:
+        if target_acc is None:
+            source_acc.customer_id = target.customer_id
+        else:
+            source_acc.is_active = False
+            source_acc.token_version = int(source_acc.token_version or 0) + 1
+            db.add(source_acc)
+
+    source.is_deleted = True
+    source.deleted_at = func.now()
+    source.deleted_by_user_id = current_user.id
+    source.archive_reason = f"مدمج مع العميل #{target.customer_id}"
+
+    db.add(
+        ActivityLog(
+            user_id=current_user.id,
+            action="merge",
+            entity_type="customer",
+            entity_id=target.customer_id,
+            description=(
+                f"دمج العميل #{source.customer_id} "
+                f"({source.first_name} {source.last_name}) داخل "
+                f"#{target.customer_id} ({target.first_name} {target.last_name})"
+            ),
+        )
+    )
+
+    db.commit()
+    audit_log(
+        db, request, current_user,
+        action="merge_customer",
+        entity_type="customer",
+        entity_id=target.customer_id,
+        description={"source_id": source.customer_id, "moved": moved},
+    )
+    db.refresh(target)
+    return target
+
+
 @router.get("/search", response_model=list[CustomerRead])
 def search_customers_by_phone(
     phone: str = Query(..., min_length=3, max_length=30),
@@ -213,6 +364,7 @@ def create_customer(
         existing_customer.deleted_at = None
         existing_customer.first_name = payload.first_name
         existing_customer.last_name = payload.last_name
+        existing_customer.second_phone = payload.second_phone
         existing_customer.email = payload.email
         existing_customer.notes = payload.notes
         
@@ -234,6 +386,7 @@ def create_customer(
         first_name=payload.first_name,
         last_name=payload.last_name,
         phone=payload.phone,
+        second_phone=payload.second_phone,
         email=payload.email,
         notes=payload.notes,
     )
@@ -254,9 +407,25 @@ def update_customer(
     if not customer:
         raise HTTPException(status_code=404, detail="العميل غير موجود")
 
+    duplicate = (
+        db.query(Customer)
+        .filter(
+            Customer.phone == payload.phone,
+            Customer.customer_id != customer_id,
+            Customer.is_deleted == False,
+        )
+        .first()
+    )
+    if duplicate:
+        raise HTTPException(
+            status_code=400,
+            detail=f"رقم الهاتف مسجل بالفعل للعميل {duplicate.first_name} {duplicate.last_name}",
+        )
+
     customer.first_name = payload.first_name
     customer.last_name = payload.last_name
     customer.phone = payload.phone
+    customer.second_phone = payload.second_phone
     customer.email = payload.email
     customer.notes = payload.notes
 

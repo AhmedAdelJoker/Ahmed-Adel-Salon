@@ -44,6 +44,13 @@ describe("owner dashboard never shows invented figures unlabelled", () => {
     }
   });
 
+  it("no demo or fallback figure set is exported", async () => {
+    const mod = await import("@/features/reports-dashboard/constants");
+    expect("DEMO_STATS" in mod).toBe(false);
+    expect("FALLBACK_WEEKLY" in mod).toBe(false);
+    expect("FALLBACK_SERVICES" in mod).toBe(false);
+  });
+
   it("during loading the KPI numbers are not populated", async () => {
     let resolve: (v: unknown) => void = () => {};
     const pending = new Promise((r) => {
@@ -59,11 +66,10 @@ describe("owner dashboard never shows invented figures unlabelled", () => {
     );
 
     function Probe() {
-      const { stats, loading, isDemo } = useHook();
+      const { stats, loading } = useHook();
       return (
         <div>
           <span data-testid="loading">{String(loading)}</span>
-          <span data-testid="demo">{String(isDemo)}</span>
           <span data-testid="revenue">{stats.todayRevenue}</span>
         </div>
       );

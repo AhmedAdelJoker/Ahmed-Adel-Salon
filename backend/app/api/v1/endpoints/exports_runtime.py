@@ -14,6 +14,7 @@ from app.models.activity_log import ActivityLog
 from app.models.user import User
 from app.services.activity_service import log_activity
 from app.services.runtime_settings_service import get_runtime_settings
+from app.core.clock import salon_now
 
 router = APIRouter(prefix="/exports", tags=["Runtime Exports"])
 
@@ -140,7 +141,7 @@ def export_security_audit(
     )
     return _workbook_response(
         workbook,
-        f"security_audit_{date.today().isoformat()}.xlsx",
+        f"security_audit_{salon_now().date().isoformat()}.xlsx",
     )
 
 
@@ -168,7 +169,7 @@ def export_financial_rules(
     )
     return _workbook_response(
         workbook,
-        f"financial_rules_{date.today().isoformat()}.xlsx",
+        f"financial_rules_{salon_now().date().isoformat()}.xlsx",
     )
 
 

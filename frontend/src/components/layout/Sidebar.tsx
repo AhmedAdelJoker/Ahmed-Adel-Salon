@@ -180,7 +180,7 @@ export default function Sidebar({
       onMouseLeave={() => setHoverExpanded(false)}
     >
       {/* Premium Glass Surface */}
-      <div className="absolute inset-0 bg-bg-card/95 backdrop-blur-3xl border-l border-border/10 shadow-2xl" />
+      <div className="absolute inset-0 bg-bg-card/95 border-l border-border/10 shadow-2xl" />
 
       {/* Decorative Gold Glow */}
       <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-accent/5 blur-[100px]" />

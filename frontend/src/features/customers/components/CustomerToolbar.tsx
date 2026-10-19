@@ -5,6 +5,13 @@ import { Card } from "@/components/ui";
 import { cn } from "@/lib/core/utils";
 import { CUSTOMER_FILTER_TABS } from "@/features/customers/constants";
 
+const COUNT_KEY_BY_TAB: Record<string, string> = {
+  "الكل": "total",
+  VIP: "vip_count",
+  "منتظم": "regular_count",
+  "جديد": "new_count",
+};
+
 export default function CustomerToolbar({
   activeFilter,
   onFilter,
@@ -13,6 +20,7 @@ export default function CustomerToolbar({
   viewMode,
   onViewMode,
   loading,
+  counts = {},
 }: {
   activeFilter: string;
   onFilter: (tab: string) => void;
@@ -21,22 +29,41 @@ export default function CustomerToolbar({
   viewMode: string;
   onViewMode: (v: string) => void;
   loading: boolean;
+  counts?: Record<string, number>;
 }) {
   return (
       <Card className="border-border p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
           <div className="chip-scroller">
-            {CUSTOMER_FILTER_TABS.map((tab) => (
-              <button
-                type="button"
-                key={tab}
-                disabled={loading}
-                onClick={() => onFilter(tab)}
-                className={`whitespace-nowrap rounded-xl px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeFilter === tab ? "bg-primary text-white shadow-lg shadow-primary/30" : "bg-soft text-muted hover:text-main"}`}
-              >
-                {tab}
-              </button>
-            ))}
+            {CUSTOMER_FILTER_TABS.map((tab) => {
+              const active = activeFilter === tab;
+              const count = counts[COUNT_KEY_BY_TAB[tab]];
+              return (
+                <button
+                  type="button"
+                  key={tab}
+                  onClick={() => onFilter(tab)}
+                  className={cn(
+                    "flex items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all",
+                    active
+                      ? "bg-primary text-white shadow-lg shadow-primary/30"
+                      : "bg-soft text-muted hover:text-main",
+                  )}
+                >
+                  {tab}
+                  <span
+                    className={cn(
+                      "rounded-md px-1.5 py-0.5 text-[8px] font-black leading-none",
+                      active
+                        ? "bg-white/20"
+                        : "bg-card border border-border/60",
+                    )}
+                  >
+                    {count ?? "—"}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <div className="relative flex-1">
             <Search className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />

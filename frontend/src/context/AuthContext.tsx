@@ -22,6 +22,8 @@ export interface AuthUser {
   fullName?: string;
   role?: string;
   is_active?: boolean;
+  /** Per-user page-access overrides from GET /auth/me; absent = role defaults. */
+  permissions?: Record<string, boolean> | null;
   [key: string]: unknown;
 }
 

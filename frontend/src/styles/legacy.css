@@ -15,7 +15,7 @@
   
 
   .surface-toolbar{
-    @apply rounded-[1.25rem] border border-border/70 bg-card p-3 shadow-sm backdrop-blur-xl;
+    @apply rounded-[1.25rem] border border-border/70 bg-card p-3 shadow-sm;
   }
 
   .chip-scroller{
@@ -31,7 +31,7 @@
   }
 
   .content-panel{
-    @apply rounded-premium border border-border/70 bg-card shadow-sm backdrop-blur-xl;
+    @apply rounded-premium border border-border/70 bg-card shadow-sm;
   }
 }
 
@@ -490,8 +490,6 @@
       color-mix(in srgb, var(--bg-soft) 86%, white 14%),
       color-mix(in srgb, var(--bg-soft) 60%, transparent)
     );
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
   }
 
   .dark .premium-table,
@@ -703,8 +701,6 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 

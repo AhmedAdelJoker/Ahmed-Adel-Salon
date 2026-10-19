@@ -36,10 +36,24 @@ import { Textarea } from "@/components/ui/textarea";
 import api from "@/services/api";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { isManagementLike } from "@/lib/access/roles";
 
 const BarberClients = () => {
   const { user } = useAuth();
-   
+
+  /**
+   * `Customer` is a shop-wide record, so writing to one is management-only --
+   * `PUT /barber/clients/{id}` answers 403 for a barber, deliberately: one
+   * appointment used to be enough to earn permanent write access to the address
+   * book every other barber and the cashier read from.
+   *
+   * The edit button used to render for everyone, so a barber could fill in the
+   * dialog, press save, and be handed a 403 with their typing discarded. It now
+   * only renders for the roles the API accepts, which is the same set as the
+   * backend's `_SUPERVISOR_ROLES` (`manager`, `admin`, `owner`).
+   */
+  const canEditClients = isManagementLike(user?.role);
+
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -196,14 +210,17 @@ const BarberClients = () => {
                       <p className="text-sm font-black text-main truncate">
                         {client.name}
                       </p>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handleEdit(client)}
-                      >
-                        <Edit2 size={12} />
-                      </Button>
+                      {canEditClients && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleEdit(client)}
+                          aria-label={`تعديل بيانات ${client.name}`}
+                        >
+                          <Edit2 size={12} />
+                        </Button>
+                      )}
                     </div>
                     <p className="text-[10px] font-bold text-muted mt-0.5">
                       {client.phone}

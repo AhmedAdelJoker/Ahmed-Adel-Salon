@@ -20,6 +20,7 @@ export { default as CustomerMiniStat } from "@/features/customers/components/Cus
 export { default as CustomerHeader } from "@/features/customers/components/CustomerHeader";
 export { default as CustomerKpis } from "@/features/customers/components/CustomerKpis";
 export { default as DuplicatesAlert } from "@/features/customers/components/DuplicatesAlert";
+export { default as MergeCustomersDialog } from "@/features/customers/components/MergeCustomersDialog";
 export { default as CustomerToolbar } from "@/features/customers/components/CustomerToolbar";
 export { default as CustomerTable } from "@/features/customers/components/CustomerTable";
 export { default as CustomerCards } from "@/features/customers/components/CustomerCards";

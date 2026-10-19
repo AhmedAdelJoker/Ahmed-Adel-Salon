@@ -39,6 +39,20 @@ def decide(role, totp_enabled=False, first_login=None, created=None, now=NOW):
     )
 
 
+@pytest.fixture(autouse=True)
+def _enforcement_on(monkeypatch):
+    """Pin the kill switch to ON unless a test overrides it.
+
+    The policy tests assert BLOCK/WARN verdicts, which only exist while
+    enforcement is enabled; they implicitly relied on the default. A developer
+    `.env` that sets ``TOTP_ENFORCEMENT_ENABLED=false`` (the break-glass path
+    this same file tests) flipped every one of them to EXEMPT. The kill-switch
+    test and the recover-by-disabling flow override this locally, and their
+    setattr runs after the fixture's, so the override wins.
+    """
+    monkeypatch.setattr(totp_enforcement.settings, "TOTP_ENFORCEMENT_ENABLED", True)
+
+
 # --------------------------------------------------------------------------
 # Who is affected
 # --------------------------------------------------------------------------

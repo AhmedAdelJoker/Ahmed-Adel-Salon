@@ -1,5 +1,20 @@
 import { JOB_TITLES } from "@/features/hr/utils/constants";
 
+/**
+ * Who serves customers directly — the twin of `SERVICE_PROVIDER_JOB_TITLES` in
+ * `backend/app/core/employee_rules.py`. Only these titles can appear on the
+ * public online-booking site (with the owner's switch on); the server enforces
+ * it too, so this copy decides what the UI *offers*, not what is allowed.
+ */
+export const SERVICE_PROVIDER_JOB_TITLES = [
+  "barber",
+  "colorist",
+  "esthetician",
+];
+
+export const isServiceProviderJobTitle = (value: any) =>
+  SERVICE_PROVIDER_JOB_TITLES.includes(String(value ?? "").trim().toLowerCase());
+
 export const getJobTitleLabel = (value: any) =>
   JOB_TITLES.find((item) => item.value === value)?.label || value || "غير محدد";
 

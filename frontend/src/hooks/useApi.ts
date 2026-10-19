@@ -29,10 +29,6 @@ const queryKeys = {
  
 type AnyRecord = Record<string, any>;
 
-function fetchEmployees(params?: PaginatedParams): Promise<unknown> {
-  return api.get("/employees", { params }).then((r) => r.data);
-}
-
 function fetchEmployeesArchive(params?: PaginatedParams): Promise<unknown> {
   return api.get("/employees/archive", { params }).then((r) => r.data);
 }
@@ -94,18 +90,6 @@ function fetchDailySummary(date: string): Promise<any> {
 }
 
 type QueryOpts<T> = Omit<UseQueryOptions<T>, "queryKey" | "queryFn">;
-
-export function useEmployees<T = unknown>(
-  params: PaginatedParams = {},
-  options: QueryOpts<T> = {},
-) {
-  return useQuery<T>({
-    queryKey: [...queryKeys.employees, params],
-    queryFn: () => fetchEmployees(params) as Promise<T>,
-    staleTime: 60_000,
-    ...options,
-  });
-}
 
 export function useEmployeesArchive<T = unknown>(
   params: PaginatedParams = {},

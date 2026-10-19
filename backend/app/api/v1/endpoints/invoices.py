@@ -30,12 +30,14 @@ from app.services.pdf_service import generate_invoice_pdf
 from app.services.inventory_service import deduct_stock_for_invoice
 from app.core.audit import audit_log
 from app.models.business_settings import BusinessSettings
+from app.models.service_session import ServiceSession
 import hashlib
 import json
 from decimal import Decimal, InvalidOperation
 from app.services.loyalty_service import update_customer_loyalty, calculate_loyalty_discount
 from app.services.websocket import manager
 from app.crud.core_business import create_cash_transaction
+from app.core.clock import salon_day_bounds_utc, salon_now, utc_now_naive
 
 logger = logging.getLogger("app.invoices")
 
@@ -180,7 +182,7 @@ def _resolve_invoice_item(
     )
     if offer is None:
         raise HTTPException(status_code=400, detail="العرض غير موجود أو غير نشط")
-    today = date.today()
+    today = salon_now().date()
     if offer.start_date and offer.start_date > today:
         raise HTTPException(status_code=400, detail="العرض لم يبدأ بعد")
     if offer.end_date and offer.end_date < today:
@@ -473,10 +475,14 @@ def create_manual_invoice(
         record_invoice_payment(payload.payment_method, final_amount, invoice.invoice_no)
 
     # 8. Update Appointment Status if linked
+    # "done" (not "completed"): a paid appointment must leave the reception
+    # review board for good. "completed" is the pre-payment "service finished,
+    # awaiting till" state, so setting it here pushed the paid booking straight
+    # back onto the review column and the Done KPI stayed at zero.
     if payload.appointment_id:
         appointment = db.query(Appointment).filter(Appointment.id == payload.appointment_id).first()
         if appointment:
-            appointment.status = "completed"
+            appointment.status = "done"
 
     # 9. Generate PDF
     customer = db.query(Customer).filter(Customer.customer_id == invoice.customer_id).first()
@@ -587,8 +593,10 @@ def list_today_invoices(
     current_user: User = Depends(require_cashier_manager_owner)
 ):
     from datetime import date, datetime, time
-    today_start = datetime.combine(date.today(), time.min)
-    today_end = datetime.combine(date.today(), time.max)
+    # Compared against `Invoice.created_at`, stored as UTC by SQLite's
+    # CURRENT_TIMESTAMP. See `salon_day_bounds_utc` for why a local midnight is
+    # the wrong window here.
+    today_start, today_end = salon_day_bounds_utc()
 
     # Eager-load customer + barber (was N+1: 2 extra queries per invoice)
     query = db.query(Invoice).options(
@@ -710,7 +718,7 @@ def close_month(
     for inv in invoices:
         if not getattr(inv, "is_closed", False):
             inv.is_closed = True
-            inv.closed_at = datetime.utcnow()
+            inv.closed_at = utc_now_naive()
             inv.closed_by_user_id = getattr(current_user, "id", None)
             closed_count += 1
     
@@ -797,6 +805,7 @@ def list_invoices(
     search: str | None = Query(None, alias="search"),
     payment_method: str | None = Query(None),
     status: str | None = Query(None),
+    customer_id: int | None = Query(None, description="Filter invoices of one customer"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
     page: int | None = Query(None, ge=1),
@@ -819,11 +828,14 @@ def list_invoices(
             query = query.filter(Invoice.created_at >= start, Invoice.created_at < end)
         except ValueError:
             pass
-    elif not from_date and not to_date and not q and not payment_method and not status:
+    elif not from_date and not to_date and not q and not payment_method and not status and not customer_id:
         now = datetime.now()
         start = datetime(now.year, now.month, 1)
         end = datetime(now.year + 1, 1, 1) if now.month == 12 else datetime(now.year, now.month + 1, 1)
         query = query.filter(Invoice.created_at >= start, Invoice.created_at < end)
+
+    if customer_id is not None:
+        query = query.filter(Invoice.customer_id == customer_id)
 
     if from_date:
         try:
@@ -976,7 +988,7 @@ def create_draft_invoice(
         total_amount=0,
         created_by_user_id=getattr(current_user, "id", None),
         is_draft=True,
-        draft_saved_at=datetime.utcnow(),
+        draft_saved_at=utc_now_naive(),
     )
     db.add(draft)
     db.commit()
@@ -1009,7 +1021,7 @@ def update_draft_invoice(
     if first_employee:
         draft.barber_id = first_employee
     draft.payment_method = payload.payment_method or draft.payment_method
-    draft.draft_saved_at = datetime.utcnow()
+    draft.draft_saved_at = utc_now_naive()
     
     if payload.items:
         for item in draft.items:

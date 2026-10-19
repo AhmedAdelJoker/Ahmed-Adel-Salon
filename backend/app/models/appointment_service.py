@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Column,
+    Index,
     Integer,
     String,
     Numeric,
@@ -17,9 +18,24 @@ from app.db.base_class import Base
 class AppointmentService(Base):
     __tablename__ = "appointment_services"
 
+    # Indexed: every `selectinload(Appointment.services)` filters on this
+    # column, and four barber endpoints perform that load.
+    #
+    # Named explicitly rather than via `index=True`. `index=True` generates
+    # `ix_appointment_services_appointment_id`, while `runtime_schema` and
+    # migration `b4f1c2d8a90e` both create `ix_appointment_services_appointment`
+    # for the same column. On a database built by `create_all` -- which is what
+    # the test suite does -- the two paths disagree and you end up with two
+    # identical indexes on one column, costing writes and disk for nothing.
+    __table_args__ = (
+        Index("ix_appointment_services_appointment", "appointment_id"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
 
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False)
+    appointment_id = Column(
+        Integer, ForeignKey("appointments.id"), nullable=False
+    )
     service_id = Column(Integer, ForeignKey("services.id"), nullable=True)
 
     service_name_snapshot = Column(String(255), nullable=False)

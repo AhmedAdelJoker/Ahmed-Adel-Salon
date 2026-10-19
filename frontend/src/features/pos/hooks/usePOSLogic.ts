@@ -308,10 +308,13 @@ export function usePOSLogic(): POSContextValue {
       // fine visually. A dead services or employees call is fatal: the till
       // would render with nothing to sell and nothing to sell it to, and an
       // empty catalogue is indistinguishable from a stocked-but-quiet day.
+      // /employees/pos (not /employees): the full roster carries payroll data
+      // and is manage-employees-only, so cashiers got 403 here. The POS copy
+      // returns identity + service links for active, show_in_pos staff.
       const [servicesRes, employeesRes, categoriesRes, settingsRes] =
         await Promise.all([
           api.get("/services", { params: { limit: 1000 } }),
-          api.get("/employees", { params: { limit: 1000 } }),
+          api.get("/employees/pos", { params: { limit: 1000 } }),
           api.get("/service-categories").catch(() => ({ data: [] })),
           api.get("/business-settings").catch(() => ({ data: null })),
         ]);

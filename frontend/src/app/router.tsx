@@ -61,13 +61,15 @@ function isElectronEnv(): boolean {
 }
 
 function RouteLoader() {
-  // `min-h-[60vh]` left the lower 40% of the viewport showing only the
-  // `body` canvas — which is near-black in dark mode. During a lazy chunk load
-  // that read as a black flash before the page appeared, so the loader now
-  // paints the full viewport and sits on the app surface, not on the raw body.
+  // Covers the full viewport (100dvh) so no bare canvas shows during:
+  // - initial auth check (RequireAuth loading)
+  // - lazy route chunk load (Suspense fallback)
+  // - theme/layout recalculation between route transitions
+  // The previous `calc(100dvh-4rem)` assumed a fixed header height which
+  // does not exist on the login page or during the first paint.
   return (
     <div
-      className="flex min-h-[calc(100dvh-4rem)] w-full flex-col items-center justify-center bg-card animate-fade-in"
+      className="flex min-h-[100dvh] w-full flex-col items-center justify-center bg-card animate-fade-in"
       role="status"
       aria-live="polite"
       aria-busy="true"
@@ -249,7 +251,7 @@ function MainLayout() {
       </aside>
 
       <div className="app-shell__body relative z-20 flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        <header className="z-30 shrink-0 border-b border-border/40 bg-white/90 backdrop-blur-xl dark:bg-slate-900/90">
+        <header className="z-30 shrink-0 border-b border-border/40 bg-white/90 dark:bg-slate-900/90">
           <Header
             title={meta.title}
             subtitle={meta.subtitle ?? "إدارة ذكية ومتكاملة."}

@@ -67,7 +67,8 @@ def get_me(current_user: User = Depends(get_current_active_user)):
         "display_name": current_user.display_name,
         "bio_ar": current_user.bio_ar,
         "profile_image_url": profile_image_url,
-        "barber_id": current_user.employee_id
+        "barber_id": current_user.employee_id,
+        "permissions": current_user.permissions,
     }
 
 
@@ -653,6 +654,7 @@ def login(
             "is_active": user.is_active,
             "profile_image_url": profile_image_url,
             "display_name": user.display_name,
-            "bio_ar": user.bio_ar
+            "bio_ar": user.bio_ar,
+            "permissions": user.permissions,
         },
     }

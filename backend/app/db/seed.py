@@ -1,5 +1,6 @@
 import logging
 from app.db.session import SessionLocal
+from app.core.clock import utc_now_naive
 import app.db.base  # This will import all models
 from app.models.user import User
 from app.models.business_settings import BusinessSettings
@@ -126,7 +127,22 @@ def seed_data(include_demo_data: bool = True):
                 cashier_discount_limit_value=10,
                 manager_discount_limit_type="percentage",
                 manager_discount_limit_value=100,
-                public_site_published_at=datetime.now(),
+                landing_theme_id="midnight",
+                landing_show_staff=True,
+                landing_show_staff_bio=True,
+                public_site_published_at=utc_now_naive(),
+                # Placeholder only.
+                #
+                # This used to be a seven-key literal, which is the shape of the
+                # bug the public endpoint had: the snapshot looked populated, so
+                # the endpoint stopped 404-ing, but it carried none of the
+                # ~50 settings the public site actually reads. A seeded install
+                # therefore rendered a default-coloured, uncustomisable site
+                # with no obvious cause.
+                #
+                # What is in the snapshot is decided by `publish_site`, not by
+                # here. `publish_site_once.py` (or the Publish button) replaces
+                # this dict with the real one.
                 public_site_snapshot={
                     "salon_name": "Salon Pro",
                     "shop_phone": "01094693361",
@@ -135,6 +151,10 @@ def seed_data(include_demo_data: bool = True):
                     "logo_url": None,
                     "public_slug": None,
                     "working_hours": None,
+                    "currency": "EGP",
+                    "landing_theme_id": "midnight",
+                    "landing_show_staff": True,
+                    "landing_show_staff_bio": True,
                 },
             )
             db.add(settings)

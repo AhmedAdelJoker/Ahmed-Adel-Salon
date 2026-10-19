@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useUI } from "@/context/UIContext";
 import {
+  Archive,
   Calendar,
   CheckCircle2,
   Clock,
@@ -11,6 +12,7 @@ import {
   Pencil,
   Phone,
   Plus,
+  RotateCcw,
   TrendingUp,
   Users,
   Wallet,
@@ -25,7 +27,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
+import { EmployeePhoto } from "@/components/shared/EmployeePhoto";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/core/utils";
 import { EMPLOYMENT_TYPES, JOB_TITLE_BLUEPRINTS } from "@/features/hr/utils/constants";
@@ -37,15 +39,41 @@ export default function EmployeeCardGrid({
   employees,
   onEdit,
   onDelete,
+  onArchive,
   onCreate,
 }: {
   employees: EmployeeRecord[];
   onEdit: (emp: any) => void;
   onDelete: (emp: any) => void;
+  onArchive: (emp: any) => void;
   onCreate: () => void;
 }) {
   const navigate = useNavigate();
   const { openEmployeeQuickView } = useUI();
+
+  // active = working (green), suspended = on vacation (amber, still in the
+  // team), anything else is a muted fallback.
+  const statusMeta = (status?: string) => {
+    if (status === "active") {
+      return {
+        label: "نشط",
+        chip: "bg-success-soft text-success border-success/20",
+        dot: "bg-success",
+      };
+    }
+    if (status === "suspended") {
+      return {
+        label: "في إجازة",
+        chip: "bg-warning-soft text-warning border-warning/20",
+        dot: "bg-warning",
+      };
+    }
+    return {
+      label: "أرشيف",
+      chip: "bg-soft text-muted border-border",
+      dot: "bg-muted",
+    };
+  };
 
   return (
     <motion.div
@@ -71,7 +99,7 @@ export default function EmployeeCardGrid({
         const bp =
           JOB_TITLE_BLUEPRINTS[emp.jobTitle ?? ""] ||
           JOB_TITLE_BLUEPRINTS.other;
-        const statusActive = emp.status === "active";
+        const status = statusMeta(emp.status);
         return (
           <motion.div
             key={emp.id}
@@ -89,17 +117,36 @@ export default function EmployeeCardGrid({
               {/* Header */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-1 gap-4">
+                  {/*
+                    `EmployeePhoto` only, without a wrapping box: the previous
+                    markup wrapped it in `rounded-2xl ring-2 shadow-lg
+                    overflow-hidden` while the avatar inside already carried its
+                    own `border` and `rounded-xl`, so the photo was framed twice
+                    and read as the wrong size.
+                  */}
                   <div className="relative shrink-0">
-                    <div className="rounded-2xl ring-2 ring-border/50 shadow-lg overflow-hidden bg-soft">
-                      <EmployeeAvatar
-                        imageUrl={emp.profileImageUrl || emp.profile_image_url}
-                        name={emp.fullName}
-                        size="xl"
-                        className=""
+                    <EmployeePhoto
+                      imageUrl={emp.profileImageUrl || emp.profile_image_url}
+                      name={emp.fullName}
+                      role={
+                        isCustomJobTitleValue(emp.jobTitle) && emp.jobTitle
+                          ? emp.jobTitle
+                          : bp.title
+                      }
+                      size="xl"
+                      hintMissing
+                      className="mt-0.5"
+                    />
+                    <div
+                      className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-[3px] border-card shadow-md flex items-center justify-center"
+                      aria-hidden="true"
+                    >
+                      <span
+                        className={cn(
+                          "h-2 w-2 rounded-full",
+                          status.dot,
+                        )}
                       />
-                    </div>
-                    <div className={cn("absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-[3px] border-card shadow-md flex items-center justify-center text-white", statusActive ? "bg-success" : "bg-danger")}>
-                      <div className={cn("h-2 w-2 rounded-full bg-white", statusActive ? "animate-pulse" : "")} />
                     </div>
                   </div>
                   <div className="min-w-0 flex-1 space-y-1.5">
@@ -118,8 +165,15 @@ export default function EmployeeCardGrid({
                       >
                         {isCustomJobTitleValue(emp.jobTitle) && emp.jobTitle ? emp.jobTitle : bp.title}
                       </Badge>
-                      <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black border", statusActive ? "bg-success-soft text-success border-success/20" : "bg-danger-soft text-danger border-danger/20")}>
-                        {statusActive ? <CheckCircle2 size={10} /> : <XCircle size={10} />} {statusActive ? "نشط" : "معلّق"}
+                      <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black border", status.chip)}>
+                        {emp.status === "active" ? (
+                          <CheckCircle2 size={10} />
+                        ) : emp.status === "suspended" ? (
+                          <Clock size={10} />
+                        ) : (
+                          <XCircle size={10} />
+                        )}{" "}
+                        {status.label}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-[10px] font-bold text-muted">
@@ -148,8 +202,19 @@ export default function EmployeeCardGrid({
                       <Eye size={16} className="ms-3 text-indigo-600" /> عرض سريع
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-2" />
-                    <DropdownMenuItem onClick={() => onDelete(emp)} className="rounded-xl font-bold py-3 text-rose-600">
-                      <XCircle size={16} className="ms-3" /> {emp.status === "active" ? "تعطيل الملف" : "تفعيل الملف"}
+                    <DropdownMenuItem onClick={() => onDelete(emp)} className="rounded-xl font-bold py-3 text-amber-600">
+                      {emp.status === "active" ? (
+                        <>
+                          <Clock size={16} className="ms-3" /> تسجيل إجازة
+                        </>
+                      ) : (
+                        <>
+                          <RotateCcw size={16} className="ms-3" /> إرجاع للعمل
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onArchive(emp)} className="rounded-xl font-bold py-3 text-rose-600">
+                      <Archive size={16} className="ms-3" /> أرشفة (ترك العمل)
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

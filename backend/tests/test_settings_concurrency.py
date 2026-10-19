@@ -1,4 +1,6 @@
 """Concurrency control, audit trail and publish-staleness on business settings."""
+from datetime import date, timedelta
+
 from app.models.activity_log import ActivityLog
 from app.models.business_settings import BusinessSettings
 from tests.helpers import auth_headers, make_user
@@ -13,11 +15,28 @@ def _put(client, headers, payload):
     return client.put("/api/v1/business-settings", json=payload, headers=headers)
 
 
+def test_currency_reaches_the_public_catalog(client, db_session):
+    """`currency` was read by the public catalog but never snapshotted.
+
+    The snapshot therefore never contained the key, and the site received
+    `None` for it forever no matter what the salon chose.
+    """
+    headers = _owner(client, db_session)
+    _put(client, headers, {"currency": "EGP"})
+    client.post("/api/v1/business-settings/publish-site", headers=headers)
+
+    catalog = client.get("/api/v1/public/booking-catalog").json()
+    assert catalog["business"]["currency"] == "EGP"
+
+
 def test_read_exposes_a_version(client, db_session):
     headers = _owner(client, db_session)
     body = client.get("/api/v1/business-settings", headers=headers).json()
     assert body["version"] == 1
-    assert body["publicSiteStale"] is False
+    # Never-published counts as stale. The publish button is gated on this flag,
+    # so a `False` here left a fresh install unable to ever publish.
+    assert body["publicSiteStale"] is True
+    assert body["publicSitePublishedAt"] is None
 
 
 def test_save_bumps_the_version(client, db_session):
@@ -212,6 +231,22 @@ def test_publish_writes_an_audit_entry(client, db_session):
 
 
 # --------------------------------------------------------------------------- publish staleness
+
+
+def test_never_published_site_reports_stale_and_the_catalogue_is_404(client, db_session):
+    """The deadlock: the catalogue 404s while the publish button is disabled."""
+    headers = _owner(client, db_session)
+    body = client.get("/api/v1/business-settings", headers=headers).json()
+
+    assert body["publicSiteStale"] is True
+    assert body["publicSitePublishedVersion"] is None
+
+    catalogue = client.get("/api/v1/public/booking-catalog")
+    assert catalogue.status_code == 404, catalogue.text
+
+    published = client.post("/api/v1/business-settings/publish-site", headers=headers).json()
+    assert published["publicSiteStale"] is False
+    assert client.get("/api/v1/public/booking-catalog").status_code == 200
 
 
 def test_publish_stamps_the_published_version(client, db_session):

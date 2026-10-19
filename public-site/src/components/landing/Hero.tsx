@@ -133,6 +133,23 @@ export default function Hero({
   const reduced = usePrefersReducedMotion();
   const hasStats = stats.services > 0 || stats.barbers > 0;
 
+  /*
+    Sound on the hero video.
+
+    The owner can turn `landing_video_muted` off, and that used to be taken at
+    face value: the element autoplayed with audio and there was no control
+    anywhere on the page to stop it. A visitor could not silence it, and a
+    looping background clip that keeps making noise is WCAG 1.4.2 (Audio
+    Control) as well as being hostile on a landing page.
+
+    So sound is opt-in from the visitor's side. The clip still autoplays when it
+    is muted, which is the normal case and the only one browsers will autoplay
+    unprompted anyway; when the owner asked for audio the clip waits for a click
+    on the control below, and the visitor can silence it again at any time.
+  */
+  const wantsSound = heroVideo?.muted === false;
+  const [soundOn, setSoundOn] = useState(false);
+
   /** Only the fields the owner actually filled in; an empty callout is a bug. */
   const highlightBadge = highlight?.badge?.trim();
   const highlightTitle = highlight?.title?.trim();
@@ -167,20 +184,39 @@ export default function Hero({
           {...{ fetchpriority: "high" }}
         />
         {heroVideo && heroVideo.autoplay ? (
-          <video
-            className="absolute inset-0 h-full w-full object-cover object-center"
-            poster={heroVideo.poster}
-            autoPlay
-            muted={heroVideo.muted}
-            loop
-            playsInline
-            preload="metadata"
-            aria-hidden="true"
-            tabIndex={-1}
-          >
-            <source src={heroVideo.src} />
-          </video>
+          <>
+          {/*
+          The clip is decorative: hidden from assistive tech and out of the tab
+          order, so a captions track would be claiming a translation that does
+          not exist. When the owner asked for sound it is muted until the visitor
+          turns it on, which is what keeps the audio controllable.
+        */}
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- decorative, aria-hidden, and silent until the visitor opts in */}
+        <video
+          className="absolute inset-0 h-full w-full object-cover object-center"
+          poster={heroVideo.poster}
+          autoPlay={!wantsSound}
+          muted={!soundOn}
+          loop
+          playsInline
+          preload="metadata"
+          aria-hidden="true"
+          tabIndex={-1}
+        >
+          <source src={heroVideo.src} />
+        </video>
+          </>
         ) : null}
+      {wantsSound && (
+        <button
+          type="button"
+          onClick={() => setSoundOn((on) => !on)}
+          aria-pressed={soundOn}
+          className="absolute bottom-4 start-4 z-20 flex items-center gap-2 rounded-full border border-border/60 bg-black/55 px-4 py-2 text-[11px] font-black text-white backdrop-blur-md transition-colors hover:bg-black/75"
+        >
+          {soundOn ? "كتم الصوت" : "تشغيل صوت الفيديو"}
+        </button>
+      )}
       </div>
 
       <div className="mk-shell mk-hero-inner">

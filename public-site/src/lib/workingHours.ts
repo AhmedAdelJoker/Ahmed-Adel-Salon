@@ -51,9 +51,24 @@ export const crossesMidnight = (entry?: WorkingHourEntry): boolean => {
   return close <= open;
 };
 
+/**
+ * The word shown for a day the salon is closed.
+ *
+ * Passed in rather than hardcoded: this string is rendered directly into the
+ * page, so an English visitor was being told a day was "مغلق" while the rest of
+ * the page was in English.
+ */
+export const CLOSED_LABEL = {
+  ar: "مغلق",
+  en: "Closed",
+} as const;
+
 /** "22:00 – 03:00 (+1)" for an overnight window, plain range otherwise. */
-export const formatHoursRange = (entry?: WorkingHourEntry): string => {
-  if (!entry?.is_open || !entry.open_time || !entry.close_time) return "مغلق";
+export const formatHoursRange = (
+  entry?: WorkingHourEntry,
+  closedLabel: string = CLOSED_LABEL.ar,
+): string => {
+  if (!entry?.is_open || !entry.open_time || !entry.close_time) return closedLabel;
   return crossesMidnight(entry)
     ? `${entry.open_time} – ${entry.close_time} (+1)`
     : `${entry.open_time} – ${entry.close_time}`;

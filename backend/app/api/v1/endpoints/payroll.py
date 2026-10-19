@@ -13,6 +13,7 @@ from app.models.payroll_record import PayrollRecord
 from app.models.salary_advance import SalaryAdvance
 from app.models.expense import Expense
 from app.core.audit import audit_log
+from app.core.clock import utc_now_naive
 from app.schemas.payroll import (
     PayrollCreate, PayrollRead, PayrollUpdate, 
     PayrollSummary, PayrollArchiveResponse, PayrollCalculateRequest
@@ -351,10 +352,13 @@ def pay_payroll(
     
     if record.status == "paid":
         raise HTTPException(status_code=400, detail="Payroll already paid")
-        
+
     try:
         record.status = "paid"
-        record.payment_date = datetime.now()
+        # UTC, like every other stored timestamp. `datetime.now()` wrote the
+        # *server's* zone, which is wrong by the offset whenever the server is not
+        # in Egypt -- and payroll figures are compared by date downstream.
+        record.payment_date = utc_now_naive()
         if payment_data and "payment_method" in payment_data:
             record.payment_method = payment_data["payment_method"]
         

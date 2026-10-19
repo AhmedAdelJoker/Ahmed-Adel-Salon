@@ -47,6 +47,7 @@ export default function BookingFormDialog({
   duplicateBooking,
   conflictMsg,
   availableSlots,
+  slotsError,
   employees,
   services,
   categories,
@@ -304,6 +305,12 @@ export default function BookingFormDialog({
                       </div>
                     )}
                   </div>
+
+                  {slotsError && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] font-black text-rose-600 dark:text-rose-400">
+                      {slotsError}
+                    </div>
+                  )}
 
                   {availableSlots.length > 0 ? (
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-40 overflow-y-auto custom-scrollbar p-1 border border-border/40 rounded-xl bg-soft/30">

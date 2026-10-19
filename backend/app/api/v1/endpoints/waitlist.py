@@ -240,7 +240,15 @@ def convert_waitlist_to_appointment(
         raise HTTPException(status_code=400, detail="لا يمكن تحويل هذا القيد")
 
     # Create the appointment
-    from app.api.v1.endpoints.appointments import _create_recurring_instances
+    #
+    # This line used to be:
+    #     from app.api.v1.endpoints.appointments import _create_recurring_instances
+    # That symbol does not exist anywhere in the repository, and it was never used
+    # in this function either — so the waitlist-to-appointment conversion raised
+    # ImportError before it could create anything. Recurrence is still a stub
+    # (`RecurrencePattern` in booking_enums.py is referenced by no code); when it
+    # is built it belongs here, after `db.flush()` and alongside the
+    # AppointmentService rows below.
     from app.models.appointment import Appointment, AppointmentService
     
     import json

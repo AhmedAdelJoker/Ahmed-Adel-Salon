@@ -12,6 +12,8 @@ interface ProfileTabProps {
   avatarPreview: string | null;
   onAvatarChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   loading: boolean;
+  /** True while the photo is uploading, so the label is not a dead click. */
+  avatarLoading?: boolean;
   onSaveProfile: () => void | Promise<void>;
   onLoadProfile: () => void | Promise<void>;
   user: AuthUser | null;
@@ -23,6 +25,7 @@ export const ProfileTab = ({
   avatarPreview,
   onAvatarChange,
   loading,
+  avatarLoading = false,
   onSaveProfile,
   onLoadProfile,
   user,
@@ -54,17 +57,24 @@ export const ProfileTab = ({
               <label className="absolute bottom-0 left-1/2 -translate-x-1/2">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
                   onChange={onAvatarChange}
                   className="hidden"
+                  disabled={avatarLoading}
                 />
                 <button
                   type="button"
-                  className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors"
+                  disabled={avatarLoading}
+                  aria-busy={avatarLoading}
+                  aria-label={avatarLoading ? "جاري رفع الصورة" : "تغيير الصورة"}
+                  className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-wait"
                 >
-                  <Camera size={16} />
+                  <Camera size={16} className={avatarLoading ? "animate-pulse" : undefined} />
                 </button>
               </label>
+              {avatarLoading && (
+                <p className="mt-2 text-[11px] font-bold text-muted">جاري رفع الصورة…</p>
+              )}
             </div>
             <h3 className="font-black text-main">
               {profile.full_name || "غير محدد"}

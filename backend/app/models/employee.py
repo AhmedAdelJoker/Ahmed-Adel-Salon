@@ -1,6 +1,6 @@
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import Column, Integer, String, Boolean, Numeric, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Boolean, Numeric, Text, DateTime, Date, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
@@ -16,6 +16,11 @@ class Employee(Base):
     display_name = Column(String(255), nullable=True) # for POS/Booking/Short names
     phone_primary = Column(String(30), nullable=False)
     phone_secondary = Column(String(30), nullable=True)
+    # The employee's own address, kept apart from the linked `User.email` (which
+    # is the login address and is NULL for staff without an account). Most of a
+    # salon roster has no login, so putting the address only on `users` left
+    # nowhere to record it.
+    email = Column(String(255), nullable=True)
     profile_image_url = Column(String(255), nullable=True)
     national_id = Column(String(20), nullable=True)
     birth_date = Column(DateTime, nullable=True)
@@ -31,6 +36,11 @@ class Employee(Base):
     department = Column(String(100), nullable=True)
     employment_type = Column(String(30), nullable=False, default="full_time") # full_time, part_time, temporary
     hire_date = Column(DateTime, nullable=True, server_default=func.now())
+    # Only meaningful for `employment_type` temporary/part_time. Stored rather
+    # than derived from hire_date because a contract can be extended or ended
+    # early, and payroll/renewal reminders need the date that was actually
+    # agreed, not a number of months counted from the start.
+    contract_end_date = Column(Date, nullable=True)
     status = Column(String(30), nullable=False, default="active") # active, suspended, resigned
     work_days_json = Column(JSON, nullable=True)
     work_hours_json = Column(JSON, nullable=True)

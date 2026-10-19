@@ -1,13 +1,20 @@
 import os
+from pathlib import Path
 
 from stub_env import provision
 
 # Per-process test database: parallel pytest runs (or stale processes) must
 # never share one sqlite file — sharing caused cross-run UNIQUE collisions
 # and ObjectDeletedError when one process wiped another's rows mid-test.
+#
+# The path is absolute on purpose. `app.db.session` now sends a *relative*
+# sqlite URL to the external data directory (that is what stops the dev
+# backend and the packaged app from drifting onto two databases), and a
+# relative test URL would opt this suite straight into the user's real
+# database. Absolute keeps the file next to the backend, where it always was.
 _PID = os.getpid()
-_TEST_DB_FILE = f"test_{_PID}.db"
-_TEST_DB_URL = f"sqlite:///./{_TEST_DB_FILE}"
+_TEST_DB_FILE = Path(__file__).resolve().parent / f"test_{_PID}.db"
+_TEST_DB_URL = f"sqlite:///{_TEST_DB_FILE.as_posix()}"
 
 # `overwrite=True`, as the assignments this replaces were: a developer's own
 # `.env` must never decide which database the suite runs against. The required
@@ -135,7 +142,7 @@ def _reset_singletons():
 def _remove_db_files():
     for suffix in ("", "-wal", "-shm"):
         try:
-            os.remove(_TEST_DB_FILE + suffix)
+            os.remove(str(_TEST_DB_FILE) + suffix)
         except FileNotFoundError:
             pass
         except PermissionError:

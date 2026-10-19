@@ -60,6 +60,8 @@ export default function ProductBundles() {
   const navigate = useNavigate();
   const {
     offers,
+    products,
+    services,
     loading,
     isModalOpen,
     setIsModalOpen,
@@ -77,6 +79,7 @@ export default function ProductBundles() {
     handleImageUpload,
     handleAddProductToBundle,
     handleRemoveProduct,
+    handleToggleService,
     handleSave,
     handleDeleteOffer,
     handleToggleActive,
@@ -574,6 +577,38 @@ export default function ProductBundles() {
                 </label>
               </div>
 
+              {/*
+                The validity window. The catalog's offer form owned these and this
+                page did not, so an offer created here kept whatever dates the
+                other page happened to leave — usually none.
+              */}
+              <div className="space-y-3">
+                <span className="text-[10px] font-black text-muted uppercase tracking-widest">نافذة الصلاحية</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-black text-main">من تاريخ</span>
+                    <Input
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) => setFormData((p: any) => ({ ...p, startDate: e.target.value }))}
+                      className="h-12 rounded-xl font-bold border-border bg-card"
+                    />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-black text-main">إلى تاريخ</span>
+                    <Input
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) => setFormData((p: any) => ({ ...p, endDate: e.target.value }))}
+                      className="h-12 rounded-xl font-bold border-border bg-card"
+                    />
+                  </label>
+                </div>
+                {formData.startDate && formData.endDate && formData.endDate < formData.startDate && (
+                  <p className="text-[11px] font-bold text-danger">تاريخ النهاية قبل تاريخ البداية.</p>
+                )}
+              </div>
+
               <div className="p-5 sm:p-6 rounded-[1.6rem] bg-success-soft/50 border border-success/15 space-y-4">
                 <h4 className="font-black text-success flex items-center gap-2 text-sm">
                   <Tag size={16} /> خوارزمية التسعير
@@ -772,6 +807,56 @@ export default function ProductBundles() {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/*
+                The services this offer covers. The catalog's offer form owned
+                these and this page did not, so an offer created here lost its
+                services to the other page. One page now owns the whole offer.
+              */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-muted uppercase tracking-widest">الخدمات المشمولة</span>
+                  <span className="text-[10px] font-bold text-muted tabular-nums">
+                    {formData.serviceIds.length} مختارة
+                  </span>
+                </div>
+                {services.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto custom-scrollbar p-1 border border-border rounded-2xl">
+                    {services.map((s: any) => {
+                      const selected = formData.serviceIds.includes(s.id);
+                      return (
+                        <label
+                          key={s.id}
+                          className={cn(
+                            "flex items-center justify-between gap-3 p-3 rounded-xl border cursor-pointer transition-colors",
+                            selected
+                              ? "bg-primary-soft border-primary/30"
+                              : "bg-card border-border hover:border-primary/20",
+                          )}
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-xs font-black truncate">{s.name_ar || s.name}</span>
+                            {s.duration_minutes ? (
+                              <span className="block text-[10px] font-bold opacity-70">{s.duration_minutes} دقيقة</span>
+                            ) : null}
+                          </span>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-primary shrink-0"
+                            checked={selected}
+                            onChange={() => handleToggleService(s.id)}
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs font-bold text-muted">لا توجد خدمات في الكتالوج بعد.</p>
+                )}
+                <p className="text-[10px] font-bold leading-relaxed text-muted">
+                  العرض يحتاج منتجاً أو خدمة واحدة على الأقل.
+                </p>
               </div>
             </div>
           </div>

@@ -42,6 +42,7 @@ from app.models.service import Service
 from app.models.user import User
 from app.services.activity_service import log_activity
 from app.utils.arabic_pdf import fix_arabic, ensure_pdf_font
+from app.core.clock import salon_day_bounds_utc, salon_now
 
 router = APIRouter(prefix="/exports", tags=["Exports"])
 
@@ -123,7 +124,7 @@ def _matches_term(term: str | None, *values) -> bool:
 
 
 def _build_filename(base_name: str, extension: str, suffix: str | None = None) -> str:
-    effective_suffix = suffix or date.today().isoformat()
+    effective_suffix = suffix or salon_now().date().isoformat()
     return f"{base_name}_{effective_suffix}.{extension}"
 
 
@@ -375,10 +376,17 @@ def _query_customers(
     start_date: date | None,
     end_date: date | None,
     status: str | None,
+    segment: str | None,
 ) -> list[list]:
     term = _optional_text(search) or _optional_text(q)
     status_filter = _optional_text(status)
-    customers = db.query(Customer).order_by(Customer.customer_id.desc()).all()
+    segment_filter = _optional_text(segment)
+    customers = (
+        db.query(Customer)
+        .filter(Customer.is_deleted == False)
+        .order_by(Customer.customer_id.desc())
+        .all()
+    )
 
     visit_stats = {
         row[0]: {"visits": row[1], "last_visit": row[2]}
@@ -414,6 +422,16 @@ def _query_customers(
             customer.phone,
             customer.email,
         ):
+            continue
+
+        # Segment follows the same visits_count thresholds the customers
+        # page filters by (vip > 10, regular 2–10, new <= 1).
+        visits_count = int(customer.visits_count or 0)
+        if segment_filter == "vip" and visits_count <= 10:
+            continue
+        if segment_filter == "regular" and not 2 <= visits_count <= 10:
+            continue
+        if segment_filter == "new" and visits_count > 1:
             continue
 
         stats = visit_stats.get(customer.customer_id, {"visits": 0, "last_visit": None})
@@ -758,7 +776,7 @@ def _payroll_rows(records: list[PayrollRecord]) -> list[list]:
 
 def _revenue_date_window(
 period: str | None, start_date: date | None, end_date: date | None):
-    today = date.today()
+    today = salon_now().date()
     normalized_period = _clean_text(period).lower()
     if start_date or end_date:
         return start_date, end_date, normalized_period or "custom"
@@ -787,18 +805,18 @@ def _revenue_rows(
     # 1. Fetch Invoices
     inv_query = db.query(Invoice).options(joinedload(Invoice.appointment))
     if effective_start:
-        inv_query = inv_query.filter(Invoice.created_at >= datetime.combine(effective_start, datetime.min.time()))
+        inv_query = inv_query.filter(Invoice.created_at >= salon_day_bounds_utc(effective_start)[0])
     if effective_end:
-        inv_query = inv_query.filter(Invoice.created_at <= datetime.combine(effective_end, datetime.max.time()))
+        inv_query = inv_query.filter(Invoice.created_at <= salon_day_bounds_utc(effective_end)[1])
     
     invoices = inv_query.order_by(Invoice.created_at.asc()).all()
 
     # 2. Fetch Expenses
     exp_query = db.query(Expense)
     if effective_start:
-        exp_query = exp_query.filter(Expense.expense_date >= datetime.combine(effective_start, datetime.min.time()))
+        exp_query = exp_query.filter(Expense.expense_date >= salon_day_bounds_utc(effective_start)[0])
     if effective_end:
-        exp_query = exp_query.filter(Expense.expense_date <= datetime.combine(effective_end, datetime.max.time()))
+        exp_query = exp_query.filter(Expense.expense_date <= salon_day_bounds_utc(effective_end)[1])
     
     expenses_list = exp_query.all()
 
@@ -838,7 +856,7 @@ def _report_suffix(start_date: date | None, end_date: date | None, period_label:
         return f"{start_date.isoformat()}_{end_date.isoformat()}"
     if start_date:
         return start_date.isoformat()
-    return f"{period_label}_{date.today().isoformat()}"
+    return f"{period_label}_{salon_now().date().isoformat()}"
 
 
 EMPLOYEE_COLUMNS = [
@@ -971,6 +989,7 @@ def export_customers_excel(
     start_date: str | None = Query(default=None),
     end_date: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    segment: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
@@ -982,6 +1001,7 @@ def export_customers_excel(
         start_date=_parse_optional_date(start_date),
         end_date=_parse_optional_date(end_date),
         status=status,
+        segment=segment,
     )
     log_activity(db, user_id=current_user.id, action="export", entity_type="customer", description="تصدير قائمة العملاء (Excel)")
     return _make_excel_response(
@@ -999,6 +1019,7 @@ def export_customers_csv(
     start_date: str | None = Query(default=None),
     end_date: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    segment: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
@@ -1010,6 +1031,7 @@ def export_customers_csv(
         start_date=_parse_optional_date(start_date),
         end_date=_parse_optional_date(end_date),
         status=status,
+        segment=segment,
     )
     log_activity(db, user_id=current_user.id, action="export", entity_type="customer", description="تصدير قائمة العملاء (CSV)")
     return _make_csv_response(columns=CUSTOMER_COLUMNS, rows=rows, base_name="customers")
@@ -1422,7 +1444,7 @@ def export_daily_report_pdf(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    parsed_start = _parse_optional_date(start_date) or date.today()
+    parsed_start = _parse_optional_date(start_date) or salon_now().date()
     parsed_end = _parse_optional_date(end_date) or parsed_start
     rows, _ = _revenue_rows(
         db,
@@ -1452,16 +1474,16 @@ def export_strategic_growth_report_pdf(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner),
 ):
-    parsed_start = _parse_optional_date(start_date) or (date.today() - timedelta(days=30))
-    parsed_end = _parse_optional_date(end_date) or date.today()
+    parsed_start = _parse_optional_date(start_date) or (salon_now().date() - timedelta(days=30))
+    parsed_end = _parse_optional_date(end_date) or salon_now().date()
     
     settings = db.query(BusinessSettings).first()
     salon_name = settings.salon_name if settings else "SalonPro"
     
     # 1. Financial Stats
     invoices = db.query(Invoice).options(joinedload(Invoice.appointment)).filter(
-        Invoice.created_at >= datetime.combine(parsed_start, datetime.min.time()),
-        Invoice.created_at <= datetime.combine(parsed_end, datetime.max.time())
+        Invoice.created_at >= salon_day_bounds_utc(parsed_start)[0],
+        Invoice.created_at <= salon_day_bounds_utc(parsed_end)[1]
     ).all()
     
     # Filter out cancelled in Python
@@ -1478,8 +1500,8 @@ def export_strategic_growth_report_pdf(
         func.count(InvoiceItem.id).label('count'),
         func.coalesce(func.sum(InvoiceItem.total_price), 0).label('revenue')
     ).join(Invoice).outerjoin(Appointment).filter(
-        Invoice.created_at >= datetime.combine(parsed_start, datetime.min.time()),
-        Invoice.created_at <= datetime.combine(parsed_end, datetime.max.time()),
+        Invoice.created_at >= salon_day_bounds_utc(parsed_start)[0],
+        Invoice.created_at <= salon_day_bounds_utc(parsed_end)[1],
         or_(Appointment.status != "cancelled", Appointment.id.is_(None)),
         InvoiceItem.service_id.isnot(None)
     ).group_by(InvoiceItem.service_name).order_by(func.count(InvoiceItem.id).desc()).limit(5).all()
@@ -1490,8 +1512,8 @@ def export_strategic_growth_report_pdf(
         func.count(Invoice.id).label('count'),
         func.coalesce(func.sum(Invoice.total_amount), 0).label('revenue')
     ).join(Invoice, Invoice.barber_id == Employee.id).outerjoin(Appointment, Invoice.appointment_id == Appointment.id).filter(
-        Invoice.created_at >= datetime.combine(parsed_start, datetime.min.time()),
-        Invoice.created_at <= datetime.combine(parsed_end, datetime.max.time()),
+        Invoice.created_at >= salon_day_bounds_utc(parsed_start)[0],
+        Invoice.created_at <= salon_day_bounds_utc(parsed_end)[1],
         or_(Appointment.status != "cancelled", Appointment.id.is_(None))
     ).group_by(Employee.id, Employee.full_name).order_by(func.sum(Invoice.total_amount).desc()).all()
 

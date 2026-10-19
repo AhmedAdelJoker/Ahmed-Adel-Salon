@@ -198,6 +198,26 @@ def cleanup_scheduled_reports():
             logger.exception("[Scheduler] Error during PDF cleanup")
 
 
+def send_due_reminders():
+    """Send WhatsApp appointment reminders (24h and 2h windows).
+    
+    This runs every 15 minutes to catch the 24h and 2h reminder windows.
+    The reminder_service uses per-appointment flags to avoid double-sending.
+    """
+    with job_lock("send_due_reminders", ttl_seconds=300) as acquired:
+        if not acquired:
+            return
+        db = SessionLocal()
+        try:
+            from app.services.reminder_service import send_due_reminders as run_reminders
+
+            run_reminders(db)
+        except Exception:
+            logger.exception("[Scheduler] Error during reminder sending")
+        finally:
+            db.close()
+
+
 def _register_jobs() -> None:
     """Declares the schedule. Split from `start_scheduler` so the job table can
     be inspected in tests without starting a thread pool."""
@@ -229,6 +249,19 @@ def _register_jobs() -> None:
         coalesce=True,
         misfire_grace_time=60,
         id="cleanup_scheduled_pdfs",
+        replace_existing=True,
+    )
+    # Send WhatsApp appointment reminders every 15 minutes.
+    # The reminder_service uses per-appointment flags (reminder_24h_sent, reminder_2h_sent)
+    # to guarantee idempotency even if the job runs twice.
+    scheduler.add_job(
+        send_due_reminders,
+        "interval",
+        minutes=15,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=300,
+        id="send_due_reminders",
         replace_existing=True,
     )
 

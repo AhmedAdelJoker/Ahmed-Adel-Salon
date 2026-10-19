@@ -2,9 +2,6 @@ export { useReportsDashboard } from "@/features/reports-dashboard/hooks/useRepor
 export type { UseReportsDashboardReturn } from "@/features/reports-dashboard/hooks/useReportsDashboard";
 export {
   DEFAULT_STATS,
-  DEMO_STATS,
-  FALLBACK_SERVICES,
-  FALLBACK_WEEKLY,
   KPI_CONFIG,
   PERIODS,
 } from "@/features/reports-dashboard/constants";
@@ -40,4 +37,4 @@ export type { RankingTableProps, RankRow } from "@/features/reports-dashboard/co
 export { DayStatusBar } from "@/features/reports-dashboard/components/DayStatusBar";
 export type { DayStatusBarProps } from "@/features/reports-dashboard/components/DayStatusBar";
 export { useOperatingSummary } from "@/features/reports-dashboard/hooks/useOperatingSummary";
-export type { UseOperatingSummaryReturn, OperatingSummary, DailyPoint, DayStatus, RankedBarber, RankedService } from "@/features/reports-dashboard/hooks/useOperatingSummary";
+export type { UseOperatingSummaryReturn, OperatingSummary, DailyPoint, DayStatus, RankedBarber, RankedService, CancellationStats } from "@/features/reports-dashboard/hooks/useOperatingSummary";

@@ -9,6 +9,7 @@ from app.models.employee_presence_log import EmployeePresenceLog
 from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
 from app.models.salary_advance import SalaryAdvance
+from app.core.employee_rules import SERVICE_PROVIDER_JOB_TITLES
 
 def calculate_attendance_metrics(
     db: Session, 
@@ -85,7 +86,11 @@ def calculate_expected_net_salary(
         
     # 1. Commission (All types can earn commission usually)
     commission_amount = Decimal("0.00")
-    if emp.job_title == "barber":
+    if emp.job_title in SERVICE_PROVIDER_JOB_TITLES:
+        # Every service-providing title earns commission on the invoices
+        # attributed to them. Previously only exactly "barber" did, so a
+        # colourist or esthetician with a commission rate was silently paid
+        # none of it.
         comm_sum = db.query(func.sum(InvoiceItem.commission_amount)).join(Invoice).filter(
             Invoice.barber_id == emp.id,
             Invoice.created_at >= start_date,

@@ -7,6 +7,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, Bell, Shield, Palette, ArrowLeft } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
+import { staticURL } from "@/services/api";
+import { validateImageSize } from "@/lib/media/upload";
 import { adaptObject } from "@/services/apiAdapter";
 import { ProfileTab } from "@/features/barber-profile";
 import { NotificationsTab } from "@/features/barber-profile";
@@ -25,6 +27,7 @@ const BarberProfile = () => {
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarLoading, setAvatarLoading] = useState(false);
 
   const [profile, setProfile] = useState<BarberProfileForm>({
     full_name: (user?.full_name as string) || "",
@@ -129,12 +132,52 @@ const BarberProfile = () => {
     }
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /**
+   * Upload the barber's own photo.
+   *
+   * This was `FileReader.readAsDataURL` and nothing else: the preview was
+   * shown, the save sent no image field, and the data URL was thrown away — so
+   * picking a photo appeared to work and changed nothing. It now posts the file
+   * and stores the path the server gives back.
+   */
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev: ProgressEvent<FileReader>) => setAvatarPreview(ev.target?.result as string | null);
-    reader.readAsDataURL(file);
+    if (!validateImageSize(file)) {
+      e.target.value = "";
+      return;
+    }
+
+    // Instant local preview so the barber sees their pick immediately.
+    const localPreview = URL.createObjectURL(file);
+    setAvatarPreview(localPreview);
+    setAvatarLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await api.post("/barbers/upload-image", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const url = res.data?.url;
+      if (!url) throw new Error("لم يتم إرجاع رابط الصورة من الخادم");
+
+      setProfile((prev) => ({ ...prev, avatar_url: url }));
+      // Swap the blob preview for the stored path, cache-busted so a re-upload
+      // of the same bytes is not served from cache.
+      const resolved = url.startsWith("http") ? url : `${staticURL}${url}`;
+      setAvatarPreview(`${resolved}${resolved.includes("?") ? "&" : "?"}t=${Date.now()}`);
+      await refreshUser();
+      toast.success("تم رفع الصورة بنجاح");
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { detail?: unknown } }; message?: string };
+      const msg = apiErr?.response?.data?.detail || apiErr?.message || "فشل رفع الصورة";
+      toast.error(String(msg));
+      setAvatarPreview(null);
+    } finally {
+      setAvatarLoading(false);
+      URL.revokeObjectURL(localPreview);
+      e.target.value = "";
+    }
   };
 
   return (
@@ -190,6 +233,7 @@ const BarberProfile = () => {
             profile={profile}
             setProfile={setProfile}
             avatarPreview={avatarPreview}
+            avatarLoading={avatarLoading}
             onAvatarChange={handleAvatarChange}
             loading={loading}
             onSaveProfile={handleSaveProfile}

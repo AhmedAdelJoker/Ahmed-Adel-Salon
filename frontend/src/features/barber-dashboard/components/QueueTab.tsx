@@ -1,8 +1,10 @@
-import { Clock, CheckCircle, Play, Zap, Scissors, Activity, UserCheck, RefreshCw } from "lucide-react";
+import { Clock, CheckCircle, Zap, Scissors, Activity, UserCheck, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/core/utils";
+import { useAppLocale } from "@/hooks/useAppLocale";
+import { AppointmentStatusActions } from "@/components/shared/AppointmentStatusActions";
 
 interface QueueRow {
   id: string | number;
@@ -29,6 +31,8 @@ export const QueueTab = ({
   fetchDashboardData,
   handleStatusChange,
 }: QueueTabProps) => {
+  const { locale } = useAppLocale();
+
   return (
     <div className="space-y-4">
       {/* Quick Stats */}
@@ -106,40 +110,32 @@ export const QueueTab = ({
                             {item.service_name || "خدمة صالون"}
                           </Badge>
                           <span className="text-[10px] font-bold text-muted">
+                            {/*
+                              The API already sends `"HH:MM"` — a pre-formatted
+                              wall-clock string, not a timestamp. Running it
+                              through `new Date()` and back out is a round trip
+                              that can only lose information (an invalid input
+                              becomes `Invalid Date`, and the browser's timezone
+                              is applied to a time that has none). Formatted
+                              straight through `Intl` instead.
+                            */}
                             {item.start_time
-                              ? new Date(item.start_time).toLocaleTimeString("ar-EG", {
+                              ? new Intl.DateTimeFormat(locale, {
                                   hour: "2-digit",
                                   minute: "2-digit",
-                                })
+                                  hour12: true,
+                                }).format(new Date(`2000-01-01T${item.start_time}`))
                               : "--:--"}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {item.status === "waiting" ? (
-                        <Button
-                          size="sm"
-                          className="h-9 rounded-xl px-4 text-[10px] font-black"
-                          onClick={() => handleStatusChange(item.id, "in-service")}
-                        >
-                          <Play size={12} className="ms-1" /> بدء
-                        </Button>
-                      ) : item.status === "in-service" ? (
-                        <Button
-                          size="sm"
-                          variant="success"
-                          className="h-9 rounded-xl px-4 text-[10px] font-black"
-                          onClick={() => handleStatusChange(item.id, "completed")}
-                        >
-                          <CheckCircle size={12} className="ms-1" /> إنهاء
-                        </Button>
-                      ) : (
-                        <Badge variant="success" className="h-7 px-3 text-[10px] font-black">
-                          <CheckCircle size={10} className="ms-1" /> مكتمل
-                        </Badge>
-                      )}
-                    </div>
+<AppointmentStatusActions
+                      status={item.status}
+                      onChange={(next) =>
+                        handleStatusChange(item.id, next)
+                      }
+                    />
                   </div>
                 </motion.div>
               ))}

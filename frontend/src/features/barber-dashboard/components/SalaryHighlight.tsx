@@ -3,6 +3,7 @@ import { ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PremiumCard } from "@/components/shared/PremiumUI";
 import { currencyLabel } from "@/lib/core/currency";
+import { useAppLocale } from "@/hooks/useAppLocale";
 
 interface ProjectedSalaryMetrics {
   attendance_percent?: number | string | null;
@@ -20,6 +21,9 @@ interface SalaryHighlightProps {
 }
 
 export const SalaryHighlight = ({ projectedSalary }: SalaryHighlightProps) => {
+  // Read before the early return: hooks cannot be called conditionally.
+  const { locale } = useAppLocale();
+
   if (!projectedSalary) return null;
 
   return (
@@ -42,7 +46,7 @@ export const SalaryHighlight = ({ projectedSalary }: SalaryHighlightProps) => {
           </div>
           <div className="text-center md:text-left">
             <div className="text-4xl font-black text-white tabular-nums">
-              {Number(projectedSalary.net_salary || 0).toLocaleString("ar-EG")}
+              {Number(projectedSalary.net_salary || 0).toLocaleString(locale)}
               <span className="text-sm text-slate-400 me-2">{currencyLabel()}</span>
             </div>
             <div className="mt-2 flex items-center gap-2">

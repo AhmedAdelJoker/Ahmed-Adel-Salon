@@ -16,6 +16,7 @@ from app.schemas.discount_approval import (
     DiscountApprovalRequestCreate,
 )
 from app.services.activity_service import log_activity
+from app.core.clock import utc_now_naive
 
 router = APIRouter(prefix="/discount-approvals", tags=["Discount Approvals"])
 
@@ -140,7 +141,7 @@ def approve_discount_request(
     row.status = "approved"
     row.decision_note = payload.decision_note
     row.approved_by_user_id = current_user.id
-    row.approved_at = datetime.utcnow()
+    row.approved_at = utc_now_naive()
 
     db.add(invoice)
     db.add(row)
@@ -173,7 +174,7 @@ def reject_discount_request(
     row.status = "rejected"
     row.decision_note = payload.decision_note
     row.approved_by_user_id = current_user.id
-    row.approved_at = datetime.utcnow()
+    row.approved_at = utc_now_naive()
     db.add(row)
     log_activity(
         db,

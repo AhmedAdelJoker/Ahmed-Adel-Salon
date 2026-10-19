@@ -17,6 +17,8 @@ export {
 export {
   getJobTitleLabel,
   isCustomJobTitleValue,
+  isServiceProviderJobTitle,
+  SERVICE_PROVIDER_JOB_TITLES,
   deriveDateOnly,
   normalizeEmployeeRecord,
 } from "@/features/hr/utils/helpers";
@@ -37,4 +39,5 @@ export { default as AssistantTab } from "@/features/hr/components/form/Assistant
 export { default as SystemTab } from "@/features/hr/components/form/SystemTab";
 export { default as DocumentsTab } from "@/features/hr/components/form/DocumentsTab";
 export { default as ReviewTab } from "@/features/hr/components/form/ReviewTab";
+export { default as MoneyInput } from "@/features/hr/components/form/MoneyInput";
 export { default as employeeDocumentService } from "@/features/hr/services/employeeDocumentService";

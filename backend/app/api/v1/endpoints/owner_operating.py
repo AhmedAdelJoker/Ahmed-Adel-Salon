@@ -299,6 +299,30 @@ def operating_summary(
         logger.exception("operating-summary: daily series unavailable")
         daily = None
 
+    # Every appointment in the window, split by whether it was cancelled. A high
+    # rate is the one that needs a decision, so do not hide it behind the KPI
+    # trend numbers.
+    try:
+        window_statuses = (
+            db.query(Appointment.status)
+            .filter(Appointment.appointment_date >= since.date())
+            .all()
+        )
+        total_appts = len(window_statuses)
+        cancelled_count = sum(
+            1 for (s,) in window_statuses if s in ("cancelled", "auto_cancelled")
+        )
+        cancellations: dict[str, Any] | None = {
+            "count": cancelled_count,
+            "total": total_appts,
+            "rate": round((cancelled_count / total_appts) * 100, 1)
+            if total_appts > 0
+            else None,
+        }
+    except Exception:
+        logger.exception("operating-summary: cancellation stats unavailable")
+        cancellations = None
+
     try:
         barbers = _top_barbers(db, since, limit)
     except Exception:
@@ -323,5 +347,6 @@ def operating_summary(
         "top_barbers": barbers,
         "top_services": services,
         "day_status": status,
+        "cancellations": cancellations,
         "generated_at": now.isoformat(),
     }

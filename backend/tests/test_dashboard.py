@@ -19,7 +19,7 @@ def _seed_customer(db_session, first_name="Sara", phone="01001234567", is_delete
 
 
 def _seed_invoice(db_session, customer_id, total, invoice_no, is_draft=False):
-    from datetime import datetime
+    from app.core.clock import utc_now_naive
 
     invoice = Invoice(
         invoice_no=invoice_no,
@@ -28,7 +28,10 @@ def _seed_invoice(db_session, customer_id, total, invoice_no, is_draft=False):
         subtotal_amount=Decimal(str(total)),
         total_amount=Decimal(str(total)),
         is_draft=is_draft,
-        created_at=datetime.now(),
+        # The columns hold naive UTC (see app/core/clock.py); seeding naive
+        # local time put "today's" invoice three hours outside the salon-day
+        # window and the dashboard test read 0 sales.
+        created_at=utc_now_naive(),
     )
     db_session.add(invoice)
     db_session.commit()

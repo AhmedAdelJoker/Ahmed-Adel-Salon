@@ -71,51 +71,14 @@ export const PERIODS: PeriodOption[] = [
   { value: "year", label: "هذا العام" },
 ];
 
-export const FALLBACK_WEEKLY: WeeklyRow[] = [
-  { name: "السبت", revenue: 12500, appointments: 18 },
-  { name: "الأحد", revenue: 8200, appointments: 12 },
-  { name: "الإثنين", revenue: 9600, appointments: 14 },
-  { name: "الثلاثاء", revenue: 11200, appointments: 16 },
-  { name: "الأربعاء", revenue: 10800, appointments: 15 },
-  { name: "الخميس", revenue: 14500, appointments: 20 },
-  { name: "الجمعة", revenue: 16800, appointments: 22 },
-];
-
-export const FALLBACK_SERVICES: ServiceSlice[] = [
-  { name: "حلاقة", value: 42 },
-  { name: "عناية بالبشرة", value: 28 },
-  { name: "صبغة", value: 18 },
-  { name: "أخرى", value: 12 },
-];
-
-export const DEMO_STATS: DashboardStats = {
-  todayRevenue: 18750,
-  todayExpenses: 3420,
-  netProfit: 15330,
-  todayAppointments: 24,
-  avgInvoice: 780,
-  occupancy: 72,
-  todayRevenueTrend: 12,
-  todayExpensesTrend: -5,
-  netProfitTrend: 18,
-  todayAppointmentsTrend: 8,
-  avgInvoiceTrend: 4,
-  occupancyTrend: -2,
-};
-
 /**
  * What the dashboard shows before the request has answered.
  *
- * All zeros, and deliberately not a copy of `DEMO_STATS`. This was
- * `{ ...DEMO_STATS }`, which meant that opening /owner rendered 18,750 EGP of
- * revenue and 72% occupancy before the server replied -- invented numbers,
- * presented exactly like real ones, for as long as the request took. On a
- * connection that is slow, that is a day of revenue the owner believes they
- * earned.
+ * All zeros, and deliberately never a stand-in for real figures. Invented
+ * numbers rendered as if earned lasted on screen exactly as long as the
+ * request -- on a slow connection, an entire day of phantom revenue.
  *
- * `DEMO_STATS` is for the honest case: the request succeeded and the period
- * genuinely has no figures. That state is labelled on screen. This one is not
- * labelled because nothing about it should look like a figure at all.
+ * `DEFAULT_STATS` is for the loading window: zeros, not a fabricated day.
  */
 export const DEFAULT_STATS: DashboardStats = {
   todayRevenue: 0,
@@ -131,3 +94,4 @@ export const DEFAULT_STATS: DashboardStats = {
   avgInvoiceTrend: 0,
   occupancyTrend: 0,
 };
+

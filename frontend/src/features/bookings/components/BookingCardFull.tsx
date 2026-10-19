@@ -55,7 +55,6 @@ export default function BookingCardFull({
   const config = statusConfig(booking.status);
   const status = normalizeStatus(booking.status);
   const isOnline = booking.booking_source === "online";
-  const isWalkIn = booking.booking_source === "walkin";
 
   const isToday = booking.appointment_date === TODAY;
   const now = new Date();
@@ -208,14 +207,6 @@ export default function BookingCardFull({
               className="text-[10px] font-black text-sky-600 bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800 px-2 h-5"
             >
               ONLINE
-            </Badge>
-          )}
-          {isWalkIn && (
-            <Badge
-              variant="outline"
-              className="text-[10px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 px-2 h-5"
-            >
-              مشاة
             </Badge>
           )}
           {isLate && (

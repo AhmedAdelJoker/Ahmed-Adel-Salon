@@ -1,14 +1,14 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import i18n from "@/i18n";
 import {
   Activity,
   AlertTriangle,
   LayoutDashboard,
-  Loader2,
   RefreshCw,
   Wallet,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,6 @@ export default function ReportsDashboard() {
     loading,
     period,
     chartType,
-    isDemo,
     loadError,
     employeeId,
     employeeName,
@@ -87,6 +86,16 @@ export default function ReportsDashboard() {
     useOperatingSummary(14);
 
   const busy = loading || opsLoading;
+
+  // The salon view moves faster than the month; keep it fresh without a manual
+  // click. 60s is a compromise between "current" and "not a poll storm".
+  useEffect(() => {
+    const id = setInterval(() => {
+      loadData();
+      reloadOps();
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Today's revenue against the mean of the days before it. Null when there is no
   // baseline, which renders as "لا مقارنة" rather than a confident percentage.
@@ -128,6 +137,7 @@ export default function ReportsDashboard() {
         icon: Wallet,
         trend: stats.todayRevenueTrend,
         money: true,
+        to: "/owner/financial",
       },
       {
         key: "netProfit",
@@ -136,6 +146,7 @@ export default function ReportsDashboard() {
         icon: Activity,
         trend: stats.netProfitTrend,
         money: true,
+        to: "/owner/financial",
       },
       {
         key: "todayAppointments",
@@ -144,6 +155,7 @@ export default function ReportsDashboard() {
         icon: LayoutDashboard,
         trend: stats.todayAppointmentsTrend,
         money: false,
+        to: "/bookings",
       },
       {
         key: "occupancy",
@@ -153,6 +165,7 @@ export default function ReportsDashboard() {
         trend: null,
         money: false,
         percent: true,
+        to: "/owner/reports",
       },
     ],
     [stats],
@@ -166,17 +179,16 @@ export default function ReportsDashboard() {
           subtitle={scopeLabel}
           badge="لوحة القيادة التنفيذية"
           icon={LayoutDashboard}
-          actions={undefined}
-          className={undefined}
+         
         />
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {kpis.map((kpi) => (
-            <SkeletonCard key={kpi.key} variant="stats" className={undefined} />
+            <SkeletonCard key={kpi.key} variant="stats" />
           ))}
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <SkeletonCard variant="content" className={undefined} />
-          <SkeletonCard variant="content" className={undefined} />
+          <SkeletonCard variant="content" />
+          <SkeletonCard variant="content" />
         </div>
       </div>
     );
@@ -225,15 +237,16 @@ export default function ReportsDashboard() {
               disabled={busy}
               aria-label="تحديث البيانات"
             >
-              <Loader2
+              <RefreshCw
                 className={cn("ms-1.5 h-3.5 w-3.5", busy && "animate-spin")}
                 aria-hidden="true"
               />
               <span className="hidden sm:inline">تحديث</span>
             </Button>
+
           </div>
         }
-        className={undefined}
+       
       />
 
       {/* 1. Needs a decision. */}
@@ -243,55 +256,48 @@ export default function ReportsDashboard() {
       <DayStatusBar
         status={summary?.day_status ?? null}
         unavailable={failures.status || Boolean(opsError)}
-        className={undefined}
+       
       />
 
-      {/* Load failures, stated once and precisely. */}
-      {loadError && !loading && (
+      {/* Load failures, stated once and precisely. Both sources merged into one strip. */}
+      {!loading && (loadError || opsError) && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-danger/20 bg-danger-soft px-4 py-2.5 text-danger">
           <AlertTriangle size={16} className="shrink-0" />
-          <p className="min-w-[200px] flex-1 text-[11px] font-bold">{loadError}</p>
-          <Button variant="outline" size="sm" onClick={loadData} className="shrink-0">
+          <div className="min-w-[200px] flex-1 space-y-1">
+            {loadError && <p className="text-[11px] font-bold">{loadError}</p>}
+            {opsError && <p className="text-[11px] font-bold">{opsError}</p>}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (loadError) loadData();
+              if (opsError) reloadOps();
+            }}
+            className="shrink-0"
+          >
             <RefreshCw size={13} className="ms-1.5" />
             إعادة المحاولة
           </Button>
-        </div>
-      )}
-
-      {opsError && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-danger/20 bg-danger-soft px-4 py-2.5 text-danger">
-          <AlertTriangle size={16} className="shrink-0" />
-          <p className="min-w-[200px] flex-1 text-[11px] font-bold">{opsError}</p>
-          <Button variant="outline" size="sm" onClick={reloadOps} className="shrink-0">
-            <RefreshCw size={13} className="ms-1.5" />
-            إعادة المحاولة
-          </Button>
-        </div>
-      )}
-
-      {isDemo && !loading && (
-        <div className="flex items-center gap-3 rounded-xl border border-warning/20 bg-warning-soft px-4 py-2.5 text-warning">
-          <Activity size={16} className="shrink-0 animate-pulse" />
-          <p className="text-[11px] font-bold">
-            وضع العرض التوضيحي — لا توجد بيانات حقيقية للفترة الحالية.
-          </p>
         </div>
       )}
 
       {/* 3. Today against the days before it. */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-        {kpis.map((kpi) => (
-          <KpiCell
-            key={kpi.key}
-            label={kpi.label}
-            value={kpi.value}
-            icon={kpi.icon}
-            trend={kpi.trend}
-            money={kpi.money}
-            percent={kpi.percent}
-            demo={isDemo}
-          />
-        ))}
+            {kpis.map((kpi) => (
+              <KpiCell
+                key={kpi.key}
+                label={kpi.label}
+                value={kpi.value}
+                icon={kpi.icon}
+                trend={kpi.trend}
+                money={kpi.money}
+                percent={kpi.percent}
+
+                to={kpi.to}
+                onNavigate={navigate}
+              />
+            ))}
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -300,14 +306,14 @@ export default function ReportsDashboard() {
             <h3 className="text-[10px] font-black uppercase tracking-widest text-muted">
               اتجاه الإيراد · 14 يوماً
             </h3>
-            <Delta value={todayVsBaseline} className={undefined} />
+            <Delta value={todayVsBaseline} />
           </div>
           <div className="p-4">
             <RevenueSparkline
               data={summary?.daily ?? []}
               baseline={summary?.previous_window_average ?? null}
               unavailable={failures.daily || Boolean(opsError)}
-              className={undefined}
+             
             />
           </div>
         </PremiumCard>
@@ -333,14 +339,14 @@ export default function ReportsDashboard() {
           rows={topBarbers}
           unavailable={failures.barbers || Boolean(opsError)}
           emptyMessage="لم تُسجَّل فواتير موصوفة بموظف في هذه الفترة"
-          className={undefined}
+         
         />
         <RankingTable
           title="الخدمات الأعلى مبيعاً"
           rows={topServices}
           unavailable={failures.services || Boolean(opsError)}
           emptyMessage="لم تُسجَّل بيانات مبيعات في هذه الفترة"
-          className={undefined}
+         
         />
       </div>
 
@@ -348,18 +354,20 @@ export default function ReportsDashboard() {
           question you go looking for, rather than one you check on the way in.
           The sparkline above is the glanceable version of the same story. */}
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-        <RevenueChart
-          chartRows={chartRows}
-          chartType={chartType}
-          onChartTypeChange={setChartType}
-          period={period}
-          onPeriodChange={handlePeriodChange}
-        />
-        <div className="xl:col-span-1">
-          <SmartInsights
-            newCustomersThisWeek={stats.newCustomersThisWeek}
-            onNavigate={navigate}
+          <RevenueChart
+            chartRows={chartRows}
+            chartType={chartType}
+            onChartTypeChange={setChartType}
+            period={period}
+            onPeriodChange={handlePeriodChange}
           />
+        <div className="xl:col-span-1">
+            <SmartInsights
+              newCustomersThisWeek={stats.newCustomersThisWeek}
+              onNavigate={navigate}
+              cancellations={summary?.cancellations ?? null}
+              daily={summary?.daily ?? null}
+            />
         </div>
       </div>
     </div>
@@ -379,26 +387,30 @@ function KpiCell({
   trend,
   money = false,
   percent = false,
-  demo = false,
+  to,
+  onNavigate,
 }: {
   label: string;
   value: number | null | undefined;
-  icon: any;
+  icon: LucideIcon;
   trend: number | null | undefined;
   money?: boolean;
   percent?: boolean;
-  demo?: boolean;
+  to?: string;
+  onNavigate?: (to: string) => void;
 }) {
   const unknown = value === null || value === undefined;
 
-  return (
+  const cell = (
     <div className="group relative overflow-hidden rounded-2xl border border-border bg-card px-4 py-3 transition-colors hover:border-accent/25">
       <div className="flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-muted">
           <Icon size={11} className="text-accent" />
           {label}
         </span>
-        {trend !== undefined && !unknown && <Delta value={trend} className={undefined} />}
+        {trend !== undefined && trend !== null && !unknown && (
+          <Delta value={trend} />
+        )}
       </div>
 
       <div className="mt-1.5 flex items-baseline gap-2">
@@ -421,10 +433,14 @@ function KpiCell({
       {unknown && (
         <p className="mt-0.5 text-[9px] font-bold text-muted">تعذّر الحساب</p>
       )}
-      {demo && !unknown && (
-        <p className="mt-0.5 text-[9px] font-bold text-warning">رقم توضيحي</p>
-      )}
     </div>
+  );
+
+  if (!to || !onNavigate) return cell;
+  return (
+    <button type="button" onClick={() => onNavigate(to)} className="block w-full text-right">
+      {cell}
+    </button>
   );
 }
 
@@ -456,7 +472,12 @@ function MiniPanel({
                   : row.money
                     ? formatCurrency(row.value)
                     : row.percent
-                      ? `${row.value}%`
+                      ? (
+                        <span className="inline-flex items-center gap-2">
+                          <GoalRing value={Number(row.value ?? 0)} />
+                          {`${row.value}%`}
+                        </span>
+                      )
                       : Number(row.value).toLocaleString("ar-EG-u-nu-latn")}
               </dd>
             </div>
@@ -466,3 +487,30 @@ function MiniPanel({
     </PremiumCard>
   );
 }
+
+/** 18px progress ring for goal rows. */
+function GoalRing({ value }: { value: number }) {
+  const clamped = Math.min(100, Math.max(0, value));
+  const r = 7;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg width={18} height={18} viewBox="0 0 18 18" role="img" aria-label={`${clamped}%`}>
+      <circle cx={9} cy={9} r={r} fill="none" stroke="var(--border)" strokeWidth={2.5} />
+      <circle
+        cx={9}
+        cy={9}
+        r={r}
+        fill="none"
+        stroke="var(--primary)"
+        strokeWidth={2.5}
+        strokeDasharray={`${(clamped / 100) * c} ${c}`}
+        strokeLinecap="round"
+        transform="rotate(-90 9 9)"
+      />
+    </svg>
+  );
+}
+
+
+
+

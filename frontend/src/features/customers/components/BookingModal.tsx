@@ -45,12 +45,14 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
       setExistingBookings([]);
       return;
     }
-    Promise.all([api.get("/services"), api.get("/employees")])
+    // /employees/active (not /employees): the payroll roster is
+    // manage-employees-only; this modal only needs assignable staff names.
+    Promise.all([api.get("/services"), api.get("/employees/active")])
       .then(([s, b]) => {
         setServices(s.data || []);
         setBarbers(b.data || []);
       })
-      .catch(() => {});
+      .catch((err) => console.error("BookingModal data load failed:", err));
   }, [open]);
 
   useEffect(() => {
@@ -66,17 +68,25 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
       setExistingBookings([]);
       return;
     }
+    // List endpoint only honors start/end dates through date_filter="custom".
     api
       .get("/appointments", {
         params: {
           customer_id: customer.customer_id,
-          date_from: date,
-          date_to: date,
+          date_filter: "custom",
+          start_date: date,
+          end_date: date,
+          limit: 100,
         },
       })
       .then((res) => setExistingBookings(res.data || []))
       .catch(() => setExistingBookings([]));
   }, [date, customer?.customer_id]);
+
+  const finishedStatuses = ["cancelled", "auto_cancelled", "no_show"];
+  const sameDayBookings = existingBookings.filter(
+    (b) => !finishedStatuses.includes(String(b.status || "").toLowerCase()),
+  );
 
   const toggleService = (id) => {
     setServiceIds((prev) =>
@@ -136,7 +146,7 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
     if (!time) return toast.error("يرجى اختيار الوقت");
     if (isTimeInPast(time)) return toast.error("لا يمكن الحجز في وقت مضى");
     if (conflictMsg) return toast.error(conflictMsg);
-    if (existingBookings.length > 0)
+    if (sameDayBookings.length > 0)
       return toast.error(
         "هذا العميل لديه حجز بالفعل في هذا اليوم. يرجى اختيار يوم آخر.",
       );
@@ -302,7 +312,7 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
               </p>
             </div>
           )}
-          {existingBookings.length > 0 && (
+          {sameDayBookings.length > 0 && (
             <div className="rounded-lg bg-warning/5 border border-warning/20 p-2.5">
               <p className="text-[10px] font-black text-warning flex items-center gap-1.5">
                 <AlertTriangle size={12} /> هذا العميل لديه حجز في هذا اليوم
@@ -338,7 +348,7 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
               serviceIds.length === 0 ||
               !time ||
               !!conflictMsg ||
-              existingBookings.length > 0
+              sameDayBookings.length > 0
             }
           >
             <Plus size={14} className="ms-1.5" /> تأكيد الحجز

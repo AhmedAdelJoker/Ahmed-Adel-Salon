@@ -57,7 +57,7 @@ const BarberBookings = () => {
               <Button
                 variant="outline"
                 className="h-10 rounded-xl px-3"
-                onClick={fetchAppointments}
+                onClick={() => fetchAppointments()}
               >
                 <RefreshCw size={14} className="ms-1.5" />
                 <span className="hidden sm:inline">تحديث</span>

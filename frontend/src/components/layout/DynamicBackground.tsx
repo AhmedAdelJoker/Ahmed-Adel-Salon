@@ -1,58 +1,49 @@
-import React, { useMemo } from "react";
-import { motion } from "framer-motion";
+import React from "react";
 import { usePreferences } from "@/context/PreferencesContext";
 
 /**
- * Enterprise Living Background
- * Provides a high-end, subtle, and slow-moving aesthetic.
- * Uses Framer Motion for hardware-accelerated performance.
+ * Enterprise Background (static).
+ *
+ * Deliberately NOT animated. The previous version moved three 60–80vw blobs
+ * with a 120px blur (plus a full-viewport noise layer) on an infinite
+ * framer-motion loop for every logged-in session. That forced the compositor
+ * to redraw every frame indefinitely, and on the salon's Iris Xe machines the
+ * Intel display driver periodically missed its TDR timeout and Windows reset
+ * it (System event log, Id 4101 "igfxn stopped responding and has recovered") —
+ * the user-visible symptom was the entire screen going black for ~1 second and
+ * coming back, at any time, including while idle.
+ *
+ * The identical composition is kept as static layers: they are rasterised
+ * once and cached by the compositor. At 4–8% opacity behind everything the
+ * difference is visually indistinguishable, while the per-frame GPU cost is
+ * effectively zero.
  */
 export default function DynamicBackground() {
   const { preferences } = usePreferences();
   const isDark = preferences?.theme === "dark";
 
-  // Blob configurations for a sophisticated look
-  const blobs = useMemo(
-    () => [
-      {
-        id: 1,
-        color: isDark ? "rgba(34, 211, 238, 0.08)" : "rgba(124, 58, 237, 0.06)",
-        size: "w-[80vw] h-[80vw]",
-        initial: { x: "-20%", y: "-20%", scale: 1 },
-        animate: {
-          x: ["-20%", "20%", "-20%"],
-          y: ["-20%", "10%", "-20%"],
-          scale: [1, 1.2, 1],
-        },
-        duration: 35,
-      },
-      {
-        id: 2,
-        color: isDark ? "rgba(109, 40, 217, 0.06)" : "rgba(34, 211, 238, 0.04)",
-        size: "w-[70vw] h-[70vw]",
-        initial: { x: "40%", y: "40%", scale: 1.1 },
-        animate: {
-          x: ["40%", "10%", "40%"],
-          y: ["40%", "-10%", "40%"],
-          scale: [1.1, 0.9, 1.1],
-        },
-        duration: 45,
-      },
-      {
-        id: 3,
-        color: isDark ? "rgba(16, 185, 129, 0.04)" : "rgba(245, 158, 11, 0.03)",
-        size: "w-[60vw] h-[60vw]",
-        initial: { x: "10%", y: "10%", scale: 0.9 },
-        animate: {
-          x: ["10%", "-30%", "10%"],
-          y: ["10%", "50%", "10%"],
-          scale: [0.9, 1.15, 0.9],
-        },
-        duration: 40,
-      },
-    ],
-    [isDark],
-  );
+  // Same colors/sizes as the animated version; placements are frozen and
+  // spread across the viewport so the wash reads the same as before.
+  const blobs = [
+    {
+      id: 1,
+      color: isDark ? "rgba(34, 211, 238, 0.08)" : "rgba(124, 58, 237, 0.06)",
+      size: "w-[80vw] h-[80vw]",
+      style: { left: "-20vw", top: "-25vw" },
+    },
+    {
+      id: 2,
+      color: isDark ? "rgba(109, 40, 217, 0.06)" : "rgba(34, 211, 238, 0.04)",
+      size: "w-[70vw] h-[70vw]",
+      style: { right: "-15vw", bottom: "-20vw" },
+    },
+    {
+      id: 3,
+      color: isDark ? "rgba(16, 185, 129, 0.04)" : "rgba(245, 158, 11, 0.03)",
+      size: "w-[60vw] h-[60vw]",
+      style: { left: "15vw", top: "-12vw" },
+    },
+  ];
 
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-background">
@@ -66,24 +57,14 @@ export default function DynamicBackground() {
         }}
       />
 
-      {/* Living Blobs */}
+      {/* Ambient blobs — static layers (rasterised once, then cached) */}
       {blobs.map((blob) => (
-        <motion.div
+        <div
           key={blob.id}
           className={`absolute rounded-full blur-[120px] ${blob.size}`}
           style={{
             backgroundColor: blob.color,
-            left: "50%",
-            top: "50%",
-            marginLeft: `-${parseInt(blob.size) / 2}vw`,
-            marginTop: `-${parseInt(blob.size) / 2}vw`,
-          }}
-          initial={blob.initial}
-          animate={blob.animate}
-          transition={{
-            duration: blob.duration,
-            repeat: Infinity,
-            ease: "easeInOut",
+            ...blob.style,
           }}
         />
       ))}

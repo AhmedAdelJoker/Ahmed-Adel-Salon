@@ -23,21 +23,27 @@ def _database_url() -> str:
     Previously it always used the alembic.ini default, so a deployment that
     set DATABASE_URL (e.g. PostgreSQL) in .env would migrate a stray SQLite
     file instead. Precedence: process env > app settings (.env) > alembic.ini.
+
+    Everything goes through `resolve_database_url`, the same resolution
+    `app.db.session` applies, so a relative URL is not migrated to a different
+    file than the one the app then opens.
     """
+    from app.core.paths import resolve_database_url
+
     url = os.getenv("DATABASE_URL")
     if url:
-        return url
+        return resolve_database_url(url)
     try:
         from app.core.config import settings
 
         url = getattr(settings, "DATABASE_URL", None)
         if url:
-            return url
+            return resolve_database_url(url)
     except Exception:
         # Settings can fail validation (e.g. SECRET_KEY not set yet during a
         # first-run migration) — fall back to the alembic.ini default.
         pass
-    return config.get_main_option("sqlalchemy.url")
+    return resolve_database_url(config.get_main_option("sqlalchemy.url"))
 
 
 def run_migrations_offline() -> None:

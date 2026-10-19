@@ -4,11 +4,22 @@ from sqlalchemy.orm import Session
 from app.models.appointment import Appointment
 from app.models.customer import Customer
 from app.models.employee import Employee
+from app.core.clock import salon_now
 from app.services.meta_whatsapp_service import send_appointment_reminder_24h_template, send_appointment_reminder_2h_template
 
 
 def send_due_reminders(db: Session):
-    now = datetime.now()
+    # Salon wall-clock, not `datetime.now()`.
+    #
+    # The window below is compared against
+    # `datetime.combine(appointment.appointment_date, appointment.appointment_time)`
+    # -- a wall-clock reading built from two business columns. Comparing that to
+    # the *server's* clock compares two different timezones, and the two do not
+    # cancel: the comparison is off by the offset. On a UTC server with a Cairo
+    # salon, the 24h and 2h windows are both three hours late, so customers are
+    # reminded at the wrong time and appointments close to the window edge are
+    # skipped entirely.
+    now = salon_now()
     target_24h_from = now + timedelta(hours=23, minutes=45)
     target_24h_to = now + timedelta(hours=24, minutes=15)
     target_2h_from = now + timedelta(hours=1, minutes=45)

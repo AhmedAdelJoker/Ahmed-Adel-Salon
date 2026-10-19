@@ -345,6 +345,11 @@ def list_available_slots(
     if not schedules:
         return []
 
+    # A slot is offered when it fits *some* barber's day, so the earliest start
+    # across schedules bounds the walk and the latest close ends it. Returning
+    # strings keeps this aligned with the public booking picker, which splits on
+    # ":". The admin form wants `{time, available}` and gets that shape from
+    # `scheduling_service.get_available_time_slots`.
     current = min(schedule.start_at for schedule in schedules)
     last_end = max(schedule.end_at for schedule in schedules)
     available_slots: list[str] = []
@@ -363,3 +368,38 @@ def list_available_slots(
         current += timedelta(minutes=slot_step_minutes)
 
     return available_slots
+
+
+def get_available_slots_for_barber(
+    db: Session,
+    barber_id: int,
+    booking_date: date,
+    strict_schedule: bool = True,
+    slot_step_minutes: int = 30,
+) -> list[str]:
+    """Get available slots for a single barber on a specific date.
+    
+    This is the same logic used by the public booking flow, ensuring the admin
+    and public surfaces agree on availability.
+    """
+    from app.models.employee import Employee
+
+    barber = db.query(Employee).filter(Employee.id == barber_id).first()
+    if not barber:
+        return []
+
+    # No window for this date means the salon is closed (or has never published
+    # hours). Either way there is nothing to offer, and a malformed entry
+    # normalises to a closed day instead of raising.
+    if salon_booking_window(db, booking_date) is None:
+        return []
+
+    # Default to 30 minutes if no duration specified
+    return list_available_slots(
+        db,
+        booking_date=booking_date,
+        total_duration_minutes=30,
+        barbers=[barber],
+        strict_schedule=strict_schedule,
+        slot_step_minutes=slot_step_minutes,
+    )

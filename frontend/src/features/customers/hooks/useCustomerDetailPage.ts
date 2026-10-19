@@ -3,6 +3,7 @@
  */
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import {
@@ -15,6 +16,7 @@ import { getTierInfo } from "@/features/customers/utils/customer";
 
 export function useCustomerDetailPage(customerId: number) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
@@ -49,15 +51,13 @@ export function useCustomerDetailPage(customerId: number) {
     const avgSpend = visits > 0 ? totalSpend / visits : 0;
     const noShowRate =
       visits > 0 ? Math.round((cancellations / visits) * 100) : 0;
-    const paidInvoices = invoices.filter(
-      (i) => i.status?.toUpperCase() === "PAID",
-    );
-    const totalPaid = paidInvoices.reduce(
-      (sum, i) => sum + Number(i.total_amount || i.amount || 0),
-      0,
-    );
+    const totalPaid = invoices
+      .filter((i) => i.is_closed)
+      .reduce((sum, i) => sum + Number(i.total_amount || i.amount || 0), 0);
     const upcomingAppts = appointments.filter((a) =>
-      ["PENDING", "CONFIRMED"].includes(a.status?.toUpperCase()),
+      ["pending", "confirmed", "waiting"].includes(
+        String(a.status || "").toLowerCase(),
+      ),
     );
     return {
       totalSpend,
@@ -76,7 +76,7 @@ export function useCustomerDetailPage(customerId: number) {
       last_name: customer?.last_name || "",
       phone: customer?.phone || "",
       email: customer?.email || "",
-      phone2: customer?.phone2 || customer?.alternate_phone || "",
+      phone2: customer?.second_phone || "",
       notes: customer?.notes || "",
     });
     setIsEditOpen(true);
@@ -89,14 +89,19 @@ export function useCustomerDetailPage(customerId: number) {
     }
     try {
       setIsSaving(true);
-      const payload = { ...editForm };
-      if (!payload.phone2?.trim()) delete payload.phone2;
-      await api.put(`/customers/${customerId}`, payload);
+      await api.put(`/customers/${customerId}`, {
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        phone: editForm.phone,
+        second_phone: editForm.phone2?.trim() || null,
+        email: editForm.email?.trim() || null,
+        notes: editForm.notes || null,
+      });
       toast.success("تم تحديث بيانات العميل بنجاح");
       setIsEditOpen(false);
-      window.location.reload();
+      await queryClient.invalidateQueries({ queryKey: ["customers"] });
     } catch (err) {
-       
+
       const apiErr = err as { response?: { data?: { detail?: unknown } } };
       toast.error((apiErr.response?.data?.detail as string) || "فشل تحديث البيانات");
     } finally {
@@ -106,11 +111,17 @@ export function useCustomerDetailPage(customerId: number) {
 
   async function handleDelete() {
     try {
-      await api.delete(`/customers/${customerId}`);
-      toast.success("تم حذف العميل بنجاح");
+      const name =
+        `${customer?.first_name || ""} ${customer?.last_name || ""}`.trim() ||
+        "العميل";
+      await api.delete(`/customers/${customerId}`, {
+        data: { archive_reason: "أرشفة من صفحة العميل" },
+      });
+      toast.success("تم نقل العميل إلى الأرشيف");
+      await queryClient.invalidateQueries({ queryKey: ["customers"] });
       navigate("/customers");
-    } catch (err) {
-      toast.error("فشل حذف العميل");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "فشل حذف العميل");
     }
   }
 

@@ -36,6 +36,15 @@ class Appointment(Base):
     notes = Column(Text, nullable=True)
     cancellation_reason = Column(Text, nullable=True)
 
+    # When the barber actually began the service.
+    #
+    # The workstation's service timer is reconstructed from this, so without it
+    # a page refresh mid-cut reset the timer to zero and the barber lost track
+    # of how long they had been working. It is set on the transition into
+    # `in-service` and never cleared, so it stays truthful as a record of when
+    # work started even if the appointment later moves on.
+    started_at = Column(DateTime(timezone=True), nullable=True)
+
     total_estimated_price = Column(Numeric(10, 2), nullable=False, default=0)
     total_estimated_duration_minutes = Column(Integer, nullable=False, default=0)
 

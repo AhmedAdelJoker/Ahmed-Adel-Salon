@@ -3,6 +3,7 @@ External data directory resolver - يحل مسار المجلد الخارجي �
 كل ملفات البرنامج (DB + uploads + invoices) تروح هناك وما تتمسح مع المشروع.
 """
 import os
+import re
 from pathlib import Path
 
 
@@ -93,6 +94,35 @@ def get_db_path() -> Path:
         except Exception:
             pass
     return get_data_dir() / "salon_pro.db"
+
+
+def resolve_database_url(url: str) -> str:
+    """Point a *relative* sqlite URL at the canonical external database.
+
+    The guard this replaces was `":/" in url`, meant to spot an absolute path.
+    Every sqlite URL contains `:/` inside its own `sqlite:///` prefix, so the
+    guard was always true and the redirect below never ran. A relative URL
+    therefore stayed relative and SQLAlchemy resolved it against the working
+    directory: the dev backend wrote `backend/salon_pro.db` while its uploads
+    went to the external data dir, and the packaged app (Electron passes an
+    absolute URL) used a second, divergent database. Two databases, one uploads
+    folder -- which is how a photo the database still referenced was missing
+    from disk.
+
+    Left alone: absolute paths (`sqlite:///C:/x.db`, `sqlite:////abs/x.db`),
+    in-memory databases, and anything that is not sqlite.
+    """
+    if not url.startswith("sqlite"):
+        return url
+    if "sqlite:///" not in url:
+        # `sqlite://` — the SQLAlchemy spelling for an in-memory database.
+        return url
+    rest = url.split("sqlite:///", 1)[1]
+    if rest.startswith("/") or re.match(r"^[A-Za-z]:[\\/]", rest):
+        return url
+    if rest.startswith(":") or "mode=memory" in rest:
+        return url
+    return f"sqlite:///{get_db_path().as_posix()}"
 
 
 def get_pdf_dir() -> Path:

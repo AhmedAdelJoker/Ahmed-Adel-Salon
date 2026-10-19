@@ -3,6 +3,7 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  Loader2,
   Phone,
   RefreshCw,
   Scissors,
@@ -47,6 +48,7 @@ export default function FastClientDialog({
   totalDuration,
   barbers,
   onSubmit,
+  saving = false,
 }: any) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -342,11 +344,17 @@ export default function FastClientDialog({
 
               <Button
                 type="submit"
-                disabled={fastClientData.serviceIds.length === 0}
+                disabled={saving || fastClientData.serviceIds.length === 0}
                 className="w-full h-14 rounded-2xl bg-accent hover:bg-accent-strong text-white font-black text-base shadow-lg shadow-accent/20 transition-all active:scale-95 flex items-center justify-center gap-3"
               >
-                <CheckCircle2 size={20} />
-                <span>حفظ وتأكيد تسجيل العميل</span>
+                {saving ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <CheckCircle2 size={20} />
+                )}
+                <span>
+                  {saving ? "جارٍ الحفظ..." : "حفظ وتأكيد تسجيل العميل"}
+                </span>
               </Button>
             </div>
           </div>

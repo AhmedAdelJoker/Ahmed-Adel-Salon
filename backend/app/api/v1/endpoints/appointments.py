@@ -21,6 +21,7 @@ from app.models.invoice_item import InvoiceItem
 from app.models.invoice_payment import InvoicePayment
 from app.models.business_settings import BusinessSettings
 from app.core.clock import salon_now
+from app.core.employee_rules import SERVICE_PROVIDER_JOB_TITLES
 from app.core.working_hours import resolve_window
 from app.models.service_session import ServiceSession
 
@@ -347,6 +348,7 @@ def list_appointments(
     date_filter: str | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
+    customer_id: int | None = Query(None, description="Filter appointments of one customer"),
     # Phase 2: enforce pagination on a previously unbounded list endpoint
     skip: int = Query(0, ge=0, description="Records to skip"),
     limit: int = Query(100, ge=1, le=500, description="Max records to return"),
@@ -372,6 +374,9 @@ def list_appointments(
         query = query.filter(Appointment.appointment_date == salon_now().date())
     elif date_filter == "custom" and start_date and end_date:
         query = query.filter(Appointment.appointment_date >= start_date, Appointment.appointment_date <= end_date)
+
+    if customer_id is not None:
+        query = query.filter(Appointment.customer_id == customer_id)
 
     if current_user.role == "barber":
         barber_id = getattr(current_user, "barber_id", None) or getattr(current_user, "employee_id", None)
@@ -435,9 +440,11 @@ def get_appointments_by_barber(
     current_user: User = Depends(require_any_staff),
 ):
     query_date = target_date or salon_now().date()
+    # Every service-providing title owns appointments (colour and skin
+    # specialists included) and assistants accompany their barber's column.
     barbers = db.query(Employee).filter(
         Employee.is_active == True,
-        Employee.job_title.ilike("%barber%")
+        Employee.job_title.in_(list(SERVICE_PROVIDER_JOB_TITLES) + ["barber_assistant"]),
     ).all()
     
     appointments = db.query(Appointment).options(*appointment_eager_options()).filter(
@@ -594,9 +601,12 @@ def get_available_slots(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    from app.services.scheduling_service import get_available_time_slots
-    slots = get_available_time_slots(db, barber_id, date)
-    return slots
+    from app.services.booking_scheduler import get_available_slots_for_barber
+
+    # The scheduler returns `["22:00", "22:30", ...]`; this form renders
+    # `slot.time` / `slot.available`, so wrap rather than hand it the raw list.
+    slots = get_available_slots_for_barber(db, barber_id, date)
+    return [{"time": slot, "available": True} for slot in slots]
 
 @router.post("/cleanup-cancelled", status_code=status.HTTP_200_OK)
 def manual_cleanup_cancelled(
@@ -610,7 +620,11 @@ def manual_cleanup_cancelled(
 @router.post("/auto-cancel-expired")
 def auto_cancel_expired_appointments(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_manage_appointments),
+    # Same width as the manual cancel (DELETE /{id}) and create/update: a
+    # cashier runs the desk, and this sweep only does what they may already do
+    # by hand, bounded to expired bookings. Manager-only gate locked the till
+    # operator out with 403 on every board load.
+    current_user: User = Depends(require_cashier_manager_owner),
 ):
     """Auto-cancel expired bookings:
     - Bookings from previous days with status pending/confirmed/waiting

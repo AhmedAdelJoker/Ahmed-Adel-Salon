@@ -48,7 +48,7 @@ export default function CustomerInvoicesTab({
                   </thead>
                   <tbody className="divide-y divide-border/30">
                     {invoices.map((inv) => {
-                      const conf = getInvoiceStatusConfig(inv.status);
+                      const conf = getInvoiceStatusConfig(inv);
                       return (
                         <tr key={inv.id} className="hover:bg-soft/30">
                           <td className="px-3 py-2 text-xs font-black text-main">

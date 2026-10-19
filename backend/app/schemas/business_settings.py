@@ -78,6 +78,11 @@ class BusinessSettingsUpdate(BaseModel):
     landing_testimonials_title: Optional[str] = None
     landing_testimonials_subtitle: Optional[str] = None
     landing_cover_image_url: Optional[str] = None
+    landing_hero_video_url: Optional[str] = None
+    landing_video_poster_url: Optional[str] = None
+    landing_video_autoplay: Optional[bool] = None
+    landing_video_muted: Optional[bool] = None
+    landing_motion_enabled: Optional[bool] = None
     landing_theme_id: Optional[str] = None
     landing_show_staff: Optional[bool] = None
     landing_show_staff_bio: Optional[bool] = None
@@ -173,6 +178,11 @@ class BusinessSettingsRead(BaseModel):
     landing_testimonials_title: Optional[str] = None
     landing_testimonials_subtitle: Optional[str] = None
     landing_cover_image_url: Optional[str] = None
+    landing_hero_video_url: Optional[str] = None
+    landing_video_poster_url: Optional[str] = None
+    landing_video_autoplay: Optional[bool] = None
+    landing_video_muted: Optional[bool] = None
+    landing_motion_enabled: Optional[bool] = None
     landing_theme_id: Optional[str] = None
     landing_show_staff: Optional[bool] = True
     landing_show_staff_bio: Optional[bool] = True

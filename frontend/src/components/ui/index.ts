@@ -9,7 +9,11 @@ export {
   SelectSeparator,
 } from "@/components/ui/select";
 export { Badge } from "@/components/ui/badge";
-export { Avatar } from "@/components/ui/Avatar";
+// `Avatar` was removed: nothing imported it, and its `imageErrorRef` was a
+// plain object recreated on every render, so `onError` set it and the next
+// render reset it — the initials fallback could never appear. Every avatar in
+// the app goes through `components/shared/EmployeeAvatar`, which does handle a
+// missing file.
 export {
   Table,
   TableHeader as Thead,

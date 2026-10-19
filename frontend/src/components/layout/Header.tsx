@@ -40,6 +40,25 @@ const roleLabel = (role) =>
     ACCOUNTANT: "المحاسب",
   })[normalizeRole(role)] || "المستخدم";
 
+/**
+ * Isolated minute clock. Ticking here re-renders only this span, not the whole
+ * Header (menus, avatar, framer-motion subtrees) every second.
+ */
+function LiveClock() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <span className="text-[13px] font-black text-main tabular-nums tracking-tight">
+      {now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}
+    </span>
+  );
+}
+
 export default function Header({
   title = "Barber Luxe",
   subtitle = "Premium Management Suite",
@@ -49,13 +68,6 @@ export default function Header({
   const { user, logout, loading } = useAuth();
   const { preferences, toggleTheme } = usePreferences();
   const { valutBalance, vaultCashBalance } = useSalon();
-
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   const isDark = preferences?.theme !== "light";
   const role = normalizeRole(user?.role);
@@ -86,7 +98,7 @@ export default function Header({
 
   return (
     <header
-      className="relative z-50 flex min-h-16 w-full min-w-0 flex-wrap items-center justify-between gap-3 border-b border-border/5 bg-bg-card/40 px-3 py-3 backdrop-blur-xl sm:min-h-20 sm:px-6 lg:flex-nowrap lg:px-8"
+      className="relative z-50 flex min-h-16 w-full min-w-0 flex-wrap items-center justify-between gap-3 border-b border-border/5 bg-bg-card/40 px-3 py-3 sm:min-h-20 sm:px-6 lg:flex-nowrap lg:px-8"
     >
       {/* Decorative Top Glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[1px] w-1/2 bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
@@ -152,13 +164,7 @@ export default function Header({
               <div className="absolute inset-0 bg-accent/20 blur-sm rounded-full animate-pulse" />
               <ClockIcon size={14} className="relative text-accent" />
             </div>
-            <span className="text-[13px] font-black text-main tabular-nums tracking-tight">
-              {currentTime.toLocaleTimeString("ar-EG", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })}
-            </span>
+            <LiveClock />
           </div>
 
           {(role === "OWNER" ||
@@ -174,8 +180,8 @@ export default function Header({
               <div className="h-8 w-8 flex items-center justify-center rounded-xl bg-accent/10 text-accent border border-accent/20">
                 <Wallet size={16} />
               </div>
-              <div className="flex flex-col leading-none">
-                <span className="text-[9px] font-black text-accent/60 uppercase tracking-widest mb-1.5">
+              <div className="flex min-w-[72px] flex-col gap-0.5">
+                <span className="text-[9px] font-black text-accent/60 uppercase tracking-widest">
                   الخزنة • Vault
                 </span>
                 <span className="text-[14px] font-black text-main tabular-nums drop-shadow-sm">

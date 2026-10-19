@@ -277,7 +277,12 @@ export function useSchedule() {
       total += 1;
       if (["WAITING", "CONFIRMED"].includes(status)) confirmed += 1;
       else if (status === "IN_PROGRESS") inProgress += 1;
-      else if (status === "AT_RECEPTION") reception += 1;
+      // normalizeStatus maps "completed" → AT_RECEPTION and
+      // "ready_for_payment" → AT_CASHIER. The reception bucket is that whole
+      // group (service finished or waiting at the till); AT_CASHIER used to
+      // fall through uncounted, so paid-pending bookings vanished from stats.
+      else if (["AT_RECEPTION", "AT_CASHIER"].includes(status))
+        reception += 1;
       else if (status === "DONE") done += 1;
       else if (status === "CANCELLED") cancelled += 1;
     }

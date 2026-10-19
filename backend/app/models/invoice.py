@@ -9,6 +9,10 @@ class Invoice(Base):
     __tablename__ = "invoices"
     __table_args__ = (
         Index("ix_invoices_barber_created", "barber_id", "created_at"),
+        # Equality columns first, then the range column. The barber earnings
+        # aggregates filter `barber_id = ? AND is_draft = 0 AND created_at >= ?`,
+        # so only this ordering lets the planner satisfy all three from the index.
+        Index("ix_invoices_barber_draft_created", "barber_id", "is_draft", "created_at"),
         Index("ix_invoices_created_draft", "created_at", "is_draft"),
         UniqueConstraint(
             "created_by_user_id",

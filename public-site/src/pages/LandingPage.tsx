@@ -45,6 +45,7 @@ import FaqSection from "../components/landing/FaqSection";
 import OwnerSections from "../components/landing/OwnerSections";
 import ScrollProgress from "../components/landing/ScrollProgress";
 import ScrollReveal from "../components/landing/ScrollReveal";
+import ContactSection from "../components/landing/ContactSection";
 import GallerySection from "../components/landing/GallerySection";
 import { useMotionEnabled } from "../hooks/useMotionEnabled";
 import { ServiceRowSkeleton } from "../components/landing/Skeleton";
@@ -845,7 +846,7 @@ export default function LandingPage() {
               content.copy.landingTeamSubtitle || t("landing.teamSubtitle")
             }
             showBios={settings.landingShowStaffBio !== false}
-            salonSlug={salonSlug}
+salonSlug={salonSlug}
             t={t}
             onBook={(member) => {
               // Pre-select the stylist on the booking page. The id is only a
@@ -905,66 +906,22 @@ export default function LandingPage() {
           eyebrow={t("landing.faqEyebrow")}
         />
 
-        {/* ── Contact ────────────────────────────────────────────────── */}
+        {/* ── Contact ──────────────────────────────── */}
         {/*
-          Contact actions only. Opening hours are rendered by `OwnerSections`
-          as part of the owner's configurable location block, which is where the
-          open/closed label and the address already live; an earlier version of
-          this page also drew an hours table here, so every salon showed
-          "ساعات العمل" twice with the same seven rows.
+          The closing band: contact rows on the left, the map link on the
+          right. Hours are not repeated here — `OwnerSections` already draws
+          them together with the open/closed label.
         */}
-        <section id="contact" className="shell pb-[length:var(--section-y)]">
-          <div className="rule flex flex-col gap-8 pt-14 lg:flex-row lg:items-end lg:justify-between">
-            <div className="lg:col-span-6">
-              <p
-                className="mb-3 text-[length:var(--step--2)] font-semibold uppercase text-accent"
-                style={{ letterSpacing: "var(--tracking-eyebrow)" }}
-              >
-                {content.copy.landingContactEyebrow || t("nav.contact")}
-              </p>
-              <h2 className="text-[length:var(--step-3)] font-bold leading-tight text-balance">
-                {content.copy.landingContactTitle || salonName}
-              </h2>
-              {content.copy.landingContactSubtitle || address ? (
-                <p className="measure mt-4 text-[length:var(--step-0)] leading-relaxed text-ink-soft">
-                  {content.copy.landingContactSubtitle || address}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              {phone ? (
-                <a
-                  href={`tel:${phone}`}
-                  className="btn-base btn-base--outline min-h-11 px-5 text-[length:var(--step--1)]"
-                >
-                  {t("landing.callUs")}
-                  <span className="numeric ms-2">{phone}</span>
-                </a>
-              ) : null}
-              {whatsappUrl ? (
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-base btn-base--outline min-h-11 px-5 text-[length:var(--step--1)]"
-                >
-                  {t("landing.whatsapp")}
-                </a>
-              ) : null}
-              {mapsUrl ? (
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-base btn-base--outline min-h-11 px-5 text-[length:var(--step--1)]"
-                >
-                  {t("landing.viewMap")}
-                </a>
-              ) : null}
-            </div>
-          </div>
-        </section>
+        <ContactSection
+          t={t}
+          eyebrow={content.copy.landingContactEyebrow || t("nav.contact")}
+          title={content.copy.landingContactTitle || salonName}
+          subtitle={content.copy.landingContactSubtitle || undefined}
+          address={address ?? undefined}
+          phone={phone ?? undefined}
+          whatsappUrl={whatsappUrl ?? undefined}
+          mapsUrl={mapsUrl ?? undefined}
+        />
       </main>
 
       {/* ── Footer ───────────────────────────────────────────────────── */}

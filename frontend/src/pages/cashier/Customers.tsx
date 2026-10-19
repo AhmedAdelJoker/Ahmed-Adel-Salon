@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -5,6 +6,7 @@ import { Card } from "@/components/ui";
 import InlineNotice from "@/components/shared/InlineNotice";
 
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { PageShell } from "@/components/shared/PageShell";
 import { PageHeader } from "@/components/shared/PremiumUI";
 import { LoadingState } from "@/components/shared";
 import {
@@ -13,6 +15,7 @@ import {
   CustomerHeader,
   CustomerKpis,
   DuplicatesAlert,
+  MergeCustomersDialog,
   CustomerToolbar,
   CustomerTable,
   CustomerCards,
@@ -36,6 +39,7 @@ function CustomersInner() {
   const isOwner = user?.role === "owner" || user?.role === "admin";
   const isManagerOrOwner =
     isOwner || user?.role === "manager" || user?.role === "accountant";
+  const [isMergeOpen, setIsMergeOpen] = useState(false);
   const {
     searchTerm,
     setSearchTerm,
@@ -49,7 +53,7 @@ function CustomersInner() {
     setCurrentPage,
     totalPages,
     stats,
-    fetchCustomers,
+    refreshAll,
     removeCustomer,
     handleExport,
     statsError,
@@ -72,7 +76,7 @@ function CustomersInner() {
     openEditCustomer,
     handleCustomerFormSubmit,
     handleDelete,
-  } = useCustomerDialogs(fetchCustomers, removeCustomer);
+  } = useCustomerDialogs(refreshAll, removeCustomer);
 
   const isFiltering = searchTerm.trim() !== "" || activeFilter !== "الكل";
   const emptyTitle =
@@ -84,25 +88,24 @@ function CustomersInner() {
 
   if (loading && customers.length === 0) {
     return (
-      <div className="erp-page-container space-y-6 pb-6 sm:space-y-8">
+      <PageShell>
         <PageHeader
           title="سجل العملاء"
           subtitle="إدارة قاعدة البيانات وبناء علاقات ولاء مستدامة"
         />
         <LoadingState variant="page" label="جاري تحميل العملاء..." />
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="erp-page-container space-y-6 pb-6 sm:space-y-8">
+    <PageShell>
       <CustomerHeader
-        loading={loading}
         isManagerOrOwner={isManagerOrOwner}
         onExport={handleExport}
         onArchive={() => navigate("/owner/customers/archive")}
         onCreate={openCreateCustomer}
-        onImported={fetchCustomers}
+        onImported={refreshAll}
       />
 
       {statsError && !loading && (
@@ -114,6 +117,7 @@ function CustomersInner() {
       <DuplicatesAlert
         groupCount={stats.duplicate_group_count}
         customerCount={stats.duplicate_customer_count}
+        onMerge={() => setIsMergeOpen(true)}
       />
 
       <CustomerToolbar
@@ -124,6 +128,12 @@ function CustomersInner() {
         viewMode={viewMode}
         onViewMode={setViewMode}
         loading={loading}
+        counts={{
+          total: stats.total,
+          vip_count: stats.vip_count,
+          regular_count: stats.regular_count,
+          new_count: stats.new_count,
+        }}
       />
 
       <Card className="overflow-hidden border-none bg-transparent shadow-none lg:border lg:bg-card lg:shadow-sm">
@@ -162,15 +172,15 @@ function CustomersInner() {
             }}
           />
         )}
-      {totalPages > 1 ? (
-        <CustomerPagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalCount={stats.total}
-          filteredCount={customers.length}
-          onPage={setCurrentPage}
-        />
-      ) : null}
+        {totalPages > 1 ? (
+          <CustomerPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalCount={stats.total}
+            filteredCount={customers.length}
+            onPage={setCurrentPage}
+          />
+        ) : null}
       </Card>
 
       <CustomerDetailsDialog
@@ -202,6 +212,12 @@ function CustomersInner() {
         onConfirm={handleDelete}
         onClose={() => setDeleteTarget(null)}
       />
-    </div>
+
+      <MergeCustomersDialog
+        open={isMergeOpen}
+        onOpenChange={setIsMergeOpen}
+        onMerged={refreshAll}
+      />
+    </PageShell>
   );
 }

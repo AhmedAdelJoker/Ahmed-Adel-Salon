@@ -14,7 +14,8 @@ from app.models.business_settings import BusinessSettings
 from app.schemas.business_settings import BusinessSettingsRead, BusinessSettingsUpdate
 from app.services.activity_log_service import log_activity
 from app.utils.media import process_image_content, get_upload_path
-from app.core.upload_security import validate_image
+from app.core.upload_security import validate_image, validate_video
+from app.core.clock import utc_now_naive
 
 router = APIRouter(prefix="/business-settings", tags=["Business Settings"])
 
@@ -51,9 +52,12 @@ def _row_to_response(row: BusinessSettings, etag: bool = False):
     schema = BusinessSettingsRead.model_validate(row)
     published_version = getattr(row, "public_site_published_version", None)
     payload = schema.model_dump(by_alias=True, mode="json")
+    # Never-published is stale by definition: without this the publish button
+    # stays disabled on a fresh install and nothing can ever make the site
+    # public, because the flag is the only thing that enables the button.
     payload["publicSiteStale"] = bool(
-        published_version is not None
-        and int(published_version) != int(getattr(row, "version", 1) or 1)
+        published_version is None
+        or int(published_version) != int(getattr(row, "version", 1) or 1)
     )
     out = JSONResponse(content=payload)
     if etag:
@@ -198,6 +202,43 @@ async def upload_business_media(
     return {"url": url}
 
 
+# A hero clip is decor, not an asset library: it is one file per salon, it is
+# looped behind the headline, and it is competing with the LCP image for the
+# visitor's bandwidth. 25 MB is comfortably above a 10-15s phone recording at
+# 1080p and below the point where a visitor on mobile data abandons the page.
+MAX_HERO_VIDEO_BYTES = 25 * 1024 * 1024
+
+
+@router.post("/hero-video")
+async def upload_hero_video(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_manager),
+):
+    """رفع فيديو قصير لخلفية الـ Hero.
+
+    Unlike `/media`, the bytes are stored verbatim: there is no image pipeline to
+    run, and re-encoding a clip server-side would strip the poster frame and cost
+    more than the upload itself. Validation is extension + size (see
+    `validate_video`), which is what the rest of the upload surface does.
+    """
+    content = await validate_video(file, max_size=MAX_HERO_VIDEO_BYTES)
+
+    upload_dir = get_upload_path("business")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    # The sanitizer inside validate_upload already reduced the name; keep the
+    # suffix it validated against so the stored extension matches what the
+    # public site will be asked to play.
+    suffix = Path(file.filename or "").suffix.lower() or ".mp4"
+    if suffix not in {".mp4", ".webm"}:
+        suffix = ".mp4"
+    filename = f"hero_{uuid.uuid4().hex}{suffix}"
+
+    (upload_dir / filename).write_bytes(content)
+    return {"url": f"/uploads/business/{filename}", "size": len(content)}
+
+
 @router.post("/publish-site")
 def publish_site(
     db: Session = Depends(get_db),
@@ -207,18 +248,27 @@ def publish_site(
     from datetime import datetime
 
     row = _get_or_create_business_settings(db)
-    row.public_site_published_at = datetime.utcnow()
+    row.public_site_published_at = utc_now_naive()
 
     # Snapshot: نسخ الإعدادات العامة الحالية لاستخدامها في الصفحة العامة
     snapshot_fields = [
         "salon_name", "shop_phone", "shop_whatsapp", "address", "logo_url",
         "public_slug", "working_hours",
+        # Read by `booking_public` as `public_settings.get("currency")`, but never
+        # snapshotted — so the public site always received `None` and fell back
+        # to its own default no matter what the salon chose.
+        "currency",
         "landing_hero_title", "landing_hero_subtitle", "landing_hero_badge",
         "landing_about_title", "landing_about_content",
         "landing_services_eyebrow", "landing_services_title", "landing_services_subtitle",
         "landing_portfolio_eyebrow", "landing_portfolio_title",
         "landing_booking_eyebrow", "landing_booking_title", "landing_booking_subtitle",
         "landing_location_eyebrow", "landing_location_title", "landing_location_description",
+        # These three were on the model, in the pydantic schema, and rendered by
+        # the public site — but missing from this list, so they never reached the
+        # snapshot and the salon could not change a single word of them.
+        "landing_location_open_label", "landing_location_closed_label",
+        "landing_location_status_text",
         "landing_contact_eyebrow", "landing_contact_title", "landing_contact_subtitle",
         "landing_quick_actions_eyebrow", "landing_quick_actions_title", "landing_quick_actions_subtitle",
         "landing_final_title", "landing_final_subtitle", "landing_final_button_label",
@@ -226,6 +276,11 @@ def publish_site(
         "landing_public_header_badge",
         "landing_testimonials_eyebrow", "landing_testimonials_title", "landing_testimonials_subtitle",
         "landing_cover_image_url", "landing_theme_id",
+        # Hero video + the motion master switch. Same trap as the fields above:
+        # without these four the owner could upload a clip, see it saved, and
+        # the public site would never learn it existed.
+        "landing_hero_video_url", "landing_video_poster_url",
+        "landing_video_autoplay", "landing_video_muted", "landing_motion_enabled",
         "landing_show_staff", "landing_show_staff_bio",
         "landing_stats", "landing_features", "landing_trust_badges",
         "landing_testimonials", "landing_portfolio",

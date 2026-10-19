@@ -19,9 +19,24 @@ from app.core.working_hours import (
     window_contains,
     window_minutes,
 )
+from app.models.employee import Employee
 from app.schemas.business_settings import BusinessSettingsUpdate
 from app.services.scheduling_service import get_available_time_slots
 from tests.helpers import auth_headers, make_user
+
+
+def _seed_barber(db_session, username="barber1"):
+    """The endpoint resolves an `Employee`, not the staff `User`.
+
+    These are separate tables with separate id sequences, so passing a user id
+    found no employee and the endpoint answered `[]` for every date — which
+    passed the "corrupted row" assertion for the wrong reason while the
+    overnight test failed.
+    """
+    db_session.add(
+        Employee(full_name="Barber One", phone_primary="01009998888", job_title="barber")
+    )
+    db_session.commit()
 
 
 # --------------------------------------------------------------------------- day keys
@@ -393,7 +408,8 @@ def test_available_slots_survive_a_corrupted_row(client, db_session):
     db_session.add(row)
     db_session.commit()
 
-    barber = make_user(db_session, username="barber1", password="Barber123", role="barber")
+    _seed_barber(db_session)
+    barber = db_session.query(Employee).first()
 
     resp = client.get(
         "/api/v1/appointments/available-slots",
@@ -408,7 +424,8 @@ def test_available_slots_cover_the_overnight_tail(client, db_session):
     from app.models.business_settings import BusinessSettings
 
     make_user(db_session, username="cashier1", role="cashier")
-    barber = make_user(db_session, username="barber1", password="Barber123", role="barber")
+    _seed_barber(db_session)
+    barber = db_session.query(Employee).first()
 
     row = BusinessSettings(salon_name="SalonPro", currency="EGP")
     row.working_hours = {"saturday": {"is_open": True, "open_time": "22:00", "close_time": "02:00"}}

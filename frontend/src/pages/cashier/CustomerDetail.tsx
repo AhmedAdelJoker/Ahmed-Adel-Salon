@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { PageShell } from "@/components/shared/PageShell";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -40,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 function CustomerDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const isOwner = ["OWNER", "ADMIN"].includes(
     String(user?.role || "").toUpperCase(),
@@ -187,6 +189,14 @@ function CustomerDetailPage() {
                     <Phone size={12} /> <span dir="ltr">{customer.phone}</span>
                   </a>
                 )}
+                {customer.second_phone && (
+                  <a
+                    href={`tel:${customer.second_phone}`}
+                    className="flex items-center gap-1 text-muted hover:text-primary"
+                  >
+                    <Phone size={12} /> <span dir="ltr">{customer.second_phone}</span>
+                  </a>
+                )}
                 {customer.email && (
                   <a
                     href={`mailto:${customer.email}`}
@@ -308,6 +318,8 @@ function CustomerDetailPage() {
             appointmentsLoading={appointmentsLoading}
             invoices={invoices}
             invoicesLoading={invoicesLoading}
+            activityLogs={activityLogs}
+            activityLoading={activityLoading}
           />
 
           <CustomerAppointmentsTab
@@ -333,9 +345,9 @@ function CustomerDetailPage() {
           open={isBookingOpen}
           onOpenChange={setIsBookingOpen}
           customer={customer}
-          onSuccess={() => {
+          onSuccess={async () => {
             setIsBookingOpen(false);
-            window.location.reload();
+            await queryClient.invalidateQueries({ queryKey: ["customers"] });
           }}
         />
 
@@ -343,10 +355,10 @@ function CustomerDetailPage() {
         <ConfirmDialog
           open={isDeleteOpen}
           onOpenChange={setIsDeleteOpen}
-          title="حذف العميل"
-          description={`هل أنت متأكد من حذف ${customer.first_name}؟ سيتم حذفه نهائياً من النظام.`}
+          title="أرشفة العميل"
+          description={`هل أنت متأكد من أرشفة ${customer.first_name}؟ سيتم نقله إلى الأرشيف ويمكن للمالك استرجاعه لاحقاً من صفحة الأرشيف.`}
           onConfirm={handleDelete}
-          confirmText="نعم، احذف"
+          confirmText="نعم، أرشِف"
           cancelText="إلغاء"
           variant="danger"
         />

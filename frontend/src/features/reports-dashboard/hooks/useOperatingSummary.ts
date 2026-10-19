@@ -38,6 +38,13 @@ export interface DayStatus {
   last_closing_cash: number | null;
 }
 
+export interface CancellationStats {
+  count: number;
+  total: number;
+  /** null when there are no appointments in the window. */
+  rate: number | null;
+}
+
 export interface OperatingSummary {
   /** null when the server could not build the series. Not an empty array. */
   daily: DailyPoint[] | null;
@@ -45,6 +52,7 @@ export interface OperatingSummary {
   top_barbers: RankedBarber[] | null;
   top_services: RankedService[] | null;
   day_status: DayStatus | null;
+  cancellations: CancellationStats | null;
   generated_at: string;
 }
 
@@ -68,6 +76,7 @@ const NOTHING: OperatingSummary = {
   top_barbers: null,
   top_services: null,
   day_status: null,
+  cancellations: null,
   generated_at: "",
 };
 

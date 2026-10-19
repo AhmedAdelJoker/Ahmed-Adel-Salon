@@ -15,15 +15,34 @@ import type { AuthUser } from "../types/common";
 const TOKEN_KEY = "salon-member-token";
 const USER_KEY = "salon-member-user";
 
+export interface MemberBooking {
+  id: number;
+  /** `YYYY-MM-DD`, split out of the API's `scheduledAt` datetime. */
+  appointment_date: string;
+  /** `HH:mm`, split out of `scheduledAt`. */
+  appointment_time: string;
+  status: string;
+  service_name: string;
+  barber_name: string;
+}
+
 export interface MemberAuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   loyaltyPoints: number;
+  bookings: MemberBooking[];
   login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => void;
   register: (formData: Record<string, unknown>) => Promise<AuthUser>;
   refreshUser: () => Promise<void>;
+  fetchBookings: () => Promise<void>;
+  cancelBooking: (appointmentId: number) => Promise<void>;
+  rescheduleBooking: (
+    appointmentId: number,
+    appointmentDate: string,
+    appointmentTime: string,
+  ) => Promise<void>;
 }
 
 const MemberAuthContext = createContext<MemberAuthContextValue | null>(null);
@@ -40,6 +59,7 @@ export function MemberAuthProvider({ children }: { children: ReactNode }) {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [bookings, setBookings] = useState<MemberBooking[]>([]);
 
   const setAuth = useCallback((token: string | null, userData: AuthUser | null) => {
     try {
@@ -121,18 +141,136 @@ export function MemberAuthProvider({ children }: { children: ReactNode }) {
     }
   }, [setAuth]);
 
+  /**
+   * Booking history.
+   *
+   * `GET /public/member/bookings` has existed on the backend for the whole time
+   * the portal existed, returning the member's last 100 appointments with their
+   * status, time, service and barber — and nothing in this app called it. A
+   * logged-in member had an account and a loyalty balance but no record of a
+   * single visit, which is the one thing an account is for.
+   */
+  const fetchBookings = useCallback(async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      setBookings([]);
+      return;
+    }
+    try {
+      const res = await api.get("/public/member/bookings", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = (res.data ?? res) as unknown;
+      const list = Array.isArray(payload) ? payload : [];
+      setBookings(
+        (list as Record<string, unknown>[]).map((item) => {
+          /*
+           * The API returns camelCase (`scheduledAt`, `serviceName`,
+           * `barberName`) — MemberBookingRead in backend/app/schemas/member.py.
+           * Reading snake_case here produced a history where every field was
+           * blank: the list rendered, but with "—" for the date and an empty
+           * service name on every row.
+           *
+           * `scheduledAt` arrives as an ISO datetime; it is split here rather
+           * than passing an ISO string to `formatDate`, which expects `YYYY-MM-DD`
+           * and parses it as local wall-clock time.
+           */
+          const scheduled = String(item.scheduledAt ?? "");
+          const [datePart, timePart = ""] = scheduled.split("T");
+          return {
+            id: Number(item.id),
+            appointment_date: datePart,
+            appointment_time: timePart.slice(0, 5),
+            status: String(item.status ?? ""),
+            service_name: String(item.serviceName ?? ""),
+            barber_name: String(item.barberName ?? ""),
+          };
+        }),
+      );
+    } catch {
+      // A member with a valid token but no readable history is not an error
+      // worth surfacing — the portal degrades to an empty list.
+      setBookings([]);
+    }
+  }, []);
+
+  /**
+   * History is fetched alongside the profile: a member who signs in should see
+   * their appointments without a second round trip, and `bookingsCount` on the
+   * profile is derived from the same records.
+   */
+  useEffect(() => {
+    if (user) void fetchBookings();
+    else setBookings([]);
+  }, [user, fetchBookings]);
+
+  /**
+   * Self-service cancel and reschedule.
+   *
+   * These exist because the confirmation screen handed over a reference and a
+   * calendar file but no way to act on them — every change of plan was a phone
+   * call. The backend validates ownership and slot availability; the member
+   * token is sent because both endpoints are member-scoped.
+   *
+   * `fetchBookings()` runs afterwards so the list reflects the change instead of
+   * showing an appointment the member has just cancelled.
+   */
+  const cancelBooking = useCallback(
+    async (appointmentId: number) => {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) throw new Error("not authenticated");
+      await api.post(
+        `/public/member/bookings/${appointmentId}/cancel`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      await fetchBookings();
+    },
+    [fetchBookings],
+  );
+
+  const rescheduleBooking = useCallback(
+    async (appointmentId: number, appointmentDate: string, appointmentTime: string) => {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) throw new Error("not authenticated");
+      await api.post(
+        `/public/member/bookings/${appointmentId}/reschedule`,
+        { appointment_date: appointmentDate, appointment_time: appointmentTime },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      await fetchBookings();
+    },
+    [fetchBookings],
+  );
+
   const value = useMemo<MemberAuthContextValue>(
     () => ({
       user,
       isAuthenticated: Boolean(user),
       isLoading,
       loyaltyPoints,
+      bookings,
       login,
       logout,
       register,
       refreshUser,
+      fetchBookings,
+      cancelBooking,
+      rescheduleBooking,
     }),
-    [user, isLoading, loyaltyPoints, login, logout, register, refreshUser],
+    [
+      user,
+      isLoading,
+      loyaltyPoints,
+      bookings,
+      login,
+      logout,
+      register,
+      refreshUser,
+      fetchBookings,
+      cancelBooking,
+      rescheduleBooking,
+    ],
   );
 
   return <MemberAuthContext.Provider value={value}>{children}</MemberAuthContext.Provider>;

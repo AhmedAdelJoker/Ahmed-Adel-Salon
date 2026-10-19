@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { PageShell } from "@/components/shared/PageShell";
 import { cn } from "@/lib/core/utils";
 
 import Toolbar from "@/pages/cashier/schedule/Toolbar";
@@ -68,7 +69,7 @@ function SchedulePage() {
   } = useSchedule();
 
   return (
-    <div className="erp-page-container space-y-8 pb-16 relative">
+    <PageShell className="relative">
       <PageHeader className={undefined}
         title="مخطط المواعيد الذكي"
         subtitle="إدارة المواعيد اليومية بدقة واحترافية"
@@ -205,7 +206,7 @@ function SchedulePage() {
         appointment={selectedAppointment}
         onClose={() => setSelectedAppointment(null)}
       />
-    </div>
+    </PageShell>
   );
 }
 

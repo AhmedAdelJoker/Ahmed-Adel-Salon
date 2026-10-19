@@ -27,8 +27,10 @@ import {
   ServiceDetailsPanel,
   QuickActionsPanel,
 } from "@/features/barber-workstation";
+import { useAppLocale } from "@/hooks/useAppLocale";
 
 const BarberWorkStation = () => {
+  const { locale } = useAppLocale();
   const {
     navigate,
     setSearchParams,
@@ -138,8 +140,7 @@ const BarberWorkStation = () => {
                     <p className="text-sm text-muted flex items-center gap-2">
                       <Calendar size={14} />
                       {apt.appointment_date
-                        ? new Date(apt.appointment_date).toLocaleDateString(
-                            "ar-EG",
+                        ? new Date(apt.appointment_date).toLocaleDateString(locale,
                             { weekday: "long", day: "numeric", month: "long" },
                           )
                         : ""}
@@ -209,9 +210,10 @@ const BarberWorkStation = () => {
             formatCurrency={formatCurrency}
             audioEnabled={audioEnabled}
             setAudioEnabled={setAudioEnabled}
-            onComplete={() => setShowCompleteDialog(true)}
-            onCancel={() => setShowCancelDialog(true)}
-          />
+onComplete={() => setShowCompleteDialog(true)}
+        onCancel={() => setShowCancelDialog(true)}
+        status={appointment.status}
+        />
         </div>
       </PageShell>
 

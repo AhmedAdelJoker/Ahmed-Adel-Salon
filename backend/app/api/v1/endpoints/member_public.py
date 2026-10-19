@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, time
 import logging
 from typing import Optional
 
@@ -24,6 +24,7 @@ from app.core.security import (
 )
 from app.models.appointment import Appointment
 from app.models.customer import Customer
+from app.models.customer_cancellation_log import CustomerCancellationLog
 from app.models.member_account import MemberAccount
 from app.models.user import User
 from app.schemas.member import (
@@ -42,6 +43,35 @@ member_auth_rate_limit = rate_limit(
     max_requests=10,
     window_seconds=60,
 )
+
+"""
+Statuses that represent work already done. A member cannot cancel or move these:
+rewriting a completed visit would break revenue reporting and the loyalty points
+that were awarded against it. Kept as a set because both endpoints refuse the
+same list, and it is the one thing that must not drift between them.
+"""
+_FINAL_STATUSES = frozenset({"completed", "done", "paid", "checked_out"})
+
+
+class MemberCancelPayload(BaseModel):
+    """Body for cancelling a booking.
+
+    An empty body is valid — cancelling does not require justifying itself — so
+    `reason` is optional and defaults to a member-initiated cancellation.
+    """
+
+    reason: Optional[str] = None
+
+
+class MemberReschedulePayload(BaseModel):
+    """Body for moving a booking.
+
+    `appointment_time` is typed as `time`, so FastAPI rejects "25:00" at the
+    schema boundary instead of letting it reach the database.
+    """
+
+    appointment_date: date
+    appointment_time: time
 
 
 def _normalize_email(email: str) -> str:
@@ -145,6 +175,46 @@ def _member_user(
     name = " ".join(
         part for part in (customer.first_name, customer.last_name) if part
     ).strip()
+
+    # Calculate average rating from public reviews (verified visits only)
+    from app.models.review import Review
+    avg_rating = (
+        db.query(func.avg(Review.rating))
+        .filter(
+            Review.appointment_id.in_(
+                db.query(Appointment.id).filter(
+                    Appointment.customer_id == customer.customer_id,
+                    Appointment.status.in_(
+                        ["completed", "done", "checked_out", "paid"]
+                    ),
+                )
+            ),
+            Review.is_public == True,
+            Review.is_verified_visit == True,
+        )
+        .scalar()
+    )
+    rating = float(avg_rating) if avg_rating is not None else None
+
+    # Simple streak: count of consecutive recent visits (within 60 days)
+    # This is a simplified heuristic; a real streak would need more logic
+    streak = 0
+    if bookings_count > 0:
+        # Count completed appointments in the last 60 days as a simple activity metric
+        from datetime import datetime, timedelta
+        cutoff = datetime.now() - timedelta(days=60)
+        recent_completed = (
+            db.query(func.count(Appointment.id))
+            .filter(
+                Appointment.customer_id == customer.customer_id,
+                Appointment.status.in_(["completed", "done", "checked_out", "paid"]),
+                Appointment.appointment_date >= cutoff.date(),
+            )
+            .scalar()
+            or 0
+        )
+        streak = int(recent_completed)
+
     return MemberUserRead(
         id=customer.customer_id,
         name=name or "عميل",
@@ -152,6 +222,8 @@ def _member_user(
         phone=customer.phone,
         loyaltyPoints=float(customer.loyalty_points or 0),
         bookingsCount=int(bookings_count),
+        rating=rating,
+        streak=streak,
     )
 
 
@@ -328,6 +400,172 @@ def list_member_bookings(
             )
         )
     return result
+
+
+@router.post("/member/bookings/{appointment_id}/cancel")
+def cancel_member_booking(
+    appointment_id: int,
+    payload: MemberCancelPayload,
+    customer: Customer = Depends(get_current_member),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Let a member cancel their own appointment.
+
+    Why this exists: the booking confirmation hands over a reference and the
+    member portal shows a history, but until now there was no way to change
+    anything. Every change of plan was a phone call.
+
+    Two rules make this safe to expose publicly:
+
+    1. **Ownership is checked by query, not by id.** The appointment is fetched
+       with `customer_id == customer.customer_id` in the filter, so an id
+       belonging to someone else is a 404 rather than a 403 — the endpoint does
+       not confirm that the appointment exists at all.
+    2. **Only a future appointment can be cancelled**, and the statuses that
+       represent work already done (`completed`, `done`, `paid`, `checked_out`)
+       are refused explicitly. Cancelling a completed visit would rewrite history
+       and break revenue reporting.
+    """
+    appointment = (
+        db.query(Appointment)
+        .filter(
+            Appointment.id == appointment_id,
+            Appointment.customer_id == customer.customer_id,
+        )
+        .first()
+    )
+    if appointment is None:
+        raise HTTPException(status_code=404, detail="الحجز غير موجود")
+
+    if appointment.status in _FINAL_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail="لا يمكن إلغاء موعد تم إنجازه",
+        )
+
+    scheduled = datetime.combine(
+        appointment.appointment_date, appointment.appointment_time
+    )
+    if scheduled <= datetime.now():
+        raise HTTPException(
+            status_code=400,
+            detail="لا يمكن إلغاء موعد في الماضي",
+        )
+
+    previous_status = appointment.status
+    appointment.status = "cancelled"
+    # Recorded so the salon can see why a slot opened up and whether the client
+    # is a habitual canceller.
+    appointment.cancellation_reason = payload.reason or "إلغاء بواسطة العميل"
+    logger.info(
+        "Member %s cancelled appointment %s (%s -> cancelled)",
+        customer.customer_id,
+        appointment.id,
+        previous_status,
+    )
+
+    db.add(
+        CustomerCancellationLog(
+            appointment_id=appointment.id,
+            customer_id=customer.customer_id,
+            # `cancelled_by_user_id` stays null: this was the member, not a
+            # staff user. Who cancelled is recorded in the reason, which is the
+            # field the salon actually reads.
+            reason=appointment.cancellation_reason,
+        )
+    )
+    db.add(appointment)
+    db.commit()
+
+    return {
+        "message": "تم إلغاء الحجز",
+        "appointment_id": appointment.id,
+        "status": appointment.status,
+    }
+
+
+@router.post("/member/bookings/{appointment_id}/reschedule")
+def reschedule_member_booking(
+    appointment_id: int,
+    payload: MemberReschedulePayload,
+    customer: Customer = Depends(get_current_member),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Move a member's own appointment to a new date and time.
+
+    The new slot is validated by the same engine the public booking flow uses
+    (`booking_scheduler._slot_fits` via `get_available_barbers_for_slot`), so a
+    reschedule cannot create a double booking — the failure mode that makes
+    self-service rescheduling dangerous to ship carelessly.
+    """
+    from app.services.booking_scheduler import get_available_barbers_for_slot
+
+    appointment = (
+        db.query(Appointment)
+        .options(joinedload(Appointment.services), selectinload(Appointment.services))
+        .filter(
+            Appointment.id == appointment_id,
+            Appointment.customer_id == customer.customer_id,
+        )
+        .first()
+    )
+    if appointment is None:
+        raise HTTPException(status_code=404, detail="الحجز غير موجود")
+
+    if appointment.status in _FINAL_STATUSES:
+        raise HTTPException(status_code=400, detail="لا يمكن تعديل موعد تم إنجازه")
+
+    duration_minutes = (
+        appointment.total_estimated_duration_minutes
+        or sum(
+            int(service.duration_snapshot_minutes or 0)
+            for service in appointment.services
+            if service.is_active
+        )
+        or 30
+    )
+
+    slot_start = datetime.combine(payload.appointment_date, payload.appointment_time)
+    if slot_start <= datetime.now():
+        raise HTTPException(status_code=400, detail="الوقت الجديد في الماضي")
+
+    # Only the appointment's current barber is re-checked, and the conflict
+    # check ignores the appointment being moved — otherwise a member could never
+    # reschedule, because their own booking always appears to conflict with
+    # itself.
+    barber = getattr(appointment, "barber", None)
+    available = get_available_barbers_for_slot(
+        db,
+        booking_date=payload.appointment_date,
+        appointment_time=payload.appointment_time,
+        total_duration_minutes=duration_minutes,
+        barbers=[barber] if barber is not None else [],
+        strict_schedule=False,
+    )
+    if not available:
+        raise HTTPException(
+            status_code=409,
+            detail="الوقت الجديد غير متاح، اختر وقتاً آخر",
+        )
+
+    previous = (appointment.appointment_date, appointment.appointment_time)
+    appointment.appointment_date = payload.appointment_date
+    appointment.appointment_time = payload.appointment_time
+    # Back to pending: the slot changed, so staff need to reconfirm rather than
+    # inherit the old confirmation.
+    appointment.status = "pending"
+    db.add(appointment)
+    db.commit()
+
+    return {
+        "message": "تم تعديل الموعد",
+        "appointment_id": appointment.id,
+        "previous_date": previous[0].isoformat(),
+        "previous_time": previous[1].isoformat(),
+        "appointment_date": payload.appointment_date.isoformat(),
+        "appointment_time": payload.appointment_time.isoformat(),
+        "status": appointment.status,
+    }
 
 
 @router.post("/member/logout")

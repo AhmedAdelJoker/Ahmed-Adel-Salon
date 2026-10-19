@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import api from "@/services/api";
 import { useSocket } from "@/context/SocketContext";
+import { PageShell } from "@/components/shared/PageShell";
 import {
   useAppointments,
   useEmployees,
@@ -32,6 +33,7 @@ export default function ReceptionBoard() {
   const connected = socketCtx?.connected ?? false;
   const queryClient = useQueryClient();
   const [isFastClientModalOpen, setIsFastClientModalOpen] = useState(false);
+  const [fastClientSaving, setFastClientSaving] = useState(false);
 
   const [assigningAppt, setAssigningAppt] = useState<any>(null);
 
@@ -235,6 +237,8 @@ export default function ReceptionBoard() {
       toast.error("يرجى إدخال رقم الهاتف واسم العميل");
       return;
     }
+    if (fastClientSaving) return;
+    setFastClientSaving(true);
     try {
       const payload = {
         phone: String(fastClientData.phone).trim(),
@@ -263,6 +267,8 @@ export default function ReceptionBoard() {
       toast.error(
         (apiErr?.response?.data?.detail as string) || "فشل تسجيل العميل",
       );
+    } finally {
+      setFastClientSaving(false);
     }
   };
 
@@ -274,7 +280,7 @@ export default function ReceptionBoard() {
   };
 
   return (
-    <div className="erp-page-container space-y-6 pb-16 relative">
+    <PageShell className="relative">
       <ReceptionHeader
         connected={connected}
         appointmentsFetching={appointmentsFetching}
@@ -329,6 +335,7 @@ export default function ReceptionBoard() {
         totalDuration={totalDuration}
         barbers={barbers}
         onSubmit={handleFastClientSubmit}
+        saving={fastClientSaving}
       />
 
       <ReceptionActionDialogs
@@ -340,6 +347,6 @@ export default function ReceptionBoard() {
         setCancelAppt={setCancelAppt}
         onConfirmCancel={confirmCancel}
       />
-    </div>
+    </PageShell>
   );
 }

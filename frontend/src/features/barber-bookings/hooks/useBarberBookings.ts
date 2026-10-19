@@ -1,8 +1,14 @@
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "react-hot-toast";
 import { barberService } from "@/services/barberService";
 import { loadErrorMessage } from "@/lib/core/asyncError";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import {
+  statusChangeMessage,
+  STATUS_LABELS,
+  STATUS_VARIANTS,
+} from "@/lib/barberStatus";
 
 export interface BarberAppointment {
   id: string | number;
@@ -25,25 +31,25 @@ export interface CalendarDay {
   hasPending: boolean;
 }
 
-export type StatusVariant = "warning" | "info" | "success" | "danger" | "secondary";
+/**
+ * Re-exported from `lib/barberStatus` rather than declared here.
+ *
+ * This local copy covered six statuses. The API writes ten, so `confirmed`,
+ * `in_progress`, `done` and `no_show` fell through to `apt.status` -- the raw
+ * English key rendered inside an Arabic badge, coloured `secondary` regardless
+ * of meaning. `no_show` in particular is a no-show, and it was being presented
+ * in the same neutral grey as a routine pending booking.
+ */
+export type StatusVariant =
+  | "success"
+  | "warning"
+  | "info"
+  | "danger"
+  | "outline"
+  | "secondary";
 
-export const statusLabels: Record<string, string> = {
-  pending: "قيد الانتظار",
-  waiting: "في الانتظار",
-  "in-service": "قيد الخدمة",
-  completed: "مكتمل",
-  ready_for_payment: "جاهز للدفع",
-  cancelled: "ملغي",
-};
-
-export const statusColors: Record<string, StatusVariant> = {
-  pending: "warning",
-  waiting: "warning",
-  "in-service": "info",
-  completed: "success",
-  ready_for_payment: "success",
-  cancelled: "danger",
-};
+export const statusLabels = STATUS_LABELS;
+export const statusColors = STATUS_VARIANTS;
 
 export const useBarberBookings = () => {
   const { user } = useAuth();
@@ -58,34 +64,47 @@ export const useBarberBookings = () => {
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const fetchAppointments = useCallback(async (): Promise<void> => {
-    try {
-      setLoading(true);
-      setLoadError(null);
-      const monthStr: string = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, "0")}`;
-      const getCalendar = barberService.getCalendar as unknown as (
-        month: string | null,
-      ) => Promise<{ appointments?: BarberAppointment[] }>;
-      const res = await getCalendar(monthStr);
-      setAppointments(res?.appointments || []);
-    } catch (err) {
-      // Console-only: a failed load showed the barber an empty day with no
-      // indication that the request failed rather than the day being free.
-      console.error("Appointments fetch error:", err);
-      setLoadError(loadErrorMessage(err, "الحجوزات"));
-    } finally {
-      setLoading(false);
-    }
-  }, [calendarMonth]);
+  const fetchAppointments = useCallback(
+    async (silent = false): Promise<void> => {
+      try {
+        // A background poll must not blank the list it is refreshing.
+        if (!silent) setLoading(true);
+        setLoadError(null);
+        const monthStr: string = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, "0")}`;
+        const getCalendar = barberService.getCalendar as unknown as (
+          month: string | null,
+        ) => Promise<{ appointments?: BarberAppointment[] }>;
+        const res = await getCalendar(monthStr);
+        setAppointments(res?.appointments || []);
+      } catch (err) {
+        // Console-only: a failed load showed the barber an empty day with no
+        // indication that the request failed rather than the day being free.
+        console.error("Appointments fetch error:", err);
+        setLoadError(loadErrorMessage(err, "الحجوزات"));
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [calendarMonth],
+  );
+
+  // Same guard as the dashboard: a poll must not race a status write.
+  const statusChangeInFlight = useRef(false);
 
   useEffect(() => {
     void fetchAppointments();
   }, [fetchAppointments]);
 
+  useAutoRefresh(() => {
+    if (statusChangeInFlight.current) return;
+    void fetchAppointments(true);
+  }, 30_000);
+
   const handleStatusChange = async (
     id: string | number,
     newStatus: string,
   ): Promise<void> => {
+    statusChangeInFlight.current = true;
     try {
       await barberService.updateStatus(id, newStatus);
       await fetchAppointments();
@@ -93,7 +112,9 @@ export const useBarberBookings = () => {
       // Silent status updates leave the barber's list disagreeing with the
       // backend, so surface it instead of logging.
       console.error("Status update error:", err);
-      toast.error("تعذر تحديث حالة الحجز. أعد المحاولة.");
+      toast.error(statusChangeMessage(err));
+    } finally {
+      statusChangeInFlight.current = false;
     }
   };
 

@@ -17,6 +17,12 @@ from app.utils.media import process_image_content, get_upload_path
 from app.core.upload_security import validate_image_or_pdf
 from app.core.audit import audit_log
 from app.crud.core_business import create_cash_transaction
+from app.core.clock import (
+    salon_day_bounds_utc,
+    salon_month_start_utc as _salon_month_start_utc,
+    salon_now,
+    salon_year_start_utc as _salon_year_start_utc,
+)
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 # UPLOAD_DIR now resolved lazily via get_upload_path("expenses") (SOT §5.2)
@@ -202,21 +208,33 @@ def get_expenses_summary(
     total = base_query.with_entities(func.sum(Expense.amount)).scalar() or 0
     count = base_query.count()
 
+    # One reading of the clock for the whole summary. Called per line instead,
+    # the month could be computed from one "now" and the year from another if the
+    # request happened to land on midnight.
+    _today = salon_now().date()
+
+    # `Expense.expense_date` is a DATETIME column carrying SQLite's
+    # CURRENT_TIMESTAMP, so it holds UTC -- despite the name, it is not a calendar
+    # date. Every bound below is therefore built in UTC. The day, month and year
+    # are still the *shop's*, so the first-of-month and first-of-year instants
+    # have to be anchored to the shop's midnight and then converted; anchoring them
+    # to UTC midnight would slide the month boundary by three hours and move a
+    # whole day of expenses across it.
+    today_start, today_end = salon_day_bounds_utc(_today)
+    month_start = _salon_month_start_utc(_today)
+    year_start = _salon_year_start_utc(_today)
+
     # Today
-    today_start = datetime.combine(date.today(), time.min)
-    today_end = datetime.combine(date.today(), time.max)
     today_total = db.query(func.sum(Expense.amount)).filter(
         Expense.expense_date >= today_start, Expense.expense_date <= today_end
     ).scalar() or 0
 
     # This month
-    month_start = datetime(date.today().year, date.today().month, 1)
     month_total = db.query(func.sum(Expense.amount)).filter(
         Expense.expense_date >= month_start
     ).scalar() or 0
 
     # Year total
-    year_start = datetime(date.today().year, 1, 1)
     year_total = db.query(func.sum(Expense.amount)).filter(
         Expense.expense_date >= year_start
     ).scalar() or 0

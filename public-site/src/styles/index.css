@@ -1,6 +1,17 @@
 @import "tailwindcss";
 @import "./mockup.css";
-@config "../../../frontend/tailwind.config.js";
+
+/*
+  Theme ownership: the salon decides, not the operating system.
+
+  Tailwind v4 resolves `dark:` from `prefers-color-scheme`. Left alone, a
+  visitor whose laptop is in light mode but who picked the midnight salon theme
+  got a light-OS build with the salon palette forced on top — measured in the
+  browser, not guessed at. `applyThemeMode` in `lib/theme.ts` already toggles
+  `.dark` on <html>; this makes the class the thing `dark:` keys off, so the
+  toggle is what decides.
+*/
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   /* تأمين مساحة السكرول بار لمنع اهتزاز المحتوى عند فتح الـ Dialogs */
@@ -82,8 +93,25 @@
   --color-danger-bg: var(--danger-soft);
   --color-warning: var(--warning);
   --color-warning-bg: var(--warning-soft);
-  --color-info: var(--info);
-  --color-info-bg: var(--info-soft);
+--color-info: var(--info);
+--color-info-bg: var(--info-soft);
+
+  /*
+    Names the admin app's v2 semantic layer used and this site inherited:
+    `canvas`, `inset`, `line`, `line-strong`. They were only ever defined by
+    `frontend/tailwind.config.js`, which this stylesheet reached into — so
+    `bg-canvas`, `border-line` and friends resolved only while that bridge
+    existed, and the public site could not be built on its own.
+
+    Aliased onto this site's own palette rather than copied from the admin
+    tokens: `canvas` is the page ground, `inset` a recessed fill, `line` the
+    hairline and `line-strong` the emphasised one. Same intent, same variables
+    the rest of the sheet already uses, so the dark theme follows automatically.
+  */
+  --color-canvas: var(--bg-main);
+  --color-inset: var(--bg-soft);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-2);
 
   /* ── Border radius scale ────────────────────────────────── */
   --radius-xs: 0.375rem;
@@ -1746,39 +1774,59 @@
 ────────────────────────────────────────────────────────────── */
 
 @media print {
-  .sidebar,
-  .topbar,
-  .btn,
-  .toast,
-  .noise-overlay,
-  .skeleton {
-    display: none !important;
-  }
+    /*
+      Chrome, not content.
 
-  body {
-    background: white !important;
-    color: black !important;
-    direction: rtl;
-    font-size: 12pt;
-    line-height: 1.6;
-  }
+      `.sidebar`, `.bento-card` and `.stat-card` were admin class names copied
+      across with the rest of the app: nothing on the public site has ever
+      matched them, so every rule naming them was dead weight that read as if
+      the print sheet had been tailored to this page.
 
-  .card,
-  .bento-card,
-  .stat-card {
-    border: 1pt solid #d1d5db !important;
-    box-shadow: none !important;
-    break-inside: avoid;
-    page-break-inside: avoid;
-    border-radius: 0 !important;
-  }
+      `.topbar` is still real (the booking page header) and `.skeleton` still
+      holds a reserved row while a section loads — printing either produces a
+      blank band or a stack of placeholder boxes, so both stay hidden.
+    */
+    header.sticky,
+    footer,
+    .topbar,
+    .btn,
+    .toast,
+    .noise-overlay,
+    .skeleton {
+      display: none !important;
+    }
 
-  a[href]::after {
-    content: " (" attr(href) ")";
-    font-size: 0.8em;
-    color: #6b7280;
+    body {
+      background: white !important;
+      color: black !important;
+      direction: rtl;
+      font-size: 12pt;
+      line-height: 1.6;
+    }
+
+    /*
+      Cards are Tailwind utilities here, not a `.card` class, so this has to
+      work off what the primitives actually set: the border and the shadow.
+      `break-inside` is the part that matters — without it a price table splits
+      across two sheets and the second half has no header.
+    */
+    .public-card,
+    section > div,
+    [data-print-block] {
+      box-shadow: none !important;
+      break-inside: avoid;
+      page-break-inside: avoid;
+      border-radius: 0 !important;
+    }
+
+    /*
+      Dropped: `a[href]::after { content: " (" attr(href) ")" }`.
+      It appended the target to *every* link, so an in-page nav link printed as
+      "الخدمات (#services)" and a phone link printed its number twice. A
+      booking sheet is read by a person on a phone, who does not need the URL
+      spelled out next to the label they just read.
+    */
   }
-}
 
 /* ──────────────────────────────────────────────────────────────
    Reduced-motion accessibility

@@ -204,9 +204,6 @@ const OperationalReports = lazy(
 const LoyaltySettingsPanel = lazy(
   () => import("@/pages/owner/LoyaltySettingsPanel"),
 );
-const OwnerWebsiteSettingsPage = lazy(
-  () => import("@/pages/owner/OwnerWebsiteSettingsPage"),
-);
 const CustomerArchive = lazy(() => import("@/pages/owner/CustomerArchive"));
 
 // Manager
@@ -449,7 +446,11 @@ export const APP_ROUTES: readonly AppRoute[] = [
   {
     path: "/approvals",
     component: ApprovalCenter,
-    roles: [...ROLES.MANAGEMENT, "CASHIER", "ACCOUNTANT"],
+    // CASHIER removed: every action inside is manager+ (discount/expense
+    // approve, payroll audit/delete — all owner_or_manager on the backend),
+    // and the page's payroll fetch 403'd for cashiers on load. An approval
+    // center you cannot approve anything in is not a cashier surface.
+    roles: [...ROLES.MANAGEMENT, "ACCOUNTANT"],
     title: "مركز الموافقات",
     nav: {
       label: "مركز الموافقات",
@@ -572,14 +573,18 @@ export const APP_ROUTES: readonly AppRoute[] = [
   {
     path: "/attendance",
     component: AttendanceManagement,
-    roles: [...ROLES.MANAGEMENT, "CASHIER", "ACCOUNTANT"],
+    // CASHIER removed: the monthly view computes net salary from base_salary
+    // client-side and GET /employees is deliberately payroll-gated, so a
+    // cashier here meant a 403 on load (or a salary leak if widened). The
+    // desk gets its presence view from /reception-board.
+    roles: [...ROLES.MANAGEMENT, "ACCOUNTANT"],
     title: "الحضور والانضباط",
     nav: {
       label: "الحضور والانضباط",
       icon: UserCheck,
       group: "management",
       order: 2,
-      roles: ["OWNER", "ADMIN", "MANAGER", "ACCOUNTANT", "CASHIER"],
+      roles: ["OWNER", "ADMIN", "MANAGER", "ACCOUNTANT"],
       searchCategory: "الإدارة",
     },
   },
@@ -756,27 +761,16 @@ export const APP_ROUTES: readonly AppRoute[] = [
     subtitle: "إدارة الخدمات والأسعار والتصنيفات.",
     embeddedIn: "/owner/settings",
     nav: {
-      label: "الخدمات والعروض",
+      // No longer "والخدمات والعروض": the offers half of this page moved to
+      // /inventory/bundles, where the whole offer is edited.
+      label: "الخدمات",
       icon: Scissors,
       group: "system",
       order: 3,
       roles: ["OWNER", "ADMIN"],
     },
   },
-  {
-    path: "/owner/website-settings",
-    component: OwnerWebsiteSettingsPage,
-    roles: ROLES.OWNER,
-    title: "إعدادات الموقع",
-    embeddedIn: "/owner/settings",
-    nav: {
-      label: "إعدادات الموقع",
-      icon: Globe,
-      group: "system",
-      order: 4,
-      roles: ["OWNER", "ADMIN"],
-    },
-  },
+
   {
     path: "/owner/loyalty-settings",
     component: LoyaltySettingsPanel,

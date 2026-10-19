@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/table";
 
 const BarberEarnings = () => {
+  const { locale } = useAppLocale();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [earnings, setEarnings] = useState({
@@ -64,6 +65,10 @@ const BarberEarnings = () => {
     cash: 0,
     card: 0,
     transfer: 0,
+    // Payment methods outside the known vocabulary (`split`, and anything a
+    // shop configures later). Previously absent here and silently dropped from
+    // the chart, so the slices did not sum to the day's real total.
+    other: 0,
     total_sales: 0,
   });
    
@@ -263,7 +268,7 @@ const BarberEarnings = () => {
                       <Tooltip
                         formatter={(v) => [formatCurrency(v), "إيرادات"]}
                         labelFormatter={(v) =>
-                          new Date(v).toLocaleDateString("ar-EG")
+                          new Date(v).toLocaleDateString(locale)
                         }
                       />
                       <Area
@@ -304,6 +309,16 @@ const BarberEarnings = () => {
                             value: earnings.transfer || 0,
                             color: "var(--chart-5)",
                           },
+                          // Any payment method outside the known vocabulary
+                          // (`split`, and whatever a shop adds later) is
+                          // reported by the API as `other`. Rendering it keeps
+                          // the chart adding up to the day's real total instead
+                          // of quietly dropping an unknown share.
+                          {
+                            name: "أخرى",
+                            value: earnings.other || 0,
+                            color: "var(--chart-4)",
+                          },
                         ].filter((d) => d.value > 0)}
                         cx="50%"
                         cy="50%"
@@ -315,6 +330,7 @@ const BarberEarnings = () => {
                           { color: "var(--chart-3)" },
                           { color: "var(--chart-2)" },
                           { color: "var(--chart-5)" },
+                          { color: "var(--chart-4)" },
                         ].map((e, i) => (
                           <Cell key={i} fill={e.color} />
                         ))}
@@ -417,7 +433,7 @@ const BarberEarnings = () => {
                       commissions.map((c, i) => (
                         <TableRow key={i}>
                           <TableCell className="text-[10px] font-bold text-muted">
-                            {new Date(c.date).toLocaleDateString("ar-EG")}
+                            {new Date(c.date).toLocaleDateString(locale)}
                           </TableCell>
                           <TableCell className="font-black text-main">
                             {c.customer_name}
@@ -517,5 +533,6 @@ const BarberEarnings = () => {
 };
 import api from "@/services/api";
 import { Badge } from "@/components/ui/badge";
+import { useAppLocale } from "@/hooks/useAppLocale";
 
 export default BarberEarnings;

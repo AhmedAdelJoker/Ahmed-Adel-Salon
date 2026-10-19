@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -18,6 +18,14 @@ class User(Base):
     profile_image_url = Column(String(255), nullable=True)
 
     role = Column(String(30), nullable=False, default="cashier")
+
+    # Per-user page-access overrides, stored as {permissionKey: bool}. Absent
+    # keys (or a NULL column) fall back to the role defaults the frontend
+    # already derives from the route registry. Same shape the permissions
+    # dialog edits: explicit true (granted), explicit false (revoked), missing
+    # key (inherit role). Page access is a frontend gate; the backend role
+    # matrix still guards every API operation.
+    permissions = Column(JSON, nullable=True)
 
     # `use_alter=True` breaks a mutual dependency that PostgreSQL refuses.
     #

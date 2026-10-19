@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/core/utils";
-import { DATE_FILTERS, TAB_CATEGORIES } from "@/features/bookings";
+import { DATE_FILTERS, TAB_CATEGORIES, TODAY } from "@/features/bookings";
 
 export default function BookingsToolbar({
   searchTerm,
@@ -163,12 +163,29 @@ export default function BookingsToolbar({
           <Filter size={12} /> فلترة سريعة:
         </span>
 
+        {(searchTerm || quickFilter !== "all" || activeTab !== TAB_CATEGORIES[0].id || selectedEmployeeId !== "all" || dateFilter !== "today") && (
+          <button
+            onClick={() => {
+              setSearchTerm("");
+              setQuickFilter("all");
+              setActiveTab(TAB_CATEGORIES[0].id);
+              setSelectedEmployeeId("all");
+              setDateFilter("today");
+              setStartDate(TODAY);
+              setEndDate(TODAY);
+            }}
+            className="px-3 py-1 rounded-full text-[10px] font-black transition-all whitespace-nowrap border bg-rose-500/10 text-rose-600 border-rose-500/30 hover:bg-rose-500/20 flex items-center gap-1"
+          >
+            <X size={12} /> مسح التصفية
+          </button>
+        )}
+
         {[
           { id: "all", label: "الكل" },
-          { id: "walkin", label: "مشاة" },
           { id: "late", label: "المتأخرة" },
           { id: "pending", label: "قيد التأكيد" },
           { id: "online", label: "أونلاين" },
+          { id: "cancelled", label: "ملغي" },
         ].map((chip) => (
           <button
             key={chip.id}

@@ -11,7 +11,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "react-hot-toast";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
-const AUTO_REFRESH_MS = 30_000;
+// 60s: the WS layer already invalidates the affected queries live on every
+// event, so this sweep is only a periodic safety net. A full-refetch burst
+// every 30s was pure overhead — and it re-triggered chart entry animations
+// whenever any number changed.
+const AUTO_REFRESH_MS = 60_000;
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -44,7 +44,7 @@ export default function SalonCapacityBanner({
             </span>{" "}
             اليوم | نسبة الضغط التشغيلي:{" "}
             <span className="text-indigo-300 font-bold">
-              {salonCapacity.percentage}%
+              <span dir="ltr">{salonCapacity.percentage}%</span>
             </span>
           </p>
         </div>
@@ -53,7 +53,7 @@ export default function SalonCapacityBanner({
       <div className="w-full md:w-72 space-y-2 relative z-10">
         <div className="flex justify-between items-center text-xs font-bold text-white/80">
           <span>سعة التشغيل</span>
-          <span className="text-indigo-400">{salonCapacity.percentage}%</span>
+          <span className="text-indigo-400"><span dir="ltr">{salonCapacity.percentage}%</span></span>
         </div>
         <div className="h-2.5 w-full rounded-full bg-white/10 overflow-hidden p-0.5">
           <div
@@ -72,3 +72,4 @@ export default function SalonCapacityBanner({
     </div>
   );
 }
+

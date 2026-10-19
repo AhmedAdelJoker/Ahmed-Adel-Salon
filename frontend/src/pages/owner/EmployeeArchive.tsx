@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import {
   Archive,
   Search,
-  UserX,
   History,
   RotateCcw,
   Phone,
@@ -16,6 +15,7 @@ import {
 import { toast } from "react-hot-toast";
 import { useEmployeesArchive, useInvalidateEmployees } from "@/hooks/useApi";
 import { normalizeEmployeeRecord } from "@/features/hr/utils/helpers";
+import { JOB_TITLES } from "@/features/hr";
 import api from "@/services/api";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
@@ -27,38 +27,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const JOB_TITLES = [
-  { value: "owner", label: "المالك والمستثمر (Principal Owner)" },
-  { value: "manager", label: "مدير عمليات التشغيل (Operations Manager)" },
-  {
-    value: "accountant",
-    label: "المحاسب المالي والإداري (Financial & Admin Accountant)",
-  },
-  {
-    value: "barber",
-    label: "أخصائي حلاقة وتصفيف الشعر وعناية باللحية (Master Barber)",
-  },
-  { value: "colorist", label: "أخصائي تلوين ومعالجة الشعر (Color Specialist)" },
-  {
-    value: "esthetician",
-    label: "أخصائي عناية بالبشرة والوجه (Skin Care Expert)",
-  },
-  {
-    value: "barber_assistant",
-    label: "مساعد فني / مسؤول تحضير (Technical Assistant)",
-  },
-  { value: "cashier", label: "كاشير ومسؤول صندوق (Cashier & POS)" },
-  {
-    value: "receptionist",
-    label: "منسق تجربة العملاء (Guest Experience Coordinator)",
-  },
-  { value: "cleaner", label: "مسؤول مرافق وتعقيم (Sanitation Officer)" },
-  { value: "other", label: "أخرى" },
-];
-
 const STATUS_BADGE = {
-  suspended: { label: "موقوف إدارياً", variant: "destructive" },
-  resigned: { label: "مستقيل", variant: "outline" },
+  // Legacy rows only: "on vacation" now lives in the team list, not here.
+  suspended: { label: "في إجازة", variant: "outline" },
+  resigned: { label: "ترك العمل", variant: "outline" },
 };
 
 export default function EmployeeArchive() {
@@ -112,7 +84,6 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
   const stats = useMemo(
     () => ({
       total: employees.length,
-      suspended: employees.filter((e) => e.status === "suspended").length,
       resigned: employees.filter((e) => e.status === "resigned").length,
     }),
     [employees],
@@ -123,15 +94,17 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
       <ConfirmDialog
         open={!!confirmTarget}
         onOpenChange={(open) => !open && setConfirmTarget(null)}
+        variant="info"
         title="استعادة الموظف؟"
-        description="هل أنت متأكد من رغبتك في استعادة هذا الموظف للعمل؟ سيتم إرجاع كافة صلاحياته وحسابه كـ نشط."
+        confirmText="استعادة"
+        description="سيعود الموظف إلى قائمة الفريق كـ نشط. مفاتيح الظهور في الكاشير والحجز تبقى مغلقة حتى تفعّلها من ملفه الشخصي."
         onConfirm={handleRestore}
         loading={isActionLoading}
       />
 
       <PageHeader
         title="أرشيف الموظفين"
-        subtitle="سجل الموظفين السابقين، المستقيلين، والموقوفين عن العمل."
+        subtitle="سجل الموظفين الذين تركوا العمل، مع إمكانية الاستعادة في أي وقت."
         badge="سجل الانقطاعات"
         icon={Archive}
         className={undefined}
@@ -158,16 +131,7 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
           delay={0}
         />
         <StatCard
-          label="موقوفين"
-          value={stats.suspended}
-          icon={UserX}
-          variant="danger"
-          trend={undefined}
-          trendValue={undefined}
-          delay={0.05}
-        />
-        <StatCard
-          label="مستقيلين"
+          label="تركوا العمل"
           value={stats.resigned}
           icon={History}
           variant="warning"
@@ -215,7 +179,7 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
           variant="page"
           icon={Archive}
           title="الأرشيف فارغ"
-          message="لا يوجد موظفون موقوفون أو مستقيلون في الأرشيف حالياً، أو لا توجد نتائج تطابق بحثك."
+          message="لا يوجد موظفون في الأرشيف حالياً — الأرشيف لمن تركوا العمل فقط، أو لا توجد نتائج تطابق بحثك."
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">

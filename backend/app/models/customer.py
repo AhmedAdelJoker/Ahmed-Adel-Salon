@@ -12,7 +12,8 @@ class Customer(Base):
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100), nullable=False)
     phone = Column(String(30), nullable=False, index=True)
-    email = Column(String(255), nullable=True)
+    second_phone = Column(String(30), nullable=True, index=True)
+    email = Column(String(255), nullable=True, index=True)
     notes = Column(String(1000), nullable=True)
     
     # Loyalty Fields

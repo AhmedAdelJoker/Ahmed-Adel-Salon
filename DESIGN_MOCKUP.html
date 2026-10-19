@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>Salon Pro — إعادة تصميم الموقع</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet" />
+<style>
+/* Palette tokens copied verbatim from public-site/src/lib/theme.ts — `midnight`
+   (ember/dark). The redesign keeps the same roles so the real app can adopt it. */
+:root{
+  --c-bg:#080B11; --c-surface:#0E131B; --c-card:#131A24; --c-inset:#0A0E15;
+  --c-border:rgba(233,240,250,.10); --c-border-strong:rgba(233,240,250,.20);
+  --c-text:#EDF1F7; --c-muted:#8895A6; --c-faint:#5B6674;
+  --c-accent:#FF5A36; --c-accent-2:#FFA07A; --c-accent-wash:rgba(255,90,54,.12);
+  --c-ok:#4ADE80;
+  --step--2:clamp(.69rem,.68rem + .06vw,.75rem);
+  --step--1:clamp(.83rem,.81rem + .11vw,.9rem);
+  --step-0:clamp(1rem,.96rem + .2vw,1.13rem);
+  --step-1:clamp(1.2rem,1.11rem + .45vw,1.5rem);
+  --step-2:clamp(1.44rem,1.29rem + .73vw,2rem);
+  --step-3:clamp(1.73rem,1.45rem + 1.4vw,2.66rem);
+  --step-4:clamp(2.07rem,1.6rem + 2.35vw,3.55rem);
+  --step-5:clamp(2.49rem,1.73rem + 3.8vw,4.74rem);
+  --gutter:clamp(1.25rem,4vw,2.5rem);
+  --section-y:clamp(4.5rem,9vw,8rem);
+  --r-md:.75rem; --r-lg:1.25rem; --r-xl:1.75rem;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--c-bg); color:var(--c-text);
+  font-family:'Cairo',system-ui,sans-serif; line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+}
+.shell{max-width:1240px;margin-inline:auto;padding-inline:var(--gutter)}
+.num{font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
+.eyebrow{
+  font-size:var(--step--2);font-weight:700;text-transform:uppercase;
+  letter-spacing:.16em;color:var(--c-accent-2);
+}
+.section{padding-block:var(--section-y)}
+.h2{font-size:var(--step-4);font-weight:900;line-height:1.15;letter-spacing:-.02em}
+.h3{font-size:var(--step-2);font-weight:700;line-height:1.3}
+.lead{font-size:var(--step-1);color:var(--c-muted);line-height:1.85;max-width:62ch}
+
+/* ── announcement bar: a global site always states trust up front ── */
+.topbar{
+  background:var(--c-accent);color:#140502;
+  font-size:var(--step--2);font-weight:700;
+  padding:.6rem 0;text-align:center;letter-spacing:.02em;
+}
+/* ── header ── */
+header{
+  position:sticky;top:0;z-index:50;
+  background:rgba(8,11,17,.82);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--c-border);
+}
+.nav{display:flex;align-items:center;gap:2rem;height:72px}
+.brand{display:flex;align-items:center;gap:.75rem;font-weight:900;font-size:var(--step-0)}
+.brand .mark{
+  width:40px;height:40px;border-radius:var(--r-md);flex:0 0 auto;
+  background:linear-gradient(135deg,var(--c-accent),var(--c-accent-2));
+  display:grid;place-items:center;color:#140502;font-weight:900;
+}
+.brand small{display:block;font-size:var(--step--2);color:var(--c-faint);font-weight:600}
+.nav ul{display:flex;gap:1.75rem;list-style:none;margin-inline-end:auto}
+.nav a{color:var(--c-muted);text-decoration:none;font-weight:600;font-size:var(--step--1);transition:color .2s}
+.nav a:hover{color:var(--c-text)}
+.btn{
+  display:inline-flex;align-items:center;gap:.5rem;border:0;cursor:pointer;
+  border-radius:999px;font-family:inherit;font-weight:700;
+  transition:transform .2s, filter .2s;
+}
+.btn:hover{transform:translateY(-2px);filter:brightness(1.08)}
+.btn-lg{padding:.95rem 1.9rem;font-size:var(--step-0)}
+.btn-sm{padding:.6rem 1.25rem;font-size:var(--step--1)}
+.btn-primary{background:var(--c-accent);color:#140502}
+.btn-ghost{background:transparent;color:var(--c-text);border:1px solid var(--c-border-strong)}
+
+/* ── HERO — the fix: the image is a real column, and the type block owns a
+   guaranteed-contrast ground of its own instead of relying on theme ink
+   over a dark photograph. ── */
+.hero{position:relative;overflow:hidden}
+.hero-bg{position:absolute;inset:0;z-index:0}
+.hero-bg img{width:100%;height:100%;object-fit:cover;object-position:center}
+.hero-bg::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(8,11,17,.86) 0%,rgba(8,11,17,.55) 42%,rgba(8,11,17,.96) 100%);
+}
+.hero-inner{
+  position:relative;z-index:1;
+  display:grid;grid-template-columns:1.05fr .95fr;gap:4rem;align-items:center;
+  padding-block:5.5rem 4.5rem;
+}
+.hero h1{
+  font-size:var(--step-5);font-weight:900;line-height:1.08;
+  letter-spacing:-.025em;margin-block:1.25rem .5rem;
+  /* FIX 1 — explicit light ink on the photo. Never theme-driven here. */
+  color:#fff;text-shadow:0 2px 30px rgba(0,0,0,.5);
+}
+.hero h1 em{font-style:normal;color:var(--c-accent-2)}
+.hero-sub{font-size:var(--step-1);color:#C4CEDA;max-width:46ch;line-height:1.8}
+.hero-cta{display:flex;gap:.85rem;margin-top:2.25rem;flex-wrap:wrap}
+.trust{display:flex;gap:2.5rem;margin-top:3rem;flex-wrap:wrap}
+.trust div strong{display:block;font-size:var(--step-2);font-weight:900;color:#fff;line-height:1.2}
+.trust div span{font-size:var(--step--2);color:var(--c-muted);font-weight:600}
+/* open-now strip */
+.openbar{
+  display:inline-flex;align-items:center;gap:.6rem;
+  padding:.5rem 1rem;border-radius:999px;
+  background:var(--c-ok-wash,rgba(74,222,128,.12));
+  border:1px solid rgba(74,222,128,.3);
+  font-size:var(--step--1);font-weight:700;color:var(--c-ok);
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--c-ok);display:inline-block}
+/* booking panel — a real card with a solid ground, not rgba over a photo */
+.bookcard{
+  background:var(--c-card);border:1px solid var(--c-border-strong);
+  border-radius:var(--r-xl);padding:1.75rem;
+  box-shadow:0 30px 80px -30px rgba(0,0,0,.9);
+}
+.bookcard h3{font-size:var(--step-0);font-weight:700;margin-bottom:1.25rem}
+.slotgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem}
+.slot{
+  border:1px solid var(--c-border-strong);background:var(--c-inset);
+  color:var(--c-text);border-radius:var(--r-md);
+  padding:.7rem .35rem;font-family:inherit;font-size:var(--step--1);
+  font-weight:700;cursor:pointer;transition:.18s;
+}
+.slot:hover{border-color:var(--c-accent);background:var(--c-accent-wash)}
+.slot.is-on{background:var(--c-accent);color:#140502;border-color:var(--c-accent)}
+.bookcard .btn{width:100%;justify-content:center;margin-top:1.25rem}
+.bookfoot{margin-top:1rem;font-size:var(--step--2);color:var(--c-faint);text-align:center}
+
+/* ── about ── */
+.about{background:var(--c-surface);border-block:1px solid var(--c-border)}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center}
+.about-photo{position:relative;border-radius:var(--r-xl);overflow:hidden;aspect-ratio:4/5}
+.about-photo img{width:100%;height:100%;object-fit:cover}
+.badge-float{
+  position:absolute;inset-block-end:1.5rem;inset-inline-start:-1.25rem;
+  background:var(--c-card);border:1px solid var(--c-border-strong);
+  border-radius:var(--r-lg);padding:1rem 1.35rem;
+  display:flex;align-items:center;gap:.85rem;
+  box-shadow:0 20px 50px -20px rgba(0,0,0,.8);
+}
+.badge-float strong{font-size:var(--step-1);font-weight:900;color:var(--c-accent-2);line-height:1}
+.badge-float span{font-size:var(--step--2);color:var(--c-muted);font-weight:600}
+.feat{display:flex;gap:1rem;margin-top:1.5rem}
+.feat .ic{
+  width:42px;height:42px;flex:0 0 auto;border-radius:var(--r-md);
+  background:var(--c-accent-wash);color:var(--c-accent);
+  display:grid;place-items:center;font-size:1.1rem;
+}
+.feat h4{font-weight:700;font-size:var(--step-0)}
+.feat p{font-size:var(--step--1);color:var(--c-muted)}
+
+/* ── services ── */
+.svc-head{display:flex;justify-content:space-between;align-items:flex-end;gap:2rem;flex-wrap:wrap;margin-bottom:3rem}
+.filters{display:flex;gap:.5rem;flex-wrap:wrap}
+.filters button{
+  background:transparent;border:1px solid var(--c-border-strong);color:var(--c-muted);
+  padding:.5rem 1.15rem;border-radius:999px;font-family:inherit;font-size:var(--step--1);
+  font-weight:700;cursor:pointer;transition:.18s;
+}
+.filters button:hover{color:var(--c-text);border-color:var(--c-faint)}
+.filters button.on{background:var(--c-accent);border-color:var(--c-accent);color:#140502}
+.svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.15rem}
+.svc{
+  background:var(--c-card);border:1px solid var(--c-border);
+  border-radius:var(--r-lg);padding:1.5rem;
+  display:flex;flex-direction:column;gap:.85rem;
+  transition:transform .22s,border-color .22s;
+}
+.svc:hover{transform:translateY(-4px);border-color:var(--c-border-strong)}
+.svc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
+.svc h4{font-size:var(--step-0);font-weight:700;line-height:1.4}
+.price{font-size:var(--step-1);font-weight:900;color:var(--c-accent);white-space:nowrap}
+.svc p{font-size:var(--step--1);color:var(--c-muted);line-height:1.7}
+.svc-meta{display:flex;gap:1rem;font-size:var(--step--2);color:var(--c-faint);font-weight:600;
+  padding-top:.85rem;border-top:1px solid var(--c-border);margin-top:auto}
+.tag{
+  display:inline-block;background:var(--c-accent-wash);color:var(--c-accent-2);
+  border:1px solid rgba(255,90,54,.28);
+  padding:.15rem .6rem;border-radius:var(--r-sm);font-size:var(--step--2);font-weight:700;
+}
+/* offers band */
+.offers{
+  margin-top:4.5rem;padding:2.75rem;border-radius:var(--r-xl);
+  background:linear-gradient(120deg,var(--c-card),rgba(255,90,54,.10));
+  border:1px solid var(--c-accent-line,rgba(255,90,54,.34));
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:2rem;align-items:center;
+}
+.offer{padding-inline-start:1.5rem;border-inline-start:2px solid var(--c-accent)}
+.offer .old{font-size:var(--step--1);color:var(--c-faint);text-decoration:line-through}
+.offer .new{font-size:var(--step-1);font-weight:900;color:var(--c-ok)}
+.offer h4{font-weight:700;font-size:var(--step-0);margin-block:.35rem .25rem}
+.offer p{font-size:var(--step--1);color:var(--c-muted)}
+
+/* ── team ── */
+.team-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.5rem}
+.member{
+  background:var(--c-card);border:1px solid var(--c-border);
+  border-radius:var(--r-lg);overflow:hidden;transition:transform .22s,border-color .22s;
+}
+.member:hover{transform:translateY(-4px);border-color:var(--c-border-strong)}
+.member .ph{aspect-ratio:4/5;overflow:hidden;background:var(--c-inset)}
+.member .ph img{width:100%;height:100%;object-fit:cover}
+.member .info{padding:1.35rem}
+.member h4{font-size:var(--step-0);font-weight:700}
+.member .role{font-size:var(--step--1);color:var(--c-accent-2);font-weight:700;margin-top:.15rem}
+.stars{color:#FBBF24;font-size:.85rem;letter-spacing:.1em;margin-top:.5rem}
+.member .info p{font-size:var(--step--2);color:var(--c-muted);margin-top:.4rem}
+
+/* ── reviews ── */
+.rev-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:1.25rem}
+.rev{background:var(--c-card);border:1px solid var(--c-border);border-radius:var(--r-lg);padding:1.6rem}
+.rev .q{font-size:var(--step--2);color:var(--c-faint);font-weight:700;text-transform:uppercase;letter-spacing:.14em}
+.rev p{font-size:var(--step-0);line-height:1.85;margin-top:.85rem;color:var(--c-text)}
+.rev footer{display:flex;align-items:center;gap:.75rem;margin-top:1.35rem;padding-top:1.1rem;border-top:1px solid var(--c-border)}
+.rev .av{width:38px;height:38px;border-radius:50%;background:var(--c-accent-wash);color:var(--c-accent);display:grid;place-items:center;font-weight:800;font-size:var(--step--1)}
+.rev footer strong{font-size:var(--step--1);display:block}
+.rev footer span{font-size:var(--step--2);color:var(--c-faint)}
+
+/* ── contact ── */
+.contact{background:var(--c-surface);border-block:1px solid var(--c-border)}
+.c-grid{display:grid;grid-template-columns:1fr 1fr;gap:4rem}
+.c-card{background:var(--c-card);border:1px solid var(--c-border);border-radius:var(--r-lg);padding:1.6rem}
+.c-row{display:flex;gap:1rem;padding-block:1.1rem;border-bottom:1px solid var(--c-border)}
+.c-row:last-child{border-bottom:0;padding-bottom:0}
+.c-row:first-child{padding-top:0}
+.c-row .ic{width:40px;height:40px;flex:0 0 auto;border-radius:var(--r-md);background:var(--c-accent-wash);color:var(--c-accent);display:grid;place-items:center}
+.c-row h4{font-size:var(--step--1);font-weight:700;color:var(--c-muted)}
+.c-row p{font-size:var(--step-0);font-weight:700;margin-top:.15rem}
+.hours{display:grid;gap:.55rem;margin-top:1.25rem}
+.hours li{display:flex;justify-content:space-between;font-size:var(--step--1);padding-block:.5rem;border-bottom:1px dashed var(--c-border)}
+.hours li span:last-child{color:var(--c-muted)}
+.map{
+  border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--c-border);
+  background:var(--c-inset);aspect-ratio:16/11;position:relative;display:grid;place-items:center;
+}
+.map::before{
+  content:"";position:absolute;inset:0;
+  background-image:linear-gradient(var(--c-border) 1px,transparent 1px),linear-gradient(90deg,var(--c-border) 1px,transparent 1px);
+  background-size:38px 38px;opacity:.5;
+}
+.map-pin{position:relative;text-align:center}
+.map-pin .p{
+  width:48px;height:48px;border-radius:50%;background:var(--c-accent);color:#140502;
+  display:grid;place-items:center;margin-inline:auto;font-size:1.3rem;
+  box-shadow:0 0 0 10px var(--c-accent-wash);
+}
+.map-pin small{display:block;margin-top:.9rem;font-weight:700}
+
+/* ── footer ── */
+footer{border-top:1px solid var(--c-border);padding-block:3rem 2rem}
+.f-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:3rem}
+.f-grid h5{font-size:var(--step--1);font-weight:700;color:var(--c-text);margin-bottom:1rem}
+.f-grid ul{list-style:none;display:grid;gap:.55rem}
+.f-grid a,.f-grid li{color:var(--c-muted);text-decoration:none;font-size:var(--step--1)}
+.f-grid a:hover{color:var(--c-accent-2)}
+.f-bot{margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--c-border);
+  display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;font-size:var(--step--2);color:var(--c-faint)}
+/* sticky mobile CTA — conversion */
+.mcta{
+  display:none;position:fixed;inset-block-end:0;inset-inline:0;z-index:60;
+  background:rgba(8,11,17,.95);backdrop-filter:blur(12px);
+  border-top:1px solid var(--c-border);padding:.85rem var(--gutter) calc(.85rem + env(safe-area-inset-bottom));
+}
+@media(max-width:1000px){
+  .hero-inner{grid-template-columns:1fr;gap:3rem;padding-block:3.5rem 3rem}
+  .about-grid,.c-grid{grid-template-columns:1fr;gap:2.75rem}
+  .f-grid{grid-template-columns:1fr;gap:2rem}
+  .nav ul{display:none}
+  .mcta{display:block}
+  footer{padding-bottom:5rem}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">مفتوح الآن · يومياً من 10:00 إلى 22:00 · جدة، حي الروضة</div>
+
+<header>
+  <div class="shell nav">
+    <div class="brand">
+      <div class="mark">SP</div>
+      <div>Salon Pro<small>صالون محترف</small></div>
+    </div>
+    <ul>
+      <li><a href="#about">عن الصالون</a></li>
+      <li><a href="#services">الخدمات والعروض</a></li>
+      <li><a href="#team">الفريق</a></li>
+      <li><a href="#reviews">آراء العملاء</a></li>
+      <li><a href="#contact">تواصل معنا</a></li>
+    </ul>
+    <button class="btn btn-primary btn-sm">احجز موعدك</button>
+  </div>
+</header>
+
+<!-- ══ 1. HERO ══ -->
+<section class="hero">
+  <div class="hero-bg">
+    <img src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?q=80&w=2000&auto=format&fit=crop" alt="داخل صالون Salon Pro" />
+  </div>
+  <div class="shell hero-inner">
+    <div>
+      <div class="openbar"><i class="dot"></i> الصالون مفتوح الآن — متاح الحجز اليوم</div>
+      <h1 style="margin-top:1.25rem">حلاقة احترافية<br /><em>بمواعيد دقيقة</em> وأسلوب يليق بيك</h1>
+      <p class="hero-sub">فريق متخصص، أدوات معقمة لكل عميل، ومواعيد محترمة من غير انتظار. احجز مكانك أونلاين في أقل من دقيقة.</p>
+      <div class="hero-cta">
+        <button class="btn btn-primary btn-lg">احجز موعدك الآن ←</button>
+        <button class="btn btn-ghost btn-lg">تصفح الخدمات</button>
+      </div>
+      <div class="trust">
+        <div><strong>1,2K+</strong><span>عميل يثق بنا</span></div>
+        <div><strong>4.9<span style="color:var(--c-accent-2)">★</span></strong><span>تقييم العملاء</span></div>
+        <div><strong>8 سنوات</strong><span>خبرة في المجال</span></div>
+      </div>
+    </div>
+
+    <aside class="bookcard">
+      <h3>احجز في 3 خطوات</h3>
+      <div class="slotgrid">
+        <button class="slot">09:30</button><button class="slot">10:15</button><button class="slot is-on">11:00</button>
+        <button class="slot">11:45</button><button class="slot">12:30</button><button class="slot">01:15</button>
+        <button class="slot">02:00</button><button class="slot">02:45</button><button class="slot">03:30</button>
+      </div>
+      <button class="btn btn-primary btn-lg">متابعة اختيار الموعد</button>
+      <div class="bookfoot">دفع آمن · تأكيد فوري · إلغاء مجاني حتى ساعتين</div>
+    </aside>
+  </div>
+</section>
+
+<!-- ══ 2. عن الصالون ══ -->
+<section class="section about" id="about">
+  <div class="shell about-grid">
+    <div class="about-photo">
+      <img src="https://images.unsplash.com/photo-1621605815971-fbc98d665033?q=80&w=1200&auto=format&fit=crop" alt="حلاق في صالون Salon Pro" />
+      <div class="badge-float"><strong>8</strong><span>سنوات خبرة<br />في المدينة</span></div>
+    </div>
+    <div>
+      <p class="eyebrow">عن الصالون</p>
+      <h2 class="h2" style="margin-block:.75rem 1.25rem">مش مجرد حلاق —<br />ده مكان بتثق فيه في شكلك</h2>
+      <p class="lead">بدأنا بحلاق واحد وعقيدة وحدة في حي الروضة سنة 2018. النهارده عندنا خمسة حلاقين، كل واحد متخصص في مجال مختلف — من القص الكلاسيكي للتشطيبات الحديثة.</p>
+
+      <div class="feat">
+        <div class="ic">✂</div>
+        <div><h4>أدوات معقمة لكل عميل</h4><p>شفرة جديدة وأدوات معقمة بعد كل عميل. من غير استثناء.</p></div>
+      </div>
+      <div class="feat">
+        <div class="ic">⏱</div>
+        <div><h4>مواعيد دقيقة من غير انتظار</h4><p>الحجز بالوقت مش بالحاجب. بنحترم وقتك حتى لو كنت مستعجل.</p></div>
+      </div>
+      <div class="feat">
+        <div class="ic">★</div>
+        <div><h4>استشارة مجانية قبل القص</h4><p>بنناقش الشكل المناسب لوجهك وشعرك قبل ما نبدأ — مش هتكتشف بعدين إن الشكل غلط.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 3. الخدمات والعروض ══ -->
+<section class="section" id="services">
+  <div class="shell">
+    <div class="svc-head">
+      <div>
+        <p class="eyebrow">الخدمات والأسعار</p>
+        <h2 class="h2" style="margin-top:.75rem">كل الخدمات بأسعار واضحة</h2>
+      </div>
+      <div class="filters">
+        <button class="on">الكل</button><button>قص شعر</button><button>حلاقة ذقن</button>
+        <button>عناية</button><button>باقات</button>
+      </div>
+    </div>
+
+    <div class="svc-grid">
+      <article class="svc">
+        <div class="svc-top"><h4>قص شعر كلاسيكي</h4><span class="price num">100</span></div>
+        <p>قصّ قصير أو كامل مع تصفيف نهائي وغسيل.</p>
+        <div class="svc-meta"><span>⏱ 30 دقيقة</span><span>الأكثر طلباً</span></div>
+      </article>
+      <article class="svc">
+        <div class="svc-top"><h4>حلاقة ذقن</h4><span class="price num">50</span></div>
+        <p>تشذيب دقيق مع فوم وتيشور بعد الحلاقة.</p>
+        <div class="svc-meta"><span>⏱ 20 دقيقة</span></div>
+      </article>
+      <article class="svc">
+        <div class="svc-top"><h4>قص + ذقن كامل</h4><span class="price num">130</span></div>
+        <p>الباقة الأساسية — قص شعر مع حلاقة ذقن كاملة.</p>
+        <div class="svc-meta"><span>⏱ 45 دقيقة</span><span class="tag">الأكثر طلباً</span></div>
+      </article>
+      <article class="svc">
+        <div class="svc-top"><h4>تشطيب شعر</h4><span class="price num">70</span></div>
+        <p>صبغة خفيفة أو تظليل لتغطية الشعر الأبيض.</p>
+        <div class="svc-meta"><span>⏱ 35 دقيقة</span></div>
+      </article>
+      <article class="svc">
+        <div class="svc-top"><h4>علاج قشرة</h4><span class="price num">90</span></div>
+        <p>جلسة علاجية للقشرة مع سيروم مناسب.</p>
+        <div class="svc-meta"><span>⏱ 25 دقيقة</span></div>
+      </article>
+      <article class="svc">
+        <div class="svc-top"><h4>حمام مغربي</h4><span class="price num">110</span></div>
+        <p>غسل بالطين والغنيم، قناع، وفقرة ساخنة.</p>
+        <div class="svc-meta"><span>⏱ 40 دقيقة</span></div>
+      </article>
+    </div>
+
+    <div class="offers">
+      <div>
+        <p class="eyebrow">عروض هذا الشهر</p>
+        <h3 class="h3" style="margin-top:.5rem">عروض حقيقية<br />مش كلام فاضي</h3>
+      </div>
+      <div class="offer">
+        <span class="old num">150</span> → <span class="new num">120</span>
+        <h4>الباقة الشهرية</h4>
+        <p>خصم 20% لأعضاء باقة.</p>
+      </div>
+      <div class="offer">
+        <span class="old num">200</span> → <span class="new num">99</span>
+        <h4>أول زيارة</h4>
+        <p>للعملاء الجدد فقط.</p>
+      </div>
+      <div class="offer">
+        <span class="old num">250</span> → <span class="new num">200</span>
+        <h4>باقة العائلة</h4>
+        <p>خصم 20% لـ 4 أفراد.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 4. الفريق ══ -->
+<section class="section about" id="team">
+  <div class="shell">
+    <div style="text-align:center;max-width:52ch;margin-inline:auto;margin-bottom:3.25rem">
+      <p class="eyebrow">فريق العمل</p>
+      <h2 class="h2" style="margin-block:.75rem 1rem">الناس اللي هتحجز معاهم</h2>
+      <p class="lead" style="margin-inline:auto">كل حلاق في الفريق عنده تخصص مختلف — اختار اللي يناسب ذوقك من الصور والتقييمات.</p>
+    </div>
+
+    <div class="team-grid">
+      <article class="member">
+        <div class="ph"><img src="https://images.unsplash.com/photo-1622286342621-4bd786c2447c?q=80&w=700&auto=format&fit=crop" alt="أحمد عادل" /></div>
+        <div class="info"><h4>أحمد عادل</h4><div class="role">مؤسس الصالون · 8 سنوات</div><div class="stars">★★★★★</div><p>متخصص في القص الكلاسيكي والتشطيبات.</p></div>
+      </article>
+      <article class="member">
+        <div class="ph"><img src="https://images.unsplash.com/photo-1599351431202-1e0f0137899a?q=80&w=700&auto=format&fit=crop" alt="محمد سامي" /></div>
+        <div class="info"><h4>محمد سامي</h4><div class="role">حلاقة ذقن · 5 سنوات</div><div class="stars">★★★★★</div><p>أفضل تشطيب ذقن في الصالون.</p></div>
+      </article>
+      <article class="member">
+        <div class="ph"><img src="https://images.unsplash.com/photo-1582893561942-d61adcb2e534?q=80&w=700&auto=format&fit=crop" alt="يوسف كريم" /></div>
+        <div class="info"><h4>يوسف كريم</h4><div class="role">تشطيبة وعناية · 4 سنوات</div><div class="stars">★★★★☆</div><p>متخصص في صبغات الشعر وتغطية البياض.</p></div>
+      </article>
+      <article class="member">
+        <div class="ph"><img src="https://images.unsplash.com/photo-1567894340315-735d7c361db0?q=80&w=700&auto=format&fit=crop" alt="عمر طارق" /></div>
+        <div class="info"><h4>عمر طارق</h4><div class="role">قص عصري · 3 سنوات</div><div class="stars">★★★★★</div><p>قص عصري وتدرجات حديثة.</p></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 5. آراء العملاء ══ -->
+<section class="section" id="reviews">
+  <div class="shell">
+    <div style="text-align:center;max-width:52ch;margin-inline:auto;margin-bottom:3.25rem">
+      <p class="eyebrow">آراء العملاء</p>
+      <h2 class="h2" style="margin-block:.75rem 1rem">الناس اللي جربوا الصالون</h2>
+      <p class="lead" style="margin-inline:auto">تقييم 4.9 من أكتر من 1,200 عميل.</p>
+    </div>
+    <div class="rev-grid">
+      <blockquote class="rev"><div class="q">قص شعر</div><p>بلدي أحسن صالون جربته في جدة. الموعد كان 11 بالظبط، قصّ ممتاز، وطلعت في نفس الوقت بدون أي انتظار.</p><footer><div class="av">م</div><div><strong>محمد العتيبي</strong><span>عميل منذ 2023</span></div></footer></blockquote>
+      <blockquote class="rev"><div class="q">حلاقة ذقن</div><p>حجزت مع محمد سامي ثلاث مرات. تشطيب الذقن مفيش زيّه — تشطّيب دقيق وخفيف على البشرة.</p><footer><div class="av">س</div><div><strong>سلطان الحربي</strong><span>عميل متكرر</span></div></footer></blockquote>
+      <blockquote class="rev"><div class="q">باقة العائلة</div><p>بنحجز كل شهر. الأدوات جديدة ومتعقمة، والمكان نضيف، والأسعار واضحة من غير مفاجآت.</p><footer><div class="av">ن</div><div><strong>نورة القحطاني</strong><span>باقة عائلية</span></div></footer></blockquote>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 6. التواصل ══ -->
+<section class="section contact" id="contact">
+  <div class="shell">
+    <div class="svc-head">
+      <div><p class="eyebrow">تواصل معنا</p><h2 class="h2" style="margin-top:.75rem">كيف توصلنا؟</h2></div>
+      <button class="btn btn-primary btn-lg">احجز موعدك الآن ←</button>
+    </div>
+
+    <div class="c-grid">
+      <div>
+        <div class="c-card">
+          <div class="c-row"><div class="ic">📍</div><div><h4>العنوان</h4><p>حي الروضة، شارع الأمير سعود، جدة</p></div></div>
+          <div class="c-row"><div class="ic">📞</div><div><h4>الهاتف / واتساب</h4><p class="num">01094693361</p></div></div>
+          <div class="c-row"><div class="ic">🕐</div><div style="flex:1"><h4>ساعات العمل</h4><ul class="hours"><li><span>الأحد – الخميس</span><span class="num">10:00 – 22:00</span></li><li><span>الجمعة</span><span class="num">16:00 – 22:00</span></li><li><span>السبت</span><span class="num">10:00 – 22:00</span></li></ul></div></div>
+        </div>
+      </div>
+      <div class="map">
+        <div class="map-pin"><div class="p">✂</div><small>Salon Pro — حي الروضة</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="shell">
+    <div class="f-grid">
+      <div>
+        <div class="brand" style="margin-bottom:1rem"><div class="mark">SP</div><div>Salon Pro<small>صالون محترف · جدة</small></div></div>
+        <p style="color:var(--c-muted);font-size:var(--step--1);max-width:40ch">حلاقة احترافية بمواعيد دقيقة وأسعار واضحة منذ 2018.</p>
+      </div>
+      <div><h5>روابط</h5><ul><li><a href="#about">عن الصالون</a></li><li><a href="#services">الخدمات</a></li><li><a href="#team">الفريق</a></li><li><a href="#contact">تواصل معنا</a></li></ul></div>
+      <div><h5>تواصل</h5><ul><li class="num">01094693361</li><li>حي الروضة، جدة</li><li>يومياً 10:00–22:00</li></ul></div>
+    </div>
+    <div class="f-bot"><span>© 2026 Salon Pro. جميع الحقوق محفوظة.</span><span>السعودية · العربية / English</span></div>
+  </div>
+</footer>
+
+<div class="mcta"><button class="btn btn-primary btn-lg" style="width:100%;justify-content:center">احجز موعدك الآن ←</button></div>
+
+</body>
+</html>

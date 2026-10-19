@@ -46,9 +46,21 @@ export const useBarberWorkStation = () => {
       setAppointment((res as any)?.data);
       const startedAt = (res as any)?.data?.started_at;
       if (startedAt) {
-        const start = new Date(startedAt).getTime();
+        /**
+         * The column is stored as **naive UTC**, like every other timestamp in
+         * this schema. A naive ISO string has no zone, so `new Date(value)`
+         * silently assumes the *browser's* zone -- which made this timer correct
+         * only for a barber sitting in Cairo and wrong for everyone else by
+         * their offset from it.
+         *
+         * The explicit `Z` is what marks it as UTC. A value that already carries
+         * an offset is left alone, so an aware timestamp would not be double
+         * shifted if the writer ever changes.
+         */
+        const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(startedAt);
+        const start = new Date(hasZone ? startedAt : `${startedAt}Z`).getTime();
         const elapsed = Math.floor((Date.now() - start) / 1000);
-        setElapsedTime(elapsed);
+        setElapsedTime(elapsed > 0 ? elapsed : 0);
         setTimerRunning(true);
       }
     } catch (_err) {

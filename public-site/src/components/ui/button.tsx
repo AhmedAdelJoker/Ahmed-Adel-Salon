@@ -4,42 +4,51 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { Loader2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 
+/**
+ * The button set.
+ *
+ * ## What changed
+ *
+ * The previous version had twelve variants across four different palettes:
+ * gold-bronze (`#8a5a25` → `#c58c3a`) in light, cyan (`#22D3EE`) in dark, plus
+ * a `bg-[#17110e]` "primary" that ignored the salon palette entirely — so the
+ * single most prominent element on the page did not follow the theme it was
+ * supposed to belong to.
+ *
+ * Now every colour comes from the palette via `index.css` (`bg-accent`,
+ * `border-line`, `text-ink`), so a button is the accent colour of whatever
+ * salon it renders in. The shadow is a hard 2px offset rather than a blurred
+ * halo — crisper, cheaper to composite, and the one place the softened
+ * neo-brutalist register shows through.
+ *
+ * `rounded-2xl` on the old base (16px) plus `rounded-[1.75rem]`/`[3rem]` at
+ * call sites gave the site six competing corner radii; the base now pins
+ * `--r-md` and call sites stop overriding it.
+ */
+
 const buttonVariants = cva(
-  "public-button inline-flex max-w-full min-w-0 items-center justify-center gap-2 whitespace-normal rounded-2xl border text-center text-sm font-black leading-tight transition-all duration-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/20 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97] select-none cursor-pointer",
+  "btn-base text-[length:var(--step--1)]",
   {
     variants: {
       variant: {
-        primary:
-          "border-transparent bg-[#17110e] text-white shadow-sm hover:bg-[#241914] dark:bg-[#22D3EE] dark:text-[#121212] dark:hover:bg-[#06B6D4]",
-        default:
-          "border-transparent bg-[#17110e] text-white shadow-sm hover:bg-[#241914] dark:bg-[#22D3EE] dark:text-[#121212] dark:hover:bg-[#06B6D4]",
-        accent:
-          "border-transparent bg-[linear-gradient(135deg,#8a5a25_0%,#c58c3a_100%)] text-white shadow-sm hover:brightness-105 dark:bg-[#22D3EE] dark:text-[#121212] dark:hover:bg-[#06B6D4]",
-        secondary:
-          "public-control border-transparent text-gray-700 hover:text-[#8a5a25] dark:bg-[#1F1F1F] dark:text-gray-300 dark:hover:bg-cyan-400/10 dark:hover:text-[#22D3EE]",
-        outline:
-          "public-control bg-transparent text-gray-700 hover:border-[#8a5a25]/35 hover:text-[#8a5a25] dark:border-white/10 dark:text-gray-300 dark:hover:border-[#22D3EE]/40 dark:hover:bg-cyan-400/10 dark:hover:text-[#22D3EE]",
-        ghost:
-          "border-transparent bg-transparent text-gray-600 shadow-none hover:bg-[#8a5a25]/8 hover:text-[#8a5a25] dark:text-gray-400 dark:hover:bg-cyan-400/10 dark:hover:text-[#22D3EE]",
-        danger:
-          "border-transparent bg-red-600 text-white shadow-sm hover:bg-red-700 hover:shadow-md",
-        dangerSoft:
-          "public-control border-transparent bg-red-50 text-red-700 hover:bg-red-600 hover:text-white dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500 dark:hover:text-white",
-        success:
-          "border-transparent bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 hover:shadow-md",
-        successSoft:
-          "public-control border-transparent bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500 dark:hover:text-white",
-        warning:
-          "border-transparent bg-amber-500 text-white shadow-sm hover:bg-amber-600 hover:shadow-md",
-        warningSoft:
-          "public-control border-transparent bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500 dark:hover:text-white",
+        /** The one action a screen should offer. */
+        primary: "btn-base--solid",
+        /** Equal weight, no fill. */
+        outline: "btn-base--outline",
+        /** Tertiary. */
+        ghost: "btn-base--quiet",
+        /** A surface the user can click — inside a panel or a list. */
+        panel: "btn-base--panel",
+        /** Destructive confirmation. */
+        danger: "btn-base--danger",
+        /** Alias kept so existing call sites keep working. */
+        default: "btn-base--solid",
       },
       size: {
-        default: "min-h-12 px-6 py-2",
-        sm: "min-h-9 px-4 py-1.5 text-xs",
-        lg: "min-h-14 px-8 py-3 text-base",
-        xl: "min-h-16 px-10 py-3.5 text-lg",
-        icon: "h-11 w-11 p-0",
+        sm: "min-h-9 px-3.5",
+        default: "min-h-11 px-5",
+        lg: "min-h-13 px-7",
+        icon: "h-10 w-10 p-0",
       },
     },
     defaultVariants: {
@@ -80,7 +89,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         type={!asChild ? type : undefined}
         className={cn(
           buttonVariants({ variant, size }),
-          loading && "opacity-75",
+          loading && "opacity-70",
           className,
         )}
         disabled={!asChild ? isDisabled : undefined}
@@ -94,7 +103,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           <>
             {loading && (
               <Loader2
-                className="h-5 w-5 shrink-0 animate-spin"
+                className="h-4 w-4 shrink-0 animate-spin"
                 aria-hidden="true"
               />
             )}
@@ -109,5 +118,3 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = "Button";
 
 export { Button, buttonVariants };
-
-
