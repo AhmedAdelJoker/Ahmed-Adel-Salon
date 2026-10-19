@@ -461,6 +461,15 @@ async def add_security_headers(request, call_next):
     return response
 
 
+@app.middleware("http")
+async def serve_resized_uploads(request, call_next):
+    """`?w=` on a public upload returns a cached thumbnail instead of the
+    full-size original — see app.core.image_thumbs for the gates."""
+    from app.core.image_thumbs import maybe_resized_upload
+
+    return await maybe_resized_upload(request, call_next, uploads_root=uploads_dir)
+
+
 app.include_router(api_router, prefix="/api/v1")
 
 
