@@ -1,118 +1,61 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
 
+import {
+  DEFAULT_LOCALE,
+  LOCALE_META,
+  LOCALES,
+  formatNumber,
+  formatPrice,
+  formatTime12h,
+  isRTL,
+  translate,
+  type LocaleCode,
+} from "../lib/i18n";
+
+export type { LocaleCode };
+export { LOCALES, LOCALE_META };
+
 /**
- * I18nContext — Lightweight, dependency-free i18n system.
- * - Supports AR (default) + EN
- * - Persists choice in localStorage
- * - Auto-detects browser language on first visit
- * - Sets <html lang="..."> and <html dir="..."> dynamically
- * - Supports variable interpolation {name}
- * - Supports plural form via {count, plural, one {# item} other {# items}}
+ * I18nContext — thin React binding over lib/i18n.
+ *
+ * All copy lives in the catalogue; this file only owns *state*: which locale is
+ * active, where it is persisted, and keeping `<html lang>`/`<html dir>` in sync.
+ *
+ * The previous version embedded its own 38-key dictionary here, and no page
+ * ever called `useI18n().t` — the language switcher changed `dir` from rtl to
+ * ltr while every string on the page stayed Arabic, so an English visitor got a
+ * mirrored, half-broken Arabic layout. The dictionary now lives in one file
+ * that a test can compare key-by-key, and the pages actually consume it.
  */
 
 const STORAGE_KEY = "salon-locale";
 
-const TRANSLATIONS = {
-  ar: {
-    // Navigation
-    "nav.home": "الرئيسية",
-    "nav.services": "الخدمات",
-    "nav.team": "الفريق",
-    "nav.offers": "العروض",
-    "nav.testimonials": "آراء العملاء",
-    "nav.contact": "التواصل",
-    "nav.book": "احجز الآن",
-
-    // Hero
-    "hero.bookNow": "احجز تجربتك الملكية",
-    "hero.exploreServices": "استكشف الخدمات",
-    "hero.bookingCta": "احجز الآن",
-
-    // Stats / Trust
-    "trust.openNow": "متاحون الآن",
-    "trust.closedNow": "مغلق حالياً",
-
-    // CTA / Floating
-    "floating.bookExperience": "احجز الآن",
-    "floating.whatsappLabel": "تواصل عبر واتساب",
-    "floating.close": "إغلاق",
-    "floating.showBooking": "إظهار زر الحجز",
-
-    // Contact
-    "contact.location": "الموقع",
-    "contact.phone": "الهاتف",
-    "contact.viewMap": "عرض الخريطة",
-    "contact.callNow": "اتصل الآن",
-    "contact.workingHours": "ساعات العمل",
-    "contact.closedToday": "مغلق اليوم",
-
-    // Common
-    "common.loading": "جاري التحميل...",
-    "common.error": "حدث خطأ",
-    "common.retry": "إعادة المحاولة",
-    "common.skipToContent": "تخطي إلى المحتوى الرئيسي",
-  },
-  en: {
-    "nav.home": "Home",
-    "nav.services": "Services",
-    "nav.team": "Team",
-    "nav.offers": "Offers",
-    "nav.testimonials": "Testimonials",
-    "nav.contact": "Contact",
-    "nav.book": "Book Now",
-
-    "hero.bookNow": "Book Your Royal Experience",
-    "hero.exploreServices": "Explore Services",
-    "hero.bookingCta": "Book Now",
-
-    "trust.openNow": "Open Now",
-    "trust.closedNow": "Currently Closed",
-
-    "floating.bookExperience": "Book Now",
-    "floating.whatsappLabel": "Contact via WhatsApp",
-    "floating.close": "Close",
-    "floating.showBooking": "Show booking button",
-
-    "contact.location": "Location",
-    "contact.phone": "Phone",
-    "contact.viewMap": "View Map",
-    "contact.callNow": "Call Now",
-    "contact.workingHours": "Working Hours",
-    "contact.closedToday": "Closed Today",
-
-    "common.loading": "Loading...",
-    "common.error": "An error occurred",
-    "common.retry": "Retry",
-    "common.skipToContent": "Skip to main content",
-  },
-};
-
-export type LocaleCode = "ar" | "en";
-
 export interface I18nContextValue {
   locale: LocaleCode;
   dir: "rtl" | "ltr";
-  t: (key: string, vars?: Record<string, unknown>) => string;
-  setLocale: (newLocale: LocaleCode) => void;
-  toggleLocale: () => void;
   isRTL: boolean;
-  availableLocales: { code: string; label: string; flag: string }[];
+  t: (key: string, vars?: Record<string, unknown>) => string;
+  setLocale: (locale: LocaleCode) => void;
+  toggleLocale: () => void;
+  number: (value: number | string | null | undefined) => string;
+  price: (value: number | string | null | undefined) => string;
+  time12: (value: string | null | undefined) => string;
+  availableLocales: (typeof LOCALE_META)[LocaleCode][];
 }
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
-function detectInitialLocale() {
-  if (typeof window === "undefined") return "ar";
+function detectInitialLocale(): LocaleCode {
+  if (typeof window === "undefined") return DEFAULT_LOCALE;
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "ar" || stored === "en") return stored;
   } catch {
     // ignore
   }
-  // Auto-detect from browser
-  const browserLang = (navigator.language || "ar").toLowerCase();
-  if (browserLang.startsWith("en")) return "en";
-  return "ar"; // Default to Arabic
+  // Arabic is the product's primary language, so an unrecognised browser
+  // language falls back to it rather than to the browser's setting.
+  return DEFAULT_LOCALE;
 }
 
 export function I18nProvider({
@@ -123,14 +66,14 @@ export function I18nProvider({
   defaultLocale?: LocaleCode;
 }) {
   const [locale, setLocaleState] = useState<LocaleCode>(
-    (defaultLocale as LocaleCode) || (detectInitialLocale() as LocaleCode),
+    () => defaultLocale ?? detectInitialLocale(),
   );
 
-  const setLocale = useCallback((newLocale: LocaleCode) => {
-    if (newLocale !== "ar" && newLocale !== "en") return;
-    setLocaleState(newLocale);
+  const setLocale = useCallback((next: LocaleCode) => {
+    if (next !== "ar" && next !== "en") return;
+    setLocaleState(next);
     try {
-      localStorage.setItem(STORAGE_KEY, newLocale);
+      localStorage.setItem(STORAGE_KEY, next);
     } catch {
       // ignore
     }
@@ -140,37 +83,35 @@ export function I18nProvider({
     setLocale(locale === "ar" ? "en" : "ar");
   }, [locale, setLocale]);
 
-  // Update <html lang/dir> when locale changes
+  /**
+   * `<html lang>` and `<html dir>` are the single source of truth for
+   * direction. No page sets `dir` itself any more — that is what previously
+   * produced a hardcoded rtl container inside an ltr document.
+   */
   useEffect(() => {
     if (typeof document === "undefined") return;
-    document.documentElement.lang = locale;
-    document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
+    const root = document.documentElement;
+    root.lang = locale;
+    root.dir = isRTL(locale) ? "rtl" : "ltr";
   }, [locale]);
 
   const t = useCallback(
-    (key: string, vars?: Record<string, unknown>) => {
-      const translation = TRANSLATIONS[locale]?.[key] ?? TRANSLATIONS.ar[key] ?? key;
-      if (!vars) return translation;
-      // Simple variable interpolation: {name}
-      return translation.replace(/\{(\w+)\}/g, (m, name) =>
-        vars[name] !== undefined ? String(vars[name]) : m,
-      );
-    },
+    (key: string, vars?: Record<string, unknown>) => translate(locale, key, vars),
     [locale],
   );
 
   const value = useMemo<I18nContextValue>(
     () => ({
       locale,
-      dir: locale === "ar" ? "rtl" : "ltr",
-      isRTL: locale === "ar",
+      dir: isRTL(locale) ? "rtl" : "ltr",
+      isRTL: isRTL(locale),
       t,
       setLocale,
       toggleLocale,
-      availableLocales: [
-        { code: "ar", label: "العربية", flag: "🇪🇬" },
-        { code: "en", label: "English", flag: "🇬🇧" },
-      ],
+      number: (v) => formatNumber(v, locale),
+      price: (v) => formatPrice(v, locale),
+      time12: (v) => formatTime12h(v, locale),
+      availableLocales: LOCALES.map((code) => LOCALE_META[code]),
     }),
     [locale, t, setLocale, toggleLocale],
   );

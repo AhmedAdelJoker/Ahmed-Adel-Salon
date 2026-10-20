@@ -68,9 +68,9 @@ export function CloseReopenDialogs({
               disabled={closingMonth === confirmClose?.key}
             >
               {closingMonth === confirmClose?.key ? (
-                <Loader className="ml-2 h-4 w-4 animate-spin" />
+                <Loader className="ms-2 h-4 w-4 animate-spin" />
               ) : (
-                <Lock size={14} className="ml-2" />
+                <Lock size={14} className="ms-2" />
               )}
               تأكيد الإغلاق
             </Button>
@@ -114,9 +114,9 @@ export function CloseReopenDialogs({
               disabled={reopeningMonth === confirmReopen?.key}
             >
               {reopeningMonth === confirmReopen?.key ? (
-                <Loader className="ml-2 h-4 w-4 animate-spin" />
+                <Loader className="ms-2 h-4 w-4 animate-spin" />
               ) : (
-                <Unlock size={14} className="ml-2" />
+                <Unlock size={14} className="ms-2" />
               )}
               تأكيد الفتح
             </Button>

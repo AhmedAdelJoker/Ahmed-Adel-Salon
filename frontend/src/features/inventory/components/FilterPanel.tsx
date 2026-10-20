@@ -300,14 +300,14 @@ export function FilterPanel({
             className="flex-1 h-12 rounded-xl font-black uppercase text-xs"
             onClick={handleClear}
           >
-            <X size={16} className="ml-2" /> مسح الكل
+            <X size={16} className="ms-2" /> مسح الكل
           </Button>
           <Button
             className="flex-1 h-12 rounded-xl font-black uppercase text-xs shadow-lg shadow-accent/20"
             onClick={handleApply}
           >
             تطبيق ({activeFilterCount}){" "}
-            <ChevronDown size={16} className="mr-2" />
+            <ChevronDown size={16} className="me-2" />
           </Button>
         </div>
       </div>
@@ -329,7 +329,7 @@ function FilterSection({ title, icon: Icon, description, children }) {
           </p>
         </div>
       </div>
-      <div className="border-r-2 border-border/30 mr-5 pr-4">{children}</div>
+      <div className="border-e-2 border-border/30 me-5 pe-4">{children}</div>
     </div>
   );
 }

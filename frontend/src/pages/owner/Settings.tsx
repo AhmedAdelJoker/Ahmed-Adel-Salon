@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Store,
@@ -28,6 +28,12 @@ import { adaptObject } from "@/services/apiAdapter";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/core/utils";
+import {
+  errorHeadline,
+  isConflict,
+  toErrorLines,
+  type ApiErrorLine,
+} from "@/lib/core/apiErrors";
 import { motion } from "framer-motion";
 import {
   Select,
@@ -42,6 +48,7 @@ import {
   ContentPanel,
   SkeletonCard,
 } from "@/components/shared/PremiumUI";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 
 // New Panel Components
 import WorkingHoursPanel from "@/pages/owner/WorkingHoursPanel";
@@ -116,6 +123,14 @@ const Settings = () => {
   const [logoUploading, setLogoUploading] = useState(false);
   const [shopInitial, setShopInitial] = useState<Record<string, string> | null>(null);
   const [hoursDirty, setHoursDirty] = useState(false);
+  const [shopFetchStarted, setShopFetchStarted] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [settingsVersion, setSettingsVersion] = useState<number | undefined>(undefined);
+  const [publicSiteStale, setPublicSiteStale] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [shopSaveErrors, setShopSaveErrors] = useState<ApiErrorLine[]>([]);
+  const [shopConflict, setShopConflict] = useState<string | null>(null);
+  const tabListRef = useRef<HTMLDivElement>(null);
 
   const [shopSettings, setShopSettings] = useState({
     salon_name: "",
@@ -179,11 +194,13 @@ const Settings = () => {
     setLoadError(null);
     try {
       const res = await api.get("/business-settings");
-      const settingsData = adaptObject(res, {}) || {};
+      const settingsData = (adaptObject(res, {}) || {}) as Record<string, unknown>;
       if (settingsData && Object.keys(settingsData).length) {
         const normalized = normalizeShopSettings(settingsData, {});
         setShopSettings((prev) => ({ ...prev, ...normalized }));
         setShopInitial({ ...normalized } as Record<string, string>);
+        setSettingsVersion(Number(settingsData.version) || undefined);
+        setPublicSiteStale(Boolean(settingsData.publicSiteStale));
         setSettingsReady(true);
       } else {
         setLoadError("تعذر تحميل بيانات المنشأة. تحقق من الاتصال ثم أعد المحاولة.");
@@ -197,8 +214,10 @@ const Settings = () => {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (activeTab !== "shop" || settingsReady || shopFetchStarted) return;
+    setShopFetchStarted(true);
+    void fetchData();
+  }, [activeTab, settingsReady, shopFetchStarted, fetchData]);
 
   const shopIsDirty = useMemo(() => {
     if (!shopInitial) return false;
@@ -225,15 +244,77 @@ const Settings = () => {
     return { done, total: checks.length };
   }, [shopSettings]);
 
-  const setActiveTab = (tab: string) => {
-    const leavingShop = shopIsDirty && activeTab === "shop" && tab !== "shop";
-    const leavingHours = hoursDirty && activeTab === "hours" && tab !== "hours";
-    if (leavingShop || leavingHours) {
-      const label = leavingShop ? "بيانات المنشأة" : "ساعات العمل";
-      const ok = window.confirm(`لديك تغييرات غير محفوظة في ${label}. هل تريد المتابعة بدون حفظ؟`);
-      if (!ok) return;
+  const dirtyLabel = useMemo(() => {
+    if (activeTab === "shop" && shopIsDirty) return "بيانات المنشأة";
+    if (activeTab === "hours" && hoursDirty) return "ساعات العمل";
+    return null;
+  }, [activeTab, shopIsDirty, hoursDirty]);
+
+  const commitTab = useCallback(
+    (tab: string) => {
+      setSearchParams({ tab });
+      setPendingTab(null);
+    },
+    [setSearchParams],
+  );
+
+  const requestTab = useCallback(
+    (tab: string) => {
+      if (tab === activeTab) return;
+      if (dirtyLabel) {
+        setPendingTab(tab);
+        return;
+      }
+      commitTab(tab);
+    },
+    [activeTab, dirtyLabel, commitTab],
+  );
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const requested = new URLSearchParams(window.location.search).get("tab");
+      const target =
+        requested && visibleTabs.some((t) => t.id === requested)
+          ? requested
+          : isOwnerLike
+            ? "shop"
+            : "hours";
+      if (target === activeTab) return;
+
+      if (dirtyLabel) {
+        window.history.pushState(null, "", `${window.location.pathname}?tab=${activeTab}`);
+        const proceed = window.confirm(
+          `لديك تغييرات غير محفوظة في ${dirtyLabel}. هل تريد المتابعة بدون حفظ؟`,
+        );
+        if (proceed) setSearchParams({ tab: target }, { replace: true });
+        return;
+      }
+      setSearchParams({ tab: target }, { replace: true });
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [activeTab, dirtyLabel, isOwnerLike, setSearchParams, visibleTabs]);
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const keys = ["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const index = visibleTabs.findIndex((t) => t.id === activeTab);
+    let nextIndex = index;
+    if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = visibleTabs.length - 1;
+    else if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+      nextIndex = (index + 1) % visibleTabs.length;
+    } else {
+      nextIndex = (index - 1 + visibleTabs.length) % visibleTabs.length;
     }
-    setSearchParams({ tab });
+    const nextTab = visibleTabs[nextIndex];
+    requestTab(nextTab.id);
+    const node = tabListRef.current?.querySelector<HTMLButtonElement>(
+      `#settings-tab-${nextTab.id}`,
+    );
+    node?.focus();
   };
 
   const validateShopFields = useCallback(() => {
@@ -263,6 +344,8 @@ const Settings = () => {
       return;
     }
     setLoading(true);
+    setShopSaveErrors([]);
+    setShopConflict(null);
 
     try {
       const payload: Record<string, unknown> = {
@@ -275,26 +358,44 @@ const Settings = () => {
         receiptFooter: shopSettings.receipt_footer.trim() || null,
         currency: shopSettings.currency.trim() || "EGP",
       };
+      if (settingsVersion) payload.expectedVersion = settingsVersion;
 
       const res = await api.put("/business-settings", payload);
-      const updated = adaptObject(res, {}) || {};
+      const updated = (adaptObject(res, {}) || {}) as Record<string, unknown>;
       const normalized = normalizeShopSettings(updated, {}) as Record<string, string>;
       setShopSettings((prev) => ({ ...prev, ...normalized }));
       setShopInitial({ ...normalized });
+      setSettingsVersion(Number(updated.version) || settingsVersion);
+      setPublicSiteStale(Boolean(updated.publicSiteStale));
 
       toast.success("تم حفظ بيانات المنشأة بنجاح");
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      if (Array.isArray(detail)) {
-        const msg = detail.map((d: any) => d.msg || d.message).filter(Boolean).join(" • ");
-        toast.error(msg || "فشل حفظ بيانات المنشأة");
-      } else if (typeof detail === "string" && detail) {
-        toast.error(detail);
-      } else {
-        toast.error("فشل حفظ بيانات المنشأة");
+    } catch (err: unknown) {
+      if (isConflict(err)) {
+        const [line] = toErrorLines(err, "تم تعديل الإعدادات من مستخدم آخر");
+        setShopConflict(line?.message ?? "تم تعديل الإعدادات من مستخدم آخر");
+        toast.error("تعارض في الحفظ — الإعدادات تغيّرت من مستخدم آخر");
+        return;
       }
+      const lines = toErrorLines(err, "فشل حفظ بيانات المنشأة");
+      setShopSaveErrors(lines);
+      toast.error(errorHeadline(lines, "فشل حفظ بيانات المنشأة"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    setPublishing(true);
+    try {
+      const res = await api.post("/business-settings/publish-site");
+      const updated = (adaptObject(res, {}) || {}) as Record<string, unknown>;
+      setPublicSiteStale(Boolean(updated.publicSiteStale));
+      setSettingsVersion(Number(updated.version) || settingsVersion);
+      toast.success("تم نشر الموقع العام بنجاح");
+    } catch {
+      toast.error("فشل نشر الموقع العام");
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -315,7 +416,7 @@ const Settings = () => {
     }
   };
 
-  if (initialLoading)
+  if (activeTab === "shop" && initialLoading)
     return (
       <div className="erp-page-container space-y-6 pb-24">
         <PageHeader
@@ -334,7 +435,7 @@ const Settings = () => {
       </div>
     );
 
-  if (loadError)
+  if (activeTab === "shop" && loadError)
     return (
       <div className="erp-page-container space-y-6 pb-24">
         <PageHeader
@@ -374,7 +475,7 @@ const Settings = () => {
             variant="primary"
             className="h-10 rounded-xl px-5 text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary border-none shadow-sm"
           >
-            <ShieldCheck size={16} className="ml-2" strokeWidth={2.5} />{" "}
+            <ShieldCheck size={16} className="ms-2" strokeWidth={2.5} />{" "}
             {isOwnerLike ? "صلاحيات وصول المالك" : "صلاحيات المدير — ساعات العمل فقط"}
           </Badge>
         }
@@ -386,12 +487,36 @@ const Settings = () => {
         </div>
       )}
 
+      {isOwnerLike && publicSiteStale && (
+        <div
+          role="status"
+          className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-900 dark:bg-sky-950/30"
+        >
+          <Globe size={16} className="shrink-0 text-sky-700 dark:text-sky-300" />
+          <p className="flex-1 text-[11px] font-black leading-relaxed text-sky-900 dark:text-sky-200">
+            عدّلت الإعدادات بعد آخر نشر — الموقع العام لازم ينشر تاني عشان يشوف التعديلات دي
+            (وقت الدوام، الاسم، الشعار).
+          </p>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handlePublish}
+            loading={publishing}
+            className="h-8 shrink-0 rounded-xl px-4 text-[11px] font-black"
+          >
+            <Upload size={13} className="ms-1" /> انشر الآن
+          </Button>
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row gap-10">
         {/* Advanced Settings Navigation Sidebar */}
         <aside className="w-full lg:w-[320px] shrink-0">
           <div
+            ref={tabListRef}
             role="tablist"
             aria-label="أقسام الإعدادات"
+            aria-orientation="vertical"
             className="sticky top-24 space-y-2 flex lg:flex-col overflow-x-auto pb-4 lg:pb-0 no-scrollbar snap-x snap-mandatory bg-card/40 lg:bg-transparent p-2 rounded-2xl border border-border/40 lg:border-none lg:p-0"
           >
             {visibleTabs.map((tab) => {
@@ -400,11 +525,17 @@ const Settings = () => {
               return (
                 <button
                   key={tab.id}
+                  id={`settings-tab-${tab.id}`}
                   role="tab"
+                  type="button"
                   aria-selected={isActive}
-                  onClick={() => setActiveTab(tab.id)}
+                  aria-controls={`settings-panel-${tab.id}`}
+                  tabIndex={isActive ? 0 : -1}
+                  onKeyDown={handleTabKeyDown}
+                  onClick={() => requestTab(tab.id)}
                   className={cn(
                     "relative flex items-center justify-between min-w-[180px] lg:min-w-full px-5 py-4 rounded-2xl transition-all duration-300 group snap-start",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     isActive
                       ? "bg-primary text-white shadow-premium scale-[1.02] z-10"
                       : "bg-card text-muted hover:bg-soft hover:text-primary border border-border/40 lg:border-transparent",
@@ -462,7 +593,13 @@ const Settings = () => {
         </aside>
 
         {/* Dynamic Content Workspace */}
-        <main className="flex-1 min-w-0">
+        <main
+          role="tabpanel"
+          id={`settings-panel-${activeTab}`}
+          aria-labelledby={`settings-tab-${activeTab}`}
+          tabIndex={-1}
+          className="flex-1 min-w-0 focus-visible:outline-none"
+        >
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -501,6 +638,53 @@ const Settings = () => {
                     }
                     className="overflow-hidden"
                   >
+                    {shopConflict && (
+                      <div
+                        role="alert"
+                        className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30"
+                      >
+                        <div className="flex items-center gap-2 text-[11px] font-black text-amber-800 dark:text-amber-200">
+                          <ShieldCheck size={16} className="shrink-0" />
+                          {shopConflict}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={fetchData}
+                          className="h-8 self-start rounded-xl border-amber-300 px-3 text-[11px] font-black text-amber-800 dark:border-amber-700 dark:text-amber-200"
+                        >
+                          <Activity size={13} className="ms-1" /> جلب أحدث نسخة
+                        </Button>
+                      </div>
+                    )}
+
+                    {shopSaveErrors.length > 0 && (
+                      <div
+                        role="alert"
+                        className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-900 dark:bg-rose-950/30"
+                      >
+                        <p className="flex items-center gap-2 text-[11px] font-black text-rose-700 dark:text-rose-300">
+                          <ShieldCheck size={16} className="shrink-0" />
+                          {shopSaveErrors.length === 1
+                            ? "تعذر الحفظ"
+                            : `تعذر الحفظ — ${shopSaveErrors.length} أخطاء من الخادم`}
+                        </p>
+                        <ul className="mt-2 space-y-1 pe-4">
+                          {shopSaveErrors.map((line, index) => (
+                            <li
+                              key={`${line.field ?? "err"}-${index}`}
+                              className="text-[11px] font-bold text-rose-700/90 dark:text-rose-300/90"
+                            >
+                              {line.field ? (
+                                <span className="font-black">{line.field}: </span>
+                              ) : null}
+                              {line.message}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
                       {/* Logo + receipt preview */}
                       <div className="space-y-4">
@@ -576,7 +760,7 @@ const Settings = () => {
                             <span className="text-[10px] font-black uppercase tracking-widest text-muted">
                               معاينة الإيصال
                             </span>
-                            <span className="mr-auto text-[10px] font-bold text-muted">حيّة</span>
+                            <span className="me-auto text-[10px] font-bold text-muted">حيّة</span>
                           </div>
                           <div className="p-4 flex flex-col items-center gap-2 text-center">
                             {getLogoPreviewUrl() ? (
@@ -620,7 +804,7 @@ const Settings = () => {
                       <div className="space-y-5 min-w-0">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-1.5">
-                            <label htmlFor="settings-salon-name" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-salon-name" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <Store size={11} /> المسمى التجاري الرسمي <span className="text-danger">*</span>
                             </label>
                             <Input
@@ -631,12 +815,12 @@ const Settings = () => {
                               placeholder="مثال: صالون الأناقة"
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1 tabular-nums">
+                            <p className="text-[10px] font-bold text-muted me-1 tabular-nums">
                               {shopSettings.salon_name.length}/255
                             </p>
                           </div>
                           <div className="space-y-1.5">
-                            <label htmlFor="settings-shop-phone" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-shop-phone" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <Bell size={11} /> رقم التواصل
                             </label>
                             <Input
@@ -649,10 +833,10 @@ const Settings = () => {
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                               dir="ltr"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1">يظهر في الفاتورة الحرارية</p>
+                            <p className="text-[10px] font-bold text-muted me-1">يظهر في الفاتورة الحرارية</p>
                           </div>
                           <div className="space-y-1.5">
-                            <label htmlFor="settings-shop-whatsapp" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-shop-whatsapp" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <MessageCircle size={11} /> واتساب
                             </label>
                             <Input
@@ -665,10 +849,10 @@ const Settings = () => {
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                               dir="ltr"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1">للتواصل وروابط الحجز</p>
+                            <p className="text-[10px] font-bold text-muted me-1">للتواصل وروابط الحجز</p>
                           </div>
                           <div className="space-y-1.5">
-                            <label htmlFor="settings-currency" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-currency" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <Coins size={11} /> العملة
                             </label>
                             <Select
@@ -683,12 +867,18 @@ const Settings = () => {
                                 <SelectItem value="SAR">ريال سعودي — SAR</SelectItem>
                                 <SelectItem value="USD">دولار — USD</SelectItem>
                                 <SelectItem value="AED">درهم إماراتي — AED</SelectItem>
-                                <SelectItem value="ج.م">ج.م</SelectItem>
+                                {/* The fifth entry was `value="ج.م"` labelled ج.م:
+                                    an option whose value was a rendered symbol
+                                    rather than a currency code, and identical to
+                                    the EGP entry above it. Selecting it stored
+                                    "ج.م" in business_settings.currency, which no
+                                    formatter understood. The codes above are the
+                                    contract. */}
                               </SelectContent>
                             </Select>
                           </div>
                           <div className="md:col-span-2 space-y-1.5">
-                            <label htmlFor="settings-address" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-address" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <MapPin size={11} /> العنوان الجغرافي
                             </label>
                             <Input
@@ -699,10 +889,10 @@ const Settings = () => {
                               placeholder="المنطقة، الشارع، علامة مميزة"
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1 tabular-nums">{shopSettings.address.length}/500</p>
+                            <p className="text-[10px] font-bold text-muted me-1 tabular-nums">{shopSettings.address.length}/500</p>
                           </div>
                           <div className="md:col-span-2 space-y-1.5">
-                            <label htmlFor="settings-maps-url" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-maps-url" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <Globe size={11} /> رابط الخريطة (Google Maps)
                             </label>
                             <div className="flex gap-2">
@@ -729,10 +919,10 @@ const Settings = () => {
                                 </Button>
                               )}
                             </div>
-                            <p className="text-[10px] font-bold text-muted mr-1">يظهر زر الخريطة في الموقع العام — يجب أن يبدأ بـ https://</p>
+                            <p className="text-[10px] font-bold text-muted me-1">يظهر زر الخريطة في الموقع العام — يجب أن يبدأ بـ https://</p>
                           </div>
                           <div className="md:col-span-2 space-y-1.5">
-                            <label htmlFor="settings-receipt-footer" className="text-[10px] font-black text-muted uppercase tracking-widest mr-1 flex items-center gap-1.5">
+                            <label htmlFor="settings-receipt-footer" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
                               <Receipt size={11} /> تذييل الإيصال
                             </label>
                             <Textarea
@@ -744,7 +934,7 @@ const Settings = () => {
                               placeholder="مثال: شكراً لزيارتكم — نتطلع لخدمتكم مجدداً"
                               className="rounded-xl bg-soft border-border/60 font-bold"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1 tabular-nums">
+                            <p className="text-[10px] font-bold text-muted me-1 tabular-nums">
                               {shopSettings.receipt_footer.length}/500 — يظهر أسفل كل فاتورة
                             </p>
                           </div>
@@ -768,7 +958,7 @@ const Settings = () => {
                     <span className="text-xs font-bold text-muted hidden sm:inline">
                       {shopIsDirty ? "لديك تغييرات غير محفوظة" : "محفوظ"}
                     </span>
-                    <div className="flex gap-2 mr-auto">
+                    <div className="flex gap-2 me-auto">
                       <Button
                         variant="outline"
                         onClick={() => {
@@ -792,7 +982,12 @@ const Settings = () => {
                 </div>
               )}
 
-              {activeTab === "hours" && <WorkingHoursPanel onDirtyChange={setHoursDirty} />}
+              {activeTab === "hours" && (
+        <WorkingHoursPanel
+          onDirtyChange={setHoursDirty}
+          onVersionChange={setSettingsVersion}
+        />
+      )}
               {activeTab === "services" && <ServicesManagement hideHeader />}
               {activeTab === "website" && <BusinessSettingsPage />}
               {activeTab === "loyalty" && <LoyaltySettingsPanel />}
@@ -828,6 +1023,17 @@ const Settings = () => {
           </AnimatePresence>
         </main>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingTab)}
+        onOpenChange={(open) => !open && setPendingTab(null)}
+        title="لديك تغييرات غير محفوظة"
+        description={`التعديلات في ${dirtyLabel ?? "هذا القسم"} ستُفقد إذا تابعت. يمكنك العودة والإكمال أولاً.`}
+        confirmText="متابعة بدون حفظ"
+        cancelText="العودة والإكمال"
+        variant="danger"
+        onConfirm={() => pendingTab && commitTab(pendingTab)}
+      />
     </div>
   );
 };

@@ -1,31 +1,69 @@
-import { Activity, LayoutDashboard, Loader2, ShieldCheck, TrendingUp, Users, Wallet } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import i18n from "@/i18n";
+import {
+  Activity,
+  AlertTriangle,
+  LayoutDashboard,
+  RefreshCw,
+  Wallet,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
+import { PageHeader, PremiumCard, SkeletonCard } from "@/components/shared/PremiumUI";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/core/utils";
-import {
-  PageHeader,
-  PremiumCard,
-  SkeletonCard,
-} from "@/components/shared/PremiumUI";
-import { KPI_CONFIG, PERIODS } from "@/features/reports-dashboard/constants";
-import { useReportsDashboard } from "@/features/reports-dashboard/hooks/useReportsDashboard";
-import { KpiStats } from "@/features/reports-dashboard/components/KpiStats";
-import { RevenueChart } from "@/features/reports-dashboard/components/RevenueChart";
-import { ServiceDistribution } from "@/features/reports-dashboard/components/ServiceDistribution";
-import { SmartInsights } from "@/features/reports-dashboard/components/SmartInsights";
-import { QuickActions } from "@/features/reports-dashboard/components/QuickActions";
+import { cn, formatCurrency } from "@/lib/core/utils";
 
+import { PERIODS } from "@/features/reports-dashboard/constants";
+import { useReportsDashboard } from "@/features/reports-dashboard/hooks/useReportsDashboard";
+import { useOperatingSummary } from "@/features/reports-dashboard/hooks/useOperatingSummary";
+import {
+  DayStatusBar,
+  Delta,
+  NeedsAttention,
+  RankingTable,
+  RevenueChart,
+  RevenueSparkline,
+  SmartInsights,
+} from "@/features/reports-dashboard";
+
+/**
+ * `/owner` -- executive cockpit.
+ *
+ * Rebuilt around one question per band, top to bottom:
+ *
+ *   1. What needs a decision?          (NeedsAttention, /owner/alerts)
+ *   2. Is the salon trading, and how?   (DayStatusBar)
+ *   3. How did today go, against the
+ *      days before it?                  (KPI row + RevenueSparkline)
+ *   4. Who and what is carrying it?     (RankingTable x2)
+ *
+ * That order is the difference between this and the previous layout, which put
+ * the revenue chart above the fold and the things requiring action at the bottom.
+ *
+ * Two requests, not one: `useReportsDashboard` owns the period-scoped KPIs and
+ * the demo-mode decision, `useOperatingSummary` owns the always-current trading
+ * state. They are kept apart so the period selector cannot change what "open
+ * right now" means, and so each can say which sections it has.
+ *
+ * Density is the point. Rows are tight, figures are tabular, and every panel is
+ * a table or a strip rather than a card with a shadow. Nothing here is a
+ * placeholder: a section that could not be loaded says so, and a section that is
+ * genuinely empty says what was checked.
+ */
 export default function ReportsDashboard() {
   const navigate = useNavigate();
+  const dir = i18n.dir() as "rtl" | "ltr";
+
   const {
     stats,
     weeklyData,
@@ -33,7 +71,7 @@ export default function ReportsDashboard() {
     loading,
     period,
     chartType,
-    isDemo,
+    loadError,
     employeeId,
     employeeName,
     displayName,
@@ -44,50 +82,134 @@ export default function ReportsDashboard() {
     setChartType,
   } = useReportsDashboard();
 
+  const { summary, loading: opsLoading, failures, error: opsError, reload: reloadOps } =
+    useOperatingSummary(14);
+
+  const busy = loading || opsLoading;
+
+  // The salon view moves faster than the month; keep it fresh without a manual
+  // click. 60s is a compromise between "current" and "not a poll storm".
+  useEffect(() => {
+    const id = setInterval(() => {
+      loadData();
+      reloadOps();
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Today's revenue against the mean of the days before it. Null when there is no
+  // baseline, which renders as "لا مقارنة" rather than a confident percentage.
+  const todayVsBaseline = useMemo(() => {
+    const today = summary?.daily?.find((d) => d.is_today);
+    const baseline = summary?.previous_window_average;
+    if (!today || baseline == null || baseline <= 0) return null;
+    return ((today.revenue - baseline) / baseline) * 100;
+  }, [summary]);
+
+  const topBarbers = useMemo(
+    () =>
+      summary?.top_barbers?.map((b) => ({
+        name: b.name,
+        revenue: b.revenue,
+        count: b.invoices,
+        countLabel: "فاتورة",
+      })) ?? null,
+    [summary],
+  );
+
+  const topServices = useMemo(
+    () =>
+      summary?.top_services?.map((s) => ({
+        name: s.name,
+        revenue: s.revenue,
+        count: s.count,
+        countLabel: "مرة",
+      })) ?? null,
+    [summary],
+  );
+
+  const kpis = useMemo(
+    () => [
+      {
+        key: "todayRevenue",
+        label: "إيراد اليوم",
+        value: stats.todayRevenue,
+        icon: Wallet,
+        trend: stats.todayRevenueTrend,
+        money: true,
+        to: "/owner/financial",
+      },
+      {
+        key: "netProfit",
+        label: "صافي الربح",
+        value: stats.netProfit,
+        icon: Activity,
+        trend: stats.netProfitTrend,
+        money: true,
+        to: "/owner/financial",
+      },
+      {
+        key: "todayAppointments",
+        label: "مواعيد اليوم",
+        value: stats.todayAppointments,
+        icon: LayoutDashboard,
+        trend: stats.todayAppointmentsTrend,
+        money: false,
+        to: "/bookings",
+      },
+      {
+        key: "occupancy",
+        label: "الإشغال",
+        value: stats.occupancy,
+        icon: Zap,
+        trend: null,
+        money: false,
+        percent: true,
+        to: "/owner/reports",
+      },
+    ],
+    [stats],
+  );
+
   if (loading && weeklyData.length === 0 && serviceDistribution.length === 0) {
     return (
-      <div className="erp-page space-y-8 pb-8" dir={i18n.dir() as "rtl" | "ltr"} aria-busy="true" aria-live="polite">
+      <div className="erp-page space-y-4 pb-8" dir={dir} aria-busy="true" aria-live="polite">
         <PageHeader
           title={`أهلاً بك، ${displayName}`}
           subtitle={scopeLabel}
           badge="لوحة القيادة التنفيذية"
           icon={LayoutDashboard}
-          actions={undefined}
-          className={undefined}
+         
         />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="جاري تحميل الإحصائيات">
-          {KPI_CONFIG.map((kpi) => (
-            <SkeletonCard key={kpi.key} variant="stats" className={undefined} />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {kpis.map((kpi) => (
+            <SkeletonCard key={kpi.key} variant="stats" />
           ))}
         </div>
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3 mt-8">
-          <PremiumCard className="xl:col-span-2" noPadding>
-            <SkeletonCard variant="chart" height={400} className={undefined} />
-          </PremiumCard>
-          <div className="space-y-6">
-            <PremiumCard className="h-full min-h-[400px]">
-              <SkeletonCard variant="chart" height={400} className={undefined} />
-            </PremiumCard>
-            <PremiumCard className={undefined}>
-              <SkeletonCard variant="content" className={undefined} />
-            </PremiumCard>
-          </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SkeletonCard variant="content" />
+          <SkeletonCard variant="content" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="erp-page space-y-6 pb-8" dir={i18n.dir() as "rtl" | "ltr"} aria-busy={loading} aria-live="polite">
+    <div
+      className="erp-page space-y-4 pb-8"
+      dir={dir}
+      aria-busy={busy}
+      aria-live="polite"
+    >
       <PageHeader
         title={`أهلاً بك، ${displayName}`}
         subtitle={scopeLabel}
-        badge="لوحة القيادة التنفيذية"
+        badge="لوحة القيادة"
         icon={LayoutDashboard}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Select value={period} onValueChange={handlePeriodChange}>
-              <SelectTrigger className="h-10 rounded-xl" aria-label="اختيار الفترة">
+              <SelectTrigger className="h-9 rounded-xl" aria-label="اختيار الفترة">
                 <SelectValue placeholder="الفترة" />
               </SelectTrigger>
               <SelectContent>
@@ -98,90 +220,297 @@ export default function ReportsDashboard() {
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              variant={employeeId ? "outline" : "primary"}
-              onClick={() => navigate("/owner")}
-              className="h-10 rounded-xl px-4 hidden sm:inline-flex"
-            >
-              المكتب الرئيسي
-            </Button>
+
             {employeeId && (
               <Badge variant="info" size="sm" className="rounded-xl px-3 py-1.5">
                 {employeeName || `الموظف #${employeeId}`}
               </Badge>
             )}
-            <Button onClick={loadData} variant="outline" className="h-10 rounded-xl" disabled={loading} aria-label="تحديث البيانات">
-              <Loader2 className={cn("ml-2 h-4 w-4", loading ? "animate-spin" : "")} aria-hidden="true" />
+
+            <Button
+              onClick={() => {
+                loadData();
+                reloadOps();
+              }}
+              variant="outline"
+              className="h-9 rounded-xl"
+              disabled={busy}
+              aria-label="تحديث البيانات"
+            >
+              <RefreshCw
+                className={cn("ms-1.5 h-3.5 w-3.5", busy && "animate-spin")}
+                aria-hidden="true"
+              />
               <span className="hidden sm:inline">تحديث</span>
             </Button>
+
           </div>
         }
-        className={undefined}
+       
       />
 
-      {/* Demo Banner — توكنز الثيم */}
-      {isDemo && !loading && (
-        <div className="rounded-2xl border border-warning/20 bg-warning-soft px-4 py-3 flex items-center gap-3 text-warning">
-          <Activity size={18} className="shrink-0 animate-pulse" />
-          <p className="text-xs font-bold">وضع العرض التوضيحي — لا توجد بيانات حقيقية للفترة الحالية. يتم عرض أرقام توضيحية لتوضيح شكل اللوحة.</p>
+      {/* 1. Needs a decision. */}
+      <NeedsAttention onNavigate={navigate} />
+
+      {/* 2. Is the salon trading. */}
+      <DayStatusBar
+        status={summary?.day_status ?? null}
+        unavailable={failures.status || Boolean(opsError)}
+       
+      />
+
+      {/* Load failures, stated once and precisely. Both sources merged into one strip. */}
+      {!loading && (loadError || opsError) && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-danger/20 bg-danger-soft px-4 py-2.5 text-danger">
+          <AlertTriangle size={16} className="shrink-0" />
+          <div className="min-w-[200px] flex-1 space-y-1">
+            {loadError && <p className="text-[11px] font-bold">{loadError}</p>}
+            {opsError && <p className="text-[11px] font-bold">{opsError}</p>}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (loadError) loadData();
+              if (opsError) reloadOps();
+            }}
+            className="shrink-0"
+          >
+            <RefreshCw size={13} className="ms-1.5" />
+            إعادة المحاولة
+          </Button>
         </div>
       )}
 
-      {/* KPI Stats */}
-      <KpiStats stats={stats} />
+      {/* 3. Today against the days before it. */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+            {kpis.map((kpi) => (
+              <KpiCell
+                key={kpi.key}
+                label={kpi.label}
+                value={kpi.value}
+                icon={kpi.icon}
+                trend={kpi.trend}
+                money={kpi.money}
+                percent={kpi.percent}
 
-      {/* شريط هوية — انتقال سريع (مرحلة 3) */}
-      <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
-        <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ml-2">
-            <LayoutDashboard size={12} className="text-accent" /> انتقال سريع
-          </span>
-          {[
-            { label: "الموارد البشرية", desc: "الكادر والرواتب", icon: Users, href: "/owner/hr", color: "bg-primary text-white" },
-            { label: "الرواتب", desc: "المستحقات والسلف", icon: Wallet, href: "/owner/payroll", color: "bg-success text-white" },
-            { label: "الأمان", desc: "الصلاحيات والجلسات", icon: ShieldCheck, href: "/owner/security-access", color: "bg-info text-white" },
-            { label: "التشغيل", desc: "التقارير اليومية", icon: TrendingUp, href: "/owner/reports", color: "bg-warning text-white" },
-          ].map((l) => (
-            <button
-              key={l.href}
-              onClick={() => navigate(l.href)}
-              className="inline-flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-right hover:border-accent/20 hover:bg-soft transition-colors group"
-            >
-              <span className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", l.color)}>
-                <l.icon size={14} />
-              </span>
-              <span className="text-right">
-                <span className="block text-xs font-black text-main group-hover:text-accent transition-colors">{l.label}</span>
-                <span className="block text-[10px] font-bold text-muted leading-none">{l.desc}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </PremiumCard>
+                to={kpi.to}
+                onNavigate={navigate}
+              />
+            ))}
+      </div>
 
-      {/* Main Charts & Insights */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        {/* Revenue Chart */}
-        <RevenueChart
-          chartRows={chartRows}
-          chartType={chartType}
-          onChartTypeChange={setChartType}
-          period={period}
-          onPeriodChange={handlePeriodChange}
-        />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <PremiumCard className="lg:col-span-2 p-0 overflow-hidden" hoverable={false} animate={false}>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-muted">
+              اتجاه الإيراد · 14 يوماً
+            </h3>
+            <Delta value={todayVsBaseline} />
+          </div>
+          <div className="p-4">
+            <RevenueSparkline
+              data={summary?.daily ?? []}
+              baseline={summary?.previous_window_average ?? null}
+              unavailable={failures.daily || Boolean(opsError)}
+             
+            />
+          </div>
+        </PremiumCard>
 
-        {/* Service Distribution & Insights */}
-        <div className="space-y-6">
-          {/* Service Distribution */}
-          <ServiceDistribution serviceDistribution={serviceDistribution} occupancy={stats.occupancy} />
-
-          {/* Smart Insights */}
-          <SmartInsights newCustomersThisWeek={stats.newCustomersThisWeek} onNavigate={navigate} />
+        <div className="flex flex-col gap-3">
+          <MiniPanel
+            title="ملخّص الفترة"
+            loading={loading}
+            rows={[
+              { label: "المصروفات", value: stats.todayExpenses, money: true },
+              { label: "متوسط الفاتورة", value: stats.avgInvoice, money: true },
+              { label: "هدف الشهر", value: stats.monthGoal, percent: true },
+              { label: "عملاء جدد", value: stats.newCustomersThisWeek ?? 0 },
+            ]}
+          />
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <QuickActions onNavigate={navigate} />
+      {/* 4. Who and what is carrying it. */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <RankingTable
+          title="الأعلى إيراداً"
+          rows={topBarbers}
+          unavailable={failures.barbers || Boolean(opsError)}
+          emptyMessage="لم تُسجَّل فواتير موصوفة بموظف في هذه الفترة"
+         
+        />
+        <RankingTable
+          title="الخدمات الأعلى مبيعاً"
+          rows={topServices}
+          unavailable={failures.services || Boolean(opsError)}
+          emptyMessage="لم تُسجَّل بيانات مبيعات في هذه الفترة"
+         
+        />
+      </div>
+
+      {/* 5. Period analysis. Kept below the cockpit bands because it answers a
+          question you go looking for, rather than one you check on the way in.
+          The sparkline above is the glanceable version of the same story. */}
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+          <RevenueChart
+            chartRows={chartRows}
+            chartType={chartType}
+            onChartTypeChange={setChartType}
+            period={period}
+            onPeriodChange={handlePeriodChange}
+          />
+        <div className="xl:col-span-1">
+            <SmartInsights
+              newCustomersThisWeek={stats.newCustomersThisWeek}
+              onNavigate={navigate}
+              cancellations={summary?.cancellations ?? null}
+              daily={summary?.daily ?? null}
+            />
+        </div>
+      </div>
     </div>
   );
 }
+
+/**
+ * One KPI cell, 28px padding instead of a card.
+ *
+ * `value` may be null, which means the server could not compute it. That renders
+ * as an em dash with the reason underneath rather than as 0.
+ */
+function KpiCell({
+  label,
+  value,
+  icon: Icon,
+  trend,
+  money = false,
+  percent = false,
+  to,
+  onNavigate,
+}: {
+  label: string;
+  value: number | null | undefined;
+  icon: LucideIcon;
+  trend: number | null | undefined;
+  money?: boolean;
+  percent?: boolean;
+  to?: string;
+  onNavigate?: (to: string) => void;
+}) {
+  const unknown = value === null || value === undefined;
+
+  const cell = (
+    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card px-4 py-3 transition-colors hover:border-accent/25">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-muted">
+          <Icon size={11} className="text-accent" />
+          {label}
+        </span>
+        {trend !== undefined && trend !== null && !unknown && (
+          <Delta value={trend} />
+        )}
+      </div>
+
+      <div className="mt-1.5 flex items-baseline gap-2">
+        <span
+          className={cn(
+            "text-xl font-black tabular-nums tracking-tight",
+            unknown ? "text-muted" : "text-main",
+          )}
+        >
+          {unknown
+            ? "—"
+            : money
+              ? formatCurrency(value)
+              : percent
+                ? `${value}%`
+                : Number(value).toLocaleString("ar-EG-u-nu-latn")}
+        </span>
+      </div>
+
+      {unknown && (
+        <p className="mt-0.5 text-[9px] font-bold text-muted">تعذّر الحساب</p>
+      )}
+    </div>
+  );
+
+  if (!to || !onNavigate) return cell;
+  return (
+    <button type="button" onClick={() => onNavigate(to)} className="block w-full text-right">
+      {cell}
+    </button>
+  );
+}
+
+function MiniPanel({
+  title,
+  rows,
+  loading,
+}: {
+  title: string;
+  loading: boolean;
+  rows: { label: string; value: number | null | undefined; money?: boolean; percent?: boolean }[];
+}) {
+  return (
+    <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
+      <div className="border-b border-border px-4 py-3">
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-muted">
+          {title}
+        </h3>
+      </div>
+      <dl className="divide-y divide-border/50">
+        {rows.map((row) => {
+          const unknown = row.value === null || row.value === undefined;
+          return (
+            <div key={row.label} className="flex items-center justify-between px-4 py-2">
+              <dt className="text-[10px] font-bold text-muted">{row.label}</dt>
+              <dd className="text-[11px] font-black tabular-nums text-main">
+                {loading || unknown
+                  ? "—"
+                  : row.money
+                    ? formatCurrency(row.value)
+                    : row.percent
+                      ? (
+                        <span className="inline-flex items-center gap-2">
+                          <GoalRing value={Number(row.value ?? 0)} />
+                          {`${row.value}%`}
+                        </span>
+                      )
+                      : Number(row.value).toLocaleString("ar-EG-u-nu-latn")}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </PremiumCard>
+  );
+}
+
+/** 18px progress ring for goal rows. */
+function GoalRing({ value }: { value: number }) {
+  const clamped = Math.min(100, Math.max(0, value));
+  const r = 7;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg width={18} height={18} viewBox="0 0 18 18" role="img" aria-label={`${clamped}%`}>
+      <circle cx={9} cy={9} r={r} fill="none" stroke="var(--border)" strokeWidth={2.5} />
+      <circle
+        cx={9}
+        cy={9}
+        r={r}
+        fill="none"
+        stroke="var(--primary)"
+        strokeWidth={2.5}
+        strokeDasharray={`${(clamped / 100) * c} ${c}`}
+        strokeLinecap="round"
+        transform="rotate(-90 9 9)"
+      />
+    </svg>
+  );
+}
+
+
+
+

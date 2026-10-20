@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { formatCurrency } from "@/lib/core/utils";
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUI } from "@/context/UIContext";
@@ -11,7 +12,6 @@ import {
   Pencil,
   CheckCircle2,
   UserPlus,
-  Save,
   X,
   Archive,
   ArrowRight,
@@ -21,6 +21,9 @@ import {
   Wallet,
   Clock,
   BarChart3,
+  Info,
+  Save,
+  FileClock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +45,7 @@ import {
 } from "@/components/shared/PremiumUI";
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
+import { currencyLabel } from "@/lib/core/currency";
 
 import {
   PersonalTab,
@@ -58,6 +62,8 @@ import {
   EmployeeCardGrid,
   EmployeeTable,
 } from "@/features/hr";
+import { describeDraftAge } from "@/features/hr/utils/draft";
+import { issuesForStep } from "@/features/hr/utils/formIssues";
 
 const HRManagement = () => {
   const navigate = useNavigate();
@@ -100,6 +106,8 @@ const HRManagement = () => {
     editingEmp,
     deleteTarget,
     setDeleteTarget,
+    archiveTarget,
+    setArchiveTarget,
     formData,
     setFormData,
     imagePreview,
@@ -109,12 +117,23 @@ const HRManagement = () => {
     customJobTitle,
     setCustomJobTitle,
     DYNAMIC_TABS,
+    hiddenSteps,
+    stepIssues,
+    goNext,
+    draftOffer,
+    draftSavedAt,
+    saveDraft,
+    resumeDraft,
+    dismissDraft,
+    keepDraftOnClose,
     currentBlueprint,
     handleImageChange,
+    applyJobTitleDefaults,
     openCreate,
     openEdit,
     handleSubmit,
     handleToggleStatus,
+    handleArchiveEmployee,
   } = useEmployeeForm(fetchEmployees);
   useEffect(() => {
     if (editingEmp && activeTab === "documents") {
@@ -140,12 +159,14 @@ const HRManagement = () => {
         );
       case "work":
         return (
-          <WorkTab
-            formData={formData}
-            setFormData={setFormData}
-            customJobTitle={customJobTitle}
-            setCustomJobTitle={setCustomJobTitle}
-          />
+<WorkTab
+              formData={formData}
+              setFormData={setFormData}
+              customJobTitle={customJobTitle}
+              setCustomJobTitle={setCustomJobTitle}
+              applyJobTitleDefaults={applyJobTitleDefaults}
+              hiddenSteps={hiddenSteps}
+            />
         );
       case "skills":
         return (
@@ -187,7 +208,13 @@ const HRManagement = () => {
         );
       case "review":
         return (
-          <ReviewTab formData={formData} blueprint={currentBlueprint} />
+          <ReviewTab
+            formData={formData}
+            blueprint={currentBlueprint}
+            onSubmit={handleSubmit}
+            isActionLoading={isActionLoading}
+            isEditing={!!editingEmp}
+          />
         );
       default:
         return null;
@@ -207,16 +234,37 @@ const HRManagement = () => {
 
   return (
     <div className="erp-page space-y-8 pb-20">
+      {/* Vacation is not a punishment: info tone, and the employee stays. */}
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
+        variant="info"
         title={
           deleteTarget?.status === "active"
-            ? "تعطيل ملف الموظف؟"
-            : "إعادة تفعيل الموظف؟"
+            ? "تسجيل إجازة للموظف؟"
+            : "إرجاع الموظف للعمل؟"
         }
-        description={`سيتم تعديل الحالة التشغيلية للموظف ${deleteTarget?.fullName}.`}
+        confirmText={
+          deleteTarget?.status === "active" ? "تسجيل إجازة" : "إرجاع للعمل"
+        }
+        description={
+          deleteTarget?.status === "active"
+            ? `سيبقى ${deleteTarget?.fullName} في قائمة الفريق ببادج "في إجازة"، ويتوقف ظهوره في الكاشير والحجوزات حتى إرجاعه بضغطة واحدة.`
+            : `سيعود ${deleteTarget?.fullName} نشطاً في القائمة، حسب مفاتيح الظهور المحفوظة له.`
+        }
         onConfirm={handleToggleStatus}
+        loading={isActionLoading}
+      />
+
+      {/* Archive is the heavier decision: the employee actually left the salon. */}
+      <ConfirmDialog
+        open={!!archiveTarget}
+        onOpenChange={(open) => !open && setArchiveTarget(null)}
+        variant="danger"
+        title="أرشفة الموظف (ترك العمل)؟"
+        confirmText="أرشفة"
+        description={`سيختفي ${archiveTarget?.fullName} من قائمة الفريق وينتقل إلى الأرشيف مع الاحتفاظ بكامل سجله. يمكن استعادته من صفحة الأرشيف عند الحاجة.`}
+        onConfirm={handleArchiveEmployee}
         loading={isActionLoading}
       />
 
@@ -234,7 +282,7 @@ const HRManagement = () => {
               onClick={openCreate}
               className="h-11 rounded-2xl bg-accent px-8 text-sm font-black shadow-xl shadow-accent/20 transition-all active:scale-95"
             >
-              <Plus className="ml-2" size={20} strokeWidth={3} /> إضافة موظف
+              <Plus className="ms-2" size={20} strokeWidth={3} /> إضافة موظف
               جديد
             </Button>
             <Button
@@ -242,7 +290,7 @@ const HRManagement = () => {
               onClick={() => navigate("/owner/hr/archive")}
               className="h-9 rounded-xl border-border bg-card/50 px-5 text-xs font-black text-muted transition-all hover:border-accent/20 hover:text-main"
             >
-              <Archive className="ml-2" size={16} /> الأرشيف
+              <Archive className="ms-2" size={16} /> الأرشيف
             </Button>
           </>
         }
@@ -253,13 +301,13 @@ const HRManagement = () => {
       {/* ═══ RELATED NAV — هوية HR (مرحلة 3) ═══ */}
       <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
         <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ml-2">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ms-2">
             <Sparkles size={12} className="text-accent" /> انتقال سريع
           </span>
           {[
             { label: "الرواتب", desc: "المستحقات والسلف", icon: Wallet, href: "/owner/payroll", color: "bg-warning text-white" },
             { label: "الحضور", icon: Clock, desc: "الانضباط اليومي", href: "/attendance", color: "bg-info text-white" },
-            { label: "أرشيف الموظفين", icon: Archive, desc: "المعلّقون والسجل", href: "/owner/hr/archive", color: "bg-soft text-muted border border-border" },
+            { label: "أرشيف الموظفين", icon: Archive, desc: "من تركوا العمل والسجل", href: "/owner/hr/archive", color: "bg-soft text-muted border border-border" },
             { label: "تقارير الأداء", icon: BarChart3, desc: "الإنتاجية والعمولة", href: "/owner/employee-reports", color: "bg-primary text-white" },
           ].map((l) => (
             <button
@@ -294,6 +342,7 @@ const HRManagement = () => {
             employees={filteredEmployees}
             onEdit={openEdit}
             onDelete={setDeleteTarget}
+            onArchive={setArchiveTarget}
             onCreate={openCreate}
           />
         ) : (
@@ -301,6 +350,7 @@ const HRManagement = () => {
             employees={filteredEmployees}
             onEdit={openEdit}
             onDelete={setDeleteTarget}
+            onArchive={setArchiveTarget}
           />
         )}
       </AnimatePresence>
@@ -328,7 +378,12 @@ const HRManagement = () => {
       })()}
 
       {/* ═══ EMPLOYEE WIZARD MODAL ═══ */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <Dialog open={isModalOpen} onOpenChange={(open) => {
+            // Only on the way shut, and only for a half-filled new hire: an
+            // edit has the saved row, so nothing would be lost.
+            if (!open) keepDraftOnClose();
+            setIsModalOpen(open);
+          }}>
         <DialogContent
           className="flex h-[100dvh] sm:h-[94vh] w-[100vw] sm:w-[96vw] max-w-350 flex-col overflow-hidden rounded-none sm:rounded-[2rem] border-0 bg-card p-0 shadow-[0_50px_150px_-30px_rgba(0,0,0,0.4)]"
         >
@@ -342,6 +397,46 @@ const HRManagement = () => {
                   <UserPlus size={24} strokeWidth={3} />
                 )}
               </div>
+              {/*
+                Close the form halfway through and everything typed is gone:
+                name, phone, salary, commission, a password. Offer the way back
+                in rather than making the owner remember and retype it.
+              */}
+              {draftOffer && (
+                <div className="rounded-2xl border border-primary/25 bg-primary-soft/60 p-4">
+                  <div className="flex items-start gap-3">
+                    <FileClock size={20} className="mt-0.5 shrink-0 text-primary" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-black text-main">
+                        يوجد نموذج غير مكتمل محفوظ
+                      </p>
+                      <p className="mt-0.5 text-[11px] font-bold leading-relaxed text-muted">
+                        {draftOffer.formData.fullName
+                          ? `مسودة "${String(draftOffer.formData.fullName)}" `
+                          : "مسودة "}
+                        {describeDraftAge(draftOffer.savedAt)} على هذا الجهاز.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          onClick={resumeDraft}
+                          className="rounded-xl font-black"
+                        >
+                          استكمال المسودة
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={dismissDraft}
+                          className="rounded-xl font-black"
+                        >
+                          تجاهل والبدء من جديد
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div>
                 <DialogTitle className="text-2xl font-black text-main tracking-tight">
                   {editingEmp ? "تحديث ملف موظف" : "إضافة كادر جديد للمنظومة"}
@@ -389,8 +484,8 @@ const HRManagement = () => {
                         )}
                       </div>
                     </div>
-                    <div className={cn("absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full border-[3px] border-card shadow-md flex items-center justify-center text-white", formData.status === "active" ? "bg-success" : "bg-danger") }>
-                      {formData.status === "active" ? <CheckCircle2 size={14} strokeWidth={3} /> : <X size={14} strokeWidth={3} />}
+                    <div className={cn("absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full border-[3px] border-card shadow-md flex items-center justify-center text-white", formData.status === "active" ? "bg-success" : formData.status === "suspended" ? "bg-warning" : "bg-danger") }>
+                      {formData.status === "active" ? <CheckCircle2 size={14} strokeWidth={3} /> : formData.status === "suspended" ? <Clock size={14} strokeWidth={3} /> : <X size={14} strokeWidth={3} />}
                     </div>
                   </div>
                   <div className="text-center space-y-2 w-full">
@@ -413,13 +508,13 @@ const HRManagement = () => {
                     <div className="rounded-2xl bg-soft border border-border/50 p-3 text-center">
                       <div className="text-[8px] font-black text-muted uppercase tracking-widest mb-1">الحالة</div>
                       <div className="flex items-center justify-center gap-1.5">
-                        <div className={cn("h-2 w-2 rounded-full", formData.status==="active"?"bg-success animate-pulse":"bg-danger")} />
-                        <span className="text-[11px] font-black text-main">{formData.status==="active"?"نشط":"معلّق"}</span>
+                        <div className={cn("h-2 w-2 rounded-full", formData.status==="active"?"bg-success animate-pulse":formData.status==="suspended"?"bg-warning":"bg-danger")} />
+                        <span className="text-[11px] font-black text-main">{formData.status==="active"?"نشط":formData.status==="suspended"?"في إجازة":"أرشيف"}</span>
                       </div>
                     </div>
                     <div className="rounded-2xl bg-soft border border-border/50 p-3 text-center">
                       <div className="text-[8px] font-black text-muted uppercase tracking-widest mb-1">الراتب</div>
-                      <div className="text-[11px] font-black text-main">{Number(formData.baseSalary||0).toLocaleString("ar-EG")} <span className="text-[9px] text-muted">ج.م</span></div>
+                      <div className="text-[11px] font-black text-main">{Number(formData.baseSalary||0).toLocaleString("ar-EG")} <span className="text-[9px] text-muted">{currencyLabel()}</span></div>
                     </div>
                   </div>
 
@@ -477,9 +572,13 @@ const HRManagement = () => {
                   {DYNAMIC_TABS.map((tab, idx) => {
                     const isActive = activeTab === tab.id;
                     const isPast = DYNAMIC_TABS.findIndex((t) => t.id === activeTab) > idx;
+                    const problems = issuesForStep(stepIssues, tab.id);
                     return (
-                      <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={cn("flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[11px] font-black whitespace-nowrap transition-all shrink-0", isActive ? "bg-accent text-white border-accent shadow-md" : isPast ? "bg-success-soft text-success border-success/20" : "bg-card text-muted border-border")}>
+                      <button key={tab.id} onClick={() => setActiveTab(tab.id)} title={problems[0]} className={cn("flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[11px] font-black whitespace-nowrap transition-all shrink-0", isActive ? "bg-accent text-white border-accent shadow-md" : isPast ? "bg-success-soft text-success border-success/20" : "bg-card text-muted border-border")}>
                         {isPast ? <CheckCircle2 size={14} /> : <tab.icon size={14} />} {tab.label}
+                        {problems.length > 0 && (
+                          <span className={cn("h-2 w-2 rounded-full", isActive ? "bg-white" : "bg-danger")} aria-hidden="true" />
+                        )}
                       </button>
                     );
                   })}
@@ -488,7 +587,7 @@ const HRManagement = () => {
                 <div className="mt-4 rounded-2xl border border-border bg-card p-4 flex items-center gap-4">
                   <div className="h-14 w-14 rounded-xl overflow-hidden bg-soft flex items-center justify-center shrink-0 ring-1 ring-border">
                     {imagePreview || formData.profileImageUrl ? (
-                      <img src={imagePreview || (formData.profileImageUrl?.startsWith("http") ? formData.profileImageUrl : `${staticURL}${formData.profileImageUrl}`)} alt="preview" className="h-full w-full object-cover" />
+                      <img src={imagePreview || (formData.profileImageUrl?.startsWith("http") ? formData.profileImageUrl : `${staticURL}${formData.profileImageUrl}`)} alt="preview" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                     ) : (
                       <User size={20} className="text-muted/40" />
                     )}
@@ -497,8 +596,8 @@ const HRManagement = () => {
                     <div className="text-[11px] font-black text-main truncate">{formData.fullName || "بدون اسم"}</div>
                     <div className="text-[10px] font-bold text-accent">{currentBlueprint.title}</div>
                     <div className="flex gap-1 mt-1">
-                      <span className={cn("text-[8px] px-1.5 py-0.5 rounded-full font-black border", formData.status==="active"?"bg-success text-white border-success":"bg-danger text-white border-danger")}>{formData.status==="active"?"نشط":"معلّق"}</span>
-                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-soft border border-border font-bold text-muted">{Number(formData.baseSalary||0).toLocaleString("ar-EG")} ج.م</span>
+                      <span className={cn("text-[8px] px-1.5 py-0.5 rounded-full font-black border", formData.status==="active"?"bg-success text-white border-success":formData.status==="suspended"?"bg-warning text-white border-warning":"bg-danger text-white border-danger")}>{formData.status==="active"?"نشط":formData.status==="suspended"?"في إجازة":"أرشيف"}</span>
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-soft border border-border font-bold text-muted">{formatCurrency(formData.baseSalary || 0)}</span>
                     </div>
                   </div>
                   <div className="text-[9px] font-black text-muted">{Math.round(((DYNAMIC_TABS.findIndex(t=>t.id===activeTab)+1)/DYNAMIC_TABS.length)*100)}%</div>
@@ -530,7 +629,7 @@ const HRManagement = () => {
                   disabled={DYNAMIC_TABS.findIndex((t) => t.id === activeTab) === 0}
                   className="h-11 sm:h-12 px-6 sm:px-8 rounded-xl font-black text-[11px] uppercase tracking-widest order-2 sm:order-1"
                 >
-                  <ArrowRight size={16} className="ml-2" /> السابق
+                  <ArrowRight size={16} className="ms-2" /> السابق
                 </Button>
                 <div className="hidden sm:flex items-center gap-2 order-2">
                   {DYNAMIC_TABS.map((tab) => (
@@ -539,24 +638,49 @@ const HRManagement = () => {
                 </div>
                 {activeTab !== "review" ? (
                   <Button
-                    onClick={() => {
-                      const idx = DYNAMIC_TABS.findIndex((t) => t.id === activeTab);
-                      if (idx < DYNAMIC_TABS.length - 1) setActiveTab(DYNAMIC_TABS[idx + 1].id);
-                    }}
+                    onClick={goNext}
                     className="h-11 sm:h-12 px-6 sm:px-8 rounded-xl bg-accent text-white font-black text-[11px] uppercase tracking-widest order-1 sm:order-3"
                   >
-                    التالي <ArrowLeft size={16} className="mr-2" />
+                    التالي <ArrowLeft size={16} className="me-2" />
                   </Button>
                 ) : (
                   <div className="hidden sm:block w-[100px] order-3" />
                 )}
               </div>
-              {/* Mobile Save Button */}
+              {/*
+                The way out that does not lose the work. Offered only for a new
+                hire: an edit already has a saved row to fall back on, so a local
+                copy here would only risk restoring stale data over a newer one.
+              */}
+              {!editingEmp && activeTab !== "review" && (
+                <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={saveDraft}
+                    className="rounded-xl font-black text-[11px] text-muted"
+                  >
+                    <Save size={14} className="ms-2" />
+                    حفظ كمسودة والمتابعة لاحقاً
+                  </Button>
+                  {draftSavedAt && (
+                    <span className="text-[10px] font-bold text-muted">
+                      حُفظت {describeDraftAge(draftSavedAt)}
+                    </span>
+                  )}
+                </div>
+              )}
+              {/*
+                The approval button moved onto the review step, so the phone no
+                longer needs a second one pinned here — it was a duplicate of
+                the same action, and on the review step both showed at once.
+              */}
               <div className="xl:hidden mt-6">
-                <Button onClick={handleSubmit} disabled={isActionLoading || activeTab !== "review"} className={cn("h-12 w-full rounded-xl font-black text-white shadow-lg", activeTab==="review" ? "bg-accent hover:bg-accent/90 shadow-accent/20" : "bg-soft text-muted opacity-60 cursor-not-allowed")}>
-                  <Save size={18} className="ml-2" /> {editingEmp ? "تحديث البيانات" : "حفظ الموظف"}
-                </Button>
-                {activeTab !== "review" && <p className="mt-2 text-center text-[10px] font-bold text-muted">أكمل الخطوات للوصول للمراجعة ثم الحفظ</p>}
+                {activeTab !== "review" && (
+                  <p className="text-center text-[10px] font-bold text-muted">
+                    أكمل الخطوات للوصول للمراجعة ثم اضغط "قبول"
+                  </p>
+                )}
               </div>
             </main>
 
@@ -591,10 +715,17 @@ const HRManagement = () => {
                   const isActive = activeTab === tab.id;
                   const isPast =
                     DYNAMIC_TABS.findIndex((t) => t.id === activeTab) > idx;
+                  /*
+                    A red dot instead of a silent step: the step that holds the
+                    mistake is visible from anywhere in the wizard, and its
+                    title carries the message for the mouse.
+                  */
+                  const problems = issuesForStep(stepIssues, tab.id);
                   return (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
+                      title={problems[0]}
                       className={cn(
                         "group relative z-10 flex w-full items-center gap-4 rounded-2xl p-3 transition-all",
                         isActive
@@ -604,7 +735,7 @@ const HRManagement = () => {
                     >
                       <div
                         className={cn(
-                          "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-all",
+                          "relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-all",
                           isActive
                             ? "bg-accent text-white shadow-lg shadow-accent/20 scale-110"
                             : isPast
@@ -616,6 +747,12 @@ const HRManagement = () => {
                           <CheckCircle2 size={18} strokeWidth={3} />
                         ) : (
                           <tab.icon size={18} strokeWidth={isActive ? 3 : 2} />
+                        )}
+                        {problems.length > 0 && (
+                          <span
+                            className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-card bg-danger"
+                            aria-hidden="true"
+                          />
                         )}
                       </div>
                       <div className="text-right">
@@ -638,23 +775,40 @@ const HRManagement = () => {
                 })}
               </div>
 
+              {/*
+                The approval button now lives on the review step itself, where
+                the owner is looking when they decide. It used to sit here too,
+                disabled until `review`, which made two buttons for one action
+                and left the phone with no visible way to finish.
+              */}
               <div className="mt-auto pt-10">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isActionLoading || activeTab !== "review"}
-                  className={cn(
-                    "h-14 w-full rounded-2xl font-black text-white shadow-xl transition-all",
-                    activeTab === "review"
-                      ? "bg-accent shadow-accent/20 hover:bg-accent/90"
-                      : "bg-soft cursor-not-allowed opacity-50",
-                  )}
-                >
-                  <Save size={20} className="ml-2" />
-                  {editingEmp ? "تحديث البيانات" : "حفظ الموظف الجديد"}
-                </Button>
+                {/*
+                  Steps come and go with the job title. Say which ones dropped
+                  and why: a stepper that silently loses entries reads as a
+                  bug, and the owner filling the form has no way to tell a
+                  deliberate skip from a lost one.
+                */}
+                {hiddenSteps.length > 0 && (
+                  <div className="mb-6 rounded-2xl border border-border/60 bg-soft/60 p-3.5">
+                    <p className="flex items-center gap-1.5 text-[10px] font-black text-muted">
+                      <Info size={12} className="shrink-0" />
+                      خطوات لا تنطبق على هذا المسار
+                    </p>
+                    <ul className="mt-2 space-y-2">
+                      {hiddenSteps.map((step) => (
+                        <li key={step.id} className="text-[10px] leading-relaxed">
+                          <span className="font-bold text-muted-foreground line-through decoration-muted/40">
+                            {step.label}
+                          </span>
+                          <span className="block text-muted/70">{step.reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {activeTab !== "review" && (
-                  <p className="mt-4 text-center text-[10px] font-bold text-muted-foreground animate-pulse">
-                    يرجى إكمال الخطوات للوصول للمراجعة والحفظ
+                  <p className="text-center text-[10px] font-bold text-muted-foreground animate-pulse">
+                    أكمل الخطوات للوصول للمراجعة ثم اضغط "قبول"
                   </p>
                 )}
               </div>

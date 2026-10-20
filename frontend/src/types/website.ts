@@ -9,6 +9,24 @@ export interface BusinessSettings {
   landingHeroBadge?: string;
   landingCoverImageUrl?: string;
   landing_cover_image_url?: string;
+  /**
+   * Hero video. `landingVideoPosterUrl` is a data URL produced in the browser
+   * when the clip is uploaded (see `lib/heroVideo.ts`), so it can be a long
+   * string — it is still stored in the same JSON settings column as everything
+   * else.
+   */
+  landingHeroVideoUrl?: string;
+  landingVideoPosterUrl?: string;
+  landingVideoAutoplay?: boolean;
+  landingVideoMuted?: boolean;
+  landingMotionEnabled?: boolean;
+  /** Snake-case aliases: the API may return either casing, and the reader
+   *  accepts both so a rename cannot silently blank the panel. */
+  landing_hero_video_url?: string;
+  landing_video_poster_url?: string;
+  landing_video_autoplay?: boolean;
+  landing_video_muted?: boolean;
+  landing_motion_enabled?: boolean;
   landingThemeId?: string;
   landingFeatures?: unknown[];
   landingStats?: unknown[];
@@ -58,6 +76,11 @@ export interface SettingsState {
   landingTestimonialsTitle: string;
   landingTestimonialsSubtitle: string;
   landingCoverImageUrl: string;
+  landingHeroVideoUrl: string;
+  landingVideoPosterUrl: string;
+  landingVideoAutoplay: boolean;
+  landingVideoMuted: boolean;
+  landingMotionEnabled: boolean;
   landingThemeId: string;
   landingShowStaff: boolean;
   landingShowStaffBio: boolean;

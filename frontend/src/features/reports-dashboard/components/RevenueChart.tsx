@@ -59,6 +59,11 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
           </Select>
         </div>
       </div>
+      {chartRows.length === 0 ? (
+        <div className="flex h-[360px] sm:h-[420px] min-h-[320px] items-center justify-center rounded-xl border border-dashed border-border text-[11px] font-bold text-muted">
+          لا توجد بيانات للفترة المحددة
+        </div>
+      ) : (
       <div className="h-[360px] sm:h-[420px] min-h-[320px]" dir="ltr">
         <ResponsiveContainer width="100%" height="100%">
           {chartType === "area" ? (
@@ -78,7 +83,7 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
                 dataKey="name"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: "var(--text)", fontSize: 12, fontWeight: 700 }}
+                tick={{ fill: "var(--text-muted)", fontSize: 12, fontWeight: 700 }}
                 dy={10}
               />
               <YAxis
@@ -104,7 +109,6 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
               />
               <Legend
                 wrapperStyle={{ paddingTop: 20 }}
-                formatter={(name) => name === "revenue" ? "الإيرادات" : "المواعيد"}
               />
               <Area
                 type="monotone"
@@ -146,7 +150,7 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
                 type="category"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: "var(--text)", fontSize: 12, fontWeight: 700 }}
+                tick={{ fill: "var(--text-muted)", fontSize: 12, fontWeight: 700 }}
                 width={90}
                 orientation="left"
                 padding={{ top: 10, bottom: 10 }}
@@ -168,6 +172,7 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
           )}
         </ResponsiveContainer>
       </div>
+      )}
     </ContentPanel>
   );
 }

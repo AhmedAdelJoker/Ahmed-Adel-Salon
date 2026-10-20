@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
+import { loadErrorMessage } from "@/lib/core/asyncError";
 import api from "@/services/api";
 import { normalizeListResponse } from "@/services/apiAdapter";
 import { exportService } from "@/services/exportService";
@@ -77,17 +78,18 @@ export function useCustomersList() {
   /** Filtered total for the current query (drives pagination). */
   const [totalCount, setTotalCount] = useState(0);
   const [stats, setStats] = useState<CustomerStats>(EMPTY_CUSTOMER_STATS);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   async function handleExport(type = "excel") {
     const filename = `customers_${new Date().toISOString().split("T")[0]}`;
+    const params: Record<string, string | undefined> = {
+      q: debouncedSearch.trim() || undefined,
+      segment: SEGMENT_BY_FILTER[activeFilter] ?? "all",
+    };
     if (type === "excel") {
-      await exportService.downloadExcel("/exports/customers/excel", filename, {
-        q: debouncedSearch,
-      });
+      await exportService.downloadExcel("/exports/customers/excel", filename, params);
     } else {
-      await exportService.downloadCsv("/exports/customers/csv", filename, {
-        q: debouncedSearch,
-      });
+      await exportService.downloadCsv("/exports/customers/csv", filename, params);
     }
   }
 
@@ -110,10 +112,14 @@ export function useCustomersList() {
 
   const fetchStats = useCallback(async () => {
     try {
+      setStatsError(null);
       const res = await api.get("/customers/stats");
       setStats(readStats(res));
     } catch (error) {
+      // The KPI row above the list was silently zero, which reads as "you have no
+      // customers" rather than "the totals could not be loaded".
       console.error("Customers stats error:", error);
+      setStatsError(loadErrorMessage(error, "إحصائيات العملاء"));
     }
   }, []);
 
@@ -121,17 +127,14 @@ export function useCustomersList() {
     try {
       setLoading(true);
       const offset = (currentPage - 1) * CUSTOMERS_PAGE_SIZE;
-      const [response] = await Promise.all([
-        api.get("/customers", {
-          params: {
-            limit: CUSTOMERS_PAGE_SIZE,
-            offset,
-            q: debouncedSearch.trim() || undefined,
-            segment: SEGMENT_BY_FILTER[activeFilter] ?? "all",
-          },
-        }),
-        fetchStats(),
-      ]);
+      const response = await api.get("/customers", {
+        params: {
+          limit: CUSTOMERS_PAGE_SIZE,
+          offset,
+          q: debouncedSearch.trim() || undefined,
+          segment: SEGMENT_BY_FILTER[activeFilter] ?? "all",
+        },
+      });
       const { items } = normalizeListResponse(response);
       setCustomers(items);
       setTotalCount(readTotal(response, items.length));
@@ -142,7 +145,17 @@ export function useCustomersList() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearch, activeFilter, fetchStats]);
+  }, [currentPage, debouncedSearch, activeFilter]);
+
+  // Global stats are query-independent: fetch once on mount, then refresh
+  // explicitly after data mutations — never on pagination/drill-down.
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([fetchCustomers(), fetchStats()]);
+  }, [fetchCustomers, fetchStats]);
 
   useEffect(() => {
     fetchCustomers();
@@ -164,7 +177,10 @@ export function useCustomersList() {
     totalCount,
     totalPages,
     stats,
+    statsError,
     fetchCustomers,
+    fetchStats,
+    refreshAll,
     removeCustomer,
     handleExport,
   };

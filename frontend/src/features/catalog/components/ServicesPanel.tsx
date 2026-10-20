@@ -294,7 +294,7 @@ export default function ServicesPanel({
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-soft border px-3 py-1.5 text-xs font-black tabular-nums text-main">
                           <Clock size={12} /> {service.duration_minutes || 30} دقيقة
                           {pricing.getServiceLowStockCount(service) > 0 && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 text-white px-1.5 py-0.5 text-[9px] mr-1">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 text-white px-1.5 py-0.5 text-[9px] me-1">
                               <AlertTriangle size={10} /> نقص
                             </span>
                           )}
@@ -306,7 +306,7 @@ export default function ServicesPanel({
                             onClick={() => onEdit(service)}
                             className="h-9 rounded-xl px-4 text-xs font-black"
                           >
-                            <Pencil size={14} className="ml-1" /> تعديل
+                            <Pencil size={14} className="ms-1" /> تعديل
                           </Button>
                           <Button
                             variant="ghost"

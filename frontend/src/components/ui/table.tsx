@@ -58,7 +58,7 @@ function TableHead({ className, ...props }: React.ThHTMLAttributes<HTMLTableCell
   return (
     <th
       className={cn(
-        "h-12 px-3 text-right align-middle text-[11px] font-black uppercase tracking-normal text-gray-500 sm:px-4 [&:has([role=checkbox])]:pr-0 dark:text-gray-400",
+        "h-12 px-3 text-right align-middle text-[11px] font-black uppercase tracking-normal text-gray-500 sm:px-4 [&:has([role=checkbox])]:pe-0 dark:text-gray-400",
         className,
       )}
       {...props}
@@ -70,7 +70,7 @@ function TableCell({ className, ...props }: React.TdHTMLAttributes<HTMLTableCell
   return (
     <td
       className={cn(
-        "p-3 align-middle font-bold leading-relaxed text-gray-800 sm:p-4 [&:has([role=checkbox])]:pr-0 dark:text-gray-100",
+        "p-3 align-middle font-bold leading-relaxed text-gray-800 sm:p-4 [&:has([role=checkbox])]:pe-0 dark:text-gray-100",
         className,
       )}
       {...props}

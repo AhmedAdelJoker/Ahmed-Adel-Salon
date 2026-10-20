@@ -77,7 +77,7 @@ export function TodayInvoicesList({
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="بحث برقم الفاتورة أو العميل..."
-              className="pr-9 h-9 text-[11px] font-bold"
+              className="pe-9 h-9 text-[11px] font-bold"
             />
           </div>
           <Button
@@ -86,7 +86,7 @@ export function TodayInvoicesList({
             onClick={onArchive}
             className="text-[10px] font-black uppercase"
           >
-            الأرشيف <ArrowRight size={14} className="mr-2 rotate-180" />
+            الأرشيف <ArrowRight size={14} className="me-2 rotate-180" />
           </Button>
         </div>
       }

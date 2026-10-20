@@ -9,6 +9,7 @@ class CustomerBase(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(default="", min_length=0, max_length=100)
     phone: str = Field(..., min_length=5, max_length=30)
+    second_phone: Optional[str] = None
     email: Optional[str] = None
     notes: Optional[str] = None
 
@@ -26,6 +27,7 @@ class CustomerRead(BaseModel):
     first_name: str
     last_name: str
     phone: str
+    second_phone: Optional[str] = None
     email: Optional[str] = None
     notes: Optional[str] = None
     

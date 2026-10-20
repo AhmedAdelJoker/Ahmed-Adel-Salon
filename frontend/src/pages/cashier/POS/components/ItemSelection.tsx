@@ -37,7 +37,7 @@ const ItemSelection = () => {
           />
           <Input
             placeholder="بحث عن خدمة أو منتج..."
-            className="pr-9 h-10 rounded-xl border-border/50 focus:ring-primary/20 text-xs font-bold"
+            className="pe-9 h-10 rounded-xl border-border/50 focus:ring-primary/20 text-xs font-bold"
             value={itemSearchQuery}
             onChange={(e) => setItemSearchQuery(e.target.value)}
           />

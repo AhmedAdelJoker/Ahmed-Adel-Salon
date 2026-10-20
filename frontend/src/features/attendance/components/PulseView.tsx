@@ -34,9 +34,9 @@ export default function PulseView({
                 {
                   label: "حضور اليوم",
                   value: todayRecords.length,
-                  color: "text-[#d3a15c]",
+                  color: "text-primary",
                   icon: UserCheck,
-                  bg: "bg-[#d3a15c]/10",
+                  bg: "bg-primary-soft",
                 },
                 {
                   label: "المتأخرين",

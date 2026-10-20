@@ -1,0 +1,86 @@
+{
+  "title": "Appearance",
+  "subtitle": "Choose the theme, brand accent, interface density and motion. Changes are saved on this device immediately.",
+  "reset": "Reset",
+
+  "sections": {
+    "theme": {
+      "title": "Theme",
+      "description": "Light or dark. Saved to your account and carried across your devices.",
+      "light": "Light",
+      "lightHint": "Suits a well-lit desk",
+      "dark": "Dark",
+      "darkHint": "Easier on the eyes at night"
+    },
+    "accent": {
+      "title": "Brand colour",
+      "description": "Changes the colour of every interactive element, immediately."
+    },
+    "density": {
+      "title": "Interface density",
+      "description": "Tune the spacing and row size to suit your screen."
+    },
+    "motion": {
+      "title": "Motion",
+      "description": "The speed and range of transitions between screens."
+    },
+    "contrast": {
+      "title": "High contrast",
+      "description": "Strengthens borders and text to meet accessibility requirements.",
+      "label": "Enable high contrast",
+      "hint": "Suits bright rooms or reduced vision."
+    },
+    "preview": {
+      "title": "Preview",
+      "description": "How the core components look with the current settings."
+    }
+  },
+
+  "densityOptions": {
+    "compact": "Compact",
+    "compactHint": "More rows per screen",
+    "comfortable": "Comfortable",
+    "comfortableHint": "The default",
+    "spacious": "Spacious",
+    "spaciousHint": "Roomier controls"
+  },
+
+  "motionOptions": {
+    "reduced": "Reduced",
+    "reducedHint": "No transforms",
+    "normal": "Normal",
+    "normalHint": "Standard easing",
+    "rich": "Rich",
+    "richHint": "Longer, springier"
+  },
+
+  "motionSystemOverride": "Your system asks for reduced motion, so “Reduced” is applied automatically. The control above resumes working as soon as you change the system preference.",
+
+  "previewStatus": {
+    "success": "Healthy",
+    "warning": "Needs attention",
+    "danger": "Critical"
+  },
+
+  "previewButtons": {
+    "primary": "Primary action",
+    "secondary": "Secondary",
+    "ghost": "Ghost"
+  },
+
+  "previewBadges": {
+    "success": "Success",
+    "warning": "Warning",
+    "danger": "Error",
+    "info": "Info",
+    "neutral": "Neutral"
+  },
+
+  "accents": {
+    "indigo": "Indigo",
+    "violet": "Violet",
+    "cyan": "Cyan",
+    "emerald": "Emerald",
+    "gold": "Champagne gold"
+  }
+}

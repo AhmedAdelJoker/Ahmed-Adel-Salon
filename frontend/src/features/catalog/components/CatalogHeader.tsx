@@ -47,7 +47,7 @@ export default function CatalogHeader({
                 : activeTab === "categories"
                   ? "إضافة تصنيف"
                   : "إضافة عرض"}{" "}
-              <Plus className="mr-2" size={18} />
+              <Plus className="me-2" size={18} />
             </Button>
           }
         />
@@ -106,7 +106,7 @@ export default function CatalogHeader({
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
-              className="h-11 w-full pr-12 rounded-xl border-border/60 bg-card text-sm font-bold focus:bg-card transition-all"
+              className="h-11 w-full pe-12 rounded-xl border-border/60 bg-card text-sm font-bold focus:bg-card transition-all"
             />
             {searchTerm && (
               <button
@@ -126,12 +126,12 @@ export default function CatalogHeader({
               disabled={refreshing}
               className="h-11 flex-1 lg:flex-initial rounded-xl border-border/60 bg-card px-6 font-black text-xs hover:bg-soft"
             >
-              <RefreshCw size={15} className={cn("ml-2", refreshing && "animate-spin")} />
+              <RefreshCw size={15} className={cn("ms-2", refreshing && "animate-spin")} />
               تحديث
             </Button>
             {hideHeader && (
               <Button onClick={onCreate} className="h-11 flex-1 lg:flex-initial rounded-xl px-6 font-black text-xs shadow-sm">
-                <Plus size={16} className="ml-2" />
+                <Plus size={16} className="ms-2" />
                 {activeTab === "services"
                   ? "إضافة خدمة"
                   : activeTab === "categories"

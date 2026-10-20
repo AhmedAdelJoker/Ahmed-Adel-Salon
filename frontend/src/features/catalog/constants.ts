@@ -1,5 +1,5 @@
 /** Catalog feature: shared constants (moved from ServicesManagement page). */
-import { Scissors, Layers, Gift } from "lucide-react";
+import { Scissors, Layers } from "lucide-react";
 
 export const TABS = [
   {
@@ -16,13 +16,13 @@ export const TABS = [
     color: "text-indigo-500",
     bg: "bg-indigo-500/10",
   },
-  {
-    key: "offers",
-    label: "العروض",
-    icon: Gift,
-    color: "text-emerald-500",
-    bg: "bg-emerald-500/10",
-  },
+  /*
+    The "offers" tab is gone. Offers are one row in one table, and they used to
+    be edited from here (services + a date window) and from /inventory/bundles
+    (products + image + publish), so each page silently dropped the other's
+    fields. /inventory/bundles is now the whole offer; `?tab=offers` here
+    redirects to it.
+  */
 ];
 
 export const DEFAULT_SERVICE_FORM = {

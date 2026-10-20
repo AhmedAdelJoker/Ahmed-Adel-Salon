@@ -128,7 +128,7 @@ export default function CustomerEditDialog({
                 loading={isSaving}
                 className="h-10 flex-1 rounded-xl text-xs"
               >
-                <Save size={14} className="ml-1.5" /> حفظ
+                <Save size={14} className="ms-1.5" /> حفظ
               </Button>
             </DialogFooter>
           </DialogContent>

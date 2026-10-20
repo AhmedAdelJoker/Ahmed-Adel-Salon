@@ -76,7 +76,7 @@ export function ForecastTab({
                     dataKey="label"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                    tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                     dy={8}
                   />
                   <YAxis
@@ -84,19 +84,19 @@ export function ForecastTab({
                     tickLine={false}
                     width={56}
                     tickFormatter={compactTick}
-                    tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                    tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                   />
                   <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
                   <Legend wrapperStyle={{ fontSize: 11, fontWeight: 800 }} />
-                  <Bar dataKey="rev" name="الإيرادات" fill="#10B981" radius={[6, 6, 0, 0]} maxBarSize={28} />
-                  <Bar dataKey="exp" name="المصروفات" fill="#F43F5E" radius={[6, 6, 0, 0]} maxBarSize={28} />
+                  <Bar dataKey="rev" name="الإيرادات" fill="var(--chart-3)" radius={[6, 6, 0, 0]} maxBarSize={28} />
+                  <Bar dataKey="exp" name="المصروفات" fill="var(--chart-7)" radius={[6, 6, 0, 0]} maxBarSize={28} />
                   <Line
                     type="monotone"
                     dataKey="net"
                     name="الصافي"
-                    stroke="#6366F1"
+                    stroke="var(--chart-2)"
                     strokeWidth={2.5}
-                    dot={{ r: 3, fill: "#6366F1" }}
+                    dot={{ r: 3, fill: "var(--chart-2)" }}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -161,8 +161,8 @@ export function ForecastTab({
                 <ComposedChart data={forecast.cumulative} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                   <defs>
                     <linearGradient id="finForecast" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.28} />
-                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                      <stop offset="5%" stopColor="var(--chart-5)" stopOpacity={0.28} />
+                      <stop offset="95%" stopColor="var(--chart-5)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="var(--border)" opacity={0.5} />
@@ -170,7 +170,7 @@ export function ForecastTab({
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                    tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                     dy={8}
                   />
                   <YAxis
@@ -178,14 +178,14 @@ export function ForecastTab({
                     tickLine={false}
                     width={56}
                     tickFormatter={compactTick}
-                    tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                    tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                   />
                   <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
                   <Area
                     type="monotone"
                     dataKey="net"
                     name="الصافي التراكمي المتوقع"
-                    stroke="#8B5CF6"
+                    stroke="var(--chart-5)"
                     strokeWidth={2.5}
                     strokeDasharray="6 4"
                     fill="url(#finForecast)"

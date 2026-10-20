@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Fingerprint } from "lucide-react";
+import { CheckCircle2, Fingerprint, XCircle } from "lucide-react";
 import {
   ROLES,
 } from "@/features/hr";
@@ -20,6 +20,9 @@ import {
   FIELD_TEXTAREA_CLASS,
   FIELD_SELECT_CLASS,
 } from "@/features/hr";
+import { cn } from "@/lib/core/utils";
+import { validateUsername, passwordRequirements } from "@/features/hr/utils/validators";
+import FieldError from "./FieldError";
 
 export default function SystemTab({
   formData,
@@ -30,6 +33,16 @@ export default function SystemTab({
   setFormData: Dispatch<SetStateAction<EmployeeRecord>>;
   editingEmp: EmployeeRecord | null;
 }) {
+  const typedUsername = String(formData.username ?? "").trim();
+  const usernameError = typedUsername ? validateUsername(typedUsername) : null;
+  /*
+    Shown once the owner starts typing, and never for "keep the existing
+    password" (empty while editing): the checklist is a coaching aid, not a
+    gate. The backend's `validate_password_strength` is the actual gate.
+  */
+  const passwordValue = String(formData.password ?? "");
+  const passwordChecks = passwordRequirements(passwordValue);
+
   return (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-wrap items-center justify-between gap-4 p-6 rounded-2xl border border-primary/20 bg-primary-soft text-main">
@@ -66,7 +79,18 @@ export default function SystemTab({
                     }
                     className={FIELD_INPUT_CLASS}
                     dir="ltr"
+                    autoComplete="off"
+                    maxLength={30}
+                    aria-invalid={Boolean(usernameError)}
+                    aria-describedby={usernameError ? "username-error" : undefined}
                   />
+                  {usernameError ? (
+                    <FieldError id="username-error">{usernameError}</FieldError>
+                  ) : (
+                    <p className="text-[11px] font-bold text-muted">
+                      يُستخدم لتسجيل الدخول — حروف إنجليزية وأرقام و . _ -
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className={FIELD_LABEL_CLASS}>كلمة المرور</label>
@@ -78,10 +102,37 @@ export default function SystemTab({
                     }
                     className={FIELD_INPUT_CLASS}
                     dir="ltr"
+                    autoComplete="new-password"
                     placeholder={
                       editingEmp ? "••••••••" : "أدخل كلمة المرور..."
                     }
                   />
+                  {/*
+                    The rules as a live checklist rather than a rejection: the
+                    owner sees exactly what the password still needs while
+                    typing it, not after the save bounces. Mirrors
+                    `validate_password_strength` in the backend.
+                  */}
+                  {passwordValue.length > 0 && (
+                    <ul className="grid grid-cols-2 gap-1.5 pt-1">
+                      {passwordChecks.map((check) => (
+                        <li
+                          key={check.label}
+                          className={cn(
+                            "flex items-center gap-1.5 text-[11px] font-bold",
+                            check.met ? "text-success" : "text-muted",
+                          )}
+                        >
+                          {check.met ? (
+                            <CheckCircle2 size={12} className="shrink-0" aria-hidden="true" />
+                          ) : (
+                            <XCircle size={12} className="shrink-0" aria-hidden="true" />
+                          )}
+                          {check.label}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <label className={FIELD_LABEL_CLASS}>مستوى الوصول</label>
@@ -112,6 +163,7 @@ export default function SystemTab({
                 }
                 className={FIELD_TEXTAREA_CLASS}
                 rows={4}
+                maxLength={500}
               />
             </div>
           </div>

@@ -57,18 +57,6 @@ export function useBookingsData() {
   const searchInputRef = useRef<any>(null);
   const phoneTimerRef = useRef<any>(null);
 
-  const [isWalkInOpen, setIsWalkInOpen] = useState(false);
-  const [walkInData, setWalkInData] = useState<any>({
-    phone: "",
-    firstName: "",
-    lastName: "",
-    employeeId: "",
-    serviceIds: [],
-    notes: "",
-  });
-  const [walkInSaving, setWalkInSaving] = useState(false);
-  const [walkInCustomer, setWalkInCustomer] = useState<any>(null);
-  const [walkInSuggestions, setWalkInSuggestions] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState<any>(null);
@@ -86,6 +74,7 @@ export function useBookingsData() {
   const [selectedServiceCategory, setSelectedServiceCategory] = useState("all");
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const [availableSlots, setAvailableSlots] = useState<any[]>([]);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (dateFilter !== "today") return;
@@ -342,7 +331,12 @@ export function useBookingsData() {
         if (res.data.has_conflict) setConflictMsg(res.data.message);
         else setConflictMsg("");
       } catch (e) {
+        // A failed conflict check used to pass silently, so the booking was
+        // saved with no double-booking warning at all.
         console.error(e);
+        setConflictMsg(
+          "تعذر التحقق من تعارض المواعيد. راجع المواعيد يدوياً قبل الحفظ.",
+        );
       }
     },
     [formData.services, services, editingBooking?.id],
@@ -371,12 +365,20 @@ export function useBookingsData() {
     async (barberId: string | number, date: string) => {
       if (!barberId || !date) return;
       try {
+        setSlotsError(null);
         const res = await api.get("/appointments/available-slots", {
           params: { barber_id: barberId, date: date },
         });
         setAvailableSlots(res.data);
       } catch (e) {
+        // Previously the previous slot list was left in place, so a failed
+        // refresh meant the barber could still pick a time that had just been
+        // taken. Clear it and say so instead.
         console.error("Error fetching slots:", e);
+        setAvailableSlots([]);
+        setSlotsError(
+          "تعذر تحميل الأوقات المتاحة. أعد المحاولة قبل اختيار الموعد.",
+        );
       }
     },
     [],
@@ -539,108 +541,6 @@ export function useBookingsData() {
     invalidateAppointments,
   ]);
 
-  const handleWalkInPhoneSearch = useCallback(
-    async (phone: string) => {
-      const cleanPhone = String(phone || "").replace(/\D/g, "");
-      setWalkInData((p: any) => ({ ...p, phone: cleanPhone }));
-      if (cleanPhone.length < 8) {
-        setWalkInSuggestions([]);
-        setWalkInCustomer(null);
-        return;
-      }
-      try {
-        const res = await api.get("/customers/search", {
-          params: { phone: cleanPhone },
-        });
-        const results = Array.isArray(res.data)
-          ? res.data
-          : [res.data].filter(Boolean);
-        setWalkInSuggestions(results);
-        if (results.length === 1) selectWalkInCustomer(results[0]);
-      } catch (err) {
-        setWalkInSuggestions([]);
-      }
-    },
-    [],
-  );
-
-  const selectWalkInCustomer = useCallback(
-    (customer: any) => {
-      setWalkInCustomer(customer);
-      setWalkInData((p: any) => ({
-        ...p,
-        phone: customer.phone || p.phone,
-        firstName: customer.first_name || customer.name || "",
-        lastName: customer.last_name || "",
-      }));
-      setWalkInSuggestions([]);
-    },
-    [],
-  );
-
-  const handleWalkInSubmit = useCallback(async () => {
-    if (!walkInData.firstName.trim() || !walkInData.phone.trim()) {
-      toast.error("يرجى إدخال اسم العميل ورقم الهاتف");
-      return;
-    }
-    if (walkInData.serviceIds.length === 0)
-      return toast.error("يرجى اختيار خدمة واحدة على الأقل");
-
-    try {
-      setWalkInSaving(true);
-      let customerId = walkInCustomer?.customer_id || walkInCustomer?.id;
-
-      if (!customerId) {
-        const res = await api.post("/customers", {
-          first_name: walkInData.firstName,
-          last_name: walkInData.lastName || "",
-          phone: walkInData.phone,
-        });
-        customerId = res.data.customer_id || res.data.id;
-      }
-
-      const res = await api.post("/appointments/fast-walkin", {
-        customer_id: Number(customerId),
-        service_ids: walkInData.serviceIds,
-        employee_id:
-          walkInData.employeeId === "auto"
-            ? null
-            : walkInData.employeeId || null,
-        notes: walkInData.notes || "عميل مشاة (Walk-in)",
-        booking_source: "walkin",
-      });
-
-      toast.success("تم تسجيل العميل وإضافته للاستقبال");
-      setIsWalkInOpen(false);
-      setWalkInData({
-        phone: "",
-        firstName: "",
-        lastName: "",
-        employeeId: "",
-        serviceIds: [],
-        notes: "",
-      });
-      setWalkInCustomer(null);
-      setWalkInSuggestions([]);
-      invalidateAppointments();
-      navigate("/reception-board");
-    } catch (err) {
-      const apiErr = err as {
-        response?: { data?: { detail?: unknown } };
-      };
-      toast.error(
-        (apiErr?.response?.data?.detail as string) || "فشل تسجيل العميل",
-      );
-    } finally {
-      setWalkInSaving(false);
-    }
-  }, [
-    walkInData,
-    walkInCustomer,
-    invalidateAppointments,
-    navigate,
-  ]);
-
   const openCreate = useCallback(() => {
     setEditingBooking(null);
     setFormData({ ...emptyForm, appointmentDate: TODAY });
@@ -747,15 +647,6 @@ export function useBookingsData() {
     refreshBookings,
     phoneInputRef,
     searchInputRef,
-    isWalkInOpen,
-    setIsWalkInOpen,
-    walkInData,
-    setWalkInData,
-    walkInSaving,
-    walkInCustomer,
-    setWalkInCustomer,
-    walkInSuggestions,
-    setWalkInSuggestions,
     isModalOpen,
     setIsModalOpen,
     isCancelDialogOpen,
@@ -787,6 +678,7 @@ export function useBookingsData() {
     customerSuggestions,
     setCustomerSuggestions,
     availableSlots,
+    slotsError,
     setAvailableSlots,
     groupedServices,
     handleTransferToPOS,
@@ -808,9 +700,6 @@ export function useBookingsData() {
     onPhoneChange,
     selectSuggestedCustomer,
     handleSaveBooking,
-    handleWalkInPhoneSearch,
-    selectWalkInCustomer,
-    handleWalkInSubmit,
     openCreate,
     openEdit,
   };

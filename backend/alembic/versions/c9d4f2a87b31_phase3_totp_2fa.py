@@ -37,7 +37,7 @@ def upgrade() -> None:
     if not _column_exists("users", "totp_enabled"):
         op.add_column(
             "users",
-            sa.Column("totp_enabled", sa.Boolean, nullable=False, server_default="0"),
+            sa.Column("totp_enabled", sa.Boolean, nullable=False, server_default=sa.false()),
         )
 
 

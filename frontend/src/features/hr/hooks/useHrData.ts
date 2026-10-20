@@ -56,7 +56,11 @@ export function useHrData() {
   }, [fetchEmployees]);
 
   const filteredEmployees = useMemo(() => {
-    let result = employees.filter((emp) => emp.status === "active");
+    // The team list includes employees on vacation (status "suspended") with a
+    // "في إجازة" badge — they are still part of the salon, one tap away from
+    // coming back. Only people who actually left (resigned) are not here; they
+    // live in the archive.
+    let result = employees.filter((emp) => emp.status !== "resigned");
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       result = result.filter(

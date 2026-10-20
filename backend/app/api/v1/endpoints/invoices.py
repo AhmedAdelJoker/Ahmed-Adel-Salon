@@ -1,7 +1,8 @@
 from __future__ import annotations
+import logging
 from pathlib import Path
 from datetime import date, datetime
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
@@ -27,14 +28,19 @@ from app.services.activity_service import log_activity
 from app.services.meta_whatsapp_service import upload_and_send_pdf
 from app.services.pdf_service import generate_invoice_pdf
 from app.services.inventory_service import deduct_stock_for_invoice
+from app.core.audit import audit_log
 from app.models.business_settings import BusinessSettings
-import asyncio
+from app.models.service_session import ServiceSession
 import hashlib
 import json
 from decimal import Decimal, InvalidOperation
 from app.services.loyalty_service import update_customer_loyalty, calculate_loyalty_discount
 from app.services.websocket import manager
 from app.crud.core_business import create_cash_transaction
+from app.core.clock import salon_day_bounds_utc, salon_now, utc_now_naive
+
+logger = logging.getLogger("app.invoices")
+
 
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
@@ -176,7 +182,7 @@ def _resolve_invoice_item(
     )
     if offer is None:
         raise HTTPException(status_code=400, detail="العرض غير موجود أو غير نشط")
-    today = date.today()
+    today = salon_now().date()
     if offer.start_date and offer.start_date > today:
         raise HTTPException(status_code=400, detail="العرض لم يبدأ بعد")
     if offer.end_date and offer.end_date < today:
@@ -344,7 +350,29 @@ def create_manual_invoice(
 
     loyalty_discount = calculate_loyalty_discount(db, customer_id, total_amount)
     loyalty_discount = _normalize_money(loyalty_discount)
-    total_manual_discount = _normalize_money(payload.discount_amount) + loyalty_discount
+    manual_discount = _normalize_money(payload.discount_amount)
+    business_settings = db.query(BusinessSettings).first()
+    if (
+        current_user.role == "cashier"
+        and business_settings
+        and manual_discount > 0
+    ):
+        limit_type = str(
+            business_settings.cashier_discount_limit_type or "percentage"
+        ).lower()
+        limit_value = Decimal(
+            str(business_settings.cashier_discount_limit_value or 0)
+        )
+        if limit_type == "percentage" and total_amount > 0:
+            allowed = total_amount * limit_value / Decimal("100")
+        else:
+            allowed = limit_value
+        if manual_discount > allowed:
+            raise HTTPException(
+                status_code=403,
+                detail="الخصم يتجاوز الحد المسموح لك؛ أنشئ طلب خصم للاعتماد",
+            )
+    total_manual_discount = manual_discount + loyalty_discount
     if total_manual_discount > total_amount:
         raise HTTPException(status_code=400, detail="الخصم لا يمكن أن يتجاوز إجمالي الفاتورة")
     final_amount = (total_amount - total_manual_discount).quantize(Decimal("0.01"))
@@ -387,7 +415,15 @@ def create_manual_invoice(
     update_customer_loyalty(db, customer_id, final_amount)
     
     # 7. Deduct stock for the invoice
-    deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=current_user.id)
+    linked_session = None
+    if payload.appointment_id:
+        linked_session = (
+            db.query(ServiceSession)
+            .filter(ServiceSession.appointment_id == payload.appointment_id)
+            .first()
+        )
+    if linked_session is None:
+        deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=current_user.id)
 
     payment_label = {
         "cash": "نقدي",
@@ -439,10 +475,14 @@ def create_manual_invoice(
         record_invoice_payment(payload.payment_method, final_amount, invoice.invoice_no)
 
     # 8. Update Appointment Status if linked
+    # "done" (not "completed"): a paid appointment must leave the reception
+    # review board for good. "completed" is the pre-payment "service finished,
+    # awaiting till" state, so setting it here pushed the paid booking straight
+    # back onto the review column and the Done KPI stayed at zero.
     if payload.appointment_id:
         appointment = db.query(Appointment).filter(Appointment.id == payload.appointment_id).first()
         if appointment:
-            appointment.status = "completed"
+            appointment.status = "done"
 
     # 9. Generate PDF
     customer = db.query(Customer).filter(Customer.customer_id == invoice.customer_id).first()
@@ -460,7 +500,7 @@ def create_manual_invoice(
         )
         invoice.pdf_path = pdf_path
     except Exception as e:
-        print(f"Error generating PDF: {e}")
+        logger.exception("Error generating PDF: %s", e)
 
     try:
         db.commit()
@@ -487,24 +527,25 @@ def create_manual_invoice(
         return _serialize_invoice(replayed_invoice, replayed_customer, replayed_barber)
     db.refresh(invoice)
     
-    # 10. Broadcast WebSocket event to update POS ready-for-payment list
+    # 10. Broadcast WebSocket event to update POS ready-for-payment list.
+    #
+    # This endpoint is `def`, so FastAPI runs it in a threadpool where no event
+    # loop is running. The previous code called `asyncio.ensure_future`, which
+    # raises there, and the surrounding `except Exception` swallowed it — so
+    # paying an invoice never refreshed the POS board on any deployment, and
+    # the only trace was a warning in the log.
+    #
+    # `publish` is synchronous and hands the work to the app's loop itself, so
+    # it works from a worker thread and cannot be lost silently. Delivery errors
+    # surface instead of disappearing.
     if payload.appointment_id:
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(manager.broadcast({
-                    "event": "appointment_status_changed",
-                    "appointment_id": payload.appointment_id,
-                    "status": "completed",
-                }))
-            else:
-                loop.run_until_complete(manager.broadcast({
-                    "event": "appointment_status_changed",
-                    "appointment_id": payload.appointment_id,
-                    "status": "completed",
-                }))
-        except Exception as e:
-            print(f"WebSocket broadcast error: {e}")
+        manager.publish(
+            {
+                "event": "appointment_status_changed",
+                "appointment_id": payload.appointment_id,
+                "status": "completed",
+            }
+        )
     
     return _serialize_invoice(invoice, customer, barber)
 
@@ -552,8 +593,10 @@ def list_today_invoices(
     current_user: User = Depends(require_cashier_manager_owner)
 ):
     from datetime import date, datetime, time
-    today_start = datetime.combine(date.today(), time.min)
-    today_end = datetime.combine(date.today(), time.max)
+    # Compared against `Invoice.created_at`, stored as UTC by SQLite's
+    # CURRENT_TIMESTAMP. See `salon_day_bounds_utc` for why a local midnight is
+    # the wrong window here.
+    today_start, today_end = salon_day_bounds_utc()
 
     # Eager-load customer + barber (was N+1: 2 extra queries per invoice)
     query = db.query(Invoice).options(
@@ -675,7 +718,7 @@ def close_month(
     for inv in invoices:
         if not getattr(inv, "is_closed", False):
             inv.is_closed = True
-            inv.closed_at = datetime.utcnow()
+            inv.closed_at = utc_now_naive()
             inv.closed_by_user_id = getattr(current_user, "id", None)
             closed_count += 1
     
@@ -762,6 +805,7 @@ def list_invoices(
     search: str | None = Query(None, alias="search"),
     payment_method: str | None = Query(None),
     status: str | None = Query(None),
+    customer_id: int | None = Query(None, description="Filter invoices of one customer"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
     page: int | None = Query(None, ge=1),
@@ -784,11 +828,14 @@ def list_invoices(
             query = query.filter(Invoice.created_at >= start, Invoice.created_at < end)
         except ValueError:
             pass
-    elif not from_date and not to_date and not q and not payment_method and not status:
+    elif not from_date and not to_date and not q and not payment_method and not status and not customer_id:
         now = datetime.now()
         start = datetime(now.year, now.month, 1)
         end = datetime(now.year + 1, 1, 1) if now.month == 12 else datetime(now.year, now.month + 1, 1)
         query = query.filter(Invoice.created_at >= start, Invoice.created_at < end)
+
+    if customer_id is not None:
+        query = query.filter(Invoice.customer_id == customer_id)
 
     if from_date:
         try:
@@ -923,16 +970,25 @@ def create_draft_invoice(
     current_user: User = Depends(require_cashier_manager_owner),
 ):
     """إنشاء مسودة فاتورة جديدة"""
+    walk_in = db.query(Customer).filter(Customer.first_name == "Walk-in").first()
+    if not walk_in:
+        walk_in = Customer(
+            first_name="Walk-in",
+            last_name="Customer",
+            phone="0000000000",
+        )
+        db.add(walk_in)
+        db.flush()
     draft = Invoice(
         invoice_no=f"DRAFT-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-        customer_id=1,
+        customer_id=walk_in.customer_id,
         payment_method="cash",
         subtotal_amount=0,
         discount_amount=0,
         total_amount=0,
         created_by_user_id=getattr(current_user, "id", None),
         is_draft=True,
-        draft_saved_at=datetime.utcnow(),
+        draft_saved_at=utc_now_naive(),
     )
     db.add(draft)
     db.commit()
@@ -965,7 +1021,7 @@ def update_draft_invoice(
     if first_employee:
         draft.barber_id = first_employee
     draft.payment_method = payload.payment_method or draft.payment_method
-    draft.draft_saved_at = datetime.utcnow()
+    draft.draft_saved_at = utc_now_naive()
     
     if payload.items:
         for item in draft.items:
@@ -1078,7 +1134,7 @@ def finalize_draft(
         )
         draft.pdf_path = pdf_path
     except Exception as e:
-        print(f"Error generating PDF for finalized draft: {e}")
+        logger.exception("Error generating PDF for finalized draft: %s", e)
     
     db.commit()
     db.refresh(draft)
@@ -1099,6 +1155,7 @@ def finalize_draft(
 @router.delete("/drafts/{draft_id}")
 def delete_draft(
     draft_id: int,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
@@ -1107,9 +1164,23 @@ def delete_draft(
     if not draft:
         raise HTTPException(status_code=404, detail="المسودة غير موجودة")
     
+    # Snapshot before delete — after `db.delete()` the ORM state is expunged.
+    snapshot = {
+        "invoice_number": getattr(draft, "invoice_number", None),
+        "customer_id": getattr(draft, "customer_id", None),
+        "total": float(getattr(draft, "total", 0) or 0),
+        "item_count": len(draft.items or []),
+    }
     for item in draft.items:
         db.delete(item)
     db.delete(draft)
     db.commit()
-    
+
+    audit_log(
+        db, request, current_user,
+        action="delete_invoice_draft",
+        entity_type="invoice",
+        entity_id=draft_id,
+        description={"deleted": snapshot},
+    )
     return {"message": "تم حذف المسودة"}

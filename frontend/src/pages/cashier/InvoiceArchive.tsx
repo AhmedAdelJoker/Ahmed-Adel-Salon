@@ -1,3 +1,5 @@
+import { EmptyState } from "@/components/shared/EmptyState";
+import { PageShell } from "@/components/shared/PageShell";
 import { motion } from "framer-motion";
 import {
   Archive,
@@ -51,8 +53,8 @@ function InvoiceArchive() {
   } = useInvoiceArchive();
 
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-6">
+    <div>
+      <PageShell contained>
         <PageHeader className={undefined}
           title="الأرشيف الشهري للفواتير"
           subtitle="استعرض وأغلق فواتير الأشهر المنتهية أو أعدها للمراجعة — كل الفلاتر والإجراءات من هنا"
@@ -65,7 +67,7 @@ function InvoiceArchive() {
                 className="h-10 rounded-xl px-4"
                 onClick={() => navigate("/invoices")}
               >
-                <Receipt size={16} className="ml-2" /> الفواتير الحالية
+                <Receipt size={16} className="ms-2" /> الفواتير الحالية
               </Button>
               <Button
                 onClick={handleExportPDF}
@@ -122,34 +124,29 @@ function InvoiceArchive() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-24 text-center"
           >
-            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-soft">
-              <Archive size={40} className="text-muted" />
-            </div>
-            <h3 className="mb-2 text-xl font-black text-main">
-              لا توجد أشهر مؤرشفة بعد
-            </h3>
-            <p className="mb-6 text-sm font-bold text-muted">
-              ستنتقل الفواتير تلقائيًا إلى الأرشيف بعد انتهاء الشهر.
-            </p>
-            <Button
-              onClick={() => navigate("/invoices")}
-              className="h-11 rounded-xl px-6"
-            >
-              عرض فواتير الشهر الحالي
-            </Button>
+            <EmptyState
+              variant="page"
+              icon={Archive}
+              title="لا توجد أشهر مؤرشفة بعد"
+              message="ستنتقل الفواتير تلقائيًا إلى الأرشيف بعد انتهاء الشهر."
+              action={
+                <Button
+                  onClick={() => navigate("/invoices")}
+                  className="h-11 rounded-xl px-6"
+                >
+                  عرض فواتير الشهر الحالي
+                </Button>
+              }
+            />
           </motion.div>
         ) : filteredMonths.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-20 text-center">
-            <Search size={32} className="mb-3 text-muted" />
-            <h3 className="mb-1 text-lg font-black text-main">
-              لا نتائج مطابقة
-            </h3>
-            <p className="text-sm font-bold text-muted">
-              جرّب تعديل البحث أو الفلتر.
-            </p>
-          </div>
+          <EmptyState
+            variant="page"
+            icon={Search}
+            title="لا نتائج مطابقة"
+            message="جرّب تعديل البحث أو الفلتر."
+          />
         ) : (
           <div className="space-y-4">
             <AnimatePresence mode="popLayout">
@@ -176,7 +173,6 @@ function InvoiceArchive() {
             </AnimatePresence>
           </div>
         )}
-      </div>
 
       <CloseReopenDialogs
         confirmClose={confirmClose}
@@ -188,6 +184,7 @@ function InvoiceArchive() {
         onConfirmClose={handleCloseMonth}
         onConfirmReopen={handleReopenMonth}
       />
+      </PageShell>
     </div>
   );
 }

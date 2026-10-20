@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { EmptyState } from "@/components/shared/EmptyState";
 import React, { useEffect, useState } from "react";
 
 import {
@@ -107,7 +108,7 @@ const ManagerDashboard = () => {
             variant="success"
             className="h-10 px-4 rounded-xl font-black text-[10px] uppercase tracking-wider"
           >
-            <div className="h-1.5 w-1.5 rounded-full ml-2 bg-white animate-pulse" />
+            <div className="h-1.5 w-1.5 rounded-full ms-2 bg-white animate-pulse" />
             الرقابة التشغيلية نشطة
           </Badge>
         }
@@ -157,7 +158,7 @@ const ManagerDashboard = () => {
               className="text-[10px] font-black uppercase"
             >
               إدارة الموظفين{" "}
-              <ArrowRight size={14} className="mr-2 rotate-180" />
+              <ArrowRight size={14} className="me-2 rotate-180" />
             </Button>
           }
           noPadding
@@ -337,14 +338,11 @@ const ManagerDashboard = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-6 border-2 border-dashed border-border rounded-2xl bg-soft/30">
-                  <BarChart3 size={32} className="text-muted/30 mb-3" />
-                  <p className="text-[9px] font-black text-muted text-center uppercase tracking-widest leading-relaxed">
-                    لا توجد عمليات معلقة
-                    <br />
-                    بانتظار الموافقة
-                  </p>
-                </div>
+                <EmptyState
+                  variant="inline"
+                  icon={BarChart3}
+                  title="لا توجد عمليات معلقة بانتظار الموافقة"
+                />
               )}
             </div>
           </PremiumCard>

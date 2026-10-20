@@ -40,6 +40,25 @@ const roleLabel = (role) =>
     ACCOUNTANT: "المحاسب",
   })[normalizeRole(role)] || "المستخدم";
 
+/**
+ * Isolated minute clock. Ticking here re-renders only this span, not the whole
+ * Header (menus, avatar, framer-motion subtrees) every second.
+ */
+function LiveClock() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <span className="text-[13px] font-black text-main tabular-nums tracking-tight">
+      {now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}
+    </span>
+  );
+}
+
 export default function Header({
   title = "Barber Luxe",
   subtitle = "Premium Management Suite",
@@ -50,16 +69,11 @@ export default function Header({
   const { preferences, toggleTheme } = usePreferences();
   const { valutBalance, vaultCashBalance } = useSalon();
 
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
   const isDark = preferences?.theme !== "light";
   const role = normalizeRole(user?.role);
   const displayName = user?.full_name || user?.username || "المستخدم";
+
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const getAvatarUrl = (): string | null => {
     const profileImage = user?.profile_image_url as string | undefined;
@@ -84,7 +98,7 @@ export default function Header({
 
   return (
     <header
-      className="relative z-50 flex min-h-16 w-full min-w-0 flex-wrap items-center justify-between gap-3 border-b border-border/5 bg-bg-card/40 px-3 py-3 backdrop-blur-xl sm:min-h-20 sm:px-6 lg:flex-nowrap lg:px-8"
+      className="relative z-50 flex min-h-16 w-full min-w-0 flex-wrap items-center justify-between gap-3 border-b border-border/5 bg-bg-card/40 px-3 py-3 sm:min-h-20 sm:px-6 lg:flex-nowrap lg:px-8"
     >
       {/* Decorative Top Glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[1px] w-1/2 bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
@@ -150,13 +164,7 @@ export default function Header({
               <div className="absolute inset-0 bg-accent/20 blur-sm rounded-full animate-pulse" />
               <ClockIcon size={14} className="relative text-accent" />
             </div>
-            <span className="text-[13px] font-black text-main tabular-nums tracking-tight">
-              {currentTime.toLocaleTimeString("ar-EG", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })}
-            </span>
+            <LiveClock />
           </div>
 
           {(role === "OWNER" ||
@@ -172,8 +180,8 @@ export default function Header({
               <div className="h-8 w-8 flex items-center justify-center rounded-xl bg-accent/10 text-accent border border-accent/20">
                 <Wallet size={16} />
               </div>
-              <div className="flex flex-col leading-none">
-                <span className="text-[9px] font-black text-accent/60 uppercase tracking-widest mb-1.5">
+              <div className="flex min-w-[72px] flex-col gap-0.5">
+                <span className="text-[9px] font-black text-accent/60 uppercase tracking-widest">
                   الخزنة • Vault
                 </span>
                 <span className="text-[14px] font-black text-main tabular-nums drop-shadow-sm">
@@ -210,17 +218,23 @@ export default function Header({
               <button
                 aria-label="قائمة المستخدم"
                 aria-haspopup="menu"
-                className="flex min-w-0 items-center gap-2 rounded-2xl border border-transparent p-1.5 transition-all hover:border-border/40 hover:bg-white/5 sm:gap-4 sm:pl-4 group">
+                className="flex min-w-0 items-center gap-2 rounded-2xl border border-transparent p-1.5 transition-all hover:border-border/40 hover:bg-white/5 sm:gap-4 sm:ps-4 group">
                 <div className="relative">
                   <div className="absolute inset-0 rounded-xl bg-accent/20 blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="relative h-10 w-10 overflow-hidden rounded-xl bg-gradient-to-br from-bg-card to-bg-soft text-accent font-black border border-accent/30 shadow-md">
-                    {getAvatarUrl() ? (
+                    {getAvatarUrl() && !avatarFailed ? (
                       <img
                         src={getAvatarUrl() ?? ""}
                         alt={displayName}
                         loading="lazy"
                         decoding="async"
                         className="h-full w-full object-cover"
+                        // Same reason as the sidebar: a stored path can name a
+                        // file that no longer exists, and an <img> with no
+                        // onError renders a broken placeholder forever. See
+                        // EmployeeAvatar, which has handled it since it was
+                        // written.
+                        onError={() => setAvatarFailed(true)}
                       />
                     ) : (
                       <span className="flex h-full w-full items-center justify-center text-xs">
@@ -269,7 +283,7 @@ export default function Header({
                 >
                   <LayoutDashboard
                     size={16}
-                    className="ml-3 text-muted/60 group-hover:text-accent transition-colors"
+                    className="ms-3 text-muted/60 group-hover:text-accent transition-colors"
                   />
                   <span className="text-[13px]">لوحة التحكم</span>
                 </DropdownMenuItem>
@@ -279,7 +293,7 @@ export default function Header({
                 >
                   <User
                     size={16}
-                    className="ml-3 text-muted/60 group-hover:text-accent transition-colors"
+                    className="ms-3 text-muted/60 group-hover:text-accent transition-colors"
                   />
                   <span className="text-[13px]">إعدادات الحساب</span>
                 </DropdownMenuItem>
@@ -291,7 +305,7 @@ export default function Header({
               >
                 <LogOut
                   size={16}
-                  className="ml-3 group-hover:-translate-x-1 transition-transform"
+                  className="ms-3 group-hover:-translate-x-1 transition-transform"
                 />
                 <span className="text-[13px]">تسجيل الخروج</span>
               </DropdownMenuItem>

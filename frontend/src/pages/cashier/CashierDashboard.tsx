@@ -85,7 +85,7 @@ export default function CashierDashboard() {
             >
               <div
                 className={cn(
-                  "h-1.5 w-1.5 rounded-full ml-2",
+                  "h-1.5 w-1.5 rounded-full ms-2",
                   summary?.has_open_shift
                     ? "bg-white animate-pulse"
                     : "bg-white",

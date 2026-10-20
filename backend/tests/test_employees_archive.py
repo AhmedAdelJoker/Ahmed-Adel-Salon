@@ -32,31 +32,44 @@ def test_archive_forbidden_for_cashier(client, db_session):
     assert resp.status_code == 403
 
 
-def test_archive_returns_only_suspended_and_resigned(client, db_session):
+def test_archive_returns_only_resigned(client, db_session):
+    """The archive is for leavers only.
+
+    An employee "on vacation" keeps `status='suspended'` and stays in the main
+    team list with a badge — not here. Only people who actually left the salon
+    (`resigned`) belong in the archive.
+    """
     headers = _owner_headers(client, db_session)
     _seed(db_session, "Active One", "01000000001", "active")
-    _seed(db_session, "Suspended One", "01000000002", "suspended")
+    _seed(db_session, "On Vacation One", "01000000002", "suspended")
     _seed(db_session, "Resigned One", "01000000003", "resigned")
 
     resp = client.get("/api/v1/employees/archive", headers=headers)
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    statuses = {e["status"] for e in body}
-    assert statuses <= {"suspended", "resigned"}
-    assert len(body) == 2
+    assert [e["status"] for e in body] == ["resigned"]
+    assert body[0]["full_name"] == "Resigned One"
 
 
 def test_archive_status_filter_and_search(client, db_session):
     headers = _owner_headers(client, db_session)
-    _seed(db_session, "Suspended One", "01000000002", "suspended")
+    _seed(db_session, "On Vacation One", "01000000002", "suspended")
     _seed(db_session, "Resigned One", "01000000003", "resigned")
 
+    resp = client.get(
+        "/api/v1/employees/archive", params={"status": "resigned"}, headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert [e["full_name"] for e in resp.json()] == ["Resigned One"]
+
+    # "suspended" is no longer an archived status, so the filter cannot carve a
+    # vacationer out of the archive — there is nothing of them in it to begin
+    # with.
     resp = client.get(
         "/api/v1/employees/archive", params={"status": "suspended"}, headers=headers
     )
     assert resp.status_code == 200, resp.text
-    assert len(resp.json()) == 1
-    assert resp.json()[0]["status"] == "suspended"
+    assert [e["full_name"] for e in resp.json()] == ["Resigned One"]
 
     resp = client.get(
         "/api/v1/employees/archive", params={"q": "Resigned"}, headers=headers

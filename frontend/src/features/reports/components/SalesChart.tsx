@@ -1,3 +1,5 @@
+import { BarChart3 } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   Bar,
   BarChart,
@@ -35,8 +37,13 @@ export function SalesChart({ rows }: { rows: SalesChartRow[] }) {
 
   if (!data.length) {
     return (
-      <div className="h-[280px] sm:h-[320px] rounded-2xl border border-dashed flex items-center justify-center text-sm font-bold text-muted">
-        لا توجد بيانات للعرض البياني
+      <div className="h-[280px] sm:h-[320px]">
+        <EmptyState
+          variant="section"
+          icon={BarChart3}
+          title="لا توجد بيانات"
+          message="لا توجد بيانات للعرض البياني."
+        />
       </div>
     );
   }
@@ -69,7 +76,7 @@ export function SalesChart({ rows }: { rows: SalesChartRow[] }) {
             orientation="right"
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "var(--text)", fontSize: 12, fontWeight: 700 }}
+            tick={{ fill: "var(--text-muted)", fontSize: 12, fontWeight: 700 }}
             width={110}
           />
           <Tooltip

@@ -4,7 +4,6 @@ import {
   CreditCard,
   LayoutGrid,
   Plus,
-  UserPlus,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,13 +12,11 @@ export default function BookingsHeaderActions({
   viewMode,
   setViewMode,
   onNavigate,
-  onWalkIn,
   onCreate,
 }: {
   viewMode: string;
   setViewMode: (v: string) => void;
   onNavigate: (path: string) => void;
-  onWalkIn: () => void;
   onCreate: () => void;
 }) {
   return (
@@ -66,15 +63,6 @@ export default function BookingsHeaderActions({
       >
         <Clock size={16} />
         <span className="whitespace-nowrap">المخطط الزمني</span>
-      </Button>
-
-      <Button
-        variant="outline"
-        onClick={onWalkIn}
-        className="h-10 sm:h-11 px-3 sm:px-5 text-xs font-black flex items-center gap-2 shrink-0 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
-      >
-        <UserPlus size={16} />
-        <span className="whitespace-nowrap">عميل مشاة</span>
       </Button>
 
       <Button

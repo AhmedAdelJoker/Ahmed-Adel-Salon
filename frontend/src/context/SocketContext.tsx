@@ -9,15 +9,38 @@ import {
   type ReactNode,
 } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
+
 import { useAuth } from "@/context/AuthContext";
 import type { AuthUser } from "@/context/AuthContext";
 import api from "@/services/api";
+import { keysForSocketEvent } from "@/lib/queryKeys";
+import { needsTwoFactorEnrollment } from "@/lib/auth/twoFactorEnrollment";
 import type { ID } from "@/types/common";
 
 export interface NotificationItem {
   id?: ID;
   message?: string;
   [key: string]: unknown;
+}
+
+/**
+ * Maps a socket event to the query keys it invalidates.
+ *
+ * The 30s auto-refresh in `App.tsx` deliberately invalidates *everything*, so
+ * this is an optimisation for responsiveness, not for correctness: a live
+ * event refreshes only the affected slices immediately, and the periodic sweep
+ * still acts as the safety net if an event is missed or dropped.
+ */
+function invalidateForEvent(
+  queryClient: ReturnType<typeof useQueryClient>,
+  data: NotificationItem,
+): void {
+  const keys = keysForSocketEvent(data);
+  if (keys.length === 0) return;
+  for (const key of keys) {
+    void queryClient.invalidateQueries({ queryKey: key });
+  }
 }
 
 export interface SocketContextValue {
@@ -34,18 +57,26 @@ function getUserId(user: AuthUser | null | undefined): ID | null {
 }
 
 function buildSocketUrl(userId: ID): string {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  // على file:// (تطبيق Electron) يكون hostname فارغاً — نرجع للمحلي
-  const host = window.location.hostname || "127.0.0.1";
-  const port = import.meta?.env?.VITE_WS_PORT || "8000";
   const basePath =
-    import.meta?.env?.VITE_WS_NOTIFICATIONS_PATH || "/api/v1/notifications/ws";
+    import.meta.env.VITE_WS_NOTIFICATIONS_PATH || "/api/v1/notifications/ws";
+  const configuredBase = import.meta.env.VITE_WS_URL?.replace(/\/$/, "");
+  if (configuredBase) {
+    return `${configuredBase}${basePath}/${userId}`;
+  }
 
-  return `${protocol}//${host}:${port}${basePath}/${userId}`;
+  const isElectron = window.location.protocol === "file:";
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const host = window.location.hostname || "127.0.0.1";
+  const port =
+    import.meta.env.VITE_WS_PORT || (isElectron ? "8000" : window.location.port);
+  const authority = port ? `${host}:${port}` : host;
+
+  return `${protocol}//${authority}${basePath}/${userId}`;
 }
 
 export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const { user, currentUser, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const activeUser = currentUser || user;
   const userId = getUserId(activeUser);
 
@@ -59,6 +90,10 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   // Fallback polling for notifications
   const pollNotifications = useCallback(async () => {
     if (!isAuthenticated || !userId || wsEnabledRef.current) return;
+    // Notifications are not reachable from an enrolment-only session; asking
+    // for them just produces a 403 every cycle. No notification the user has to
+    // act on can arrive before they have finished enrolling anyway.
+    if (needsTwoFactorEnrollment()) return;
     try {
       const res = await api.get("/notifications", {
         params: { page: 1, page_size: 20, unread_only: true },
@@ -83,6 +118,16 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         socketRef.current = null;
       }
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      setConnected(false);
+      return undefined;
+    }
+
+    // A blocked session cannot open the notification socket, and the backend
+    // rejects the handshake just as it rejects the REST calls. Connecting anyway
+    // produced a failed handshake plus a retry loop; and the poll fallback that
+    // took over from it then 403'd on a 30-second timer. Nothing is lost by not
+    // connecting: the user has no notifications to receive until they enrol.
+    if (needsTwoFactorEnrollment()) {
       setConnected(false);
       return undefined;
     }
@@ -135,6 +180,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         try {
           const data = JSON.parse(event.data);
           setNotifications((prev) => [data, ...prev]);
+          invalidateForEvent(queryClient, data);
 
           if (
             typeof Notification !== "undefined" &&

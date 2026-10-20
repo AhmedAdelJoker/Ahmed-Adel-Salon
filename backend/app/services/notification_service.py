@@ -11,18 +11,18 @@ def create_notification(
     user_id: int,
     title: str,
     message: str,
-    type: str = "info",
+    commit: bool = True,
 ):
     item = Notification(
         user_id=user_id,
         title=title,
         message=message,
-        type=type,
         is_read=False,
     )
     db.add(item)
-    db.commit()
-    db.refresh(item)
+    if commit:
+        db.commit()
+        db.refresh(item)
     return item
 
 

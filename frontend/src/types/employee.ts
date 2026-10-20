@@ -21,6 +21,11 @@ export interface EmployeeRecord {
   phone_primary?: string;
   phoneSecondary?: string;
   phone_secondary?: string;
+  /** The employee's own address, separate from the login account's email. */
+  email?: string;
+  /** Only meaningful for temporary/part-time hires. */
+  contractEndDate?: string;
+  contract_end_date?: string;
   profileImageUrl?: string;
   profile_image_url?: string;
   bioAr?: string;

@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { PageShell } from "@/components/shared/PageShell";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +53,7 @@ import {
 } from "@/components/ui/table";
 
 const BarberEarnings = () => {
+  const { locale } = useAppLocale();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [earnings, setEarnings] = useState({
@@ -63,6 +65,10 @@ const BarberEarnings = () => {
     cash: 0,
     card: 0,
     transfer: 0,
+    // Payment methods outside the known vocabulary (`split`, and anything a
+    // shop configures later). Previously absent here and silently dropped from
+    // the chart, so the slices did not sum to the day's real total.
+    other: 0,
     total_sales: 0,
   });
    
@@ -97,8 +103,8 @@ const BarberEarnings = () => {
   }, [fetchEarnings]);
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <PageHeader
           title="الأرباح والعمولات"
           subtitle="متابعة تفصيلية لدخلك وعمولاتك"
@@ -112,11 +118,11 @@ const BarberEarnings = () => {
                 className="h-10 rounded-xl px-3"
                 onClick={fetchEarnings}
               >
-                <RefreshCw size={14} className="ml-1.5" />
+                <RefreshCw size={14} className="ms-1.5" />
                 <span className="hidden sm:inline">تحديث</span>
               </Button>
               <Button variant="outline" className="h-10 rounded-xl px-3">
-                <Download size={14} className="ml-1.5" />
+                <Download size={14} className="ms-1.5" />
                 <span className="hidden sm:inline">تصدير</span>
               </Button>
             </div>
@@ -224,19 +230,19 @@ const BarberEarnings = () => {
               value="overview"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <TrendingUp size={14} className="ml-1.5" /> نظرة عامة
+              <TrendingUp size={14} className="ms-1.5" /> نظرة عامة
             </TabsTrigger>
             <TabsTrigger
               value="commissions"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Wallet size={14} className="ml-1.5" /> العمولات
+              <Wallet size={14} className="ms-1.5" /> العمولات
             </TabsTrigger>
             <TabsTrigger
               value="chart"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <PieIcon size={14} className="ml-1.5" /> الرسوم البيانية
+              <PieIcon size={14} className="ms-1.5" /> الرسوم البيانية
             </TabsTrigger>
           </TabsList>
 
@@ -262,14 +268,14 @@ const BarberEarnings = () => {
                       <Tooltip
                         formatter={(v) => [formatCurrency(v), "إيرادات"]}
                         labelFormatter={(v) =>
-                          new Date(v).toLocaleDateString("ar-EG")
+                          new Date(v).toLocaleDateString(locale)
                         }
                       />
                       <Area
                         type="monotone"
                         dataKey="revenue"
-                        stroke="#10b981"
-                        fill="#10b981"
+                        stroke="var(--primary)"
+                        fill="var(--primary)"
                         fillOpacity={0.15}
                         strokeWidth={2}
                       />
@@ -291,17 +297,27 @@ const BarberEarnings = () => {
                           {
                             name: "نقدي",
                             value: earnings.cash || 0,
-                            color: "#10b981",
+                            color: "var(--chart-3)",
                           },
                           {
                             name: "بطاقة",
                             value: earnings.card || 0,
-                            color: "#3b82f6",
+                            color: "var(--chart-2)",
                           },
                           {
                             name: "تحويل",
                             value: earnings.transfer || 0,
-                            color: "#8b5cf6",
+                            color: "var(--chart-5)",
+                          },
+                          // Any payment method outside the known vocabulary
+                          // (`split`, and whatever a shop adds later) is
+                          // reported by the API as `other`. Rendering it keeps
+                          // the chart adding up to the day's real total instead
+                          // of quietly dropping an unknown share.
+                          {
+                            name: "أخرى",
+                            value: earnings.other || 0,
+                            color: "var(--chart-4)",
                           },
                         ].filter((d) => d.value > 0)}
                         cx="50%"
@@ -311,9 +327,10 @@ const BarberEarnings = () => {
                         dataKey="value"
                       >
                         {[
-                          { color: "#10b981" },
-                          { color: "#3b82f6" },
-                          { color: "#8b5cf6" },
+                          { color: "var(--chart-3)" },
+                          { color: "var(--chart-2)" },
+                          { color: "var(--chart-5)" },
+                          { color: "var(--chart-4)" },
                         ].map((e, i) => (
                           <Cell key={i} fill={e.color} />
                         ))}
@@ -416,7 +433,7 @@ const BarberEarnings = () => {
                       commissions.map((c, i) => (
                         <TableRow key={i}>
                           <TableCell className="text-[10px] font-bold text-muted">
-                            {new Date(c.date).toLocaleDateString("ar-EG")}
+                            {new Date(c.date).toLocaleDateString(locale)}
                           </TableCell>
                           <TableCell className="font-black text-main">
                             {c.customer_name}
@@ -473,7 +490,7 @@ const BarberEarnings = () => {
                       />
                       <Bar
                         dataKey="revenue"
-                        fill="#6366f1"
+                        fill="var(--primary)"
                         radius={[8, 8, 0, 0]}
                       />
                     </BarChart>
@@ -499,7 +516,7 @@ const BarberEarnings = () => {
                       <Line
                         type="monotone"
                         dataKey="revenue"
-                        stroke="#10b981"
+                        stroke="var(--primary)"
                         strokeWidth={3}
                         dot={{ r: 4 }}
                       />
@@ -508,14 +525,14 @@ const BarberEarnings = () => {
                 </div>
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
-      </div>
+            </TabsContent>
+          </Tabs>
+      </PageShell>
     </div>
   );
 };
-
 import api from "@/services/api";
 import { Badge } from "@/components/ui/badge";
+import { useAppLocale } from "@/hooks/useAppLocale";
 
 export default BarberEarnings;

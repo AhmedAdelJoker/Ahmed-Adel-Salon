@@ -2,9 +2,14 @@
 import { motion } from "framer-motion";
 import { History, Trash2 } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
-import { formatCurrency } from "@/lib/core/utils";
-import { customerId, customerName, getInitials } from "@/features/customers/utils/customer";
-import { EmptyState } from "@/components/shared";
+import { cn, formatCurrency } from "@/lib/core/utils";
+import {
+  customerId,
+  customerName,
+  getInitials,
+  getTierInfo,
+} from "@/features/customers/utils/customer";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function CustomerCards({
   rows,
@@ -36,7 +41,9 @@ export default function CustomerCards({
   return (
           <div className="p-3 sm:p-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {rows.map((customer, index) => (
+              {rows.map((customer, index) => {
+                const tier = getTierInfo(customer.current_tier);
+                return (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -51,9 +58,20 @@ export default function CustomerCards({
                         {getInitials(customerName(customer))}
                       </div>
                       <div>
-                        <h3 className="font-black text-sm text-main leading-tight">
-                          {customerName(customer)}
-                        </h3>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-black text-sm text-main leading-tight">
+                            {customerName(customer)}
+                          </h3>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[8px] font-black",
+                              tier.bg,
+                              tier.color,
+                            )}
+                          >
+                            <tier.icon size={9} /> {tier.label}
+                          </span>
+                        </div>
                         <p className="text-[9px] font-bold text-muted">
                           #{customerId(customer) || "---"}
                         </p>
@@ -94,7 +112,7 @@ export default function CustomerCards({
                         onOpenDetails(customer);
                       }}
                     >
-                      <History className="h-3.5 w-3.5 ml-1.5" /> السجل
+                      <History className="h-3.5 w-3.5 ms-1.5" /> السجل
                     </Button>
                     {isOwner && (
                       <Button
@@ -109,8 +127,9 @@ export default function CustomerCards({
                       </Button>
                     )}
                   </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
             {rows.length === 0 && (
               <EmptyState

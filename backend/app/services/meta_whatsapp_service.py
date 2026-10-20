@@ -9,6 +9,7 @@ from datetime import datetime
 
 from app.core.config import settings
 from app.models.notification_log import NotificationLog
+from app.core.clock import utc_now_naive
 
 
 def _graph_base() -> str:
@@ -184,7 +185,7 @@ def update_logs_from_webhook_payload(db: Session, payload: dict[str, Any]) -> in
                 mapped_status = status_item.get("status") or log.status
                 log.status = mapped_status
                 if mapped_status in {"sent", "delivered", "read"}:
-                    log.sent_at = log.sent_at or datetime.utcnow()
+                    log.sent_at = log.sent_at or utc_now_naive()
                 errors = status_item.get("errors")
                 if isinstance(errors, list) and errors:
                     first_error = errors[0]

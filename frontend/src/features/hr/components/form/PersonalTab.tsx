@@ -2,12 +2,25 @@
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 import type { EmployeeRecord } from "@/types/employee";
 import { Input } from "@/components/ui/input";
-import { User, Phone, ShieldCheck, Calendar, MapPin, FileText, ImageIcon, Activity, Plus, X } from "lucide-react";
+import { User, Phone, ShieldCheck, Calendar, MapPin, FileText, ImageIcon, Activity, Plus, X, CheckCircle2, Mail } from "lucide-react";
 import {
   FIELD_LABEL_CLASS,
   FIELD_INPUT_CLASS,
   FIELD_TEXTAREA_CLASS,
 } from "@/features/hr";
+import {
+  validatePhone,
+  validateEmployeeEmail,
+  normalizePhoneTyping,
+  MAX_PHONE_DIGITS,
+} from "@/features/hr/utils/phone";
+import {
+  analyzeNationalId,
+  NATIONAL_ID_LENGTH,
+} from "@/features/hr/utils/nationalId";
+import { normalizeNumericInput } from "@/features/hr/utils/digits";
+import { validatePersonName, NAME_MAX } from "@/features/hr/utils/validators";
+import FieldError from "./FieldError";
 
 export default function PersonalTab({
   formData,
@@ -26,6 +39,42 @@ export default function PersonalTab({
   onImageChange: (e: ChangeEvent<HTMLInputElement>) => void;
   blueprint: { title: string };
 }) {
+  // An empty field is not an error while the owner is still filling it in; only
+  // speak up once something has been typed and looks wrong.
+  const typedName = String(formData.fullName ?? "").trim();
+  const nameError = typedName ? validatePersonName(typedName) : null;
+  const typedPhone = String(formData.phonePrimary ?? "").trim();
+  const phoneError = typedPhone ? validatePhone(typedPhone) : null;
+  const typedEmail = String(formData.email ?? "").trim();
+  const emailError = typedEmail ? validateEmployeeEmail(typedEmail) : null;
+
+  const idAnalysis = analyzeNationalId(formData.nationalId);
+  const idError = idAnalysis.error;
+  /*
+    The id knows the birth date. When both are present and disagree, one of them
+    was mistyped — say which date the id implies rather than just "mismatch", so
+    the fix does not require decoding the number by hand.
+  */
+  const birthMismatch =
+    idAnalysis.info && formData.birthDate && formData.birthDate !== idAnalysis.info.birthDate
+      ? `تاريخ الميلاد لا يطابق الرقم القومي (${idAnalysis.info.birthDate})`
+      : null;
+
+  const handleNationalIdChange = (raw: string) => {
+    const value = normalizeNumericInput(raw, NATIONAL_ID_LENGTH);
+    const analysis = analyzeNationalId(value);
+    setFormData((prev) => ({
+      ...prev,
+      nationalId: value,
+      // Fill the birth date only when it is empty: an owner who deliberately
+      // corrected it must not have their correction overwritten on a re-type.
+      birthDate:
+        analysis.info && !String(prev.birthDate ?? "").trim()
+          ? analysis.info.birthDate
+          : prev.birthDate,
+    }));
+  };
+
   return (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col items-center gap-5">
@@ -97,7 +146,13 @@ export default function PersonalTab({
                   }
                   className={FIELD_INPUT_CLASS}
                   placeholder="أدخل الاسم الثلاثي..."
+                  maxLength={NAME_MAX}
+                  aria-invalid={Boolean(nameError)}
+                  aria-describedby={nameError ? "employee-name-error" : undefined}
                 />
+                {nameError && (
+                  <FieldError id="employee-name-error">{nameError}</FieldError>
+                )}
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
@@ -106,12 +161,49 @@ export default function PersonalTab({
                 <Input
                   value={formData.phonePrimary}
                   onChange={(e) =>
-                    setFormData({ ...formData, phonePrimary: e.target.value })
+                    setFormData({
+                      ...formData,
+                      phonePrimary: normalizePhoneTyping(e.target.value),
+                    })
                   }
                   className={FIELD_INPUT_CLASS}
                   dir="ltr"
+                  inputMode="numeric"
+                  maxLength={MAX_PHONE_DIGITS}
+                  autoComplete="off"
                   placeholder="01xxxxxxxxx"
+                  aria-invalid={Boolean(phoneError)}
+                  aria-describedby={phoneError ? "phone-primary-error" : undefined}
                 />
+                {/*
+                  Validate as they type rather than only at submit: a mistyped
+                  number used to look exactly like a correct one until the save
+                  bounced, and the owner had no idea which of eleven digits was
+                  wrong. Only shown once there is something to say.
+                */}
+                {phoneError && (
+                  <FieldError id="phone-primary-error">{phoneError}</FieldError>
+                )}
+              </div>
+              <div className="space-y-2">
+                <label className={FIELD_LABEL_CLASS}>
+                  <Mail size={14} /> البريد الإلكتروني
+                </label>
+                <Input
+                  type="email"
+                  value={String(formData.email ?? "")}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  className={FIELD_INPUT_CLASS}
+                  dir="ltr"
+                  placeholder="name@example.com"
+                  aria-invalid={Boolean(emailError)}
+                  aria-describedby={emailError ? "employee-email-error" : undefined}
+                />
+                {emailError && (
+                  <FieldError id="employee-email-error">{emailError}</FieldError>
+                )}
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
@@ -119,12 +211,34 @@ export default function PersonalTab({
                 </label>
                 <Input
                   value={formData.nationalId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nationalId: e.target.value })
-                  }
+                  onChange={(e) => handleNationalIdChange(e.target.value)}
                   className={FIELD_INPUT_CLASS}
                   dir="ltr"
+                  inputMode="numeric"
+                  maxLength={NATIONAL_ID_LENGTH}
+                  autoComplete="off"
+                  placeholder="xxxxxxxxxxxxxx"
+                  aria-invalid={Boolean(idError)}
+                  aria-describedby={idError ? "national-id-error" : undefined}
                 />
+                {idError ? (
+                  <FieldError id="national-id-error">{idError}</FieldError>
+                ) : idAnalysis.info ? (
+                  /*
+                    A valid id already carries the birth date and the issuing
+                    governorate. Showing them back is proof the number was read
+                    as intended — and a free way to catch a wrong governorate.
+                  */
+                  <p className="flex items-center gap-1.5 text-xs font-bold text-success">
+                    <CheckCircle2 size={13} className="shrink-0" aria-hidden="true" />
+                    مولود في {idAnalysis.info.birthDate} — {idAnalysis.info.governorateName}
+                  </p>
+                ) : (
+                  <p className="text-[11px] font-bold text-muted">
+                    {NATIONAL_ID_LENGTH} رقمًا تبدأ بـ 2 أو 3 — يُستخرج منها تاريخ
+                    الميلاد تلقائيًا
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
@@ -137,7 +251,12 @@ export default function PersonalTab({
                     setFormData({ ...formData, birthDate: e.target.value })
                   }
                   className={FIELD_INPUT_CLASS}
+                  aria-invalid={Boolean(birthMismatch)}
+                  aria-describedby={birthMismatch ? "birth-date-error" : undefined}
                 />
+                {birthMismatch && (
+                  <FieldError id="birth-date-error">{birthMismatch}</FieldError>
+                )}
               </div>
               <div className="md:col-span-2 space-y-2">
                 <label className={FIELD_LABEL_CLASS}>

@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import { cn, formatCurrency, formatNumber } from "@/lib/core/utils";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import {
   PageHeader,
@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/select";
 import { staticURL } from "@/services/api";
 import { useProductBundles } from "@/features/product-bundles";
+import { currencyLabel } from "@/lib/core/currency";
 
 function resolveBundleImage(offer: any): string {
   if (!offer?.image_url) return "";
@@ -59,6 +60,8 @@ export default function ProductBundles() {
   const navigate = useNavigate();
   const {
     offers,
+    products,
+    services,
     loading,
     isModalOpen,
     setIsModalOpen,
@@ -76,6 +79,7 @@ export default function ProductBundles() {
     handleImageUpload,
     handleAddProductToBundle,
     handleRemoveProduct,
+    handleToggleService,
     handleSave,
     handleDeleteOffer,
     handleToggleActive,
@@ -194,7 +198,7 @@ export default function ProductBundles() {
               onClick={openCreate}
               className="h-11 rounded-xl px-5 font-black shadow-lg shadow-primary/20"
             >
-              <Gift size={16} className="ml-1.5" /> إنشاء باقة
+              <Gift size={16} className="ms-1.5" /> إنشاء باقة
             </Button>
           </div>
         }
@@ -224,7 +228,7 @@ export default function ProductBundles() {
               variant="ghost"
               size="sm"
               onClick={handleResetFilters}
-              className="mr-auto h-8 gap-1 rounded-xl text-xs font-black"
+              className="me-auto h-8 gap-1 rounded-xl text-xs font-black"
             >
               <RotateCcw size={12} /> إعادة ضبط
             </Button>
@@ -243,7 +247,7 @@ export default function ProductBundles() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="ابحث باسم الحزمة أو الوصف..."
                 aria-label="بحث في الحزم"
-                className="h-11 pr-10 rounded-xl bg-soft border-border font-bold"
+                className="h-11 pe-10 rounded-xl bg-soft border-border font-bold"
               />
             </div>
           </div>
@@ -336,7 +340,7 @@ export default function ProductBundles() {
                   <div className="space-y-2 flex-1">
                     <div className="text-[10px] font-black text-muted uppercase tracking-widest flex items-center gap-1.5">
                       <Package size={12} className="text-primary" /> محتويات الحزمة
-                      <span className="mr-auto tabular-nums text-[10px] bg-soft border border-border rounded-full px-2 py-0.5">
+                      <span className="me-auto tabular-nums text-[10px] bg-soft border border-border rounded-full px-2 py-0.5">
                         {offer.offer_products?.length || 0}
                       </span>
                     </div>
@@ -416,9 +420,9 @@ export default function ProductBundles() {
                       {togglingId === offer.id ? (
                         <RefreshCw size={14} className="animate-spin" />
                       ) : isOffActive ? (
-                        <PowerOff size={14} className="ml-1" />
+                        <PowerOff size={14} className="ms-1" />
                       ) : (
-                        <Power size={14} className="ml-1" />
+                        <Power size={14} className="ms-1" />
                       )}
                       <span className="hidden xs:inline">{isOffActive ? "تعطيل" : "تفعيل"}</span>
                     </Button>
@@ -441,7 +445,7 @@ export default function ProductBundles() {
             {offers.length === 0 ? (
               <EmptyState
                 title="لا توجد عروض منتجات"
-                text="ابدأ بإنشاء أول حزمة منتجات (Bundle) لزيادة مبيعاتك وتفريغ المخزون الراكد."
+                message="ابدأ بإنشاء أول حزمة منتجات (Bundle) لزيادة مبيعاتك وتفريغ المخزون الراكد."
                 icon={Gift}
                 action={
                   <Button onClick={openCreate} className="h-11 rounded-xl px-6 font-black">
@@ -452,11 +456,11 @@ export default function ProductBundles() {
             ) : (
               <EmptyState
                 title="لا نتائج"
-                text="لم نجد حزماً تطابق بحثك — جرب توسيع الفلتر أو مسح البحث."
+                message="لم نجد حزماً تطابق بحثك — جرب توسيع الفلتر أو مسح البحث."
                 icon={Search}
                 action={
                   <Button variant="outline" onClick={handleResetFilters} className="h-10 rounded-xl font-black">
-                    <RotateCcw size={14} className="ml-1.5" /> مسح الفلترة
+                    <RotateCcw size={14} className="ms-1.5" /> مسح الفلترة
                   </Button>
                 }
               />
@@ -489,7 +493,7 @@ export default function ProductBundles() {
               </div>
               <span className="truncate">{editingId ? "تعديل حزمة المنتجات" : "هندسة حزمة منتجات احترافية"}</span>
             </DialogTitle>
-            <DialogDescription className="text-muted font-bold mt-2 mr-[52px] text-xs sm:text-sm">
+            <DialogDescription className="text-muted font-bold mt-2 me-[52px] text-xs sm:text-sm">
               قم بدمج المنتجات وتحديد السعر التنافسي لجذب العملاء.
             </DialogDescription>
           </DialogHeader>
@@ -573,6 +577,38 @@ export default function ProductBundles() {
                 </label>
               </div>
 
+              {/*
+                The validity window. The catalog's offer form owned these and this
+                page did not, so an offer created here kept whatever dates the
+                other page happened to leave — usually none.
+              */}
+              <div className="space-y-3">
+                <span className="text-[10px] font-black text-muted uppercase tracking-widest">نافذة الصلاحية</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-black text-main">من تاريخ</span>
+                    <Input
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) => setFormData((p: any) => ({ ...p, startDate: e.target.value }))}
+                      className="h-12 rounded-xl font-bold border-border bg-card"
+                    />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-black text-main">إلى تاريخ</span>
+                    <Input
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) => setFormData((p: any) => ({ ...p, endDate: e.target.value }))}
+                      className="h-12 rounded-xl font-bold border-border bg-card"
+                    />
+                  </label>
+                </div>
+                {formData.startDate && formData.endDate && formData.endDate < formData.startDate && (
+                  <p className="text-[11px] font-bold text-danger">تاريخ النهاية قبل تاريخ البداية.</p>
+                )}
+              </div>
+
               <div className="p-5 sm:p-6 rounded-[1.6rem] bg-success-soft/50 border border-success/15 space-y-4">
                 <h4 className="font-black text-success flex items-center gap-2 text-sm">
                   <Tag size={16} /> خوارزمية التسعير
@@ -596,14 +632,12 @@ export default function ProductBundles() {
                       value={formData.offer_price}
                       onChange={(e) => setFormData((p: any) => ({ ...p, offer_price: e.target.value }))}
                       className={cn(
-                        "h-14 rounded-xl font-black text-xl tabular-nums pl-14 pr-4 bg-card",
+                        "h-14 rounded-xl font-black text-xl tabular-nums ps-14 pe-4 bg-card",
                         isPriceInvalid ? "border-danger focus:border-danger text-danger" : "border-border focus:border-primary",
                       )}
                       placeholder="0.00"
                     />
-                    <div className={cn("absolute left-4 top-1/2 -translate-y-1/2 font-black text-sm", isPriceInvalid ? "text-danger" : "text-muted")}>
-                      ج.م
-                    </div>
+                    <div className={cn("absolute left-4 top-1/2 -translate-y-1/2 font-black text-sm", isPriceInvalid ? "text-danger" : "text-muted")}>{currencyLabel()}</div>
                   </div>
                   {isPriceInvalid && <p className="text-[11px] font-bold text-danger">لا يمكن أن يتجاوز {formatCurrency(totalPrice)}</p>}
                   {!isPriceInvalid && !isPriceEmpty && totalPrice === 0 && (
@@ -773,6 +807,56 @@ export default function ProductBundles() {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/*
+                The services this offer covers. The catalog's offer form owned
+                these and this page did not, so an offer created here lost its
+                services to the other page. One page now owns the whole offer.
+              */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-muted uppercase tracking-widest">الخدمات المشمولة</span>
+                  <span className="text-[10px] font-bold text-muted tabular-nums">
+                    {formData.serviceIds.length} مختارة
+                  </span>
+                </div>
+                {services.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto custom-scrollbar p-1 border border-border rounded-2xl">
+                    {services.map((s: any) => {
+                      const selected = formData.serviceIds.includes(s.id);
+                      return (
+                        <label
+                          key={s.id}
+                          className={cn(
+                            "flex items-center justify-between gap-3 p-3 rounded-xl border cursor-pointer transition-colors",
+                            selected
+                              ? "bg-primary-soft border-primary/30"
+                              : "bg-card border-border hover:border-primary/20",
+                          )}
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-xs font-black truncate">{s.name_ar || s.name}</span>
+                            {s.duration_minutes ? (
+                              <span className="block text-[10px] font-bold opacity-70">{s.duration_minutes} دقيقة</span>
+                            ) : null}
+                          </span>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-primary shrink-0"
+                            checked={selected}
+                            onChange={() => handleToggleService(s.id)}
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs font-bold text-muted">لا توجد خدمات في الكتالوج بعد.</p>
+                )}
+                <p className="text-[10px] font-bold leading-relaxed text-muted">
+                  العرض يحتاج منتجاً أو خدمة واحدة على الأقل.
+                </p>
               </div>
             </div>
           </div>

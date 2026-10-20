@@ -6,6 +6,7 @@ import type {
   CalendarDay,
   StatusVariant,
 } from "@/features/barber-bookings/hooks/useBarberBookings";
+import { useAppLocale } from "@/hooks/useAppLocale";
 
 interface CalendarViewProps {
   calendarMonth: Date;
@@ -28,6 +29,8 @@ export const CalendarView = ({
   statusLabels,
   statusColors,
 }: CalendarViewProps) => {
+  const { locale } = useAppLocale();
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
@@ -46,7 +49,7 @@ export const CalendarView = ({
             <ChevronRight size={16} />
           </button>
           <span className="text-sm font-black text-main">
-            {calendarMonth.toLocaleDateString("ar-EG", {
+            {calendarMonth.toLocaleDateString(locale, {
               year: "numeric",
               month: "long",
             })}
@@ -125,7 +128,7 @@ export const CalendarView = ({
           <div className="p-4 border-b border-border">
             <h3 className="text-sm font-black text-main">
               مواعيد{" "}
-              {new Date(selectedDate).toLocaleDateString("ar-EG", {
+              {new Date(selectedDate).toLocaleDateString(locale, {
                 weekday: "long",
                 day: "numeric",
                 month: "long",

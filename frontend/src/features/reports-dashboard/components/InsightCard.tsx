@@ -39,7 +39,7 @@ export function InsightCard({ icon: Icon, iconColor, title, description, actionL
         onClick={onAction}
         aria-label={actionLabel}
       >
-        {actionLabel} <ArrowRight size={12} className="ml-1" aria-hidden="true" />
+        {actionLabel} <ArrowRight size={12} className="ms-1" aria-hidden="true" />
       </Button>
     </div>
   );

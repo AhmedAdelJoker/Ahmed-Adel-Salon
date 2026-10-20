@@ -4,11 +4,12 @@ from sqlalchemy.orm import Session
 from app.models.appointment import Appointment
 from app.models.business_settings import BusinessSettings
 from app.models.employee import Employee
+from app.core.working_hours import resolve_window
 
 def get_available_time_slots(
     db: Session, 
     barber_id: int, 
-    target_date: date, 
+    target_date: date,
     slot_duration: int = 30
 ) -> List[Dict]:
     """
@@ -18,22 +19,13 @@ def get_available_time_slots(
     settings = db.query(BusinessSettings).first()
     if not settings or not settings.working_hours:
         return []
-    
-    day_name = target_date.strftime("%A").lower()
-    day_config = settings.working_hours.get(day_name)
-    
-    if not day_config or not day_config.get("is_open"):
+
+    window = resolve_window(settings.working_hours, target_date)
+    if window is None:
         return []
-        
-    open_time_str = day_config.get("open_time")
-    close_time_str = day_config.get("close_time")
-    
-    if not open_time_str or not close_time_str:
-        return []
-        
-    open_time = datetime.strptime(open_time_str, "%H:%M").time()
-    close_time = datetime.strptime(close_time_str, "%H:%M").time()
-    
+
+    _day_config, shop_open_dt, shop_close_dt = window
+
     # 2. Get existing appointments for this barber on this date
     existing_appts = db.query(Appointment).filter(
         Appointment.barber_id == barber_id,
@@ -51,8 +43,7 @@ def get_available_time_slots(
     
     # 3. Generate slots
     slots = []
-    current_slot_start = datetime.combine(target_date, open_time)
-    shop_close_dt = datetime.combine(target_date, close_time)
+    current_slot_start = shop_open_dt
     
     while current_slot_start + timedelta(minutes=slot_duration) <= shop_close_dt:
         slot_end = current_slot_start + timedelta(minutes=slot_duration)

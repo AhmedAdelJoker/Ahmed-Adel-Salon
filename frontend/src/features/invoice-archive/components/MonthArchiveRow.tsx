@@ -60,7 +60,7 @@ export function MonthInvoiceRow({
   return (
     <div className="grid grid-cols-2 items-center gap-3 rounded-xl border border-border/50 bg-card px-4 py-2.5 transition-colors hover:border-primary/30 hover:bg-primary/[0.03] md:grid-cols-12">
       <span className="col-span-1 truncate text-[11px] font-black tabular-nums text-main md:col-span-2">
-        <FileText size={10} className="ml-1 inline text-primary" />
+        <FileText size={10} className="ms-1 inline text-primary" />
         {invoice.invoice_no}
       </span>
       <span className="col-span-1 flex items-center gap-1.5 truncate text-[11px] font-bold text-main md:col-span-3">
@@ -78,7 +78,7 @@ export function MonthInvoiceRow({
               month: "short",
             })
           : "-"}
-        <span className="mr-1 text-[9px] opacity-70">{formatTime(invoice.created_at)}</span>
+        <span className="me-1 text-[9px] opacity-70">{formatTime(invoice.created_at)}</span>
       </span>
       <span className="col-span-1 hidden md:block md:col-span-1">
         <span className="inline-flex items-center gap-1 rounded-md bg-soft px-1.5 py-0.5 text-[9px] font-black text-muted">
@@ -183,7 +183,7 @@ export function MonthArchiveRow({
           </p>
         </div>
 
-        <div className="mr-auto flex items-center gap-6">
+        <div className="me-auto flex items-center gap-6">
           <div className="hidden min-w-24 text-left sm:block">
             <p className="text-[9px] font-bold uppercase tracking-wider text-muted">
               المبيعات
@@ -391,9 +391,9 @@ export function MonthArchiveRow({
                       onClick={() => onConfirmReopen(month)}
                     >
                       {reopeningMonth === month.key ? (
-                        <Loader className="ml-1.5 h-3.5 w-3.5 animate-spin" />
+                        <Loader className="ms-1.5 h-3.5 w-3.5 animate-spin" />
                       ) : (
-                        <Unlock size={12} className="ml-1.5" />
+                        <Unlock size={12} className="ms-1.5" />
                       )}
                       فتح الشهر للمراجعة
                     </Button>
@@ -404,7 +404,7 @@ export function MonthArchiveRow({
                       disabled={closingMonth === month.key}
                       onClick={() => onConfirmClose(month)}
                     >
-                      <Lock size={12} className="ml-1.5" />
+                      <Lock size={12} className="ms-1.5" />
                       إغلاق الشهر نهائيًا
                     </Button>
                   )}

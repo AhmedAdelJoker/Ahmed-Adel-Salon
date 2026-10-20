@@ -2,6 +2,7 @@ import React from "react";
 import { Lightbulb } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { Sparkles, Target, TrendingUp, Zap } from "lucide-react";
+import { currencyLabel } from "@/lib/core/currency";
 
 export default function AIInsights({ data, isSidebar = false }) {
   if (!data) return null;
@@ -92,9 +93,7 @@ export default function AIInsights({ data, isSidebar = false }) {
             <span className="text-3xl font-black tracking-tighter">
               {Number(data.predicted).toLocaleString()}
             </span>
-            <span className="text-[10px] font-black opacity-80 uppercase">
-              ج.م
-            </span>
+            <span className="text-[10px] font-black opacity-80 uppercase">{currencyLabel()}</span>
           </div>
         </div>
         <div

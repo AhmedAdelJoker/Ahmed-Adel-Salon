@@ -80,7 +80,7 @@ export default function PayrollTable({
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64">
               <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted" />
-              <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="بحث بالاسم..." className="h-10 pr-9 rounded-xl bg-card border-border font-bold text-sm" />
+              <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="بحث بالاسم..." className="h-10 pe-9 rounded-xl bg-card border-border font-bold text-sm" />
             </div>
             <div className="flex bg-soft border border-border p-1 rounded-xl shrink-0">
               <button onClick={() => setViewMode("table")} className={cn("h-8 w-8 rounded-lg flex items-center justify-center", viewMode === "table" ? "bg-card shadow border border-border text-slate-900" : "text-muted")} aria-label="جدول"><ListIcon size={14} /></button>
@@ -164,10 +164,10 @@ export default function PayrollTable({
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 rounded-xl"><MoreVertical size={14} /></Button></DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="rounded-xl w-48">
-                            <DropdownMenuItem onClick={() => exportService.downloadPdf(`/exports/payroll/${row.id}/pdf`, `payslip_${row.employee_name_snapshot}`)} className="font-bold text-xs"><FileSpreadsheet size={12} className="ml-2" /> PDF</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => fetchExpectedNet(row.employee_id as string | number || row.employeeId as string | number)} className="font-bold text-xs"><ShieldCheck size={12} className="ml-2" /> تقرير الانضباط</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openEditModal(row)} className="font-bold text-xs"><Pencil size={12} className="ml-2" /> تعديل يدوي</DropdownMenuItem>
-                            {String(row.status) !== "cancelled" && <DropdownMenuItem onClick={() => setCancelId(row.id as number | string)} className="font-bold text-xs text-rose-600"><Trash2 size={12} className="ml-2" /> إلغاء</DropdownMenuItem>}
+                            <DropdownMenuItem onClick={() => exportService.downloadPdf(`/exports/payroll/${row.id}/pdf`, `payslip_${row.employee_name_snapshot}`)} className="font-bold text-xs"><FileSpreadsheet size={12} className="ms-2" /> PDF</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => fetchExpectedNet(row.employee_id as string | number || row.employeeId as string | number)} className="font-bold text-xs"><ShieldCheck size={12} className="ms-2" /> تقرير الانضباط</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEditModal(row)} className="font-bold text-xs"><Pencil size={12} className="ms-2" /> تعديل يدوي</DropdownMenuItem>
+                            {String(row.status) !== "cancelled" && <DropdownMenuItem onClick={() => setCancelId(row.id as number | string)} className="font-bold text-xs text-rose-600"><Trash2 size={12} className="ms-2" /> إلغاء</DropdownMenuItem>}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

@@ -32,7 +32,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/core/utils";
 import { validateImageSize } from "@/lib/media/upload";
 import { PageHeader, PremiumCard, ContentPanel, SkeletonCard } from "@/components/shared/PremiumUI";
-import TwoFactorPanel from "@/features/security/components/TwoFactorPanel";
+import { TwoFactorPanel } from "@/features/security";
+import { needsTwoFactorEnrollment } from "@/lib/auth/twoFactorEnrollment";
 import { AnimatePresence } from "framer-motion";
 
 const SETTINGS_TABS = [
@@ -65,14 +66,31 @@ export default function Settings() {
   } = usePreferences();
 
   const requestedTab = searchParams.get("tab") as TabId | null;
-  const activeTab: TabId = (SETTINGS_TABS as readonly { id: string }[]).some((t) => t.id === requestedTab)
-    ? (requestedTab as TabId)
-    : "profile";
+  // Default differs by state: normally the profile tab, but an enrolment-only
+  // session cannot open it, so falling back to "profile" would render a tab the
+  // user is not allowed to use. Resolve the fallback against what is reachable.
+  const defaultTab: TabId = needsTwoFactorEnrollment() ? "security" : "profile";
+  const isVisible = (id: string | null): id is TabId =>
+    (SETTINGS_TABS as readonly { id: string }[]).some((t) => t.id === id) &&
+    (needsTwoFactorEnrollment() ? id === "security" : true);
+  // Falls back for a missing tab *and* for one this session may not open -- a
+  // stale `?tab=profile` in the URL, or a bookmark from before the block.
+  const activeTab: TabId = isVisible(requestedTab) ? requestedTab : defaultTab;
 
   const [loading, setLoading] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // While enrolment is pending the session may read nothing but the two 2FA
+  // endpoints, so every other tab is a form that submits into a guaranteed 403
+  // -- uploading an avatar, saving a name, changing a password. Showing them
+  // would invite the user into failures that look like bugs. Restricting the
+  // list is the honest rendering of what the account can actually do.
+  const enrollmentPending = needsTwoFactorEnrollment();
+  const visibleTabs = enrollmentPending
+    ? SETTINGS_TABS.filter((t) => t.id === "security")
+    : SETTINGS_TABS;
 
   const [profileData, setProfileData] = useState({
     fullName: "",
@@ -122,6 +140,13 @@ export default function Settings() {
   }, [profileData, isBarber]);
 
   const fetchProfile = async () => {
+    // Nothing to fetch while enrolling: /profile is one of the endpoints the
+    // restricted session cannot read, and the panel that unblocks the account
+    // does not depend on any of it.
+    if (needsTwoFactorEnrollment()) {
+      setInitialLoading(false);
+      return;
+    }
     try {
       setInitialLoading(true);
       setLoadError(null);
@@ -136,6 +161,13 @@ export default function Settings() {
         profileImageUrl: String(data.profile_image_url || (data as Record<string, unknown>).profileImageUrl || ""),
       });
     } catch {
+      // An enrolment-only session cannot read /profile, and this page is where
+      // the enrolment panel lives. Treating that 403 as a fatal load error
+      // replaced the whole page with "could not load your account", so the user
+      // was shown a retry button for the one endpoint that can never succeed --
+      // and never got to the panel that would unblock them. The rest of the page
+      // renders fine without profile data; the 2FA tab is self-contained.
+      if (needsTwoFactorEnrollment()) return;
       setLoadError("تعذر تحميل بيانات الحساب. تحقق من الاتصال ثم أعد المحاولة.");
     } finally {
       setInitialLoading(false);
@@ -150,7 +182,12 @@ export default function Settings() {
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !validateImageSize(file)) return;
+    // The input is hidden behind a tab that is not rendered while enrolling, so
+    // this cannot normally be reached -- but a stale file input can survive a
+    // state change, and a guaranteed 403 plus a misleading toast is worse than
+    // saying why.
+    if (!file || needsTwoFactorEnrollment()) return;
+    if (!validateImageSize(file)) return;
     const fd = new FormData();
     fd.append("file", file);
     setAvatarLoading(true);
@@ -179,14 +216,17 @@ export default function Settings() {
     }
     setLoading(true);
     try {
-      await api.put("/profile", {
-        full_name: profileData.fullName.trim(),
-        email: profileData.email.trim(),
-        ...(isBarber && {
-          display_name: profileData.displayName.trim() || null,
-          bio_ar: profileData.bioAr.trim() || null,
-        }),
-      });
+          await api.put("/profile", {
+            // `|| null` matches the two fields below: an optional field left
+            // blank must be sent as null, because `""` is not a valid email
+            // and the backend answered 422 for an untouched optional field.
+            full_name: profileData.fullName.trim() || null,
+            email: profileData.email.trim() || null,
+            ...(isBarber && {
+              display_name: profileData.displayName.trim() || null,
+              bio_ar: profileData.bioAr.trim() || null,
+            }),
+          });
       await refreshUser();
       toast.success("تم تحديث الملف الشخصي بنجاح");
     } catch (err) {
@@ -280,7 +320,7 @@ export default function Settings() {
             </Badge>
             {isOwnerLike && (
               <Button variant="outline" onClick={() => navigate("/owner/settings")} className="h-9 rounded-xl px-4 text-xs font-black">
-                <Store size={14} className="ml-1.5" /> إعدادات المحل
+                <Store size={14} className="ms-1.5" /> إعدادات المحل
               </Button>
             )}
           </div>
@@ -344,7 +384,7 @@ export default function Settings() {
             aria-label="أقسام الحساب"
             className="sticky top-24 space-y-1.5 flex lg:flex-col overflow-x-auto p-2 rounded-2xl border border-border/40 bg-card/40 lg:bg-transparent lg:border-none lg:p-0 gap-2 lg:gap-1.5 no-scrollbar snap-x"
           >
-            {SETTINGS_TABS.map((tab) => {
+            {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
@@ -390,14 +430,32 @@ export default function Settings() {
         </aside>
 
         <main className="flex-1 min-w-0">
+          {enrollmentPending && (
+            <div
+              role="status"
+              className="mb-5 flex items-start gap-3 rounded-2xl border border-warning/40 bg-warning/10 p-4"
+            >
+              <Lock size={18} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+              <div className="space-y-1">
+                <p className="text-sm font-black text-main">
+                  يجب تفعيل المصادقة الثنائية قبل استخدام بقية الإعدادات
+                </p>
+                <p className="text-xs font-bold text-muted">
+                  حسابك في فترة إلزامية لتفعيل التحقق بخطوتين. حتى يتم التفعيل، بقية
+                  الأقسام غير متاحة. فعّلها من قسم الأمان بالأسفل وسيتم تفعيلها
+                  تلقائياً.
+                </p>
+              </div>
+            </div>
+          )}
           <AnimatePresence mode="wait">
-            {activeTab === "profile" && (
+            {activeTab === "profile" && !enrollmentPending && (
               <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
                 <ContentPanel title="الملف الشخصي" subtitle="اسمك، بريدك، وصورتك — تُحفظ لكل حساب على حدة.">
                   <form onSubmit={handleProfileSubmit} className="space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label htmlFor="account-fullname" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                        <label htmlFor="account-fullname" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                           الاسم الكامل
                         </label>
                         <Input
@@ -411,14 +469,14 @@ export default function Settings() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label htmlFor="account-username" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                        <label htmlFor="account-username" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                           اسم المستخدم
                         </label>
                         <Input id="account-username" value={profileData.username} disabled className="h-11 rounded-xl bg-soft opacity-60 font-bold" dir="ltr" />
-                        <p className="text-[10px] font-bold text-muted mr-1">يُدار من إدارة المستخدمين</p>
+                        <p className="text-[10px] font-bold text-muted me-1">يُدار من إدارة المستخدمين</p>
                       </div>
                       <div className="space-y-1.5 md:col-span-2">
-                        <label htmlFor="account-email" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                        <label htmlFor="account-email" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                           البريد الإلكتروني
                         </label>
                         <Input
@@ -436,7 +494,7 @@ export default function Settings() {
                       {isBarber && (
                         <>
                           <div className="space-y-1.5 md:col-span-2">
-                            <label htmlFor="account-displayname" className="text-[10px] font-black tracking-widest text-primary uppercase mr-1">
+                            <label htmlFor="account-displayname" className="text-[10px] font-black tracking-widest text-primary uppercase me-1">
                               اسم العرض (للموقع العام)
                             </label>
                             <Input
@@ -449,7 +507,7 @@ export default function Settings() {
                             />
                           </div>
                           <div className="space-y-1.5 md:col-span-2">
-                            <label htmlFor="account-bio" className="text-[10px] font-black tracking-widest text-primary uppercase mr-1">
+                            <label htmlFor="account-bio" className="text-[10px] font-black tracking-widest text-primary uppercase me-1">
                               النبذة
                             </label>
                             <Textarea
@@ -461,7 +519,7 @@ export default function Settings() {
                               placeholder="نبذة قصيرة تظهر للعملاء"
                               className="rounded-xl bg-soft border-border/60 font-bold"
                             />
-                            <p className="text-[10px] font-bold text-muted mr-1 tabular-nums">{profileData.bioAr.length}/1000</p>
+                            <p className="text-[10px] font-bold text-muted me-1 tabular-nums">{profileData.bioAr.length}/1000</p>
                           </div>
                         </>
                       )}
@@ -481,7 +539,7 @@ export default function Settings() {
                 <ContentPanel title="الأمان وكلمة المرور" subtitle="غيّر كلمة المرور — تُطبّق فوراً على كل جلساتك.">
                   <form onSubmit={handlePasswordSubmit} className="space-y-5 max-w-xl">
                     <div className="space-y-1.5">
-                      <label htmlFor="account-old-password" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                      <label htmlFor="account-old-password" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                         كلمة المرور الحالية
                       </label>
                       <Input
@@ -496,7 +554,7 @@ export default function Settings() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label htmlFor="account-new-password" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                        <label htmlFor="account-new-password" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                           الجديدة
                         </label>
                         <Input
@@ -510,7 +568,7 @@ export default function Settings() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label htmlFor="account-confirm-password" className="text-[10px] font-black tracking-widest text-muted uppercase mr-1">
+                        <label htmlFor="account-confirm-password" className="text-[10px] font-black tracking-widest text-muted uppercase me-1">
                           تأكيد الجديدة
                         </label>
                         <Input
@@ -563,7 +621,7 @@ export default function Settings() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black tracking-widest text-muted uppercase mr-1 flex items-center gap-1.5">
+                        <label className="text-[10px] font-black tracking-widest text-muted uppercase me-1 flex items-center gap-1.5">
                           <Languages size={12} /> لغة النظام
                         </label>
                         <div className="grid grid-cols-2 gap-2">

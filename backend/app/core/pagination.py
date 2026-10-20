@@ -107,7 +107,16 @@ def paginate(
             else:
                 query = query.order_by(column.asc())
 
-    total = query.count()
+    # Count without the sort.
+    #
+    # `query.count()` on a sorted query compiles to a subquery that keeps the
+    # ORDER BY, so the database sorts the entire filtered set on every single
+    # page request — work whose only purpose is to produce a number. The list
+    # itself is already limited to `size` rows, so that sort buys nothing.
+    #
+    # `order_by(None)` strips it. The ordering is applied afterwards to the
+    # paged query, which never needs more than `size` rows sorted.
+    total = query.order_by(None).count()
     items = query.offset(params.offset).limit(params.size).all()
     pages = (total + params.size - 1) // params.size if params.size else 1
 

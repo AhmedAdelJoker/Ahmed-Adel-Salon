@@ -67,6 +67,17 @@ class BusinessSettings(Base):
     landing_testimonials_title = Column(String(500), nullable=True)
     landing_testimonials_subtitle = Column(Text, nullable=True)
     landing_cover_image_url = Column(String(500), nullable=True)
+    # Hero video. The poster is separate from the clip on purpose: it is what
+    # renders before the video is ready, and the permanent fallback when the
+    # clip is unsupported, blocked from autoplay, or suppressed because the
+    # visitor asked for reduced motion. Browsers refuse autoplay on an unmuted
+    # clip, hence the muted default — the clip is decoration, never content.
+    landing_hero_video_url = Column(String(500), nullable=True)
+    landing_video_poster_url = Column(String(500), nullable=True)
+    landing_video_autoplay = Column(Boolean, nullable=True, default=True, server_default="1")
+    landing_video_muted = Column(Boolean, nullable=True, default=True, server_default="1")
+    # Master switch for scroll-reveal and hover motion on the public site.
+    landing_motion_enabled = Column(Boolean, nullable=True, default=True, server_default="1")
     landing_theme_id = Column(String(50), nullable=True, default="gold")
     landing_show_staff = Column(Boolean, nullable=True, default=True)
     landing_show_staff_bio = Column(Boolean, nullable=True, default=True)
@@ -88,6 +99,11 @@ class BusinessSettings(Base):
     
     public_site_snapshot = Column(JSON, nullable=True)
     public_site_published_at = Column(DateTime(timezone=True), nullable=True)
+    # Settings revision counter. Bumped on every accepted write so concurrent
+    # editors can detect a lost update instead of clobbering each other.
+    version = Column(Integer, nullable=False, default=1, server_default="1")
+    # Which settings.version the public_site_snapshot was captured from.
+    public_site_published_version = Column(Integer, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

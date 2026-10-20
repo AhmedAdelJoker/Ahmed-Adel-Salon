@@ -70,7 +70,7 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
               >
                 <RefreshCw
                   size={16}
-                  className={cn("ml-2", refreshing && "animate-spin")}
+                  className={cn("ms-2", refreshing && "animate-spin")}
                 />
                 تحديث
               </Button>
@@ -81,7 +81,7 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
                 onClick={exportSecurityReport}
                 className="h-11 rounded-2xl border-border bg-card/50"
               >
-                <Download size={16} className="ml-2" />
+                <Download size={16} className="ms-2" />
                 تصدير التقرير
               </Button>
               <Button
@@ -90,7 +90,7 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
                 onClick={saveSettings}
                 className="h-11 rounded-2xl bg-accent text-white shadow-lg shadow-accent/20 hover:bg-accent/90"
               >
-                <Save size={16} className="ml-2" />
+                <Save size={16} className="ms-2" />
                 حفظ السياسات
               </Button>
             </div>
@@ -112,7 +112,7 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
               <Download size={14} />
             </Button>
             <Button type="button" size="sm" disabled={loading} onClick={saveSettings} className="h-9 rounded-xl">
-              <Save size={14} className="ml-1.5" /> حفظ
+              <Save size={14} className="ms-1.5" /> حفظ
             </Button>
           </div>
         </div>
@@ -165,7 +165,7 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
       {!embedded && (
         <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
           <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ml-2">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ms-2">
               <ShieldCheck size={12} className="text-accent" /> انتقال سريع
             </span>
             {[

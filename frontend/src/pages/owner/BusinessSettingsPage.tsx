@@ -192,9 +192,7 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
       snapshot: data?.public_site_snapshot || data?.publicSiteSnapshot || null,
       publishedAt:
         data?.public_site_published_at || data?.publicSitePublishedAt || null,
-      hasDraftChanges: Boolean(
-        data?.public_site_has_draft_changes || data?.publicSiteHasDraftChanges,
-      ),
+      hasDraftChanges: Boolean(data?.publicSiteStale),
     });
   }, []);
 
@@ -265,6 +263,20 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
                 loading={publishing}
               >
                 {publishing ? "جاري النشر..." : publication.hasDraftChanges ? "نشر التعديلات" : "الموقع محدث"}
+              </Button>
+              {/*
+                Open the public site in a new tab. The duplicate
+                `OwnerWebsiteSettingsPage` used to carry this button and nothing
+                else of value — it rendered the same `WebsiteSettingsPanel` this
+                page renders, so it is gone and this is the single place to open
+                the site from.
+              */}
+              <Button
+                variant="outline"
+                onClick={() => window.open(finalPublicSiteUrl, "_blank", "noopener")}
+                className="h-11 rounded-xl px-5 text-[11px] font-black"
+              >
+                <ExternalLink size={14} className="ms-2" /> عرض الموقع
               </Button>
             </div>
           }
@@ -463,14 +475,14 @@ function PublicLinkCard({ title, url, qrCode, onCopy }: { title: string; url: st
               a.click();
             }}
           >
-            <Download size={12} className="ml-1" /> تحميل QR
+            <Download size={12} className="ms-1" /> تحميل QR
           </Button>
         </div>
       </div>
 
       <div className="flex gap-2">
         <Button onClick={onCopy} className="flex-1 h-12 rounded-xl text-xs">
-          <Copy size={14} className="ml-2" /> نسخ الرابط
+          <Copy size={14} className="ms-2" /> نسخ الرابط
         </Button>
         <Button
           variant="outline"

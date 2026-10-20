@@ -3,7 +3,27 @@ starlette==1.6.0
 uvicorn[standard]==0.30.6
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.11
-PyJWT==2.14.0
+# 2.15.1, not 2.15.0. 2.14.0 trips PYSEC-2026-4141 (CVE-2026-101918, an
+# unauthenticated RecursionError DoS in the pre-verification payload parse), and
+# two more PyJWT advisories landed the same day, 2026-10-01: PYSEC-2026-4146
+# (CVE-2026-103001, a claims-check bypass when an `options` dict is reused
+# across decode calls) and PYSEC-2026-4148 (CVE-2026-102270, ReDoS in
+# `is_pem_format`). Neither reaches this application -- `app/core/security.py`
+# calls `jwt.encode` and `jwt.decode` with no `options` argument and never
+# constructs a `PyJWKClient` -- but 2.15.1 is the version with no open advisory
+# against it, and pinning the newest is cheaper than re-deciding this per
+# advisory.
+PyJWT==2.15.1
+# Argon2id is the current hash. bcrypt is retained on purpose and only to
+# verify hashes that already exist: accounts are upgraded to Argon2id on their
+# next successful sign-in, so no password reset is ever required.
+argon2-cffi==25.1.0
+# argon2-cffi leaves its CFFI dependency unpinned, so a fresh resolve can pair
+# the two at different ABI revisions. Every combination tried here produced a
+# module that hashes correctly and then rejects its own output on verify, which
+# reads as a broken login and cannot be fixed by reinstalling the app. Pinning
+# the pair is the only cheap guard.
+argon2-cffi-bindings==25.1.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 pydantic==2.12.5
@@ -17,6 +37,24 @@ arabic-reshaper==3.0.0
 python-bidi==0.6.7
 slowapi>=0.1.9
 pyotp==2.10.0
+# Pinned, not ranged, because PyJWT's `crypto` extra is the only thing here that
+# imports it and a silent resolve can pair them badly.
+#
+# 50.0.1 clears every advisory pip-audit reports. The 46.0.3 pin this replaced was
+# flagged for PYSEC-2026-2141, -35, -36, -3552, -3553, -3554 and
+# GHSA-537c-gmf6-5ccf. The first three are fixed in 46.0.7, which is tempting as
+# the smaller change, but 46.0.7 still reports seven findings: -3552, -3553 and
+# -3554 have no fix on the 46 series at all. So the pin moves to 50.0.1 rather
+# than the version that reduces the count from thirteen to seven.
+#
+# Verified by running, not by reading: the HS256 sign/verify round trip PyJWT
+# uses, an RSA sign/verify pair, and a Fernet encrypt/decrypt all succeed on
+# 50.0.1, with the same OpenSSL 3.0.18 underneath.
+#
+# pip-audit prints one line per fix version per finding, so 13 lines is 7
+# findings, not 13. Reading that as 13 distinct problems is reading the format
+# wrong -- and would have justified a panic that a single version bump fixes.
+cryptography==50.0.1
 pandas>=2.0.0
 openpyxl>=3.1.0
 Pillow==12.3.0

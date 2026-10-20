@@ -9,7 +9,11 @@ export {
   SelectSeparator,
 } from "@/components/ui/select";
 export { Badge } from "@/components/ui/badge";
-export { Avatar } from "@/components/ui/Avatar";
+// `Avatar` was removed: nothing imported it, and its `imageErrorRef` was a
+// plain object recreated on every render, so `onError` set it and the next
+// render reset it — the initials fallback could never appear. Every avatar in
+// the app goes through `components/shared/EmployeeAvatar`, which does handle a
+// missing file.
 export {
   Table,
   TableHeader as Thead,
@@ -18,10 +22,8 @@ export {
   TableHead as Th,
   TableCell as Td,
 } from "@/components/ui/table";
-export { Sidebar } from "@/components/ui/Sidebar";
-// CommandPalette: use the canonical version from @/components/layout/CommandPalette
-export { EmptyState } from "@/components/ui/EmptyState";
-export { ToastProvider, useToast, useToastHelpers } from "@/components/ui/Toast";
+// EmptyState is the single component for that case and lives with the other
+// page-level primitives: import it from "@/components/shared/EmptyState".
 
 // Legacy shadcn/ui components (keep for backward compatibility)
 export {

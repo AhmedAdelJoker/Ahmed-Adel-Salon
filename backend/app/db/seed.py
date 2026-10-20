@@ -1,4 +1,6 @@
+import logging
 from app.db.session import SessionLocal
+from app.core.clock import utc_now_naive
 import app.db.base  # This will import all models
 from app.models.user import User
 from app.models.business_settings import BusinessSettings
@@ -9,10 +11,11 @@ from app.models.product import Product
 from app.models.expense import Expense
 from app.core.security import get_password_hash
 from app.core.config import settings as app_settings
+from datetime import datetime
 from decimal import Decimal
 
 
-def seed_data():
+def seed_data(include_demo_data: bool = True):
     db = SessionLocal()
 
     try:
@@ -28,6 +31,10 @@ def seed_data():
             )
             db.add(admin)
             print("[seed] Admin/Owner created")
+
+        if not include_demo_data:
+            db.commit()
+            return
 
         # ✅ Employees (replacing legacy Barbers)
         if not db.query(Employee).first():
@@ -120,6 +127,35 @@ def seed_data():
                 cashier_discount_limit_value=10,
                 manager_discount_limit_type="percentage",
                 manager_discount_limit_value=100,
+                landing_theme_id="midnight",
+                landing_show_staff=True,
+                landing_show_staff_bio=True,
+                public_site_published_at=utc_now_naive(),
+                # Placeholder only.
+                #
+                # This used to be a seven-key literal, which is the shape of the
+                # bug the public endpoint had: the snapshot looked populated, so
+                # the endpoint stopped 404-ing, but it carried none of the
+                # ~50 settings the public site actually reads. A seeded install
+                # therefore rendered a default-coloured, uncustomisable site
+                # with no obvious cause.
+                #
+                # What is in the snapshot is decided by `publish_site`, not by
+                # here. `publish_site_once.py` (or the Publish button) replaces
+                # this dict with the real one.
+                public_site_snapshot={
+                    "salon_name": "Salon Pro",
+                    "shop_phone": "01094693361",
+                    "shop_whatsapp": None,
+                    "address": None,
+                    "logo_url": None,
+                    "public_slug": None,
+                    "working_hours": None,
+                    "currency": "EGP",
+                    "landing_theme_id": "midnight",
+                    "landing_show_staff": True,
+                    "landing_show_staff_bio": True,
+                },
             )
             db.add(settings)
             print("[seed] Settings created")
@@ -128,7 +164,7 @@ def seed_data():
 
     except Exception as e:
         db.rollback()
-        print("[seed] ERROR:", e)
+        logging.getLogger("app.seed").exception("[seed] failed")
 
     finally:
         db.close()

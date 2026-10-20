@@ -45,7 +45,7 @@ export default function PermissionsModal({
       <DialogContent
         className="max-w-2xl rounded-[32px] border-border bg-card p-0 shadow-premium overflow-hidden"
       >
-        <DialogHeader className="p-10 pb-6 bg-[#1B1714] relative overflow-hidden">
+        <DialogHeader className="relative p-10 pb-6 bg-neutral-900 text-white overflow-hidden dark:bg-black/40">
           <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-[80px] -mr-32 -mt-32" />
           <div className="relative z-10 space-y-2">
             <DialogTitle className="text-3xl font-black text-white uppercase tracking-tight flex items-center gap-4 leading-none">
@@ -62,7 +62,7 @@ export default function PermissionsModal({
         <div className="p-10 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest ml-1">
+              <label className="text-[10px] font-black text-muted uppercase tracking-widest ms-1">
                 الاسم القانوني الموثق
               </label>
               <div className="relative group">
@@ -71,7 +71,7 @@ export default function PermissionsModal({
                   size={18}
                 />
                 <Input
-                  className="h-14 rounded-xl pr-12 font-bold bg-soft border-border text-main focus:bg-white text-base"
+                  className="h-14 rounded-xl pe-12 font-bold bg-soft border-border text-main focus:bg-white text-base"
                   value={formData.fullName || ""}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                   placeholder="الاسم الثلاثي أو الرباعي..."
@@ -79,7 +79,7 @@ export default function PermissionsModal({
               </div>
             </div>
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest ml-1">
+              <label className="text-[10px] font-black text-muted uppercase tracking-widest ms-1">
                 قناة التواصل الرسمية
               </label>
               <div className="relative group">
@@ -88,7 +88,7 @@ export default function PermissionsModal({
                   size={18}
                 />
                 <Input
-                  className="h-14 rounded-xl pr-12 font-black bg-soft border-border text-main focus:bg-white text-lg tabular-nums"
+                  className="h-14 rounded-xl pe-12 font-black bg-soft border-border text-main focus:bg-white text-lg tabular-nums"
                   dir="ltr"
                   value={formData.phone || ""}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -99,7 +99,7 @@ export default function PermissionsModal({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest ml-1">
+              <label className="text-[10px] font-black text-muted uppercase tracking-widest ms-1">
                 معرف الدخول (Username)
               </label>
               <div className="relative group">
@@ -108,7 +108,7 @@ export default function PermissionsModal({
                   size={18}
                 />
                 <Input
-                  className="h-14 rounded-xl pr-12 font-black bg-soft border-border text-main focus:bg-white text-base uppercase"
+                  className="h-14 rounded-xl pe-12 font-black bg-soft border-border text-main focus:bg-white text-base uppercase"
                   dir="ltr"
                   value={formData.username || ""}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -116,7 +116,7 @@ export default function PermissionsModal({
               </div>
             </div>
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest ml-1">
+              <label className="text-[10px] font-black text-muted uppercase tracking-widest ms-1">
                 كلمة المرور (Encrypted)
               </label>
               <div className="relative group">
@@ -127,7 +127,7 @@ export default function PermissionsModal({
                 <Input
                   type="password"
                   placeholder={editingUser ? "••••••••••••" : "أدخل كلمة مرور قوية..."}
-                  className="h-14 rounded-xl pr-12 font-black bg-soft border-border text-main focus:bg-white text-lg tracking-tighter"
+                  className="h-14 rounded-xl pe-12 font-black bg-soft border-border text-main focus:bg-white text-lg tracking-tighter"
                   value={formData.password || ""}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 />
@@ -136,7 +136,7 @@ export default function PermissionsModal({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest ml-1">
+              <label className="text-[10px] font-black text-muted uppercase tracking-widest ms-1">
                 رتبة الوصول (Security Role)
               </label>
               <Select
@@ -165,7 +165,7 @@ export default function PermissionsModal({
               </Select>
             </div>
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-muted uppercase tracking-widest ml-1">
+              <label className="text-[10px] font-black text-muted uppercase tracking-widest ms-1">
                 التخصص الاستراتيجي
               </label>
               <div className="relative group">
@@ -174,7 +174,7 @@ export default function PermissionsModal({
                   size={18}
                 />
                 <Input
-                  className="h-14 rounded-xl pr-12 font-bold bg-soft border-border text-main focus:bg-white text-base"
+                  className="h-14 rounded-xl pe-12 font-bold bg-soft border-border text-main focus:bg-white text-base"
                   value={formData.specialty || ""}
                   onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
                   placeholder="المهارة الفنية الأساسية..."
@@ -198,7 +198,7 @@ export default function PermissionsModal({
             variant="primary"
             className="flex-[2] rounded-xl font-black text-lg h-14 shadow-lg shadow-accent/20"
           >
-            <Save size={20} className="ml-2" />
+            <Save size={20} className="ms-2" />
             {editingUser ? "اعتماد التعديلات الأمنية" : "إصدار الاعتماد الرقمي"}
           </Button>
         </DialogFooter>

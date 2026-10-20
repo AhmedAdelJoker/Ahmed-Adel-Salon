@@ -49,7 +49,7 @@ export default function CustomerDetailsDialog({
           {customer ? (
             <div className="space-y-6">
               <div className="flex items-center gap-4 rounded-2xl bg-gray-50 p-5 bg-soft">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#6D28D9] text-2xl font-black text-white dark:bg-[#22D3EE] dark:text-[#121212]">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-2xl font-black text-primary-foreground">
                   {getInitials(customerName(customer))}
                 </div>
                 <div>

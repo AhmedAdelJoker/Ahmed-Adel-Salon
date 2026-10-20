@@ -23,7 +23,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import api, { baseURL } from "@/services/api";
 import { useNavigate } from "react-router-dom";
 import { cn, formatDate, formatNumber } from "@/lib/core/utils";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   PageHeader,
   PremiumCard,
@@ -243,7 +243,7 @@ export default function SuppliesArchive() {
               onClick={() => navigate("/inventory")}
               className="h-11 rounded-xl px-4 font-black border-border bg-card"
             >
-              <ChevronRight size={16} className="ml-1.5" /> المستودع
+              <ChevronRight size={16} className="ms-1.5" /> المستودع
             </Button>
             <Button
               variant="outline"
@@ -253,14 +253,14 @@ export default function SuppliesArchive() {
               title={`تصدير كامل النطاق المفلتر (${formatNumber(totalCount)} حركة)`}
               className="h-11 rounded-xl px-4 font-black border-border bg-card"
             >
-              <Download size={16} className="ml-1.5" /> تصدير CSV
+              <Download size={16} className="ms-1.5" /> تصدير CSV
             </Button>
             <Button
               variant="outline"
               onClick={handlePrint}
               className="h-11 rounded-xl px-4 font-black border-border bg-card"
             >
-              <Printer size={16} className="ml-1.5" /> طباعة / PDF
+              <Printer size={16} className="ms-1.5" /> طباعة / PDF
             </Button>
             <Button
               onClick={() => refetch()}
@@ -269,7 +269,7 @@ export default function SuppliesArchive() {
             >
               <RefreshCw
                 size={16}
-                className={isFetching ? "ml-1.5 animate-spin" : "ml-1.5"}
+                className={isFetching ? "ms-1.5 animate-spin" : "ms-1.5"}
               />
               تحديث
             </Button>
@@ -321,7 +321,7 @@ export default function SuppliesArchive() {
               variant="ghost"
               size="sm"
               onClick={handleReset}
-              className="mr-auto h-8 gap-1 rounded-xl text-xs font-black"
+              className="me-auto h-8 gap-1 rounded-xl text-xs font-black"
             >
               <RotateCcw size={12} /> إعادة ضبط
             </Button>
@@ -340,7 +340,7 @@ export default function SuppliesArchive() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="ابحث باسم الصنف أو الملاحظة أو رقم الحركة..."
                 aria-label="بحث في سجل المخزون"
-                className="h-11 pr-10 rounded-xl bg-soft border-border font-bold"
+                className="h-11 pe-10 rounded-xl bg-soft border-border font-bold"
               />
             </div>
           </div>
@@ -443,7 +443,7 @@ export default function SuppliesArchive() {
                 size="sm"
                 className="rounded-xl font-black"
               >
-                <RefreshCw size={14} className="ml-1" /> إعادة المحاولة
+                <RefreshCw size={14} className="ms-1" /> إعادة المحاولة
               </Button>
             </div>
           </div>
@@ -451,7 +451,7 @@ export default function SuppliesArchive() {
           <div className="p-4 sm:p-6">
             <EmptyState
               title="الأرشيف فارغ"
-              text="لم نجد أي عمليات مسجلة تطابق بحثك — جرب توسيع نطاق التاريخ أو مسح البحث."
+              message="لم نجد أي عمليات مسجلة تطابق بحثك — جرب توسيع نطاق التاريخ أو مسح البحث."
               icon={History}
               action={
                 <Button
@@ -699,7 +699,7 @@ export default function SuppliesArchive() {
                           onClick={() => openDetail(log)}
                           className="rounded-xl font-black"
                         >
-                          <Eye size={14} className="ml-1" /> التفاصيل
+                          <Eye size={14} className="ms-1" /> التفاصيل
                         </Button>
                       </div>
                     </motion.div>

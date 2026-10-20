@@ -17,6 +17,7 @@ from app.models.business_settings import BusinessSettings
 from app.models.shop_settings import ShopSettings
 from app.models.user import User
 from app.services.pdf_service import generate_cash_receipt_pdf
+from app.core.clock import salon_now
 
 router = APIRouter(prefix="/cashbox", tags=["cashbox"])
 
@@ -66,7 +67,7 @@ def cashbox_stats(
 
     # Build last 7 days — include cash + non-cash splits
     trend = []
-    today = date.today()
+    today = salon_now().date()
     for i in range(6, -1, -1):
         d = today - timedelta(days=i)
         d_str = d.isoformat()
@@ -253,7 +254,11 @@ def get_transaction_receipt_pdf(
 def create_manual_cash_transaction(
     payload: CashTransactionCreate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_cashier_manager_owner)
+    # Till operators record the cash they physically handle (same width as
+    # pos-shift open/close); owner_or_manager here locked the cashier's own
+    # cashbox page out of its primary write with 403. Accountant stays
+    # read/audit only, matching require_shift_operator elsewhere.
+    current_user: User = Depends(deps.require_shift_operator)
 ):
     try:
         transaction_type = "manual_deposit" if payload.direction == "in" else "manual_withdraw"

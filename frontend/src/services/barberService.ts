@@ -17,6 +17,18 @@ export const barberService = {
     return normalizeListResponse(response);
   },
 
+  /**
+   * Today / week / month commission plus the real payment breakdown.
+   *
+   * The dashboard calls this because `/barber/stats` is scoped to today and
+   * carries no weekly figure — without it the "this week" card could only ever
+   * repeat today's commission.
+   */
+  getEarningsSummary: async () => {
+    const response = await api.get("/barber/earnings-summary");
+    return normalizeItemResponse(response);
+  },
+
   updateStatus: async (appointmentId, status) => {
     const response = await api.post(
       `/barber/update-status/${appointmentId}`,

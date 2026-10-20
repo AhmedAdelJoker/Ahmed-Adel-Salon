@@ -1,5 +1,6 @@
 import React, { useRef, useCallback } from "react";
 import { usePOS } from "@/pages/cashier/POS/POSContext";
+import { appointmentToCartItems } from "@/features/pos";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -56,46 +57,7 @@ const SessionsQueue = () => {
         setSelectedBarberId(String(appointmentBarberId));
       }
 
-      const barber = barbers.find(
-        (b) => String(b.id) === String(appointmentBarberId),
-      );
-
-      const newCart = (appointment.services || []).map((svc) => {
-        const serviceId = svc.service_id || svc.serviceId || svc.id;
-        return {
-          id: serviceId,
-          serviceId,
-          service_id: serviceId,
-          uid: `appointment-${appointmentId}-service-${serviceId}-${Math.random()}`,
-          name:
-            svc.service_name_snapshot ||
-            svc.service_name ||
-            svc.serviceName ||
-            svc.name ||
-            "خدمة",
-          price: Number(
-            svc.price_snapshot ??
-              svc.price ??
-              svc.unit_price ??
-              svc.unitPrice ??
-              0,
-          ),
-          type: "service",
-          barberId: appointmentBarberId
-            ? Number(appointmentBarberId)
-            : selectedBarberId
-              ? Number(selectedBarberId)
-              : null,
-          barberName:
-            barber?.display_name ||
-            barber?.displayName ||
-            barber?.full_name ||
-            barber?.fullName ||
-            "الخبير",
-        };
-      });
-
-      setCart(newCart);
+      setCart(appointmentToCartItems(appointment, barbers, selectedBarberId));
       setActiveAppointmentId(appointmentId);
       setSelectedCustomerId(String(appointment.customer_id || "walk_in"));
       // Auto-fill completed customer name for success screen
@@ -155,6 +117,7 @@ const SessionsQueue = () => {
         <AnimatePresence mode="popLayout">
           {readyAppointments.length === 0 ? (
             <motion.div
+              key="empty"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -166,7 +129,8 @@ const SessionsQueue = () => {
               <h3 className="text-base font-black text-muted">لا توجد جلسات</h3>
             </motion.div>
           ) : (
-            <div
+            <motion.div
+              key="sessions"
               ref={parentRef}
               className="h-full overflow-y-auto no-scrollbar touch-action-pan-y"
               style={{
@@ -211,7 +175,7 @@ const SessionsQueue = () => {
                   </motion.div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>

@@ -21,9 +21,21 @@ const isElectron: boolean = !!(
 );
 // ملاحظة: على file:// يكون hostname فارغاً، لذلك أي بروتوكول file يعني Electron
 // ونثبّت عنوان الباك إند المحلي بدل بناء URL معطوب مثل file://:8000/...
+// Electron هو الحالة الوحيدة التي يبقى فيها العنوان مطلقاً، لأن الصفحة نفسها
+// تُحمَّل من ملف على القرص ولا يوجد أصل (origin) يُحلّ بالنسبة إليه.
 const DEFAULT_API_URL: string = isElectron
   ? "http://127.0.0.1:8000/api/v1"
-  : `${window.location.protocol}//${window.location.hostname || "127.0.0.1"}:8000/api/v1`;
+  : "/api/v1";
+/**
+ * SPDX: سبب الاختيار
+ *
+ * المتصفح كان يبني `${protocol}//${hostname}:8000/api/v1`، وهذا لا يكون صحيحاً
+ * إلا على لابتوب المطوّر. على الإنتاج كان يوجّه كل طلب إلى `https://<host>:8000`
+ * وهو منفذ لا يخدمه أحد. سيرفر التطوير يوكّل `/api` إلى الباك-إند المحلي،
+ * والـ WebSocket نفسه (`SocketContext.buildSocketUrl`) يستخدم منفذ الصفحة
+ * أصلاً — فالمسار النسبي هو ما يجعل الاثنين على أصل واحد بدل أن يطلب HTTP
+ * تصريح CORS بينما WS لا يطلبه. نشر على أصل منفصل يضبط `VITE_API_URL`.
+ */
 export const baseURL: string = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 export const staticURL: string = baseURL.replace("/api/v1", "");
 

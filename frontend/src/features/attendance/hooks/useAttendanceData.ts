@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { adaptList } from "@/services/apiAdapter";
+import { loadErrorMessage } from "@/lib/core/asyncError";
 import type {
   AttendanceRecord,
   EmployeeRecord,
@@ -36,6 +37,9 @@ export function useAttendanceData() {
   );
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [workingHours, setWorkingHours] = useState<WorkingHours>({});
+  // Non-fatal: the records themselves load fine, but the schedule that decides
+  // who counts as late did not, so the totals need a caveat.
+  const [secondaryError, setSecondaryError] = useState<string | null>(null);
 
   const fetchAttendance = useCallback(async () => {
     try {
@@ -82,16 +86,27 @@ export function useAttendanceData() {
         })),
       );
     } catch (err) {
+      // Without the roster the view cannot attribute records to anyone, so the
+      // numbers on screen would be unattributable rather than merely incomplete.
       console.error("Failed to fetch employees", err);
+      setSecondaryError(
+        loadErrorMessage(err, "قائمة الموظفين") +
+          " قد تظهر سجلات الحضور بدون أسماء.",
+      );
     }
   }, []);
-
   const fetchWorkingHours = useCallback(async () => {
     try {
       const res = await api.get("/barber-presence/working-hours");
       setWorkingHours(res.data?.working_hours || {});
     } catch (err) {
+      // Working hours decide which staff are counted late. Failing open to an
+      // empty schedule silently marks everyone on time.
       console.error("Failed to fetch working hours:", err);
+      setSecondaryError(
+        loadErrorMessage(err, "ساعات العمل") +
+          " قد تظهر نتائج الحضور غير دقيقة.",
+      );
     }
   }, []);
 
@@ -131,6 +146,7 @@ export function useAttendanceData() {
     records,
     employees,
     workingHours,
+    secondaryError,
     setWorkingHours,
     loading,
     searchTerm,

@@ -13,6 +13,7 @@ export function useInvoicesData() {
   const [adjustments, setAdjustments] = useState<any[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(true);
   const [adjustmentsLoading, setAdjustmentsLoading] = useState(true);
+  const [adjustmentsError, setAdjustmentsError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -93,11 +94,17 @@ export function useInvoicesData() {
     const fetchAdjustments = async () => {
       try {
         setAdjustmentsLoading(true);
+        setAdjustmentsError(null);
         const res = await api.get("/invoice-adjustment-requests");
         setAdjustments(adaptList(res));
       } catch (error) {
+        // Silently became [], so a cashier could not tell "no requests" from
+        // "the request queue failed to load" and would not know to retry.
         console.error("Adjustments load error:", error);
         setAdjustments([]);
+        setAdjustmentsError(
+          getApiErrorMessage(error, "تعذر تحميل طلبات تعديل الفواتير"),
+        );
       } finally {
         setAdjustmentsLoading(false);
       }
@@ -287,6 +294,7 @@ export function useInvoicesData() {
     adjustments,
     invoicesLoading,
     adjustmentsLoading,
+    adjustmentsError,
     loading,
     query,
     setQuery,

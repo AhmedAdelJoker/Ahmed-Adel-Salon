@@ -52,7 +52,7 @@ export function ExpensesSummaryCards({
               <h3 className="text-sm font-black text-main">ترابط المصروفات مع النظام</h3>
               <p className="text-[11px] font-bold text-muted">كل مصروف هو عقدة مالية مرتبطة بباقي الوحدات</p>
             </div>
-            <Badge variant="outline" className="mr-auto hidden sm:flex rounded-full bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-black">تكامل تلقائي</Badge>
+            <Badge variant="outline" className="me-auto hidden sm:flex rounded-full bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-black">تكامل تلقائي</Badge>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {SYSTEM_LINKS.map((link) => (
@@ -86,7 +86,7 @@ export function ExpensesSummaryCards({
           <span className="h-1 w-1 rounded-full bg-border" />
           <span className="text-muted">الإجمالي:</span>
           <span className="font-black text-main">{formatCurrency(summary.total_amount || 0)}</span>
-          {hasActiveFilters && <Badge variant="outline" className="rounded-full bg-amber-50 text-amber-700 border-amber-200 mr-2">مفلتر</Badge>}
+          {hasActiveFilters && <Badge variant="outline" className="rounded-full bg-amber-50 text-amber-700 border-amber-200 me-2">مفلتر</Badge>}
         </div>
       )}
 
@@ -114,7 +114,7 @@ export function ExpensesSummaryCards({
                 <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 700 }} interval={0} angle={-15} textAnchor="end" height={36} tickMargin={8} />
                 <YAxis tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} width={36} />
                 <Tooltip formatter={(value) => formatCurrency(value)} cursor={{ fill: "rgba(0,0,0,0.04)" }} contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", fontWeight: 700, fontSize: 11 }} />
-                <Bar dataKey="value" fill="#0f172a" radius={[8, 8, 0, 0]} barSize={28} maxBarSize={42} />
+                <Bar dataKey="value" fill="var(--chart-1)" radius={[8, 8, 0, 0]} barSize={28} maxBarSize={42} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>

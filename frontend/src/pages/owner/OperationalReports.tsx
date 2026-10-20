@@ -6,8 +6,6 @@ import {
   Award,
   BarChart3,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Download,
   History,
@@ -36,10 +34,10 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -50,6 +48,7 @@ import {
 } from "@/components/ui/table";
 import AIInsights from "@/components/AIInsights";
 import { PageHeader, ContentPanel, SkeletonCard } from "@/components/shared/PremiumUI";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import {
   ChartCard,
   CurrencyStatCard,
@@ -64,7 +63,6 @@ import {
   formatSignedPct,
 } from "@/features/financial-reports";
 import {
-  OP_HISTORY_PAGE_SIZE,
   useOperationalReports,
   type OpTabId,
 } from "@/features/operational-reports";
@@ -146,6 +144,8 @@ export default function OperationalReports() {
     setSearchQuery,
     historyPage,
     setHistoryPage,
+    historyPageSize,
+    setHistoryPageSize,
     historyTotal,
     historyTotalPages,
     financialMetrics,
@@ -184,26 +184,12 @@ export default function OperationalReports() {
 
   if (loadError && !hasData && hasLoaded) {
     return (
-      <div className="erp-page-container space-y-6 pb-16">
-        <PageHeader
-          title="التقارير التشغيلية"
-          subtitle="تحليل الأداء التشغيلي المتقدم."
-          badge="التقارير التشغيلية"
-          icon={BarChart3}
-        />
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-            <p className="text-lg font-black text-main">تعذر تحميل البيانات التشغيلية</p>
-            <p className="max-w-md text-sm font-bold text-muted">
-              تحقق من الاتصال بالخادم ثم أعد المحاولة. النطاق الحالي: {startDate} إلى{" "}
-              {endDate}.
-            </p>
-            <Button onClick={fetchData} loading={refreshing}>
-              <RefreshCw size={16} /> إعادة المحاولة
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <EmptyState
+        variant="section"
+        icon={RefreshCw}
+        title="تعذر تحميل البيانات التشغيلية"
+        message={`تحقق من الاتصال بالخادم ثم أعد المحاولة. النطاق الحالي: ${startDate} إلى ${endDate}.`}
+      />
     );
   }
 
@@ -214,14 +200,6 @@ export default function OperationalReports() {
   const topServiceByRevenue = [...operationalMetrics.topServices].sort(
     (a, b) => b.revenue - a.revenue,
   )[0];
-  const rangeStart = (safeHistoryPageStart() - 1) * OP_HISTORY_PAGE_SIZE + 1;
-
-  function safeHistoryPageStart(): number {
-    return historyTotal === 0 ? 0 : historyPage;
-  }
-
-  const rangeEnd = Math.min(historyTotal, historyPage * OP_HISTORY_PAGE_SIZE);
-  const rangeFrom = historyTotal === 0 ? 0 : rangeStart;
 
   return (
     <div className="erp-page-container space-y-6 pb-16">
@@ -435,12 +413,12 @@ export default function OperationalReports() {
                     <AreaChart data={financialMetrics.timeline} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                       <defs>
                         <linearGradient id="opIncome" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.28} />
-                          <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                          <stop offset="5%" stopColor="var(--chart-3)" stopOpacity={0.28} />
+                          <stop offset="95%" stopColor="var(--chart-3)" stopOpacity={0} />
                         </linearGradient>
                         <linearGradient id="opExpenses" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.28} />
-                          <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
+                          <stop offset="5%" stopColor="var(--chart-7)" stopOpacity={0.28} />
+                          <stop offset="95%" stopColor="var(--chart-7)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="var(--border)" opacity={0.5} />
@@ -449,7 +427,7 @@ export default function OperationalReports() {
                         axisLine={false}
                         tickLine={false}
                         minTickGap={24}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                         dy={8}
                       />
                       <YAxis
@@ -457,28 +435,28 @@ export default function OperationalReports() {
                         tickLine={false}
                         width={56}
                         tickFormatter={compactTick}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                       />
                       <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
                       <Area
                         type="monotone"
                         dataKey="income"
                         name="الدخل"
-                        stroke="#10B981"
+                        stroke="var(--chart-3)"
                         strokeWidth={2.5}
                         fill="url(#opIncome)"
                         dot={false}
-                        activeDot={{ r: 5, strokeWidth: 2, stroke: "#10B981", fill: "#fff" }}
+                        activeDot={{ r: 5, strokeWidth: 2, stroke: "var(--chart-3)", fill: "var(--bg-card)" }}
                       />
                       <Area
                         type="monotone"
                         dataKey="expenses"
                         name="المصروفات"
-                        stroke="#F43F5E"
+                        stroke="var(--chart-7)"
                         strokeWidth={2.5}
                         fill="url(#opExpenses)"
                         dot={false}
-                        activeDot={{ r: 5, strokeWidth: 2, stroke: "#F43F5E", fill: "#fff" }}
+                        activeDot={{ r: 5, strokeWidth: 2, stroke: "var(--chart-7)", fill: "var(--bg-card)" }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -586,7 +564,7 @@ export default function OperationalReports() {
                         type="category"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 11, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 11, fontWeight: 800, fill: "var(--text-muted)" }}
                         width={120}
                       />
                       <ReTooltip content={<ServiceTooltip />} cursor={{ fill: "var(--border)", opacity: 0.25 }} />
@@ -664,7 +642,7 @@ export default function OperationalReports() {
                         axisLine={false}
                         tickLine={false}
                         interval={2}
-                        tick={{ fontSize: 9, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 9, fontWeight: 800, fill: "var(--text-muted)" }}
                         dy={8}
                       />
                       <YAxis
@@ -672,14 +650,14 @@ export default function OperationalReports() {
                         tickLine={false}
                         width={40}
                         allowDecimals={false}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                       />
                       <ReTooltip content={<HourTooltip />} cursor={{ fill: "var(--border)", opacity: 0.25 }} />
                       <Bar dataKey="count" name="العمليات" radius={[5, 5, 0, 0]} maxBarSize={22}>
                         {operationalMetrics.hourlyData.map((h, i) => (
                           <Cell
                             key={i}
-                            fill={operationalMetrics.peakHour?.hour === h.hour ? "#6366F1" : "#C7D2FE"}
+                            fill={operationalMetrics.peakHour?.hour === h.hour ? "var(--primary)" : "var(--primary-soft)"}
                             fillOpacity={operationalMetrics.peakHour?.hour === h.hour ? 1 : 0.65}
                           />
                         ))}
@@ -771,7 +749,7 @@ export default function OperationalReports() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="بحث بالبيان، التصنيف، المبلغ، أو التاريخ (YYYY-MM-DD)..."
                   aria-label="بحث في سجل العمليات"
-                  className="h-11 rounded-xl pr-10 text-xs font-bold"
+                  className="h-11 rounded-xl pe-10 text-xs font-bold"
                 />
               </div>
             </div>
@@ -856,35 +834,26 @@ export default function OperationalReports() {
                   </TableBody>
                 </Table>
 
-                <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
-                  <p className="text-[11px] font-bold tabular-nums text-muted">
-                    عرض {formatNumber(rangeFrom)}–{formatNumber(rangeEnd)} من {formatNumber(historyTotal)}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setHistoryPage(Math.max(1, historyPage - 1))}
-                      disabled={historyPage <= 1}
-                      className="gap-1 text-[11px] font-black"
-                      aria-label="الصفحة السابقة"
-                    >
-                      <ChevronRight size={14} /> السابق
-                    </Button>
-                    <span className="min-w-[90px] text-center text-[11px] font-black tabular-nums text-main">
-                      {formatNumber(historyPage)} / {formatNumber(historyTotalPages)}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setHistoryPage(Math.min(historyTotalPages, historyPage + 1))}
-                      disabled={historyPage >= historyTotalPages}
-                      className="gap-1 text-[11px] font-black"
-                      aria-label="الصفحة التالية"
-                    >
-                      التالي <ChevronLeft size={14} />
-                    </Button>
-                  </div>
+                <div className="mt-2 border-t border-border pt-3">
+                  {historyTotal > 0 && (() => {
+                    const paginator = createPaginationState({
+                      page: historyPage,
+                      size: historyPageSize,
+                      total: historyTotal,
+                    });
+                    return (
+                      <Pagination
+                        paginator={paginator}
+                        onPageChange={setHistoryPage}
+                        onSizeChange={(s) => {
+                          setHistoryPageSize(s);
+                          setHistoryPage(1);
+                        }}
+                        sizeOptions={[10, 15, 25, 50]}
+                        locale="ar"
+                      />
+                    );
+                  })()}
                 </div>
               </>
             )}

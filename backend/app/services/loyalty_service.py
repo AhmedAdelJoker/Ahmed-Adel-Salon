@@ -4,6 +4,7 @@ from app.models.business_settings import BusinessSettings
 from decimal import Decimal
 from datetime import datetime, timedelta
 import json
+from app.core.clock import utc_now_naive
 
 
 def _normalize_loyalty_settings(raw):
@@ -78,7 +79,7 @@ def get_loyalty_settings(db: Session):
 
 
 def _points_cutoff(months: int) -> datetime:
-    return datetime.utcnow() - timedelta(days=30 * months)
+    return utc_now_naive() - timedelta(days=30 * months)
 
 
 def _expire_stale_points(customer: Customer, cutoff: datetime) -> bool:
@@ -143,7 +144,7 @@ def update_customer_loyalty(db: Session, customer_id: int, amount_paid: Decimal)
     points_per_egp = Decimal(str(settings.get("points_per_egp", 0.1)))
     new_points = amount_paid * points_per_egp
     customer.loyalty_points += new_points
-    customer.loyalty_points_earned_at = datetime.utcnow()
+    customer.loyalty_points_earned_at = utc_now_naive()
 
     # 3. Update Tier
     tiers = settings.get("tiers", [])
@@ -157,6 +158,22 @@ def update_customer_loyalty(db: Session, customer_id: int, amount_paid: Decimal)
 
     db.add(customer)
     # Note: We don't commit here, the caller should commit
+
+
+def refresh_customer_tier(db: Session, customer: Customer) -> None:
+    """Recompute the current tier from the aggregate visits_count.
+
+    Used after a merge, where visits from two customers land on one row and
+    the stored tier may no longer match the combined total.
+    """
+    settings = get_loyalty_settings(db)
+    if not settings or not settings.get("enabled"):
+        return
+    tiers = sorted(settings.get("tiers", []), key=lambda x: x.get("min_visits", 0), reverse=True)
+    for tier in tiers:
+        if customer.visits_count >= tier.get("min_visits", 0):
+            customer.current_tier = tier.get("name", "Bronze")
+            break
 
 
 def calculate_loyalty_discount(db: Session, customer_id: int, current_total: Decimal) -> Decimal:

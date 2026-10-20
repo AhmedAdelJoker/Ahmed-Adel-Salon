@@ -46,7 +46,7 @@ export default function OfferFormModal({
               إنشاء عروض ترويجية تجمع عدة خدمات بسعر مخفض للعملاء.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pl-2 custom-scrollbar">
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto ps-2 custom-scrollbar">
             <div className="space-y-2">
               <label className="text-xs font-black text-main">
                 اسم العرض الترويجي

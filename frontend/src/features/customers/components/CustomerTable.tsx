@@ -1,9 +1,30 @@
 /** Customers CustomerTable (moved from Customers page, no logic changes). */
-import { Eye, History, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
+  Eye,
+  History,
+  Trash2,
+} from "lucide-react";
 import { Button, Badge } from "@/components/ui";
-import { formatCurrency } from "@/lib/core/utils";
-import { customerId, customerName, getInitials, secondPhone } from "@/features/customers/utils/customer";
-import { EmptyState } from "@/components/shared";
+import { cn, formatCurrency } from "@/lib/core/utils";
+import {
+  customerId,
+  customerName,
+  getInitials,
+  secondPhone,
+  getTierInfo,
+} from "@/features/customers/utils/customer";
+import { EmptyState } from "@/components/shared/EmptyState";
+
+const SORT_ACCESSORS: Record<string, (c: any) => number | string> = {
+  name: (c) => customerName(c),
+  id: (c) => Number(customerId(c) || 0),
+  visits: (c) => Number(c.visits_count || c.visits || 0),
+  spend: (c) => Number(c.lifetime_spend || c.total_spend || c.totalSpend || 0),
+};
 
 export default function CustomerTable({
   rows,
@@ -28,72 +49,136 @@ export default function CustomerTable({
   showClearFilter?: boolean;
   onClearFilter?: () => void;
 }) {
-  const visitsOf = (customer: any) =>
-    Number(customer.visits_count || customer.visits || 0);
-  const visitsVariant = (customer: any): "warning" | "info" | "outline" => {
-    const visits = visitsOf(customer);
-    if (visits > 10) return "warning";
-    if (visits >= 2) return "info";
-    return "outline";
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const sortedRows = useMemo(() => {
+    if (!sortKey || !SORT_ACCESSORS[sortKey]) return rows;
+    const accessor = SORT_ACCESSORS[sortKey];
+    return [...rows].sort((a, b) => {
+      const va = accessor(a);
+      const vb = accessor(b);
+      const cmp =
+        typeof va === "string" || typeof vb === "string"
+          ? String(va).localeCompare(String(vb), "ar")
+          : va - vb;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [rows, sortKey, sortDir]);
+
+  const toggleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
   };
+
+  const SortHeader = ({ label, sort }: { label: string; sort?: string }) => (
+    <th className="px-4 py-3" aria-sort={
+      sort && sortKey === sort
+        ? sortDir === "asc"
+          ? "ascending"
+          : "descending"
+        : "none"
+    }>
+      {sort ? (
+        <button
+          type="button"
+          onClick={() => toggleSort(sort)}
+          className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-muted transition-colors hover:text-main"
+        >
+          {label}
+          {sortKey === sort ? (
+            sortDir === "asc" ? (
+              <ChevronUp size={12} />
+            ) : (
+              <ChevronDown size={12} />
+            )
+          ) : (
+            <ChevronsUpDown size={12} className="opacity-40" />
+          )}
+        </button>
+      ) : (
+        <span className="text-[10px] font-black uppercase tracking-widest text-muted">
+          {label}
+        </span>
+      )}
+    </th>
+  );
+
   return (
           <div className="scroll-x">
             <table className="min-w-[52rem] w-full text-right">
               <thead>
-                <tr className="border-b border-black/5 bg-gray-50 dark:border-white/10 bg-soft">
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                    ملف العميل
-                  </th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                <tr className="border-b border-border bg-soft">
+                  <SortHeader label="ملف العميل" sort="name" />
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted">
                     رقم التواصل
                   </th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                    الزيارات
-                  </th>
-                  <th className="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest text-gray-500">
-                    الإنفاق
-                  </th>
-                  <th className="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  <SortHeader label="الزيارات" sort="visits" />
+                  <SortHeader label="الإنفاق" sort="spend" />
+                  <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-muted">
                     الإجراءات
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/5 dark:divide-white/10">
-                {rows.map((customer, index) => (
+              <tbody className="divide-y divide-border/40">
+                {sortedRows.map((customer, index) => {
+                  const tier = getTierInfo(customer.current_tier);
+                    const visits = Number(customer.visits_count || customer.visits || 0);
+                    const visitsVariant: "warning" | "info" | "outline" =
+                      visits > 10 ? "warning" : visits >= 2 ? "info" : "outline";
+                  return (
                   <tr
                     key={customerId(customer) || index}
-                    className={`cursor-pointer transition hover:bg-purple-50/60 dark:hover:bg-cyan-400/10 ${loading ? "pointer-events-none opacity-50" : ""}`}
+                    className={cn(
+                      "cursor-pointer transition hover:bg-soft/60",
+                      loading && "pointer-events-none opacity-50",
+                    )}
                     onClick={() => onOpenDetails(customer)}
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50 text-sm font-black text-[#6D28D9] dark:bg-cyan-400/10 dark:text-[#22D3EE]">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-xs font-black text-primary">
                           {getInitials(customerName(customer))}
                         </div>
-                        <div>
-                          <div className="font-black text-gray-950 dark:text-gray-50">
-                            {customerName(customer)}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-black text-main">
+                              {customerName(customer)}
+                            </span>
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[8px] font-black",
+                                tier.bg,
+                                tier.color,
+                              )}
+                            >
+                              <tier.icon size={9} /> {tier.label}
+                            </span>
                           </div>
-                          <div className="text-[10px] font-bold text-gray-500">
+                          <div className="text-[10px] font-bold text-muted">
                             #{customerId(customer) || "---"}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm font-black" dir="ltr">
-                      <div>{customer.phone || "---"}</div>
+                    <td className="px-4 py-3 text-xs font-black" dir="ltr">
+                      <div className="text-main">{customer.phone || "---"}</div>
                       {secondPhone(customer) ? (
-                        <div className="mt-1 text-xs text-gray-400">
+                        <div className="mt-0.5 text-[10px] font-bold text-muted">
                           {secondPhone(customer)}
                         </div>
                       ) : null}
                     </td>
-                    <td className="px-6 py-4">
-                      <Badge variant={visitsVariant(customer)}>
-                        {customer.visits_count || customer.visits || 0} زيارة
+                    <td className="px-4 py-3">
+                      <Badge variant={visitsVariant}>
+                        {visits} زيارة
                       </Badge>
                     </td>
-                    <td className="px-6 py-4 text-center font-black text-emerald-600">
+                    <td className="px-4 py-3 text-center text-xs font-black text-success">
                       {formatCurrency(
                         customer.lifetime_spend ||
                           customer.total_spend ||
@@ -101,47 +186,50 @@ export default function CustomerTable({
                           0,
                       )}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex justify-center gap-2">
+                    <td className="px-4 py-3">
+                      <div className="flex justify-center gap-1.5">
                         <Button
                           variant="primary"
                           size="icon"
-                          title="عرض التفاصيل"
+                          title="عرض الملف"
                           onClick={(event) => {
                             event.stopPropagation();
                             onNavigate(customerId(customer));
                           }}
                         >
-                          <Eye size={18} />
+                          <Eye size={16} />
                         </Button>
                         <Button
                           variant="secondary"
                           size="icon"
+                          title="فتح سريع"
                           onClick={(event) => {
                             event.stopPropagation();
                             onOpenDetails(customer);
                           }}
                         >
-                          <History size={18} />
+                          <History size={16} />
                         </Button>
                         {isOwner && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-red-600"
+                            className="text-danger hover:text-danger"
+                            title="أرشفة"
                             onClick={(event) => {
                               event.stopPropagation();
                               onDelete(customer);
                             }}
                           >
-                            <Trash2 size={18} />
+                            <Trash2 size={16} />
                           </Button>
                         )}
                       </div>
                     </td>
                   </tr>
-                ))}
-                {rows.length === 0 ? (
+                  );
+                })}
+                {sortedRows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-6">
                       <EmptyState

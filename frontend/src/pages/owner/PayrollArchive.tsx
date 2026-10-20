@@ -209,14 +209,14 @@ const PayrollArchive = () => {
               onClick={() => exportService.downloadExcel("/exports/payroll/archive/excel", "payroll_archive", buildCleanParams(filters) as Record<string, unknown>)}
               className="h-11 rounded-xl px-4 font-black text-xs"
             >
-              <FileSpreadsheet size={16} className="ml-1.5" /> Excel
+              <FileSpreadsheet size={16} className="ms-1.5" /> Excel
             </Button>
             <Button variant="outline" onClick={handlePrint} className="h-11 rounded-xl px-4 font-black text-xs">
-              <Printer size={16} className="ml-1.5" /> طباعة / PDF
+              <Printer size={16} className="ms-1.5" /> طباعة / PDF
             </Button>
             <Link to="/owner/payroll">
               <Button variant="ghost" className="h-11 rounded-xl border border-border bg-card px-4 font-black text-xs">
-                <ArrowRight size={16} className="ml-1.5" /> العودة للرواتب
+                <ArrowRight size={16} className="ms-1.5" /> العودة للرواتب
               </Button>
             </Link>
           </div>
@@ -251,7 +251,7 @@ const PayrollArchive = () => {
               <h3 className="text-sm font-black">فلاتر البحث المتقدم</h3>
               <p className="text-[11px] font-bold text-muted">نطاق زمني + حالة + بحث بالاسم — كل تغيير يحدّث النتائج تلقائياً</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleReset} className="mr-auto h-8 rounded-xl text-xs font-black gap-1"><X size={12} /> إعادة ضبط</Button>
+            <Button variant="ghost" size="sm" onClick={handleReset} className="me-auto h-8 rounded-xl text-xs font-black gap-1"><X size={12} /> إعادة ضبط</Button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -306,7 +306,7 @@ const PayrollArchive = () => {
           <Field label="بحث بالاسم">
             <div className="relative">
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted" />
-              <Input value={qDraft} onChange={(e) => setQDraft(e.target.value)} placeholder="اكتب اسم الموظف... يبحث تلقائياً" className="h-11 pr-9 rounded-xl bg-soft border-border font-bold" />
+              <Input value={qDraft} onChange={(e) => setQDraft(e.target.value)} placeholder="اكتب اسم الموظف... يبحث تلقائياً" className="h-11 pe-9 rounded-xl bg-soft border-border font-bold" />
               {qDraft && (
                 <button onClick={() => setQDraft("")} className="absolute left-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg bg-card border flex items-center justify-center text-muted">
                   <X size={12} />
@@ -444,7 +444,7 @@ const PayrollArchive = () => {
                 <DialogTitle className="text-lg font-black text-white">قسيمة الراتب</DialogTitle>
                 <DialogDescription className="text-xs font-bold text-slate-300">قراءة فقط • الأرشيف لا يسمح بالتعديل</DialogDescription>
               </div>
-              <div className="mr-auto"><StatusBadge status={String(detailItem?.status || "")} /></div>
+              <div className="me-auto"><StatusBadge status={String(detailItem?.status || "")} /></div>
             </div>
             {detailItem && (
               <div className="relative mt-3 flex items-center gap-2 text-[11px] font-bold text-slate-400">
@@ -483,7 +483,7 @@ const PayrollArchive = () => {
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-2"><label className="mr-1 text-[11px] font-black uppercase tracking-widest text-muted">{label}</label>{children}</div>;
+  return <div className="space-y-2"><label className="me-1 text-[11px] font-black uppercase tracking-widest text-muted">{label}</label>{children}</div>;
 }
 
 function StatusBadge({ status }: { status: string }) {

@@ -56,5 +56,18 @@ export interface LoginResponse {
   access_token: string;
   refresh_token?: string;
   user?: User;
+  /**
+   * Set when the account is a privileged role that must enrol in two-factor
+   * auth, but has not yet. Two different states share it:
+   *
+   * - `true`  the session is restricted to the two enrolment endpoints and the
+   *           rest of the API answers 403. The user must set up an
+   *           authenticator before anything else works.
+   * - absent the session is normal, but an ISO deadline is present in
+   *           `2fa_enrollment_due`, after which the session becomes restricted.
+   */
+  "2fa_enrollment_required"?: boolean;
+  /** ISO timestamp after which this account's session becomes restricted. */
+  "2fa_enrollment_due"?: string | null;
   [key: string]: unknown;
 }

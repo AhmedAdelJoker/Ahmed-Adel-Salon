@@ -93,6 +93,7 @@ export function LogDetailDialog({
                     src={image}
                     alt={product?.name || `صنف #${log.product_id}`}
                     className="h-full w-full object-cover"
+    onError={(e) => { e.currentTarget.style.display = "none"; }}
                   />
                 ) : (
                   <Package size={20} className="text-muted" />
@@ -219,7 +220,7 @@ export function LogDetailDialog({
                 إغلاق
               </Button>
               <Button onClick={onGoInventory} className="flex-1 h-11 rounded-xl font-black">
-                الذهاب للمخزون <ExternalLink size={14} className="mr-2" />
+                الذهاب للمخزون <ExternalLink size={14} className="me-2" />
               </Button>
             </div>
           </div>

@@ -1,5 +1,6 @@
 /** HR DocumentsTab (moved from HRManagement page, no logic changes). */
 import { toast } from "react-hot-toast";
+import { EmptyState } from "@/components/shared/EmptyState";
 import type { EmployeeRecord, DocumentRecord } from "@/types/employee";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +41,7 @@ export default function DocumentsTab({
                 onClick={() => (document.getElementById("doc-upload") as HTMLInputElement | null)?.click()}
                 className="h-12 px-6 rounded-xl bg-accent font-black text-xs uppercase tracking-widest shadow-lg shadow-accent/20"
               >
-                <Plus size={18} className="ml-2" /> رفع مستند جديد
+                <Plus size={18} className="ms-2" /> رفع مستند جديد
                 <input
                   id="doc-upload"
                   type="file"
@@ -162,12 +163,7 @@ export default function DocumentsTab({
                   </div>
                 ))
               ) : (
-                <div className="text-center p-12 rounded-[2rem] border-2 border-dashed border-border/40">
-                  <Archive className="mx-auto text-muted/20 mb-4" size={48} />
-                  <p className="text-xs font-bold text-muted">
-                    لا يوجد مستندات مؤرشفة لهذا الموظف حتى الآن.
-                  </p>
-                </div>
+                <EmptyState variant="section" icon={Archive} title="لا يوجد مستندات مؤرشفة لهذا الموظف حتى الآن." />
               )}
             </div>
           </div>

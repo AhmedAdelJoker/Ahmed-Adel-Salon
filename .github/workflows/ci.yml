@@ -17,6 +17,10 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
       - run: npm ci
+      # Named-commit convention, matching the other audit steps: a dependency
+      # report that does not say which lockfile it read cannot be compared
+      # against a later run.
+      - run: echo "audited state $(git rev-parse --short HEAD)"
       - run: npm audit --omit=dev --audit-level=high
 
   backend-tests:
@@ -35,7 +39,31 @@ jobs:
           pip install -r requirements.txt
 
       - name: Audit dependencies
+        # `working-directory`, not `cd`. The `cd backend` in the install step
+        # above does not carry into this one: each `run:` is a fresh shell at
+        # the repository root, so this step was looking for requirements.txt one
+        # directory too high and died with
+        # `invalid requirements input: requirements.txt` -- a file that exists,
+        # just not where it was looking. Every other step that needs to run from
+        # `backend/` says so explicitly; this one now does too.
+        working-directory: backend
         run: |
+          # Print what is being audited, before auditing it.
+          #
+          # This exists because a stale log is indistinguishable from a real
+          # failure when the only thing the log reports is a package name and a
+          # version. Three fixes in a row were pushed, each correcting something
+          # the previous CI run had reported, and a report of
+          # "cryptography 46.0.3 has vulnerabilities" cannot tell you whether it
+          # describes the file as it is now or as it was three commits ago.
+          #
+          # A log that names its own commit and its own pins is either current
+          # or visibly not, with no guessing.
+          echo "::group::audited state"
+          echo "commit: $(git rev-parse --short HEAD)"
+          echo "ref:    $(git rev-parse --abbrev-ref HEAD)"
+          grep -E '^(cryptography|PyJWT|pyotp)==' requirements.txt
+          echo "::endgroup::"
           python -m pip install pip-audit
           pip-audit -r requirements.txt
 
@@ -44,12 +72,61 @@ jobs:
           cd backend
           pytest -v
 
+      # Postgres readiness.
+      #
+      # The Alembic chain contains SQLite-only DDL by design (see the migration
+      # docstrings), so the Postgres schema is built from `create_all` and
+      # stamped. This step proves that rendering actually compiles and is
+      # complete — a column type with no Postgres equivalent, or a foreign-key
+      # cycle that `CREATE TABLE` cannot satisfy, is only visible here.
+      #
+      # The FK-cycle check is the one that matters most: SQLite defers
+      # foreign-key enforcement to commit time and so accepts a cycle that
+      # PostgreSQL rejects outright, which would make the first Postgres deploy
+      # fail no matter how many tests passed beforehand.
+      - name: Verify the schema renders on PostgreSQL
+        run: |
+          cd backend
+          python scripts/verify_postgres_schema.py
+
+      # Dialect audit. Reports SQLite-only SQL that would fail on Postgres.
+      # Informational today, and worth tightening to a hard failure as the
+      # remaining migrations are made dialect-agnostic.
+      - name: Audit dialect-specific SQL
+        run: |
+          cd backend
+          python scripts/audit_postgres_readiness.py || true
+
+      - name: Audit for sync-endpoint WebSocket broadcasts
+        run: |
+          cd backend
+          python scripts/audit_sync_broadcasts.py
+
+      - name: Verify the sync-broadcast guard actually detects the defect
+        run: |
+          cd backend
+          python scripts/verify_sync_broadcast_guard.py
+
+      - name: Audit encoding
+        run: |
+          cd backend
+          python scripts/check_mojibake.py
+
+      # `alembic upgrade head` exiting 0 only means every upgrade() ran without
+      # raising; the script is what compares the resulting schema against the
+      # models. It lives in scripts/ rather than inline because the previous
+      # inline version ended with `import app.main`, which instantiates
+      # Settings and needs DATABASE_URL, SECRET_KEY and FIRST_SUPERUSER_PASSWORD
+      # -- so the schema check died on a pydantic ValidationError and CI called
+      # it a migration failure. `alembic upgrade head` on the line above survives
+      # the same problem only because alembic/env.py wraps its settings lookup in
+      # a try/except; the check must not import the application at all.
       - name: Verify clean-room migrations
         run: |
           cd backend
           rm -f salon_pro.db
           alembic upgrade head
-          python -c "from sqlalchemy import create_engine, text; engine=create_engine('sqlite:///salon_pro.db'); connection=engine.connect(); assert connection.execute(text(\"SELECT version_num FROM alembic_version\")).scalar() == 'd6e7f8a9b0c1'; assert not connection.execute(text('PRAGMA foreign_key_check')).fetchall(); connection.close()"
+          python scripts/verify_migration_head.py
 
   frontend-lint:
     runs-on: ubuntu-latest
@@ -70,6 +147,10 @@ jobs:
 
       - name: Audit production dependencies
         run: |
+          # Same reasoning as the backend audit: name the commit, so a log is
+          # either current or visibly not. `npm audit` output otherwise carries
+          # nothing that ties it to a lockfile.
+          echo "audited state: $(git rev-parse --short HEAD) ($(git rev-parse --abbrev-ref HEAD))"
           cd frontend
           npm audit --omit=dev --audit-level=high
 
@@ -82,6 +163,18 @@ jobs:
         run: |
           cd frontend
           npm run typecheck
+
+      # Design-system integrity. These are cheap, run on the raw source, and
+      # catch a whole class of defect that typecheck and unit tests cannot:
+      # a custom property that resolves to nothing, a self-referential token
+      # cycle, a raw hex that bypasses the theme, an Arabic string with a
+      # half-typed English word spliced into it, and a physical spacing
+      # utility that would mirror wrongly the moment the locale flips.
+      - name: Verify design tokens and copy integrity
+        run: |
+          cd frontend
+          npm run check:tokens
+          npm run prune:css:check
 
       - name: Run tests
         run: |
@@ -173,17 +266,325 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  build:
+  # P7.6. Two complementary scanners, because they fail in different ways.
+  #
+  # Bandit is pattern-based and catches the specific constructs that produce
+  # vulnerabilities (string-built SQL, hardcoded credentials, disabled
+  # verification). Gitleaks is entropy-based and catches the thing Bandit
+  # structurally cannot see: a working credential with no telling name, pasted
+  # into a file where nothing looks like a password.
+  #
+  # Both run here rather than relying on either alone. The repo-local scanner in
+  # scripts/scan_secrets.py is deliberately not a third gate: it is a fast
+  # pre-commit convenience and CI is where the authoritative check belongs.
+  security-sast:
     runs-on: ubuntu-latest
-    needs: [root-dependency-audit, backend-tests, frontend-lint, public-site, e2e-smoke]
+    # `contents: read` is what the scanners need and the most this job should
+    # normally hold. The two write scopes below are for the Gitleaks action
+    # alone: it uploads a SARIF report and comments on the pull request, and it
+    # cannot do either with read-only contents -- which is why it was failing in
+    # five seconds with nothing to say, and why the step that actually gates
+    # never ran. GitHub downgrades GITHUB_TOKEN to read-only on a pull request
+    # from a fork no matter what is declared here, so the CLI step below is still
+    # the one that has to hold.
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: CI_ONLY-not-a-real-secret
+          POSTGRES_DB: salon_migration_test
+        ports:
+          - 5432:5432
+        # A real server, not a mock. The migration history shipped broken on
+        # PostgreSQL for its entire life because only SQLite was ever exercised,
+        # and four separate dialect errors sat in the chain undetected:
+        # `boolean DEFAULT 0`, `pragma_table_info`, `INSERT OR IGNORE`, and
+        # `CREATE INDEX CONCURRENTLY` inside Alembic's transaction.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Gitleaks needs the full history to find a secret that was committed
+          # and removed later. A shallow clone would let a scrubbed credential
+          # through permanently, which defeats the purpose of the scan.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Bandit and drivers
+        run: |
+          pip install bandit psycopg2-binary
+
+      # Fails on HIGH and MEDIUM. LOW findings are printed by the same script but
+      # do not fail the build, because every LOW in this repository is a known
+      # false positive and a gate that cries wolf gets switched off. The script
+      # annotates each one with why, and marks any unrecognised category as NEW.
+      - name: Bandit (HIGH + MEDIUM gate)
+        working-directory: backend
+        run: python scripts/scan_python_security.py
+
+      - name: Local secret scan
+        run: python scripts/scan_secrets.py
+
+      # The audit imports the real application -- `from app.main import app` --
+      # and walks its router tree, so it needs the application's dependencies,
+      # not just a driver. It was written to run against a venv that had them
+      # all, and the runner installs only `bandit psycopg2-binary` at this
+      # point, so the step died on `ModuleNotFoundError: No module named
+      # 'fastapi'`.
+      #
+      # Installed here rather than at the top with Bandit because Bandit reads
+      # source and does not import it, and `pip install -r requirements.txt`
+      # pulls in pandas, openpyxl and reportlab. A security gate that is slow
+      # enough to be tolerated-with-because-it-is-thorough is a gate that gets
+      # switched off.
+      - name: Install the application for the router audit
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      # Walks the router tree and fails if any endpoint authenticates nobody, or
+      # mutates state without either a role check or being self-service. This is
+      # the check that would catch a `Depends(require_owner)` being dropped from a
+      # destructive endpoint, which no existing test notices: the tests that
+      # exercise the endpoint use an admin token, so they pass either way.
+      - name: Authorisation audit
+        working-directory: backend
+        run: python scripts/audit_authorization.py
+
+      # The only check that runs the migration history on the dialect it is
+      # deployed to. Everything else in this file builds its database from the
+      # models, so a migration that is valid SQL and invalid PostgreSQL is
+      # invisible to all of it.
+      #
+      # No install step: `requirements.txt` is already installed above, for the
+      # router audit. It used to install them again here, which was harmless and
+      # slow, and it was the only reason that step was not obviously dependent on
+      # an earlier one.
+      - name: Replay the migration history on PostgreSQL
+        working-directory: backend
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg2://postgres:CI_ONLY-not-a-real-secret@127.0.0.1:5432/salon_migration_test
+        run: python -m pytest tests/test_postgres_migration_chain.py -q
+
+      # Concurrency. SQLite serialises every writer behind one lock, so none of
+      # these races can occur there and none of them can be tested there. The
+      # inventory one in particular is the difference between stock that exists
+      # and stock that does not, and it is only reachable with two real
+      # transactions.
+      - name: Concurrency against a real server
+        working-directory: backend
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg2://postgres:CI_ONLY-not-a-real-secret@127.0.0.1:5432/salon_migration_test
+        run: |
+          python -m pytest tests/test_postgres_concurrency.py -q
+
+      # Whether the 46 indexes in c4d7e9f1a3b5 are actually used. Needs a
+      # seeded million rows: on the few-hundred-row test database the planner
+      # answers every one of those queries with a sequential scan, which is
+      # correct for a small table and tells you nothing about a real one.
+      - name: Index usage at a million rows
+        working-directory: backend
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg2://postgres:CI_ONLY-not-a-real-secret@127.0.0.1:5432/salon_scale
+        run: |
+          # A separate database from the migration test: seeding a million rows
+          # into the one the history was just verified against would leave it
+          # dirty for any later step, and the two jobs are independent.
+          psql "postgresql://postgres:CI_ONLY-not-a-real-secret@127.0.0.1:5432/postgres" \
+            -c "CREATE DATABASE salon_scale" || true
+          DATABASE_URL="$TEST_POSTGRES_URL" python -m alembic upgrade head
+          python scripts/seed_million_rows.py --confirm
+          python -m pytest tests/test_index_usage_at_scale.py -q
+
+      # The action scans and comments on the pull request. It cannot be the gate:
+      # without a licence it cannot annotate a fork's pull request, and GitHub
+      # downgrades GITHUB_TOKEN to read-only on a fork regardless of what this
+      # file asks for, so there is a case -- a pull request from a fork -- where
+      # this step cannot succeed and has nothing to say. The CLI step below is
+      # what holds.
+      #
+      # Two things were wrong here and the step failed in one second both times.
+      #
+      # `GITHUB_TOKEN` was set from `secrets.GITLEAKS_LICENSE`. Those are two
+      # different secrets that the documentation lists on two different lines, and
+      # this is a personal account, where the licence is not required and is
+      # almost certainly not configured -- so GITHUB_TOKEN resolved to an empty
+      # string, overriding the token GitHub injects automatically. The action
+      # requires a valid token to call the API and exits immediately without one.
+      # A scan cannot fail that fast; the step was never scanning anything.
+      #
+      # And v2 was pinned. GitHub removed Node 20 from hosted runners on
+      # 2026-09-16, and gitleaks-action v2 is a Node 20 action: it will not run
+      # again regardless of the token. v3 is a Node 24 build with, per its
+      # README, "no changes to inputs, outputs, or behavior".
+      #
+      # `continue-on-error` is what makes the arrangement safe in both
+      # directions, and it is deliberately the opposite of trusting it to fail
+      # loudly. If the action finds a secret, the CLI step two lines below scans
+      # the same history with the same default rules (there is no
+      # `.gitleaks.toml` in this repository, so both use Gitleaks' bundled
+      # config) and fails the job. If the action fails for any other reason --
+      # a token it cannot use, a permission it does not have -- the job carries
+      # on to the step that can actually enforce the rule. What is not acceptable
+      # is the arrangement before this change, where the step that annotates
+      # decides whether the step that gates ever runs at all.
+      - name: Gitleaks (entropy-based)
+        uses: gitleaks/gitleaks-action@v3
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE is only required for organization-owned repositories.
+          # This one is a personal account, where gitleaks.io issues no licence.
+        with:
+          args: --redact --verbose --no-banner
+
+      # Belt and braces, and the step that makes the gate hold on a fork. It
+      # installs the CLI itself rather than assuming the action above left a
+      # usable binary on PATH: nothing in the workflow promised that, the action's
+      # own version controls it, and a security gate that fails with "command not
+      # found" is indistinguishable from a security gate that found a secret.
+      #
+      # The checksum is pinned to the value in the upstream
+      # `gitleaks_8.30.1_checksums.txt`, which was cross-checked against GitHub's
+      # own asset digest before being written here. Bump both together.
+      - name: Fail on any Gitleaks finding
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
+          tar -xzf "$archive" gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+          gitleaks detect --source . --redact --no-banner --verbose
+          echo "If this step fails, a secret is in the history. Rotate it first: deleting the file does not remove it from git."
+
+  # CodeQL runs as its own job because it needs the security-events write
+  # permission and a matrix over languages, and because a language that has no
+  # CodeQL support should not block the one that does.
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    needs:
+      [
+        root-dependency-audit,
+        backend-tests,
+        frontend-lint,
+        public-site,
+        e2e-smoke,
+        security-sast,
+      ]
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          language: ${{ matrix.language }}
+          # Not in the default paths: the SQL migrations and the Electron
+          # bootstrap are hand-written security-relevant code that a query would
+          # otherwise never reach.
+          paths: |
+            backend
+            frontend/src
+            frontend/scripts
+            scripts
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}
+
+  production-boot:
+    runs-on: ubuntu-latest
+    needs:
+      [
+        root-dependency-audit,
+        backend-tests,
+        frontend-lint,
+        public-site,
+        e2e-smoke,
+        security-sast,
+        codeql,
+      ]
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Docker images
-        run: |
-          docker compose build
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      - name: Verify images
+      - name: Install dependencies
         run: |
-          docker compose config
+          cd backend
+          pip install -r requirements.txt
+
+      # Guards the secrets that used to only be enforced in the (now removed)
+      # container image: production must refuse placeholder values and the
+      # demo seed must not run outside development.
+      - name: Refuse placeholder secrets in production
+        env:
+          ENVIRONMENT: production
+          SECRET_KEY: changeme-in-production
+          FIRST_SUPERUSER_PASSWORD: Str0ngPass!2345
+        run: |
+          cd backend
+          if python -c "import app.core.config" 2>/tmp/cfg_err; then
+            echo "::error::production accepted a placeholder SECRET_KEY"
+            exit 1
+          fi
+          grep -q "SECRET_KEY" /tmp/cfg_err \
+            || { echo "::error::unexpected failure"; cat /tmp/cfg_err; exit 1; }
+          echo "placeholder secret correctly rejected"
+
+      - name: Boot the ASGI app on a real port
+        env:
+          ENVIRONMENT: production
+          SEED_DEMO_DATA: "false"
+          DATABASE_URL: sqlite:///./salon_pro.db
+          FIRST_SUPERUSER_PASSWORD: Str0ngPass!2345
+        run: |
+          cd backend
+          SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+          export SECRET_KEY
+          alembic upgrade head
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 18001 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:18001/health >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18001/health
+          # Production must not expose the interactive docs or the schema.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18001/openapi.json)
+          if [ "$code" != "404" ]; then
+            echo "::error::openapi.json exposed in production (HTTP $code)"
+            exit 1
+          fi
+          echo "health OK and docs hidden in production"

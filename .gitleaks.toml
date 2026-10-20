@@ -1,0 +1,69 @@
+title = "Ahmed-Adel-Salon secret scan configuration"
+
+# Gitleaks' own ruleset is the point of this file. `useDefault` keeps it, and
+# everything below only removes specific findings that have been looked at.
+[extend]
+useDefault = true
+
+# Six findings, all from the `generic-api-key` rule, all triaged by hand.
+#
+# The reason this file exists at all is that the gate now runs. `Fail on any
+# Gitleaks finding` was skipped on every run until 6fbf2b8, so the first time it
+# executed it failed -- and the honest reading of "a secret is in this
+# repository's history" had to be checked rather than believed. It was checked,
+# by running the same pinned binary over this same history locally. None of the
+# six is a credential. What they are, and why each exemption is as narrow as it
+# can be:
+#
+# 1. `frontend/src/lib/auth/twoFactorEnrollment.ts:25`
+#      export const ENROLLMENT_DUE_KEY = "2fa_enrollment_due"
+#    A localStorage *key name*, 18 characters, a phrase. Gitleaks matched the
+#    `generic-api-key` heuristic on the identifier ending in `_KEY` next to a
+#    16+ character string. The file's own header says what it is: "This is a UX
+#    affordance and nothing more. The enforcement is the 403 that
+#    `authenticate_access_token` returns for a restricted scope, and it does not
+#    depend on anything in this file." It is also a value the browser bundle
+#    cannot avoid containing -- it is read back with
+#    `localStorage.getItem(ENROLLMENT_DUE_KEY)`, so it ships to every client by
+#    construction, and rotating it would achieve nothing. Matched by value, not by
+#    path: exempting the whole file would hide a real secret added to it later.
+#
+# 2-6. `backend/tests/test_p0_security_regressions.py` and
+#      `backend/tests/test_public_member_auth.py`
+#    Five `"password": "..."` literals in pytest files. They are fixtures: the
+#    suite runs against a per-process SQLite file that `conftest.py` creates and
+#    deletes, so there is no system for a fixture password to unlock. Checked
+#    rather than assumed -- no file under `backend/app/` contains a
+#    password-shaped literal at all.
+#
+# What is deliberately NOT done here:
+#
+# * No `stopwords`. Adding a word like "password" or "test" to the global
+#   stopword list would silence real findings that happen to contain it, and a
+#   stopword list is invisible at the point where it does damage.
+# * No exemption for `frontend/`, `.env.example`, `conftest.py` or the scripts
+#   that carry the `not-a-real-secret` stubs. Those are exactly where a real
+#   pasted credential would land.
+# * No exemption for `backend/app/`, which is the code that runs.
+#
+# The residual risk is stated rather than hidden: the test-directory exemption is
+# by path, so a credential pasted into a test file in a future commit would not
+# be reported. That is the accepted cost of having test fixtures that a
+# rule-based scanner cannot distinguish from secrets. The alternative -- removing
+# the literals from the tests -- would mean generating a random password per run,
+# which changes what the tests assert for no security benefit.
+[allowlist]
+description = "Triaged false positives: a localStorage key name, and pytest fixture passwords."
+regexes = [
+  # The localStorage key, matched by value. See note 1 above.
+  #
+  # No quotes: Gitleaks matches `allowlist.regexes` against the extracted secret,
+  # which is `2fa_enrollment_due` and not the `"2fa_enrollment_due"` it appears
+  # as in the source. The first version of this line included the quotes and
+  # silently exempted nothing.
+  '''2fa_enrollment_due''',
+]
+paths = [
+  # Notes 2-6 above: fixture credentials in the test suite.
+  '''^backend/tests/''',
+]

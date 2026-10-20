@@ -1,6 +1,6 @@
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import os
@@ -8,16 +8,24 @@ import uuid
 import shutil
 
 from app.db.session import get_db
-from app.api.deps import require_manage_employees
+from app.api.deps import require_manage_employees, require_any_staff, require_view_employees
 from app.models.employee import Employee
 from app.models.service import Service
 from app.models.user import User
-from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeRead, EmployeeListItem
+from app.schemas.employee import (
+    EmployeeCreate,
+    EmployeeUpdate,
+    EmployeeRead,
+    EmployeeListItem,
+    EmployeePOSItem,
+)
 from app.utils.media import process_image_content, get_upload_path
+from app.core.employee_rules import digits_only, is_service_provider_job_title
 from app.core.security import get_password_hash, validate_password_strength
 from app.core.rbac import can_access
 from app.core.roles import UserRole, normalize_role
 from app.core.upload_security import validate_image
+from app.core.audit import audit_log
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
@@ -58,6 +66,50 @@ def _ensure_employee_mutable(
             detail="لا يمكنك تعديل موظف مرتبط بدور أعلى من دورك",
         )
 
+
+def _ensure_identity_is_free(
+    db: Session,
+    *,
+    phone: Optional[str] = None,
+    national_id: Optional[str] = None,
+    exclude_id: Optional[int] = None,
+) -> None:
+    """One person, one primary number and one national id.
+
+    Two employees sharing a number means attendance and payouts land against
+    the wrong person, and two rows sharing a national id is the duplicate a
+    payroll audit finds months later. 409 rather than 400: the request is
+    well-formed, it just conflicts with a record that already exists, and the
+    message says exactly which one so the owner can go look.
+
+    `phone` and `national_id` are expected already normalized by the schema
+    (digits only, English numerals); they are normalized again here so a direct
+    caller cannot skip it.
+    """
+    if phone:
+        digits = digits_only(phone)
+        query = db.query(Employee).filter(Employee.phone_primary == digits)
+        if exclude_id is not None:
+            query = query.filter(Employee.id != exclude_id)
+        holder = query.first()
+        if holder:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"رقم الجوال مسجل بالفعل للموظف: {holder.full_name}",
+            )
+
+    if national_id:
+        digits = digits_only(national_id)
+        query = db.query(Employee).filter(Employee.national_id == digits)
+        if exclude_id is not None:
+            query = query.filter(Employee.id != exclude_id)
+        holder = query.first()
+        if holder:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"رقم الهوية مسجل بالفعل للموظف: {holder.full_name}",
+            )
+
 @router.post("/upload-image")
 async def upload_employee_image(
     file: UploadFile = File(...),
@@ -73,9 +125,12 @@ async def upload_employee_image(
 def list_employees(
     response: Response,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_manage_employees),
+    # Read-only roster: accountant's attendance/payroll/reports pages render
+    # base_salary, so they need the list; HR writes stay manage-employees-only.
+    current_user: User = Depends(require_view_employees),
     job_title: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
     limit: int = Query(2000, ge=1, le=2000),
     offset: int = Query(0, ge=0),
     page: Optional[int] = Query(None, ge=1),
@@ -87,6 +142,17 @@ def list_employees(
         query = query.filter(Employee.job_title == job_title)
     if status:
         query = query.filter(Employee.status == status)
+    # Free-text over name/phone/national id. Mirrors /employees/archive so the
+    # two rosters answer the same "who is this number?" question; the
+    # add-employee form uses it to catch a phone or a national id that is
+    # already on file before saving.
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            (Employee.full_name.ilike(like))
+            | (Employee.phone_primary.ilike(like))
+            | (Employee.national_id.ilike(like))
+        )
     
     eff_offset = offset
     eff_limit = limit
@@ -119,14 +185,19 @@ def list_employees(
 @router.get("/archive", response_model=List[EmployeeListItem])
 def list_archived_employees(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_manage_employees),
+    current_user: User = Depends(require_view_employees),
     q: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(1000, ge=1, le=2000),
 ):
-    """List archived employees (suspended/resigned). Owner and Manager can view."""
-    archived_statuses = ["suspended", "resigned"]
+    """List archived employees (resigned only). Owner and Manager can view.
+
+    An employee on leave (`suspended`) is NOT archived: the salon keeps them in
+    the team list with a "في إجازة" badge, one tap away from coming back. The
+    archive is for people who left (`resigned`).
+    """
+    archived_statuses = ["resigned"]
     query = db.query(Employee).options(
         joinedload(Employee.assistant_of), joinedload(Employee.services)
     ).filter(Employee.status.in_(archived_statuses))
@@ -149,11 +220,70 @@ def list_archived_employees(
     return employees
 
 
+def _slim_active_staff(db: Session, limit: int, *, pos_visible_only: bool) -> list:
+    """Active staff rows for operational surfaces, payroll-free.
+
+    Shared by ``GET /employees/pos`` (till: honors the owner-controlled
+    ``show_in_pos`` toggle) and ``GET /employees/active`` (bookings board:
+    every assignable staff member, incl. staff hidden from the public
+    online-booking site).
+    """
+    filters = [Employee.is_active == True, Employee.status == "active"]  # noqa: E712
+    if pos_visible_only:
+        filters.append(Employee.show_in_pos == True)  # noqa: E712
+
+    employees = (
+        db.query(Employee)
+        .options(joinedload(Employee.services))
+        .filter(*filters)
+        .order_by(Employee.display_order.asc(), Employee.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+    for emp in employees:
+        emp.service_ids = [s.id for s in emp.services]
+
+    return employees
+
+
+@router.get("/pos", response_model=List[EmployeePOSItem])
+def list_pos_employees(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_staff),
+    limit: int = Query(500, ge=1, le=2000),
+):
+    """Active staff for the POS terminal.
+
+    The till must load for cashiers and barbers, but ``GET /employees`` carries
+    payroll data (base_salary, commission_rate) and stays manage-employees-only.
+    This returns identity + service links only, honoring the owner-controlled
+    ``show_in_pos`` toggle ("الظهور في نقطة البيع") from the HR form.
+    """
+    return _slim_active_staff(db, limit, pos_visible_only=True)
+
+
+@router.get("/active", response_model=List[EmployeePOSItem])
+def list_active_employees(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_staff),
+    limit: int = Query(500, ge=1, le=2000),
+):
+    """All currently working staff, for the internal bookings board.
+
+    Deliberately no ``show_in_pos``/``show_in_booking`` filter: those toggles
+    govern customer-facing surfaces (till, public online booking), while the
+    board is where front desk assigns walk-ins — hiding a barber there because
+    they are switched off for online booking would block walk-in assignment.
+    """
+    return _slim_active_staff(db, limit, pos_visible_only=False)
+
+
 @router.get("/{employee_id}", response_model=EmployeeRead)
 def get_employee(
     employee_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_manage_employees),
+    current_user: User = Depends(require_view_employees),
 ):
     employee = db.query(Employee).options(
         joinedload(Employee.assistant_of), 
@@ -201,10 +331,21 @@ def create_employee(
         exclude={"username", "password", "role", "service_ids"},
         exclude_unset=False,
     )
+
+    # The booking switch is owner intent *within* a classification: a manager,
+    # accountant or assistant never reaches the public site even if the switch
+    # was left on through a mis-click. The classification is server-side so a
+    # direct API call cannot bypass it either.
+    data["show_in_booking"] = bool(data.get("show_in_booking")) and is_service_provider_job_title(
+        data.get("job_title")
+    )
+
+    # Request-shape validation first (pure, no DB): a weak password must be
+    # reported as 400 even when the payload also conflicts with an existing
+    # row — otherwise the 409 masks the user's actual mistake.
     username = (payload.username or "").strip() or None
     password = payload.password
-
-    linked_user_id = None
+    assigned_role = None
     if payload.has_login_account:
         if not username:
             raise HTTPException(status_code=400, detail="اسم المستخدم مطلوب لحساب الدخول")
@@ -215,11 +356,20 @@ def create_employee(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         default_role = (
-            "barber"
-            if str(data.get("job_title") or "").strip().lower() == "barber"
-            else "cashier"
+            "barber" if is_service_provider_job_title(data.get("job_title")) else "cashier"
         )
         assigned_role = _assignable_role(payload.role, current_user, default_role)
+
+    # Identity conflicts next, before a login user is created or any row is
+    # touched: a 409 must leave nothing half-written behind it.
+    _ensure_identity_is_free(
+        db,
+        phone=data.get("phone_primary"),
+        national_id=data.get("national_id"),
+    )
+
+    linked_user_id = None
+    if payload.has_login_account:
         existing = db.query(User).filter(User.username == username).first()
         if existing:
             raise HTTPException(status_code=400, detail="اسم المستخدم موجود مسبقاً")
@@ -277,6 +427,16 @@ def update_employee(
     raw.pop("serviceIds", None)
 
     update_data = raw
+
+    # An update must not be the side door around the create path's uniqueness —
+    # and a number may collide with someone *other* than the row being edited,
+    # hence the exclusion.
+    _ensure_identity_is_free(
+        db,
+        phone=update_data.get("phone_primary"),
+        national_id=update_data.get("national_id"),
+        exclude_id=employee.id,
+    )
     
     # Check assistant_of_barber_id
     if "assistant_of_barber_id" in update_data and update_data["assistant_of_barber_id"]:
@@ -287,6 +447,13 @@ def update_employee(
     for field, value in update_data.items():
         if hasattr(employee, field):
             setattr(employee, field, value)
+
+    # Same classification as create: whatever the payload said, a non-service
+    # title can not stay visible for online booking — this also self-heals rows
+    # saved before the rule existed.
+    employee.show_in_booking = bool(employee.show_in_booking) and is_service_provider_job_title(
+        employee.job_title
+    )
 
     has_login = update_data.get("has_login_account", employee.has_login_account)
     if has_login:
@@ -339,7 +506,7 @@ def update_employee(
                 raise HTTPException(status_code=400, detail=str(exc))
             default_role = (
                 "barber"
-                if str(employee.job_title or "").strip().lower() == "barber"
+                if is_service_provider_job_title(employee.job_title)
                 else "cashier"
             )
             assigned_role = _assignable_role(role_val, current_user, default_role)
@@ -375,6 +542,7 @@ def update_employee(
 @router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_employee(
     employee_id: int,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_manage_employees),
 ):
@@ -383,6 +551,19 @@ def delete_employee(
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
     _ensure_employee_mutable(db, employee, current_user)
 
+    # Snapshot before delete — after `db.delete()` the ORM state is expunged.
+    snapshot = {
+        "full_name": employee.full_name,
+        "job_title": employee.job_title,
+        "phone": employee.phone_primary,
+    }
     db.delete(employee)
     db.commit()
+    audit_log(
+        db, request, current_user,
+        action="delete_employee",
+        entity_type="employee",
+        entity_id=employee_id,
+        description={"deleted": snapshot},
+    )
     return None

@@ -18,7 +18,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { cn, formatTime12h } from "@/lib/core/utils";
+import {
+  cn,
+  formatCurrency,
+  formatTime12h,
+} from "@/lib/core/utils";
 import { getStatusConfig } from "@/pages/cashier/schedule/scheduleUtils";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -163,7 +167,7 @@ const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any)
                     </span>
                     {s.price != null && (
                       <span className="text-[10px] font-black text-accent tabular-nums">
-                        {s.price} ج.م
+                        {formatCurrency(s.price)}
                       </span>
                     )}
                   </div>

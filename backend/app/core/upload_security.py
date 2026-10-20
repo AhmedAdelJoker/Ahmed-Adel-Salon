@@ -190,6 +190,12 @@ async def validate_upload(
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 _PDF_EXTS = {".pdf"}
 _DATA_EXTS = {".xlsx", ".csv"}
+# Two container formats only. WebM is included because Safari/iOS has historically
+# shipped without MP4/H.264, so an mp4-only hero video renders as a blank box on
+# the platform a salon owner is most likely to demo from. Both are validated by
+# extension here; the public site picks whichever the browser reports support
+# for via `canPlayType`.
+_VIDEO_EXTS = {".mp4", ".webm"}
 _IMAGE_OR_PDF_EXTS = _IMAGE_EXTS | _PDF_EXTS
 
 
@@ -215,6 +221,17 @@ def _only(exts: set[str]):
 async def validate_image(upload: UploadFile, *, max_size: int | None = None) -> bytes:
     """Validate an image upload (jpg, jpeg, png, webp, gif)."""
     with _only(_IMAGE_EXTS):
+        return await validate_upload(upload, max_size=max_size)
+
+
+async def validate_video(upload: UploadFile, *, max_size: int | None = None) -> bytes:
+    """Validate a hero-video upload (mp4, webm).
+
+    Callers must pass an explicit `max_size`: the global image cap is far too
+    small for a short clip, and silently inheriting it would reject every video
+    a salon owner could realistically record on a phone.
+    """
+    with _only(_VIDEO_EXTS):
         return await validate_upload(upload, max_size=max_size)
 
 

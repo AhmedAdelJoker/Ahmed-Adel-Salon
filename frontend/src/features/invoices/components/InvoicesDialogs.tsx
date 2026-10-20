@@ -181,8 +181,8 @@ export function InvoiceDetailsDialog({
             onClick={onPrintSelected}
             className="h-10 rounded-xl px-4 sm:h-11 sm:px-6 premium-button"
           >
-            <Printer size={14} className="ml-2 sm:hidden" />
-            <Printer size={16} className="ml-2 hidden sm:block" /> طباعة
+            <Printer size={14} className="ms-2 sm:hidden" />
+            <Printer size={16} className="ms-2 hidden sm:block" /> طباعة
             إيصال
           </Button>
         </DialogFooter>

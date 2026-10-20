@@ -1,6 +1,7 @@
 import React from "react";
 import { vi, expect, describe, beforeEach, test } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import axe from "axe-core";
 import { toHaveNoViolations } from "jest-axe";
 import "@testing-library/jest-dom";
@@ -50,10 +51,17 @@ vi.mock("@/context/UIContext", () => ({
   UIProvider: ({ children }) => <>{children}</>,
 }));
 
-vi.mock("react-hot-toast", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-  Toaster: () => null,
-}));
+vi.mock("react-hot-toast", () => {
+  const toast = Object.assign(vi.fn(), {
+    success: vi.fn(),
+    error: vi.fn(),
+    loading: vi.fn(),
+    custom: vi.fn(),
+    dismiss: vi.fn(),
+    remove: vi.fn(),
+  });
+  return { toast, Toaster: () => null };
+});
 
 vi.mock("@/services/api", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -80,8 +88,14 @@ vi.mock("@/services/posShiftService", () => ({
 import POS from "@/pages/cashier/POS/index";
 
 describe("POS Page Accessibility (axe-core)", () => {
+  // The page reads/writes the router location (the /bookings handoff), so it
+  // needs a routing context to mount.
   const renderPOS = () => {
-    return render(<POS />);
+    return render(
+      <MemoryRouter>
+        <POS />
+      </MemoryRouter>,
+    );
   };
 
   beforeEach(() => {
@@ -91,19 +105,27 @@ describe("POS Page Accessibility (axe-core)", () => {
     document.documentElement.lang = "ar";
   });
 
-  test("POS page has no accessibility violations on initial load", async () => {
-    const { container } = renderPOS();
+  // axe-core over the whole POS tree is the slowest thing in the suite and
+  // outran the 10s global timeout whenever the runner was also busy with the
+  // file-scanning suites, which made this fail intermittently rather than for
+  // any accessibility reason.
+  test(
+    "POS page has no accessibility violations on initial load",
+    async () => {
+      const { container } = renderPOS();
 
-    // Wait for loading to complete
-    await waitFor(() => {
-      expect(
-        screen.queryByText("تنشيط محطة الـ POS الآمنة..."),
-      ).not.toBeInTheDocument();
-    });
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(
+          screen.queryByText("تنشيط محطة الـ POS الآمنة..."),
+        ).not.toBeInTheDocument();
+      });
 
-    const results = await axe.run(container);
-    expect(results).toHaveNoViolations();
-  });
+      const results = await axe.run(container);
+      expect(results).toHaveNoViolations();
+    },
+    60_000,
+  );
 
   test("Shift sidebar has no accessibility violations", async () => {
     const { container } = renderPOS();

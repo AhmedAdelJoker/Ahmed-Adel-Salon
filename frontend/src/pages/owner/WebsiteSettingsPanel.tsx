@@ -14,12 +14,15 @@ import {
   Link2,
   ShieldCheck,
   FileText,
+  Palette,
+  Check,
+  Video,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { PremiumCard, StatCard, SkeletonCard } from "@/components/shared/PremiumUI";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { staticURL } from "@/services/api";
@@ -33,7 +36,99 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   portfolio: ImageIcon,
   social: Share2,
   extras: FileText,
+  design: Palette,
 };
+
+/**
+ * The public site's palettes, mirrored from `public-site/src/lib/theme.ts`.
+ *
+ * These are literal hex values rather than the admin app's own tokens on
+ * purpose: this picker is describing the *visitor-facing* site, which has its
+ * own palette system. Reading these from `--accent` here would show the owner's
+ * swatch and quietly apply a different one.
+ *
+ * Three brand identities, each with a dark and a light ground. The ground is
+ * what changes when a visitor flips appearance; the accent — the thing the
+ * owner is actually choosing — stays put, which is why the two entries of a
+ * pair share a hue.
+ */
+const SITE_PALETTES = [
+  {
+    brand: "ember",
+    brandLabel: "جمر",
+    brandNote: "دافئ، جريء، واضح",
+    options: [
+      {
+        id: "midnight",
+        label: "حبر داكن",
+        note: "أسود مزرقّ مع مرجاني",
+        isDark: true,
+        bg: "#080B11",
+        card: "#131A24",
+        accent: "#FF5A36",
+      },
+      {
+        id: "gold",
+        label: "عاجي فاتح",
+        note: "ورقي دافئ مع قرمزي",
+        isDark: false,
+        bg: "#F3EFE6",
+        card: "#FFFDF8",
+        accent: "#D93B18",
+      },
+    ],
+  },
+  {
+    brand: "verdant",
+    brandLabel: "أخضر",
+    brandNote: "طبيعي، حيوي، مميز",
+    options: [
+      {
+        id: "moss",
+        label: "غابة داكنة",
+        note: "أخضر داكن مع ليموني",
+        isDark: true,
+        bg: "#0A100C",
+        card: "#131D16",
+        accent: "#A9E82E",
+      },
+      {
+        id: "clay",
+        label: "طين فاتح",
+        note: "طين دافئ مع فيروزي",
+        isDark: false,
+        bg: "#F6EBE1",
+        card: "#FFFBF6",
+        accent: "#0E7268",
+      },
+    ],
+  },
+  {
+    brand: "azure",
+    brandLabel: "أزرق",
+    brandNote: "هادئ، نظيف، احترافي",
+    options: [
+      {
+        id: "graphite",
+        label: "جرافيت داكن",
+        note: "رمادي مزرقّ مع سماوي",
+        isDark: true,
+        bg: "#0A1017",
+        card: "#151F2C",
+        accent: "#4C9EF5",
+      },
+      {
+        id: "silver",
+        label: "فضي فاتح",
+        note: "رمادي بارد dengan أزرق",
+        isDark: false,
+        bg: "#EDF1F6",
+        card: "#FFFFFF",
+        accent: "#0B5CC4",
+      },
+    ],
+  },
+] as const;
 
 const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { onSaved?: () => void; onChangeDraft?: (s: any) => void; embedded?: boolean }) => {
   const {
@@ -42,11 +137,14 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
     activeSubTab,
     setActiveSubTab,
     settings,
+    setSettings,
     updateField,
     handleSaveSettings,
     handleAddPortfolioImage,
     handleCoverImageUpload,
     removeCoverImage,
+    handleHeroVideoUpload,
+    removeHeroVideo,
     removePortfolioImage,
     updateArrayItem,
     SUB_TABS,
@@ -394,7 +492,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                         onClick={removeCoverImage}
                         className="text-danger border-danger/20 bg-card hover:bg-danger-soft hover:text-danger text-[11px] rounded-xl h-10"
                       >
-                        <Trash2 size={14} className="ml-1" /> حذف
+                        <Trash2 size={14} className="ms-1" /> حذف
                       </Button>
                     )}
                   </div>
@@ -423,6 +521,116 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* ── Hero video + motion ───────────────────────────────────────
+                  Sits next to the cover image because they occupy the same slot
+                  on the page: the poster is what shows before the clip loads,
+                  and if the owner clears the video the poster is what remains. */}
+              <div className="space-y-4 rounded-2xl border border-border bg-soft/40 p-5">
+                <SectionGroup title="فيديو الغلاف (اختياري)" />
+                <p className="text-xs font-bold leading-relaxed text-muted">
+                  فيديو قصير (10–15 ثانية) يظهر خلف عنوان الصفحة. الصيغ المدعومة MP4 و WebM، والحد الأقصى 25 م.ب.
+                  <span className="block mt-1 text-danger/80">
+                    مهم: صورة الغلاف مطلوبة — تُستخدم كصورة بديلة قبل تحميل الفيديو.
+                  </span>
+                </p>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <label className="h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-6 text-[11px] font-black text-white shadow-md hover:bg-primary/90 transition-colors flex">
+                    <Video size={14} /> {settings.landingHeroVideoUrl ? "استبدال الفيديو" : "رفع فيديو"}
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="video/mp4,video/webm,.mp4,.webm"
+                      onChange={handleHeroVideoUpload}
+                    />
+                  </label>
+                  {settings.landingHeroVideoUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={removeHeroVideo}
+                      className="text-danger border-danger/20 bg-card hover:bg-danger-soft hover:text-danger text-[11px] rounded-xl h-10"
+                    >
+                      <Trash2 size={14} className="ms-1" /> حذف
+                    </Button>
+                  )}
+                </div>
+
+                {settings.landingHeroVideoUrl && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="rounded-full text-[10px] font-black">
+                        <Video size={10} /> فيديو مرفوع
+                      </Badge>
+                      {!settings.landingVideoPosterUrl && (
+                        <Badge variant="warning" className="rounded-full text-[10px] font-black">
+                          بدون صورة بديلة
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Preview. `muted` + `playsInline` mirror the public hero,
+                        because an autoplaying preview would otherwise be refused
+                        by the browser and look broken in the panel. */}
+                    <div className="overflow-hidden rounded-xl border border-border bg-black aspect-video">
+                      <video
+                        key={settings.landingHeroVideoUrl}
+                        src={
+                          settings.landingHeroVideoUrl.startsWith("http")
+                            ? settings.landingHeroVideoUrl
+                            : `${staticURL}${settings.landingHeroVideoUrl}`
+                        }
+                        poster={
+                          settings.landingVideoPosterUrl ||
+                          (settings.landingCoverImageUrl
+                            ? `${staticURL}${settings.landingCoverImageUrl}`
+                            : undefined)
+                        }
+                        className="h-full w-full object-cover"
+                        controls
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                    </div>
+
+                    <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 cursor-pointer">
+                      <span className="text-[11px] font-black text-main">تشغيل الفيديو تلقائياً</span>
+                      <input
+                        type="checkbox"
+                        checked={settings.landingVideoAutoplay}
+                        onChange={(e) =>
+                          setSettings((p) => ({ ...p, landingVideoAutoplay: e.target.checked }))
+                        }
+                        className="w-4 h-4 accent-primary"
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
+
+              {/* Motion master switch. Explicitly framed as "not overriding the
+                  visitor's device setting" because an owner who turns this on
+                  expects animation everywhere, and it still will not be — the
+                  OS preference wins, always. */}
+              <div className="space-y-4 rounded-2xl border border-border bg-soft/40 p-5">
+                <SectionGroup title="الحركة والانتقالات" />
+                <p className="text-xs font-bold leading-relaxed text-muted">
+                  ظهور تدريجي للأقسام عند التمرير. هذا الخيار لا يتجاوز تفضيل جهاز الزائر: إذا كان نظامه يطلب تقليل الحركة، فلن تُعرض أي حركة.
+                </p>
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 cursor-pointer">
+                  <span className="text-[11px] font-black text-main">تفعيل أنميشن التمرير</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.landingMotionEnabled}
+                    onChange={(e) =>
+                      setSettings((p) => ({ ...p, landingMotionEnabled: e.target.checked }))
+                    }
+                    className="w-4 h-4 accent-primary"
+                  />
+                </label>
               </div>
 
               <div className="space-y-4">
@@ -472,7 +680,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                 ) : (
                   <EmptyState
                     title="المعرض فارغ"
-                    text="أضف صور أعمالك — ستظهر كشبكة جذابة في صفحة العميل."
+                    message="أضف صور أعمالك — ستظهر كشبكة جذابة في صفحة العميل."
                     icon={ImageIcon}
                     action={
                       <label className="h-11 cursor-pointer inline-flex items-center gap-2 rounded-xl bg-primary px-6 text-xs font-black text-white shadow-md hover:bg-primary/90 transition-colors">
@@ -514,7 +722,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                       <label htmlFor={social.id} className="text-[10px] font-black text-muted uppercase tracking-widest">
                         {social.label}
                       </label>
-                      {String(settings[social.id] || "").trim() && <Badge variant="success" size="sm" className="mr-auto rounded-full text-[9px]">مفعل</Badge>}
+                      {String(settings[social.id] || "").trim() && <Badge variant="success" size="sm" className="me-auto rounded-full text-[9px]">مفعل</Badge>}
                     </div>
                     <Input
                       id={social.id}
@@ -648,6 +856,186 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
             </PremiumCard>
           </motion.div>
         )}
+        {activeSubTab === "design" && (
+          <motion.div
+            key="design"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6"
+          >
+            <PremiumCard className="space-y-8">
+              <SectionGroup title="هوية الموقع" />
+              <p className="-mt-2 text-xs font-bold leading-relaxed text-muted">
+                اللون النشط يبقى ثابتاً كما هو. الخلفية فقط هي التي تتغيّر عندما
+                يختار الزائر الوضع الفاتح أو الداكن — ولهذا يأتي الخياران في كل
+                لون متشابهين.
+              </p>
+
+              <div className="space-y-7">
+                {SITE_PALETTES.map((brand) => (
+                  <div key={brand.brand} className="space-y-3">
+                    <div className="flex items-baseline gap-3">
+                      <h5 className="text-xs font-black text-main">
+                        {brand.brandLabel}
+                      </h5>
+                      <span className="text-[11px] font-bold text-muted">
+                        {brand.brandNote}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {brand.options.map((option) => {
+                        const active =
+                          String(settings.landingThemeId || "") === option.id;
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() =>
+                              updateField("landingThemeId", option.id)
+                            }
+                            aria-pressed={active}
+                            className={`group overflow-hidden rounded-2xl border-2 text-start transition-all duration-200 ${
+                              active
+                                ? "border-primary shadow-md"
+                                : "border-border hover:border-primary/40"
+                            }`}
+                          >
+                            {/*
+                              A miniature of the real thing: the ground, a
+                              raised surface, the signal used once for a
+                              headline and once for an action. Showing literal
+                              swatches would not tell the owner what the page
+                              will feel like.
+                            */}
+                            <span
+                              className="flex h-28 flex-col justify-between p-4"
+                              style={{ backgroundColor: option.bg }}
+                            >
+                              <span className="flex items-center justify-between">
+                                <span
+                                  className="h-2 w-14 rounded-full"
+                                  style={{ backgroundColor: option.accent }}
+                                />
+                                <span
+                                  className="h-2 w-2 rounded-full"
+                                  style={{
+                                    backgroundColor: option.accent,
+                                    opacity: 0.35,
+                                  }}
+                                />
+                              </span>
+                              <span className="space-y-2">
+                                <span
+                                  className="block h-2.5 w-3/4 rounded-full"
+                                  style={{
+                                    backgroundColor: option.card,
+                                    opacity: 0.9,
+                                  }}
+                                />
+                                <span
+                                  className="block h-6 w-24 rounded-lg"
+                                  style={{ backgroundColor: option.accent }}
+                                />
+                              </span>
+                            </span>
+
+                            <span className="flex items-center justify-between gap-2 border-t border-border bg-card px-4 py-3">
+                              <span className="min-w-0">
+                                <span className="block truncate text-xs font-black text-main">
+                                  {option.label}
+                                </span>
+                                <span className="block truncate text-[10px] font-bold text-muted">
+                                  {option.note}
+                                </span>
+                              </span>
+                              {active ? (
+                                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary text-white">
+                                  <Check size={12} />
+                                </span>
+                              ) : null}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </PremiumCard>
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <PremiumCard className="space-y-5">
+                <SectionGroup title="أقسام اختيارية" />
+                <div className="space-y-4">
+                  {(
+                    [
+                      [
+                        "landingShowStaff",
+                        "إظهار قسم الفريق",
+                        "يظهر اسم الحلاقين وصورهم إن كان لديك فريق.",
+                      ],
+                      [
+                        "landingShowStaffBio",
+                        "إظهار نبذة الحلاق",
+                        "يعرض الوصف إلى جانب الاسم والمسمّى.",
+                      ],
+                    ] as [string, string, string][]
+                  ).map(([key, label, hint]) => (
+                    <label
+                      key={key}
+                      htmlFor={`website-${key}`}
+                      className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-soft/40 p-4 transition-colors hover:border-primary/30"
+                    >
+                      <input
+                        id={`website-${key}`}
+                        type="checkbox"
+                        checked={Boolean(settings[key])}
+                        onChange={(e) => updateField(key, e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-xs font-black text-main">
+                          {label}
+                        </span>
+                        <span className="block text-[11px] font-bold text-muted">
+                          {hint}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </PremiumCard>
+
+              <PremiumCard className="space-y-5">
+                <SectionGroup title="شارة الهيدر العلوي" />
+                <div className="space-y-2">
+                  <label
+                    htmlFor="public-header-badge"
+                    className="text-[10px] font-black text-muted uppercase tracking-widest"
+                  >
+                    نص الشارة
+                  </label>
+                  <Input
+                    id="public-header-badge"
+                    value={String(
+                      settings.landingPublicHeaderBadge ?? "",
+                    )}
+                    onChange={(e) =>
+                      updateField("landingPublicHeaderBadge", e.target.value)
+                    }
+                    className="h-11 rounded-xl border-border bg-soft font-bold"
+                    placeholder="اتركه فارغاً لإخفائه"
+                  />
+                  <p className="text-[11px] font-bold text-muted">
+                    يظهر أعلى ترويسة الموقع. اتركه فارغاً لإخفاء الشارة بالكامل.
+                  </p>
+                </div>
+              </PremiumCard>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-border/60">
@@ -662,7 +1050,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
           loading={saving}
           className="h-12 rounded-xl px-8 font-black text-xs shadow-md disabled:opacity-60"
         >
-          <Save size={16} className="ml-2" /> {saving ? "جاري الحفظ..." : "حفظ إعدادات الموقع"}
+          <Save size={16} className="ms-2" /> {saving ? "جاري الحفظ..." : "حفظ إعدادات الموقع"}
         </Button>
       </div>
     </div>

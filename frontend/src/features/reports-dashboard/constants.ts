@@ -39,7 +39,8 @@ export interface DashboardStats {
   netProfit: number;
   todayAppointments: number;
   avgInvoice: number;
-  occupancy: number;
+  /** null when the server could not compute it. Distinct from 0. */
+  occupancy: number | null;
   todayRevenueTrend: number;
   todayExpensesTrend: number;
   netProfitTrend: number;
@@ -47,7 +48,10 @@ export interface DashboardStats {
   avgInvoiceTrend: number;
   occupancyTrend: number;
   newCustomersThisWeek?: number;
-  [key: string]: number | undefined;
+  // Widened to admit `null` for `occupancy`. Every other declared key stays a
+  // plain number, so this only loosens the catch-all rather than making all
+  // seven figures nullable at every call site.
+  [key: string]: number | null | undefined;
 }
 
 export const KPI_CONFIG: KpiConfigEntry[] = [
@@ -67,36 +71,27 @@ export const PERIODS: PeriodOption[] = [
   { value: "year", label: "هذا العام" },
 ];
 
-export const FALLBACK_WEEKLY: WeeklyRow[] = [
-  { name: "السبت", revenue: 12500, appointments: 18 },
-  { name: "الأحد", revenue: 8200, appointments: 12 },
-  { name: "الإثنين", revenue: 9600, appointments: 14 },
-  { name: "الثلاثاء", revenue: 11200, appointments: 16 },
-  { name: "الأربعاء", revenue: 10800, appointments: 15 },
-  { name: "الخميس", revenue: 14500, appointments: 20 },
-  { name: "الجمعة", revenue: 16800, appointments: 22 },
-];
-
-export const FALLBACK_SERVICES: ServiceSlice[] = [
-  { name: "حلاقة", value: 42 },
-  { name: "عناية بالبشرة", value: 28 },
-  { name: "صبغة", value: 18 },
-  { name: "أخرى", value: 12 },
-];
-
-export const DEMO_STATS: DashboardStats = {
-  todayRevenue: 18750,
-  todayExpenses: 3420,
-  netProfit: 15330,
-  todayAppointments: 24,
-  avgInvoice: 780,
-  occupancy: 72,
-  todayRevenueTrend: 12,
-  todayExpensesTrend: -5,
-  netProfitTrend: 18,
-  todayAppointmentsTrend: 8,
-  avgInvoiceTrend: 4,
-  occupancyTrend: -2,
+/**
+ * What the dashboard shows before the request has answered.
+ *
+ * All zeros, and deliberately never a stand-in for real figures. Invented
+ * numbers rendered as if earned lasted on screen exactly as long as the
+ * request -- on a slow connection, an entire day of phantom revenue.
+ *
+ * `DEFAULT_STATS` is for the loading window: zeros, not a fabricated day.
+ */
+export const DEFAULT_STATS: DashboardStats = {
+  todayRevenue: 0,
+  todayExpenses: 0,
+  netProfit: 0,
+  todayAppointments: 0,
+  avgInvoice: 0,
+  occupancy: 0,
+  todayRevenueTrend: 0,
+  todayExpensesTrend: 0,
+  netProfitTrend: 0,
+  todayAppointmentsTrend: 0,
+  avgInvoiceTrend: 0,
+  occupancyTrend: 0,
 };
 
-export const DEFAULT_STATS: DashboardStats = { ...DEMO_STATS };

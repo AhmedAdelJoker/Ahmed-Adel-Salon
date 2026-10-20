@@ -27,7 +27,7 @@ export function FinanceTooltip({
             <div className="flex min-w-0 items-center gap-2">
               <div
                 className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: entry.color || entry.payload?.fill || "#6366F1" }}
+                style={{ backgroundColor: entry.color || entry.payload?.fill || "var(--chart-2)" }}
               />
               <span className="truncate text-xs font-bold text-muted">{entry.name}</span>
             </div>

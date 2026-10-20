@@ -102,10 +102,16 @@ export const EmployeeQuickView = ({ employeeId, open, onOpenChange }: EmployeeQu
                   "font-black uppercase text-[9px] tracking-wider",
                   data?.status === "active"
                     ? "bg-success/5 text-success border-success/20"
-                    : "bg-danger/5 text-danger border-danger/20",
+                    : data?.status === "suspended"
+                      ? "bg-warning/5 text-warning border-warning/20"
+                      : "bg-danger/5 text-danger border-danger/20",
                 )}
               >
-                {data?.status === "active" ? "نشط" : "غير نشط"}
+                {data?.status === "active"
+                  ? "نشط"
+                  : data?.status === "suspended"
+                    ? "في إجازة"
+                    : "أرشيف"}
               </Badge>
             </div>
           </div>

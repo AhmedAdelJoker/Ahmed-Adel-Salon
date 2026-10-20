@@ -18,17 +18,7 @@ import { exportService } from "@/services/exportService";
 import { businessSettingsService } from "@/services/businessSettingsService";
 import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/lib/core/utils";
-
-const CHART_COLORS = [
-  "#6366F1",
-  "#10B981",
-  "#F59E0B",
-  "#EF4444",
-  "#8B5CF6",
-  "#06B6D4",
-  "#EC4899",
-  "#84CC16",
-];
+import { CHART_COLORS } from "@/lib/core/chart";
 
 type PresetId = "today" | "week" | "month" | "quarter";
 

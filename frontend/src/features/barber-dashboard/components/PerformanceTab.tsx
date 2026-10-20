@@ -11,6 +11,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { useAppLocale } from "@/hooks/useAppLocale";
 
 interface PerformanceDatum {
   date: string;
@@ -26,6 +27,7 @@ interface PerformanceTabProps {
 }
 
 export const PerformanceTab = ({ performanceData, totalRevenue, totalServices }: PerformanceTabProps) => {
+  const { locale } = useAppLocale();
   return (
     <div className="space-y-4">
       {/* Performance Summary */}
@@ -59,7 +61,7 @@ export const PerformanceTab = ({ performanceData, totalRevenue, totalServices }:
                 dataKey="date"
                 tick={{ fontSize: 10 }}
                 tickFormatter={(v: string) =>
-                  new Date(v).toLocaleDateString("ar-EG", {
+                  new Date(v).toLocaleDateString(locale, {
                     weekday: "short",
                   })
                 }
@@ -69,21 +71,21 @@ export const PerformanceTab = ({ performanceData, totalRevenue, totalServices }:
                 formatter={(value: number | string, name: string) =>
                   name === "revenue" ? [formatCurrency(value), "الإيرادات"] : [value, "الخدمات"]
                 }
-                labelFormatter={(v: string) => new Date(v).toLocaleDateString("ar-EG")}
+                labelFormatter={(v: string) => new Date(v).toLocaleDateString(locale)}
               />
               <Area
                 type="monotone"
                 dataKey="revenue"
-                stroke="#6366f1"
-                fill="#6366f1"
+                stroke="var(--chart-2)"
+                fill="var(--chart-2)"
                 fillOpacity={0.15}
                 strokeWidth={2}
               />
               <Area
                 type="monotone"
                 dataKey="services"
-                stroke="#10b981"
-                fill="#10b981"
+                stroke="var(--chart-3)"
+                fill="var(--chart-3)"
                 fillOpacity={0.15}
                 strokeWidth={2}
               />
@@ -105,14 +107,14 @@ export const PerformanceTab = ({ performanceData, totalRevenue, totalServices }:
                 dataKey="date"
                 tick={{ fontSize: 10 }}
                 tickFormatter={(v: string) =>
-                  new Date(v).toLocaleDateString("ar-EG", {
+                  new Date(v).toLocaleDateString(locale, {
                     weekday: "short",
                   })
                 }
               />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip formatter={(value: number | string) => [value, "خدمة"]} />
-              <Bar dataKey="services" fill="#10b981" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="services" fill="var(--chart-3)" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

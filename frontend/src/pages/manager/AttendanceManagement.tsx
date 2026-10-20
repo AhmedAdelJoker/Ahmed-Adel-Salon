@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { PageShell } from "@/components/shared/PageShell";
 import React, { useState, useEffect, useCallback } from "react";
 import type {
   AttendanceNotification,
@@ -10,6 +11,7 @@ import type {
 
 import { useNavigate } from "react-router-dom";
 import { useAttendanceData } from "@/features/attendance/hooks/useAttendanceData";
+import InlineNotice from "@/components/shared/InlineNotice";
 import {
   X,
 } from "lucide-react";
@@ -30,18 +32,18 @@ import { toast } from "react-hot-toast";
 
 import { Input } from "@/components/ui/input";
 import {
+  ArchiveView,
+  AttendanceDashboardView,
+  AttendanceLoading,
   AttendancePageHeader,
   AttendanceStatsCards,
   AttendanceViewTabs,
-} from "@/features/attendance/components/AttendanceHeader";
-import AttendanceDashboardView from "@/features/attendance/components/AttendanceDashboardView";
-import AttendanceLoading from "@/features/attendance/components/AttendanceLoading";
+  CalendarView,
+  LeavesView,
+  MonthlyView,
+  PulseView,
+} from "@/features/attendance";
 import type { AttendanceViewMode } from "@/features/attendance/types";
-import PulseView from "@/features/attendance/components/PulseView";
-import MonthlyView from "@/features/attendance/components/MonthlyView";
-import LeavesView from "@/features/attendance/components/LeavesView";
-import CalendarView from "@/features/attendance/components/CalendarView";
-import ArchiveView from "@/features/attendance/components/ArchiveView";
 
 const AttendanceManagement = () => {
   const navigate = useNavigate();
@@ -66,6 +68,7 @@ const AttendanceManagement = () => {
     processedData,
     archiveRecords,
     lateEmployees,
+    secondaryError,
   } = useAttendanceData();
   const [activeViewMode, setActiveViewMode] =
     useState<AttendanceViewMode>("dashboard");
@@ -99,6 +102,14 @@ const AttendanceManagement = () => {
   const isOwner = ["OWNER", "ADMIN"].includes(
     String(user?.role || "").toUpperCase(),
   );
+  // Approve/reject hits PATCH /barber-presence/leaves/{id} which is restricted
+  // to owner_or_manager (owner/admin/manager/accountant) on the backend.
+  const canApproveLeaves = [
+    "OWNER",
+    "ADMIN",
+    "MANAGER",
+    "ACCOUNTANT",
+  ].includes(String(user?.role || "").toUpperCase());
 
 
 
@@ -305,13 +316,17 @@ const AttendanceManagement = () => {
   }
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <AttendancePageHeader
           onShowSettings={() => setShowSettings(true)}
           onExportPDF={handleExportPDF}
           onRefresh={fetchAttendance}
         />
+
+        {secondaryError && (
+          <InlineNotice tone="warning">{secondaryError}</InlineNotice>
+        )}
 
         {/* Stats Cards */}
         <AttendanceStatsCards
@@ -352,6 +367,7 @@ const AttendanceManagement = () => {
             setLeaveFilter={setLeaveFilter}
             onNewLeave={() => setShowLeaveForm(true)}
             onLeaveAction={handleLeaveAction}
+            canApprove={canApproveLeaves}
           />
         )}
 
@@ -377,7 +393,7 @@ const AttendanceManagement = () => {
             setEndDate={setEndDate}
           />
         )}
-      </div>
+      </PageShell>
 
       {/* Settings Modal */}
       {showSettings && (
@@ -618,12 +634,11 @@ const AttendanceManagement = () => {
                 إرسال
               </Button>
             </div>
-          </motion.div>
-        </div>
-      )}
+            </motion.div>
+          </div>
+        )}
     </div>
   );
 };
-
 export default AttendanceManagement;
 

@@ -81,12 +81,12 @@ export function CashflowTab({
             <ComposedChart data={financials.dailyTrends} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
               <defs>
                 <linearGradient id="finRev" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.28} />
-                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--chart-3)" stopOpacity={0.28} />
+                  <stop offset="95%" stopColor="var(--chart-3)" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="finExp" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.28} />
-                  <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--chart-7)" stopOpacity={0.28} />
+                  <stop offset="95%" stopColor="var(--chart-7)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="var(--border)" opacity={0.5} />
@@ -95,7 +95,7 @@ export function CashflowTab({
                 axisLine={false}
                 tickLine={false}
                 minTickGap={24}
-                tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                 dy={8}
               />
               <YAxis
@@ -103,7 +103,7 @@ export function CashflowTab({
                 tickLine={false}
                 width={56}
                 tickFormatter={compactTick}
-                tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
               />
               <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
               {showPrev && financials.prevDailyTrends.length > 0 && (
@@ -113,24 +113,24 @@ export function CashflowTab({
                     data={financials.prevDailyTrends}
                     dataKey="rev"
                     name="إيرادات الفترة السابقة"
-                    stroke="#10B981"
+                    stroke="var(--chart-3)"
                     strokeWidth={1.5}
                     strokeDasharray="6 4"
                     strokeOpacity={0.6}
                     dot={false}
-                    activeDot={{ r: 4, strokeWidth: 2, stroke: "#10B981", fill: "#fff", strokeOpacity: 0.6 }}
+                    activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-3)", fill: "var(--bg-card)", strokeOpacity: 0.6 }}
                   />
                   <Line
                     type="monotone"
                     data={financials.prevDailyTrends}
                     dataKey="exp"
                     name="مصروفات الفترة السابقة"
-                    stroke="#F43F5E"
+                    stroke="var(--chart-7)"
                     strokeWidth={1.5}
                     strokeDasharray="6 4"
                     strokeOpacity={0.6}
                     dot={false}
-                    activeDot={{ r: 4, strokeWidth: 2, stroke: "#F43F5E", fill: "#fff", strokeOpacity: 0.6 }}
+                    activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-7)", fill: "var(--bg-card)", strokeOpacity: 0.6 }}
                   />
                 </>
               )}
@@ -138,21 +138,21 @@ export function CashflowTab({
                 type="monotone"
                 dataKey="rev"
                 name="الإيرادات"
-                stroke="#10B981"
+                stroke="var(--chart-3)"
                 strokeWidth={2.5}
                 fill="url(#finRev)"
                 dot={false}
-                activeDot={{ r: 5, strokeWidth: 2, stroke: "#10B981", fill: "#fff" }}
+                activeDot={{ r: 5, strokeWidth: 2, stroke: "var(--chart-3)", fill: "var(--bg-card)" }}
               />
               <Area
                 type="monotone"
                 dataKey="exp"
                 name="المصروفات"
-                stroke="#F43F5E"
+                stroke="var(--chart-7)"
                 strokeWidth={2.5}
                 fill="url(#finExp)"
                 dot={false}
-                activeDot={{ r: 5, strokeWidth: 2, stroke: "#F43F5E", fill: "#fff" }}
+                activeDot={{ r: 5, strokeWidth: 2, stroke: "var(--chart-7)", fill: "var(--bg-card)" }}
               />
             </ComposedChart>
           </ResponsiveContainer>

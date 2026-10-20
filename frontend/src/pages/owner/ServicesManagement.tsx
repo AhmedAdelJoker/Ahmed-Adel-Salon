@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { SkeletonCard } from "@/components/shared/PremiumUI";
+import InlineNotice from "@/components/shared/InlineNotice";
 
 
 import {
@@ -16,8 +18,20 @@ import {
 } from "@/features/catalog";
 
 const ServicesManagement = ({ hideHeader = false }: { hideHeader?: boolean }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("services");
   const [searchTerm, setSearchTerm] = useState("");
+
+  /*
+    `?tab=offers` used to open the second offer editor. Offers now live on
+    /inventory/bundles, which owns the whole row, so send anyone holding the old
+    URL there rather than leaving them on a page whose tab no longer exists.
+  */
+  useEffect(() => {
+    if (activeTab === "offers") {
+      navigate("/inventory/bundles", { replace: true });
+    }
+  }, [activeTab, navigate]);
   const {
     services,
     categories,
@@ -32,6 +46,7 @@ const ServicesManagement = ({ hideHeader = false }: { hideHeader?: boolean }) =>
     filteredOfferRows,
     serviceSummary,
     pricing,
+    loadError,
   } = useCatalogData(searchTerm);
   const {
     formData,
@@ -111,6 +126,12 @@ const ServicesManagement = ({ hideHeader = false }: { hideHeader?: boolean }) =>
         onRefresh={() => refreshAllData()}
         onCreate={openCreateDialog}
       />
+
+      {/* Categories and offers used to fail silently, so an empty tab looked
+          identical to "nothing configured yet". */}
+      {loadError && !hideHeader && (
+        <InlineNotice tone="warning">{loadError}</InlineNotice>
+      )}
 
       {isTabLoading ? (
         <SkeletonCard variant="content" height={320} />

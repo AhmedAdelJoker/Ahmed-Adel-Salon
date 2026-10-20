@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   Activity,
   AlertTriangle,
@@ -182,25 +183,12 @@ export default function FinancialReports() {
 
   if (loadError && !hasData && hasLoaded) {
     return (
-      <div className="erp-page-container space-y-6 pb-16">
-        <PageHeader
-          title="التقارير المالية"
-          subtitle="مراقبة الأرباح والتدفقات النقدية ومؤشرات الأداء."
-          badge="الرقابة المالية"
-          icon={Banknote}
-        />
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-            <p className="text-lg font-black text-main">تعذر تحميل البيانات المالية</p>
-            <p className="max-w-md text-sm font-bold text-muted">
-              تحقق من الاتصال بالخادم ثم أعد المحاولة. النطاق الحالي: {fromDate} إلى {toDate}.
-            </p>
-            <Button onClick={fetchFinancials} loading={refreshing}>
-              <RefreshCw size={16} /> إعادة المحاولة
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <EmptyState
+        variant="section"
+        icon={RefreshCw}
+        title="تعذر تحميل البيانات المالية"
+        message={`تحقق من الاتصال بالخادم ثم أعد المحاولة. النطاق الحالي: ${fromDate} إلى ${toDate}.`}
+      />
     );
   }
 

@@ -22,7 +22,7 @@ export function UsersToolbar({ searchTerm, setSearchTerm, viewMode, setViewMode 
           />
           <Input
             placeholder="البحث بالاسم أو البريد أو الرتبة..."
-            className="h-11 pl-4 pr-11 rounded-xl bg-soft border-border focus:border-primary focus:bg-card shadow-sm transition-all font-bold text-sm"
+            className="h-11 ps-4 pe-11 rounded-xl bg-soft border-border focus:border-primary focus:bg-card shadow-sm transition-all font-bold text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             aria-label="بحث المستخدمين"

@@ -15,6 +15,7 @@ from app.models.service_session import ServiceSession
 from app.schemas.walk_in_queue import WalkInQueueAssign, WalkInQueueCreate
 from app.services.activity_service import log_activity
 from app.services.session_service import convert_queue_to_session
+from app.core.clock import utc_now_naive
 
 router = APIRouter(prefix="/walk-in-queue", tags=["Walk-in Queue"])
 
@@ -209,7 +210,7 @@ def call_queue_ticket(
         raise HTTPException(status_code=400, detail="لا يمكن نداء هذه التذكرة في حالتها الحالية")
 
     row.status = "called"
-    row.called_at = datetime.utcnow()
+    row.called_at = utc_now_naive()
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -268,7 +269,7 @@ def start_queue_service(
         raise HTTPException(status_code=400, detail="لا يمكن بدء الخدمة لهذه التذكرة")
 
     row.status = "in_service"
-    row.service_started_at = datetime.utcnow()
+    row.service_started_at = utc_now_naive()
     db.add(row)
     db.commit()
     db.refresh(row)

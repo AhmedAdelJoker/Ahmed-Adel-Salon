@@ -201,17 +201,17 @@ export default function InvoiceAdjustmentRequests() {
 
   return (
     <div className="erp-page-container space-y-6 pb-24">
-      <Card className="overflow-hidden border-purple-100 bg-linear-to-r from-white via-purple-50/50 to-blue-50 p-7 shadow-sm dark:border-white/10 dark:from-[#171717] dark:via-purple-500/10 dark:to-blue-500/5">
+      <Card className="overflow-hidden border-border bg-card p-7 shadow-soft">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
           <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-purple-50 text-[#6D28D9] dark:bg-cyan-400/10 dark:text-[#22D3EE]">
+            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-primary-soft text-primary">
               <ShieldCheck size={34} />
             </div>
             <div>
-              <h1 className="text-3xl font-black text-gray-950 dark:text-gray-50">
+              <h1 className="text-3xl font-black text-main">
                 طلبات تعديل الفواتير
               </h1>
-              <p className="mt-1 text-sm font-bold text-gray-500">
+              <p className="mt-1 text-sm font-bold text-muted">
                 مراجعة واعتماد أو رفض طلبات تعديل الفواتير الصادرة من الكاشير
               </p>
             </div>
@@ -223,7 +223,7 @@ export default function InvoiceAdjustmentRequests() {
           >
             <RefreshCw
               size={18}
-              className={loading ? "ml-2 animate-spin" : "ml-2"}
+              className={loading ? "ms-2 animate-spin" : "ms-2"}
             />
             تحديث الطلبات
           </Button>
@@ -265,7 +265,7 @@ export default function InvoiceAdjustmentRequests() {
               value={query || ""}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="بحث برقم الطلب أو الفاتورة أو السبب..."
-              className="h-12 pr-11"
+              className="h-12 pe-11"
             />
           </div>
           <Select value={statusFilter || ""} onValueChange={setStatusFilter}>
@@ -290,7 +290,7 @@ export default function InvoiceAdjustmentRequests() {
         </div>
         {loading ? (
           <div className="flex min-h-52 items-center justify-center text-gray-500">
-            <RefreshCw className="ml-2 h-5 w-5 animate-spin" /> جاري تحميل
+            <RefreshCw className="ms-2 h-5 w-5 animate-spin" /> جاري تحميل
             الطلبات...
           </div>
         ) : filteredRequests.length === 0 ? (

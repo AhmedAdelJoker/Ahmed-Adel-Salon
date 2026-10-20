@@ -28,8 +28,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
-import { cn } from "@/lib/core/utils";
+import {
+  cn,
+  formatCurrency,
+} from "@/lib/core/utils";
 import { TODAY } from "@/features/bookings";
+import { currencyLabel } from "@/lib/core/currency";
 
 export default function BookingFormDialog({
   open,
@@ -43,6 +47,7 @@ export default function BookingFormDialog({
   duplicateBooking,
   conflictMsg,
   availableSlots,
+  slotsError,
   employees,
   services,
   categories,
@@ -301,6 +306,12 @@ export default function BookingFormDialog({
                     )}
                   </div>
 
+                  {slotsError && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] font-black text-rose-600 dark:text-rose-400">
+                      {slotsError}
+                    </div>
+                  )}
+
                   {availableSlots.length > 0 ? (
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-40 overflow-y-auto custom-scrollbar p-1 border border-border/40 rounded-xl bg-soft/30">
                       {availableSlots.map((slot: any) => (
@@ -486,7 +497,7 @@ export default function BookingFormDialog({
                                 active ? "text-white" : "text-accent",
                               )}
                             >
-                              {s.price} ج.م
+                              {formatCurrency(s.price)}
                             </span>
                           </button>
                         );
@@ -507,9 +518,7 @@ export default function BookingFormDialog({
                           );
                           return sum + Number(s?.price || 0);
                         }, 0)}{" "}
-                        <span className="text-xs font-bold opacity-60">
-                          ج.م
-                        </span>
+                        <span className="text-xs font-bold opacity-60">{currencyLabel()}</span>
                       </p>
                     </div>
                     <div className="h-10 w-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">

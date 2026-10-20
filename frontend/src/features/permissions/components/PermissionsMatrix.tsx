@@ -44,7 +44,7 @@ export default function PermissionsMatrix({
           />
           <Input
             placeholder="البحث الذكي بالهوية، الاسم أو المسمى الوظيفي..."
-            className="h-12 rounded-xl pr-12 bg-white border-border text-base font-medium shadow-none focus:border-accent"
+            className="h-12 rounded-xl pe-12 bg-white border-border text-base font-medium shadow-none focus:border-accent"
             value={searchTerm || ""}
             onChange={(e) => setSearchTerm(e.target.value)}
           />

@@ -167,7 +167,7 @@ export function useExpensesData(isOwner: boolean) {
     if (!expenses.length) return [];
     const grouped: Record<string, number> = {};
     expenses.forEach((exp) => { const key = String(exp.category || "أخرى"); grouped[key] = (grouped[key] || 0) + Number(exp.amount || 0); });
-    return Object.entries(grouped).map(([name, value]) => ({ name, value, color: CATEGORY_COLORS[name] || "#6b7280" }));
+    return Object.entries(grouped).map(([name, value]) => ({ name, value, color: CATEGORY_COLORS[name] || "var(--text-muted)" }));
   }, [expenses]);
   const paymentData = useMemo(() => {
     if (!expenses.length) return [];

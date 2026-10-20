@@ -14,6 +14,7 @@ def log_activity(
     entity_type: str | None = None,
     entity_id: str | None = None,
     description: str | None = None,
+    commit: bool = True,
 ):
     item = ActivityLog(
         user_id=user_id,
@@ -23,8 +24,11 @@ def log_activity(
         description=description,
     )
     db.add(item)
-    db.commit()
-    db.refresh(item)
+    if commit:
+        db.commit()
+        db.refresh(item)
+    else:
+        db.flush()
     return item
 
 

@@ -1,12 +1,21 @@
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import Column, Integer, String, Numeric, Text, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Index, Integer, String, Numeric, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 
 class SalaryAdvance(Base):
     __tablename__ = "salary_advances"
+
+    __table_args__ = (
+        # `/barber/stats` sums advances with
+        # `employee_id = ? AND is_deducted = false`. Both are equalities, so both
+        # belong at the front of the key rather than `is_deducted` being left as
+        # a residual filter.
+        Index("ix_salary_advances_employee_deducted", "employee_id", "is_deducted"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
     
     employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)

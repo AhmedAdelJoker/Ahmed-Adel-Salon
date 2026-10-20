@@ -9,12 +9,12 @@ import {
 } from "@/pages/cashier/schedule/scheduleUtils";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
 import { Badge } from "@/components/ui/badge";
-import { BarberColumn } from "@/features/schedule/components/DayBoard/BarberColumn";
+import { BarberColumn } from "@/features/schedule";
 import {
   BARBER_COL_MIN,
   TIME_COL_WIDTH,
-} from "@/features/schedule/components/DayBoard/constants";
-import { slotTo24 } from "@/features/schedule/components/DayBoard/utils";
+} from "@/features/schedule";
+import { slotTo24 } from "@/features/schedule";
 
 type DayBoardBarber = {
   id: string | number;

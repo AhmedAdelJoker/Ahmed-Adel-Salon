@@ -15,6 +15,7 @@ from app.schemas.report_schedule import (
     ReportScheduleUpdate,
 )
 from app.services.scheduled_reports import compute_next_run, run_due_schedules, run_schedule
+from app.core.clock import utc_now_naive
 
 router = APIRouter(prefix="/report-schedules", tags=["Report Schedules"])
 
@@ -41,7 +42,7 @@ def create_schedule(
     current_user: User = Depends(require_owner_or_manager),
 ):
     _validate(payload.frequency, payload.channel)
-    now = datetime.utcnow()
+    now = utc_now_naive()
     row = ReportSchedule(
         name=payload.name or "التقرير المالي الدوري",
         frequency=payload.frequency,
@@ -73,7 +74,7 @@ def update_schedule(
         if hasattr(row, field_name):
             setattr(row, field_name, value)
     if frequency_changed:
-        row.next_run_at = compute_next_run(row.frequency, datetime.utcnow())
+        row.next_run_at = compute_next_run(row.frequency, utc_now_naive())
     db.add(row)
     db.commit()
     db.refresh(row)

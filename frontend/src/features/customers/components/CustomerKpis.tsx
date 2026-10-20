@@ -1,5 +1,5 @@
 /** Customers CustomerKpis — system-wide figures from GET /customers/stats. */
-import { Star, TrendingUp, UserPlus, Users } from "lucide-react";
+import { TrendingUp, UserCheck, UserPlus, Users, Star } from "lucide-react";
 import { formatCurrency } from "@/lib/core/utils";
 import CustomerKpi from "@/features/customers/components/CustomerKpi";
 import type { CustomerStats } from "@/features/customers/hooks/useCustomersList";
@@ -10,30 +10,36 @@ export default function CustomerKpis({
   stats: CustomerStats;
 }) {
   return (
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
         <CustomerKpi
-          label="إجمالي المنظومة"
+          label="إجمالي العملاء"
           value={stats.total || ""}
           icon={Users}
-          color="bg-[#6D28D9]"
+          color="bg-primary"
         />
         <CustomerKpi
           label="نخبة VIP"
           value={stats.vip_count || ""}
           icon={Star}
-          color="bg-amber-500"
+          color="bg-warning"
         />
         <CustomerKpi
-          label="العملاء الجدد"
+          label="عملاء منتظمون"
+          value={stats.regular_count || ""}
+          icon={UserCheck}
+          color="bg-info"
+        />
+        <CustomerKpi
+          label="عملاء جدد"
           value={stats.new_count || ""}
           icon={UserPlus}
-          color="bg-emerald-600"
+          color="bg-success"
         />
         <CustomerKpi
           label="متوسط الإنفاق"
           value={formatCurrency(stats.avg_spend) || ""}
           icon={TrendingUp}
-          color="bg-blue-600"
+          color="bg-danger"
         />
       </div>
   );

@@ -113,7 +113,7 @@ export function InvoicesToolbar({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="بحث برقم الفاتورة أو اسم العميل..."
-            className="h-10 w-full pr-9 text-sm sm:h-11"
+            className="h-10 w-full pe-9 text-sm sm:h-11"
           />
         </div>
         <div className="grid grid-cols-2 gap-2 xl:col-span-3">

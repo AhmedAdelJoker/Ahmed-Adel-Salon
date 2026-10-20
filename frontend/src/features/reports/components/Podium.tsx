@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Award, Medal, Trophy } from "lucide-react";
 import { cn, formatCurrency, formatNumber } from "@/lib/core/utils";
 
@@ -38,9 +39,12 @@ export function Podium({ rows }: { rows: PodiumRow[] }) {
 
   if (!top.length) {
     return (
-      <div className="rounded-2xl border border-dashed p-8 text-center text-sm font-bold text-muted">
-        لا توجد بيانات موظفين في النطاق الحالي
-      </div>
+      <EmptyState
+        variant="section"
+        icon={Trophy}
+        title="لا توجد بيانات"
+        message="لا توجد بيانات موظفين في النطاق الحالي."
+      />
     );
   }
 

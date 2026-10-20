@@ -24,7 +24,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
-import { cn, formatTime12h } from "@/lib/core/utils";
+import {
+  cn,
+  formatCurrency,
+  formatTime12h,
+} from "@/lib/core/utils";
 import {
   TODAY,
   normalizeStatus,
@@ -51,7 +55,6 @@ export default function BookingCardFull({
   const config = statusConfig(booking.status);
   const status = normalizeStatus(booking.status);
   const isOnline = booking.booking_source === "online";
-  const isWalkIn = booking.booking_source === "walkin";
 
   const isToday = booking.appointment_date === TODAY;
   const now = new Date();
@@ -206,14 +209,6 @@ export default function BookingCardFull({
               ONLINE
             </Badge>
           )}
-          {isWalkIn && (
-            <Badge
-              variant="outline"
-              className="text-[10px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 px-2 h-5"
-            >
-              مشاة
-            </Badge>
-          )}
           {isLate && (
             <Badge className="text-[10px] font-black bg-rose-600 text-white border-none px-1.5 h-4 animate-pulse">
               متأخر {Math.abs(diffMinutes)} دقيقة
@@ -253,7 +248,7 @@ export default function BookingCardFull({
           </span>
           {booking.total_estimated_price > 0 && (
             <span className="text-primary font-black tabular-nums shrink-0">
-              {booking.total_estimated_price} ج.م
+              {formatCurrency(booking.total_estimated_price)}
             </span>
           )}
         </div>

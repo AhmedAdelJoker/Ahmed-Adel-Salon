@@ -60,7 +60,7 @@ export function CashboxFilters({
         <div className="flex items-center gap-2 text-xs font-black text-main uppercase tracking-widest border-b border-border/40 pb-3">
           <Filter className="w-4 h-4 text-accent" /> فلترة ذكية
           {hasActiveFilters && (
-            <Badge variant="outline" className="mr-auto rounded-full bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-black">
+            <Badge variant="outline" className="me-auto rounded-full bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-black">
               مفلتر
             </Badge>
           )}
@@ -76,7 +76,7 @@ export function CashboxFilters({
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="رقم العملية، مرجع، ملاحظات..."
-              className="h-11 pr-10 pl-10 rounded-xl bg-soft border-border font-bold"
+              className="h-11 pe-10 ps-10 rounded-xl bg-soft border-border font-bold"
             />
             {searchTerm && (
               <button

@@ -1,9 +1,9 @@
+import { EmptyState } from "@/components/shared/EmptyState";
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Archive,
   Search,
-  UserX,
   History,
   RotateCcw,
   Phone,
@@ -15,6 +15,7 @@ import {
 import { toast } from "react-hot-toast";
 import { useEmployeesArchive, useInvalidateEmployees } from "@/hooks/useApi";
 import { normalizeEmployeeRecord } from "@/features/hr/utils/helpers";
+import { JOB_TITLES } from "@/features/hr";
 import api from "@/services/api";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
@@ -26,38 +27,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const JOB_TITLES = [
-  { value: "owner", label: "المالك والمستثمر (Principal Owner)" },
-  { value: "manager", label: "مدير عمليات التشغيل (Operations Manager)" },
-  {
-    value: "accountant",
-    label: "المحاسب المالي والإداري (Financial & Admin Accountant)",
-  },
-  {
-    value: "barber",
-    label: "أخصائي حلاقة وتصفيف الشعر وعناية باللحية (Master Barber)",
-  },
-  { value: "colorist", label: "أخصائي تلوين ومعالجة الشعر (Color Specialist)" },
-  {
-    value: "esthetician",
-    label: "أخصائي عناية بالبشرة والوجه (Skin Care Expert)",
-  },
-  {
-    value: "barber_assistant",
-    label: "مساعد فني / مسؤول تحضير (Technical Assistant)",
-  },
-  { value: "cashier", label: "كاشير ومسؤول صندوق (Cashier & POS)" },
-  {
-    value: "receptionist",
-    label: "منسق تجربة العملاء (Guest Experience Coordinator)",
-  },
-  { value: "cleaner", label: "مسؤول مرافق وتعقيم (Sanitation Officer)" },
-  { value: "other", label: "أخرى" },
-];
-
 const STATUS_BADGE = {
-  suspended: { label: "موقوف إدارياً", variant: "destructive" },
-  resigned: { label: "مستقيل", variant: "outline" },
+  // Legacy rows only: "on vacation" now lives in the team list, not here.
+  suspended: { label: "في إجازة", variant: "outline" },
+  resigned: { label: "ترك العمل", variant: "outline" },
 };
 
 export default function EmployeeArchive() {
@@ -111,7 +84,6 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
   const stats = useMemo(
     () => ({
       total: employees.length,
-      suspended: employees.filter((e) => e.status === "suspended").length,
       resigned: employees.filter((e) => e.status === "resigned").length,
     }),
     [employees],
@@ -122,15 +94,17 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
       <ConfirmDialog
         open={!!confirmTarget}
         onOpenChange={(open) => !open && setConfirmTarget(null)}
+        variant="info"
         title="استعادة الموظف؟"
-        description="هل أنت متأكد من رغبتك في استعادة هذا الموظف للعمل؟ سيتم إرجاع كافة صلاحياته وحسابه كـ نشط."
+        confirmText="استعادة"
+        description="سيعود الموظف إلى قائمة الفريق كـ نشط. مفاتيح الظهور في الكاشير والحجز تبقى مغلقة حتى تفعّلها من ملفه الشخصي."
         onConfirm={handleRestore}
         loading={isActionLoading}
       />
 
       <PageHeader
         title="أرشيف الموظفين"
-        subtitle="سجل الموظفين السابقين، المستقيلين، والموقوفين عن العمل."
+        subtitle="سجل الموظفين الذين تركوا العمل، مع إمكانية الاستعادة في أي وقت."
         badge="سجل الانقطاعات"
         icon={Archive}
         className={undefined}
@@ -157,16 +131,7 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
           delay={0}
         />
         <StatCard
-          label="موقوفين"
-          value={stats.suspended}
-          icon={UserX}
-          variant="danger"
-          trend={undefined}
-          trendValue={undefined}
-          delay={0.05}
-        />
-        <StatCard
-          label="مستقيلين"
+          label="تركوا العمل"
           value={stats.resigned}
           icon={History}
           variant="warning"
@@ -186,7 +151,7 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="بحث بالاسم أو رقم الجوال..."
-            className="h-12 pl-4 pr-12 rounded-xl bg-white border-border focus:border-primary shadow-sm transition-all font-bold text-sm"
+            className="h-12 ps-4 pe-12 rounded-xl bg-white border-border focus:border-primary shadow-sm transition-all font-bold text-sm"
           />
         </div>
         <StatCard
@@ -210,16 +175,12 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
           ))}
         </div>
       ) : filteredEmployees.length === 0 ? (
-        <PremiumCard className="p-12 rounded-[32px] border-dashed border-2 border-border/60 bg-card/50 flex flex-col items-center justify-center text-center">
-          <div className="w-20 h-20 bg-soft rounded-full flex items-center justify-center mb-4 text-muted-foreground shadow-inner">
-            <Archive size={40} strokeWidth={1.5} />
-          </div>
-          <h3 className="text-xl font-black text-main mb-2">الأرشيف فارغ</h3>
-          <p className="text-sm font-bold text-muted-foreground max-w-md">
-            لا يوجد موظفون موقوفون أو مستقيلون في الأرشيف حالياً، أو لا توجد
-            نتائج تطابق بحثك.
-          </p>
-        </PremiumCard>
+        <EmptyState
+          variant="page"
+          icon={Archive}
+          title="الأرشيف فارغ"
+          message="لا يوجد موظفون في الأرشيف حالياً — الأرشيف لمن تركوا العمل فقط، أو لا توجد نتائج تطابق بحثك."
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredEmployees.map((employee) => (
@@ -273,7 +234,7 @@ const { data, isLoading } = useEmployeesArchive<{ id: string; status: string; fu
                   onClick={() => setConfirmTarget(employee)}
                   className="w-full h-12 rounded-xl font-black text-sm uppercase tracking-widest bg-white border border-border hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm"
                 >
-                  <RotateCcw size={18} className="ml-2" /> استعادة للعمل
+                  <RotateCcw size={18} className="ms-2" /> استعادة للعمل
                 </Button>
               </div>
             </PremiumCard>

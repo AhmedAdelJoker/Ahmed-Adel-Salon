@@ -1,11 +1,22 @@
 # -*- mode: python ; coding: utf-8 -*-
+#
+# argon2-cffi loads its native library at runtime through CFFI's `ffi.dlopen`,
+# which means the shared object is not reachable by PyInstaller's import graph.
+# `hiddenimports` alone is therefore not enough: the module gets bundled and the
+# `.pyd`/`.so` does not, so the frozen build imports cleanly and then raises
+# OSError on the first password hash. Collecting the dynamic libraries below is
+# what actually fixes it.
+from PyInstaller.utils.collectors import collect_dynamic_libs
+
+_argon2_libs = collect_dynamic_libs('argon2_cffi_bindings')
+_cffi_libs = collect_dynamic_libs('cffi')
 
 block_cipher = None
 
 a = Analysis(
     ['run_backend.py'],
     pathex=[],
-    binaries=[],
+    binaries=_argon2_libs + _cffi_libs,
     datas=[
         ('app', 'app'),
         ('uploads', 'uploads'),
@@ -22,10 +33,19 @@ a = Analysis(
         'uvicorn.config',
         'uvicorn.main',
         'uvicorn.supervisors',
-        'uvicorn.supervisors.basereload',
-        'uvicorn.supervisors.watchgodreload',
+        'uvicorn.supervisors.basereload',        'uvicorn.supervisors.watchgodreload',
         'uvicorn.supervisors.watchfilesreload',
         'uvicorn.supervisors.multiprocess',
+        # argon2-cffi ships a CFFI extension module that PyInstaller's static
+        # analysis does not always detect, and a frozen build that cannot
+        # import it fails on the *first login* rather than at startup. Listing
+        # it explicitly means the failure mode is a build error, not a
+        # production incident.
+        'argon2',
+        'argon2._ffi',
+        'argon2.low_level',
+        'cffi',
+        'cffi.model',
         'fastapi',
         'fastapi.middleware',
         'fastapi.middleware.cors',

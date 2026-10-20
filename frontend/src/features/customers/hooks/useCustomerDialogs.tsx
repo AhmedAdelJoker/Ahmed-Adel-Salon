@@ -82,46 +82,22 @@ export function useCustomerDialogs(
     const [firstName, ...lastNameParts] = name.split(" ");
     const lastName = lastNameParts.join(" ");
 
+    // Preserve the fields the quick form doesn't show so PUT doesn't wipe them.
     const payload = {
       first_name: firstName,
-      firstName,
       last_name: lastName,
-      lastName,
       phone,
-      phone_normalized: phone.replace(/\s+/g, ""),
-      phone2: customerForm.phone2?.trim() || null,
-      alternate_phone: customerForm.phone2?.trim() || null,
-      secondary_phone: customerForm.phone2?.trim() || null,
+      second_phone: customerForm.phone2?.trim() || null,
+      email: editingCustomer?.email || null,
+      notes: editingCustomer?.notes || null,
     };
 
     try {
       setIsSavingCustomer(true);
       const id = customerId(editingCustomer);
-      let response;
-      try {
-        response = id
-          ? await api.put(`/customers/${id}`, payload)
-          : await api.post("/customers", payload);
-      } catch (error) {
-         
-        const apiErr = error as { response?: { status?: number; data?: { detail?: unknown } } };
-        if (apiErr?.response?.status !== 422 || !customerForm.phone2.trim())
-          throw error;
-         
-        const fallbackPayload = { ...payload } as Record<string, any>;
-        delete fallbackPayload.phone2;
-        delete fallbackPayload.alternate_phone;
-        delete fallbackPayload.secondary_phone;
-        fallbackPayload.notes = [
-          fallbackPayload.notes,
-          `رقم إضافي: ${customerForm.phone2.trim()}`,
-        ]
-          .filter(Boolean)
-          .join("\n");
-        response = id
-          ? await api.put(`/customers/${id}`, fallbackPayload)
-          : await api.post("/customers", fallbackPayload);
-      }
+      const response = id
+        ? await api.put(`/customers/${id}`, payload)
+        : await api.post("/customers", payload);
       toast.success(id ? "تم تحديث بيانات العميل" : "تمت إضافة العميل بنجاح");
       await fetchCustomers();
       closeCustomerForm();
@@ -139,10 +115,13 @@ export function useCustomerDialogs(
   async function handleDelete() {
     if (!deleteTarget) return;
     const deletedId = customerId(deleteTarget);
+    const archiveReason = `${customerName(deleteTarget)} — أرشفة من قائمة العملاء`;
     setDeleteTarget(null);
     removeCustomer(deletedId);
     try {
-      await api.delete(`/customers/${deletedId}`);
+      await api.delete(`/customers/${deletedId}`, {
+        data: { archive_reason: archiveReason },
+      });
       toast.success(
         (t) => (
           <span className="flex items-center gap-3">

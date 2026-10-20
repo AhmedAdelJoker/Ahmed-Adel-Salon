@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { POSProvider, usePOS } from "@/pages/cashier/POS/POSContext";
+import { appointmentToCartItems } from "@/features/pos";
 import ShiftSidebar from "@/pages/cashier/POS/components/ShiftSidebar";
 import SessionsQueue from "@/pages/cashier/POS/components/SessionsQueue";
 import ItemSelection from "@/pages/cashier/POS/components/ItemSelection";
@@ -12,6 +14,23 @@ import { toast } from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Clock, RefreshCw } from "lucide-react";
+import { ErrorState } from "@/components/shared/AsyncState";
+import InlineNotice from "@/components/shared/InlineNotice";
+import { PageShell } from "@/components/shared/PageShell";
+import type { ID } from "@/types/common";
+import type { POSRecord } from "@/features/pos/types";
+
+/**
+ * Navigation state `/bookings` passes with `handleTransferToPOS`. A booking
+ * that arrives here must land as a prepared session — cart, customer and
+ * barber pre-filled — not as a plain route change.
+ */
+interface BookingHandoffState {
+  bookingId?: ID;
+  customerId?: ID;
+  barberId?: ID;
+  services?: POSRecord[];
+}
 
 const POSLayout = () => {
   const {
@@ -20,9 +39,64 @@ const POSLayout = () => {
     activeInvoiceId,
     activeAppointmentId,
     cart,
+    shiftError,
+    readyAppointmentsError,
+    catalogError,
+    barbers,
+    setCart,
+    setActiveAppointmentId,
+    setSelectedCustomerId,
+    setSelectedBarberId,
+    setIsReviewing,
   } = usePOS();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("sessions"); // "sessions" or "items"
   const [mobileView, setMobileView] = useState("ops"); // "ops" (Shift/Sessions), "items", "cart"
+
+  // Which middle-column panel exists where. On mobile `mobileView` picks one
+  // panel; on desktop (where mobileView never leaves "ops") `activeTab`
+  // switches between them, so exactly one renders for every viewport.
+  const showSessions = activeTab === "sessions" && mobileView !== "items";
+  const showItems = activeTab === "items" || mobileView === "items";
+
+  const handoff = (location.state ?? null) as BookingHandoffState | null;
+  const handoffBookingId = handoff?.bookingId ?? null;
+
+  // Consume the `/bookings` handoff once the catalogue has loaded (the barber
+  // list arrives in phase 1), then clear the navigation state so a browser
+  // refresh does not re-apply it.
+  useEffect(() => {
+    if (loading || !handoffBookingId) return;
+    setCart(
+      appointmentToCartItems(
+        {
+          id: handoffBookingId,
+          barber_id: handoff?.barberId ?? "",
+          services: handoff?.services ?? [],
+        },
+        barbers,
+      ),
+    );
+    setActiveAppointmentId(handoffBookingId);
+    setSelectedCustomerId(
+      handoff?.customerId ? String(handoff.customerId) : "walk_in",
+    );
+    if (handoff?.barberId) setSelectedBarberId(String(handoff.barberId));
+    setIsReviewing(true);
+    const serviceCount = (handoff?.services ?? []).length;
+    if (serviceCount > 0) {
+      toast.success("تم تحميل الحجز في نقطة البيع للمراجعة");
+    } else {
+      toast(
+        "الحجز محمّل في نقطة البيع، لكنه لا يحتوي خدمات — أضف البنود يدوياً",
+        { icon: "⚠️" },
+      );
+    }
+    // The cart view is where the prepared session is reviewed, on mobile.
+    setMobileView("cart");
+    navigate("/pos", { replace: true, state: null });
+  }, [loading, handoffBookingId, handoff, barbers, navigate, setCart, setActiveAppointmentId, setSelectedCustomerId, setSelectedBarberId, setIsReviewing]);
 
   // Global keyboard shortcut: Ctrl+Enter = Checkout
   useEffect(() => {
@@ -48,23 +122,46 @@ const POSLayout = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <PageShell fixed className="h-[60vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-primary">
           <RefreshCw className="h-10 w-10 animate-spin" />
           <p className="text-sm font-bold tracking-widest text-muted uppercase">
             تنشيط محطة الـ POS الآمنة...
           </p>
         </div>
-      </div>
+      </PageShell>
+    );
+  }
+
+  // A dead catalogue means the till has nothing to sell, so block rather than
+  // present an empty grid the cashier could mistake for a stocked-but-quiet day.
+  if (catalogError) {
+    return (
+      <PageShell fixed className="h-[60vh] flex items-center justify-center">
+        <div className="w-full p-4">
+          <ErrorState
+            title="تعذر تحميل محطة نقطة البيع"
+            message={catalogError}
+            onRetry={() => window.location.reload()}
+          />
+        </div>
+      </PageShell>
     );
   }
 
   return (
-    <div
-      className="flex h-full max-h-[calc(100vh-80px)] flex-col gap-4 relative overflow-hidden"
-    >
+    <PageShell fixed className="max-h-[calc(100vh-80px)]">
       {/* Success Overlay & Modals */}
       <SuccessOverlay />
+
+      {/* Load failures that must not be mistaken for "nothing to do". */}
+      {(shiftError || readyAppointmentsError) && (
+        <div className="px-2 lg:px-0">
+          <InlineNotice tone="error">
+            {shiftError ?? readyAppointmentsError}
+          </InlineNotice>
+        </div>
+      )}
 
       {/* Edit Mode Badge - Fixed at top */}
       {activeInvoiceId && (
@@ -81,7 +178,9 @@ const POSLayout = () => {
       )}
 
       {/* Desktop Layout (Grid) / Mobile Layout (Conditional Rendering) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr_1.5fr] xl:grid-cols-[1.2fr_2.5fr_1.8fr] gap-4 flex-1 min-h-0 overflow-hidden px-2 lg:px-0 pb-[80px] lg:pb-0">
+      {/* Extra mobile clearance: the shell covers the global pill nav, this
+          page's own bottom bar needs ~16px more. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr_1.5fr] xl:grid-cols-[1.2fr_2.5fr_1.8fr] gap-4 flex-1 min-h-0 overflow-hidden px-2 lg:px-0 pb-4 lg:pb-0">
         {/* Right Column: Shift & Quick Stats (Always on Desktop, Tabbed on Mobile) */}
         <div
           className={cn(
@@ -90,21 +189,15 @@ const POSLayout = () => {
           )}
         >
           <ShiftSidebar />
-          {/* On mobile, Sessions Queue is part of 'ops' view */}
-          <div className="lg:hidden flex-1 min-h-0">
-            <Card className="h-full p-4 overflow-hidden flex flex-col gap-4">
-              <SessionsQueue />
-            </Card>
-          </div>
         </div>
 
         {/* Middle Column: Selection Area (Always on Desktop, Tabbed on Mobile) */}
         <Card
           className={cn(
             "flex flex-col gap-4 overflow-hidden p-4 sm:p-6 shadow-sm border-border/50",
-            mobileView !== "items" &&
-              (mobileView !== "ops" || true) &&
-              "hidden lg:flex",
+            // Hidden on mobile only while the cart owns the screen; on desktop
+            // the three-column grid shows every column regardless.
+            mobileView === "cart" && "hidden lg:flex",
           )}
         >
           {/* Tab Switcher - Only visible on Desktop or when needed */}
@@ -154,19 +247,15 @@ const POSLayout = () => {
               <div
                 className={cn(
                   "h-full",
-                  activeTab === "sessions" || mobileView === "ops"
-                    ? "block"
-                    : "hidden lg:block",
+                  showSessions ? "block" : "hidden lg:block",
                 )}
               >
-                {activeTab === "sessions" && <SessionsQueue />}
+                {showSessions && <SessionsQueue />}
               </div>
               <div
                 className={cn(
                   "h-full",
-                  activeTab === "items" || mobileView === "items"
-                    ? "block"
-                    : "hidden",
+                  showItems ? "block" : "hidden",
                 )}
               >
                 {activeAppointmentId ? (
@@ -206,7 +295,7 @@ const POSLayout = () => {
         cartLength={cart.length}
         readyAppointmentsLength={readyAppointments.length}
       />
-    </div>
+    </PageShell>
   );
 };
 

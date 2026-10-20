@@ -1,60 +1,87 @@
 <!doctype html>
-<html lang="ar" dir="rtl" data-theme="light" class="">
+<!--
+  `class="dark"` is the default because midnight is the default palette. It is
+  replaced by `applyThemeMode()` as soon as a salon with a light theme resolves,
+  and it must be here in the served HTML so the very first paint is correct —
+  set from an effect, a light-theme salon flashes dark cards first.
+-->
+<html lang="ar" dir="rtl" class="dark" style="color-scheme: dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta
-      name="description"
-      content="Barber Luxe - نظام احترافي لإدارة محلات الحلاقة، المبيعات، الحجوزات، الموظفين، المخزون، والتقارير."
-    />
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#FAFAF7" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#09090B" />
+
+    <title>__SITE_TITLE__</title>
+    <meta name="description" content="__SITE_DESCRIPTION__" />
+    <meta name="application-name" content="__SITE_BRAND__" />
+    <link rel="canonical" href="__SITE_URL__/" />
+
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="__SITE_BRAND__" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Colour scheme: browser chrome, install prompt and form controls -->
     <meta name="color-scheme" content="light dark" />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
-    <meta name="format-detection" content="telephone=yes" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="__THEME_LIGHT__" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="__THEME_DARK__" />
+
+    <!-- Installability -->
+    <link rel="manifest" href="/manifest.json" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Salon Pro" />
-    <meta name="application-name" content="Salon Pro" />
+    <meta name="apple-mobile-web-app-title" content="__SITE_BRAND__" />
 
-    <script>
-      (function () {
-        try {
-          var storedTheme = localStorage.getItem("theme");
-          var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-          var theme = storedTheme === "dark" || storedTheme === "light" ? storedTheme : prefersDark ? "dark" : "light";
-          document.documentElement.dataset.theme = theme;
-          document.documentElement.classList.toggle("dark", theme === "dark");
-        } catch (error) {
-          document.documentElement.dataset.theme = "light";
-        }
-      })();
-    </script>
+    <!-- Icons. The .ico is the legacy fallback; the PNGs are what PWA
+         installability and iOS actually read. -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
-    <link rel="icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" href="/favicon.ico" />
-    <link rel="manifest" href="/manifest.json" />
-    <!-- Fonts are self-hosted via @fontsource/* packages (see src/main.jsx) -->
+    <!-- Fonts are self-hosted via @fontsource/* (see src/main.tsx), so there is
+         no third-party connection to preconnect to and no GDPR exposure. -->
 
-    <title>Barber Luxe | نظام إدارة الصالونات الاحترافي</title>
-
-    <!-- Open Graph / Facebook -->
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://barberluxe.pro/" />
-    <meta property="og:title" content="Barber Luxe | نظام إدارة الصالونات" />
-    <meta property="og:description" content="إدارة صالونك باحترافية: مبيعات، حجوزات، عملاء، ومخزون في منصة واحدة." />
-    <meta property="og:image" content="/og-image.jpg" />
+    <meta property="og:site_name" content="__SITE_BRAND__" />
+    <meta property="og:locale" content="__OG_LOCALE__" />
+    <meta property="og:locale:alternate" content="__OG_LOCALE_ALT__" />
+    <meta property="og:title" content="__SITE_TITLE__" />
+    <meta property="og:description" content="__SITE_DESCRIPTION__" />
+    <meta property="og:url" content="__SITE_URL__/" />
+    <meta property="og:image" content="__OG_IMAGE__" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="__OG_IMAGE_ALT__" />
 
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://barberluxe.pro/" />
-    <meta property="twitter:title" content="Barber Luxe | نظام إدارة الصالونات" />
-    <meta property="twitter:description" content="إدارة صالونك باحترافية: مبيعات، حجوزات، عملاء، ومخزون في منصة واحدة." />
-    <meta property="twitter:image" content="/og-image.jpg" />
+    <!-- Twitter / X. These use name=, not property=. -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="__SITE_TITLE__" />
+    <meta name="twitter:description" content="__SITE_DESCRIPTION__" />
+    <meta name="twitter:image" content="__OG_IMAGE__" />
+    <meta name="twitter:image:alt" content="__OG_IMAGE_ALT__" />
+
+    <link rel="alternate" hreflang="ar" href="__SITE_URL__/" />
+    <link rel="alternate" hreflang="x-default" href="__SITE_URL__/" />
+
+    <script src="/theme-init.js"></script>
   </head>
-  <body>
+  <!--
+    `mk-skin` opts this document into the landing skin: the themed selection
+    colour, scrollbar and the accent wash on `body`. It is a class rather than a
+    global rule because the dashboard shares this stylesheet and owns its own
+    `::selection`; scoping by class keeps the two from overwriting each other.
+  -->
+  <body class="mk-skin">
     <div id="root"></div>
+    <noscript>
+      <div style="max-width: 42rem; margin: 4rem auto; padding: 0 1.5rem; font-family: system-ui, sans-serif; line-height: 1.7">
+        <h1 style="font-size: 1.5rem">__SITE_BRAND__</h1>
+        <p>__SITE_DESCRIPTION__</p>
+        <p>هذا الموقع يحتاج إلى تفعيل JavaScript لعرض خدمات الصالون ونظام الحجز. يمكنك تفعيله من إعدادات المتصفح ثم إعادة تحميل الصفحة.</p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -173,7 +173,7 @@ export const CheckoutTotals = ({
               <div className="space-y-1">
                 <label
                   htmlFor="split-cash"
-                  className="text-[9px] font-black text-muted uppercase mr-1"
+                  className="text-[9px] font-black text-muted uppercase me-1"
                 >
                   نقدي
                 </label>
@@ -181,7 +181,7 @@ export const CheckoutTotals = ({
                   <input
                     id="split-cash"
                     type="number"
-                    className="w-full bg-white dark:bg-slate-950 border border-border/50 rounded-lg h-10 px-2 pl-6 text-xs font-black outline-none focus:border-emerald-500/40 touch-target"
+                    className="w-full bg-white dark:bg-slate-950 border border-border/50 rounded-lg h-10 px-2 ps-6 text-xs font-black outline-none focus:border-emerald-500/40 touch-target"
                     value={splitCashAmount}
                     onChange={(e) => handleCashChange(e.target.value)}
                     step="0.01"
@@ -195,7 +195,7 @@ export const CheckoutTotals = ({
               <div className="space-y-1">
                 <label
                   htmlFor="split-card"
-                  className="text-[9px] font-black text-muted uppercase mr-1"
+                  className="text-[9px] font-black text-muted uppercase me-1"
                 >
                   شبكة
                 </label>
@@ -203,7 +203,7 @@ export const CheckoutTotals = ({
                   <input
                     id="split-card"
                     type="number"
-                    className="w-full bg-white dark:bg-slate-950 border border-border/50 rounded-lg h-10 px-2 pl-6 text-xs font-black outline-none focus:border-blue-500/40 touch-target"
+                    className="w-full bg-white dark:bg-slate-950 border border-border/50 rounded-lg h-10 px-2 ps-6 text-xs font-black outline-none focus:border-blue-500/40 touch-target"
                     value={splitCardAmount}
                     onChange={(e) => handleCardChange(e.target.value)}
                     step="0.01"

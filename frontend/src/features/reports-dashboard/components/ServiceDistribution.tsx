@@ -2,23 +2,34 @@ import type { ComponentProps } from "react";
 import { Scissors } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { ContentPanel } from "@/components/shared/PremiumUI";
+import { cn } from "@/lib/core/utils";
 import type { ServiceSlice } from "@/features/reports-dashboard/constants";
 
+// The last entry used to be `var(--secondary)`, which is not defined in
+// src/styles/index.css, so the sixth slice rendered with an invalid fill and
+// silently fell back to black.
 const SLICE_COLORS = [
   `var(--primary)`,
   `var(--info)`,
   `var(--warning)`,
   `var(--success)`,
   `var(--danger)`,
-  `var(--secondary)`,
+  `var(--chart-5)`,
 ];
 
 export interface ServiceDistributionProps {
   serviceDistribution: ServiceSlice[];
-  occupancy: number | undefined;
+  /** `null` when the server could not compute it. Not the same as 0. */
+  occupancy: number | null | undefined;
 }
 
 export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceDistributionProps) {
+  // `null` is "the query failed", and rendering it as 0% would report an empty
+  // salon on the days the database was unreachable. An em dash says the figure
+  // is unavailable without asserting a value in either direction.
+  const occupancyLabel = occupancy == null ? "—" : `${occupancy}%`;
+  const occupancyMuted = occupancy == null;
+
   return (
     <ContentPanel className="h-full" title={undefined} subtitle={undefined} actions={undefined}>
       <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted mb-4">
@@ -28,11 +39,16 @@ export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceD
         {serviceDistribution.length > 0 ? (
           <>
             <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center">
-              <div className="text-3xl sm:text-4xl font-black text-main tracking-tighter tabular-nums">
-                {occupancy ?? 0}%
+              <div
+                className={cn(
+                  "text-3xl sm:text-4xl font-black tracking-tighter tabular-nums",
+                  occupancyMuted && "text-muted",
+                )}
+              >
+                {occupancyLabel}
               </div>
               <div className="mt-0.5 text-[8px] font-black uppercase tracking-widest text-muted">
-                متوسط الإشغال
+                {occupancyMuted ? "تعذّر الحساب" : "متوسط الإشغال"}
               </div>
             </div>
             <ResponsiveContainer width="100%" height="100%">
@@ -43,7 +59,7 @@ export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceD
                   outerRadius={85}
                   paddingAngle={4}
                   dataKey="value"
-                  stroke="var(--bg)"
+                  stroke="var(--bg-card)"
                   strokeWidth={2}
                   label={({ name, percent }) =>
                     typeof percent === "number" && percent > 0.08 ? `${name} ${(percent * 100).toFixed(0)}%` : false
@@ -54,7 +70,7 @@ export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceD
                     <Cell
                       key={`cell-${index}`}
                       fill={SLICE_COLORS[index % 6]}
-                      stroke="var(--bg)"
+                      stroke="var(--bg-card)"
                       strokeWidth={2}
                     />
                   ))}

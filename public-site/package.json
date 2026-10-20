@@ -5,12 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "assets": "node scripts/generate-assets.mjs",
+    "prebuild": "npm run assets",
     "build": "tsc && vite build && node scripts/prerender.mjs",
     "build:vite": "vite build",
     "prerender": "node scripts/prerender.mjs",
     "typecheck": "tsc --noEmit",
+    "pretest:contracts": "npm run build",
     "test:contracts": "node --test scripts/contracts.test.mjs",
-    "lint": "eslint src",
+    "test:api": "node --test scripts/public-payload.test.mjs",
+    "test:all": "npm run test:api && npm run test:contracts",
+    "lint": "eslint src vite.config.js",
+    "i18n:audit": "node scripts/audit-i18n-keys.mjs",
+    "screenshot": "npm run build && node scripts/screenshot.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -36,6 +43,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.39.5",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",

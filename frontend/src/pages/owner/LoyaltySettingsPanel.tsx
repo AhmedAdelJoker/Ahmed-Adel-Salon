@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { ContentPanel, PageHeader, SkeletonCard } from "@/components/shared/PremiumUI";
-import { PreviewCard } from "@/features/loyalty/components/PreviewCard";
-import { TierRow } from "@/features/loyalty/components/TierRow";
+import { PreviewCard } from "@/features/loyalty";
+import { TierRow } from "@/features/loyalty";
 import { LOYALTY_LIMITS, useLoyaltySettings } from "@/features/loyalty";
 
 const labelCls = "text-[10px] font-bold uppercase tracking-wider text-muted";

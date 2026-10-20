@@ -70,7 +70,7 @@ export function StatCardSkeleton({ className, delay = 0 }: { className?: string;
   return (
     <div
       className={cn(
-        "group border-l-4 border-border/50 rounded-premium border border-border bg-card shadow-soft transition-all duration-300 overflow-hidden animate-pulse",
+        "group border-s-4 border-border/50 rounded-premium border border-border bg-card shadow-soft transition-all duration-300 overflow-hidden animate-pulse",
         className,
       )}
       style={delay ? { animationDelay: `${delay}s` } : undefined}
@@ -112,7 +112,7 @@ export function ToolbarSkeleton({ className }) {
     >
       <div className="relative flex-1 max-w-2xl group">
         <div className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 bg-border/50 rounded" />
-        <div className="h-12 rounded-xl bg-border/50 pr-11" />
+        <div className="h-12 rounded-xl bg-border/50 pe-11" />
       </div>
       <div className="w-full xl:w-auto">
         <div className="bg-soft/50 border border-border p-1 rounded-xl h-12">
