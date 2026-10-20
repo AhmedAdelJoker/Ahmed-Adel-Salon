@@ -37,10 +37,21 @@ def get_external_data_dir() -> Path:
         pass
 
     # 3. مجلد خارج المشروع - sibling لـ Salon-Management-Pro (المختار من المستخدم)
-    # backend/app/core/paths.py -> parents[3] == Salon-Management-Pro parent (Downloads)
+    # paths.py:  core -> app -> backend -> Salon-Management-Pro -> Downloads
+    # i.e. __file__ = Salon-Management-Pro\backend\app\core\paths.py, so
+    #   parents[0] = core, parents[1] = app, parents[2] = backend,
+    #   parents[3] = Salon-Management-Pro, parents[4] = Downloads.
+    # The previous index was parents[3], which is the project folder itself —
+    # the comment above it claimed "Downloads". The data therefore lived
+    # INSIDE the repo (Salon-Management-Pro\SalonPro_External), defeating the
+    # whole point of this module (gitignored data that survives repo delete).
+    # parents[4] puts the data home next to the project, which is also the
+    # layout the packaged app builds into (frontend/build-external.ps1 ->
+    # Downloads\SalonPro_External, sharing the same Data folder since Windows
+    # paths are case-insensitive).
     cur = Path(__file__).resolve()
     try:
-        project_parent = cur.parents[3]  # .../Salon-Management-Pro/.. -> Downloads
+        project_parent = cur.parents[4]  # Downloads — sibling of the project
         # المسار المحدد من المستخدم
         chosen = project_parent / "SalonPro_External"
         if chosen.exists():
@@ -167,13 +178,12 @@ def migrate_legacy_data():
     import logging
     logger = logging.getLogger("paths.migrate")
     cur = Path(__file__).resolve()
-    # مواقع قديمة
     project_root = None
     try:
-        project_root = cur.parents[3]  # Downloads
-        # actually Salon-Management-Pro is at parents[3]? let's compute
-        # paths.py at backend/app/core/paths.py
-        # parents[0]=core,1=app,2=backend,3=Salon-Management-Pro
+        # parents[3] here is the project root (Salon-Management-Pro): all
+        # path segments below (uploads/, backend/salon_pro.db, ...) are
+        # project-relative. Do NOT "fix" this to parents[4] like
+        # get_external_data_dir — the two mean different things.
         project_root = cur.parents[3]
     except Exception:
         return
@@ -183,7 +193,7 @@ def migrate_legacy_data():
         cur.parents[2] / "uploads",  # backend/uploads
         Path.cwd() / "uploads",
     ]
-    # أيضاً legacy من parents[3]/uploads القديم الخاطئ (Downloads/uploads)
+    # وأيضاً uploads القديم المبعثر بجانب المشروع (Downloads/uploads)
     try:
         legacy_roots.append(cur.parents[4] / "uploads")
     except Exception:
