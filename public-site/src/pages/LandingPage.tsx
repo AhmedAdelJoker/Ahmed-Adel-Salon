@@ -19,11 +19,12 @@ import {
   buildFAQSchema,
   buildHairSalonSchema,
   buildServiceSchema,
+  buildWebSiteSchema,
   useSEO,
 } from "../hooks/useSEO";
 import { resolveAssetUrl } from "../lib/imageOptimizer";
 import { toCurrencyCode } from "../lib/utils";
-import { BRAND } from "../lib/site";
+import { BRAND, absoluteUrl } from "../lib/site";
 import {
   WORKING_HOURS_DAYS,
   formatHoursRange,
@@ -256,10 +257,6 @@ export default function LandingPage() {
       : null);
 
   const address = settings.address || "";
-  const pageUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}${salonPath}`
-      : "";
 
   /* ── Hours ─────────────────────────────────────────────────────────── */
 
@@ -423,27 +420,35 @@ export default function LandingPage() {
       t("landing.metaDescription") ||
       `${salonName} — ${t("landing.servicesTitle")}`,
     image: heroImage,
-    url: pageUrl,
+    url: absoluteUrl(salonPath),
     type: "website",
     siteName: salonName,
     locale: "ar_EG",
     keywords: settings.metaKeywords || `${salonName}, صالون, حلاقة, حجز أونلاين`,
     preloadImage: heroImage,
+    // The site ships one locale (Arabic), so `ar` and `x-default` name the
+    // same document. Omitting `x-default` makes language pickers fall back to
+    // whatever locale the crawler guessed — usually English on bot crawlers.
+    hreflang: [
+      { lang: "ar", href: absoluteUrl(salonPath) },
+      { lang: "x-default", href: absoluteUrl(salonPath) },
+    ],
     schema: [
+      // The WebSite node comes first: it is the site-level identity that the
+      // HairSalon node below nests into a search engine's understanding of
+      // the domain.
+      buildWebSiteSchema({ name: salonName, url: absoluteUrl("/") }),
       buildHairSalonSchema({
         settings,
         salonName,
         heroImage,
-        url: pageUrl,
+        url: absoluteUrl(salonPath),
         address,
       }),
       buildBreadcrumbSchema({
         items: [
-          {
-            name: t("nav.home"),
-            url: typeof window !== "undefined" ? window.location.origin : "",
-          },
-          { name: salonName, url: pageUrl },
+          { name: t("nav.home"), url: absoluteUrl("/") },
+          { name: salonName, url: absoluteUrl(salonPath) },
         ],
       }),
       buildFAQSchema({
@@ -467,11 +472,11 @@ export default function LandingPage() {
             image: service.image,
             url:
               salonSlug && service.id != null
-                ? `${pageUrl.replace(/\/$/, "")}/service/${service.id}`
+                ? `${absoluteUrl(salonPath).replace(/\/$/, "")}/service/${service.id}`
                 : undefined,
           })),
         currency: toCurrencyCode(currency),
-        salonUrl: pageUrl,
+        salonUrl: absoluteUrl(salonPath),
         salonName,
       }) ?? []),
     ],

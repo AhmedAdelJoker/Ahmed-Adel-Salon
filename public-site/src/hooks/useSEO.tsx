@@ -420,6 +420,35 @@ export function buildServiceSchema({
   return entries;
 }
 
+/**
+ * Build the `WebSite` node for the landing page.
+ *
+ * This is the structured-data equivalent of "this document is the site's
+ * front door, not just one document among many" — it lets search engines bind
+ * sitelinks and the site name to the origin instead of to one salon URL.
+ * No SearchAction: there is nothing to search yet, and advertising a search
+ * endpoint that does not exist is the same class of invention as a fake
+ * rating.
+ */
+export function buildWebSiteSchema({
+  name,
+  url,
+  inLanguage = "ar",
+}: {
+  name?: string;
+  /** Required: `absoluteUrl("/")` always resolves, even prerendered. */
+  url: string;
+  inLanguage?: string;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name,
+    url,
+    inLanguage,
+  };
+}
+
 /** Build a BreadcrumbList schema for the page navigation. */
 export function buildBreadcrumbSchema({
   items = [],

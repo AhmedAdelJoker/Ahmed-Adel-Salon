@@ -202,7 +202,10 @@ export default function EntityPage({ kind }: { kind: Kind }) {
     type: "website",
     siteName: BRAND.name,
     locale: locale === "ar" ? "ar_EG" : "en_US",
-    hreflang: [{ lang: "ar", href: absoluteUrl(salonPath) }],
+    hreflang: [
+      { lang: "ar", href: absoluteUrl(salonPath) },
+      { lang: "x-default", href: absoluteUrl(salonPath) },
+    ],
     schema,
   });
 
