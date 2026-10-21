@@ -1,11 +1,22 @@
 /**
- * ServicesList.tsx — services as the mockup's card grid.
+ * ServicesList.tsx — the price list, as a list.
  *
- * Each service is a `mk-svc` card: name (linked to its own page) with the
- * price on the top band, description underneath, and a meta footer with the
- * duration, one tier chip and the booking action. The tier chip is assigned
- * by price band, not stored — one chip per card, `featured` wins when the
- * owner has flagged the service.
+ * ## Why the cards went
+ *
+ * A grid of service cards reads as a product catalogue: every item the same
+ * size, every description the same length, one image per cell. A salon's
+ * services are a menu — the visitor scans names and prices vertically, then
+ * picks one. A list with the price on the same baseline as the name is both
+ * faster to read and far more honest about the fact that most services have no
+ * photo.
+ *
+ * ## What is never invented
+ *
+ * The description is rendered only when the service actually has one. The
+ * previous version fell back to a generic sentence ("خدمة مصممة بعناية...")
+ * for every service, which reached the page, the JSON-LD and the meta
+ * description. A service with no description now shows its duration and its
+ * category instead — facts, not filler.
  */
 
 import { useMemo, useState } from "react";
@@ -19,6 +30,7 @@ export type Translate = (key: string, vars?: Record<string, unknown>) => string;
 export interface ServiceItem {
   id?: string | number;
   name: string;
+  /** Empty when the owner has not written one; never a fallback sentence. */
   description: string;
   image?: string | null;
   duration?: string;
@@ -27,8 +39,6 @@ export interface ServiceItem {
   /** `category_id` from the catalogue; `null` when the service has none. */
   categoryId?: string | number | null;
   categoryName?: string | null;
-  /** 'premium' for the top-priced band; 'basic' otherwise. */
-  tier?: "basic" | "premium";
 }
 
 export interface ServicesListProps {
@@ -65,39 +75,58 @@ export default function ServicesList({
 }: ServicesListProps) {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  /**
-   * Tier badge.
-   *
-   * "Premium" is assigned by price band, not stored: the salon has no such
-   * field, and inventing a persisted tier would mean an owner-facing setting
-   * that does nothing. The top third of the catalogue gets the badge — enough
-   * services to be a meaningful choice, few enough that the label stays
-   * aspirational instead of appearing on half the menu.
-   */
-  const premiumCutoff = useMemo(() => {
-    const prices = services.map((service) => service.price).filter((price) => price > 0);
-    if (prices.length < 3) return Infinity;
-    const sorted = [...prices].sort((a, b) => a - b);
-    return sorted[Math.floor(sorted.length * 0.67)];
-  }, [services]);
+  const visible = useMemo(
+    () =>
+      !activeCategory
+        ? services
+        : services.filter(
+            (service) =>
+              service.categoryId != null &&
+              String(service.categoryId) === activeCategory,
+          ),
+    [services, activeCategory],
+  );
 
   /**
-   * Filtering is a projection of the full list, never a second source of truth.
+   * Grouped by category only when the catalogue actually has categories.
+   *
+   * With one category the group heading repeats the section title, so the
+   * rows render as a single unlabelled list. With none (an older catalogue
+   * that never sent them) the same thing happens.
    */
-  const visible = useMemo(() => {
-    return (!activeCategory
-      ? services
-      : services.filter(
-          (service) => service.categoryId != null && String(service.categoryId) === activeCategory,
-        )
-    ).map((service) => ({
-      ...service,
-      tier:
-        service.price > 0 && service.price >= premiumCutoff
-          ? ("premium" as const)
-          : ("basic" as const),
-    }));
-  }, [services, activeCategory, premiumCutoff]);
+  const groups = useMemo(() => {
+    if (!categories || categories.length < 2) {
+      return [{ id: "all", name: "", services: visible }];
+    }
+
+    const known = new Set(categories.map((category) => category.id));
+    const byCategory = new Map<string, ServiceItem[]>();
+    const uncategorised: ServiceItem[] = [];
+
+    for (const service of visible) {
+      const id = service.categoryId != null ? String(service.categoryId) : "";
+      if (!id || !known.has(id)) {
+        uncategorised.push(service);
+        continue;
+      }
+      const bucket = byCategory.get(id);
+      if (bucket) bucket.push(service);
+      else byCategory.set(id, [service]);
+    }
+
+    const result = categories
+      .map((category) => ({
+        id: category.id,
+        name: category.name,
+        services: byCategory.get(category.id) ?? [],
+      }))
+      .filter((group) => group.services.length > 0);
+
+    if (uncategorised.length > 0) {
+      result.push({ id: "other", name: t("landing.servicesOther"), services: uncategorised });
+    }
+    return result;
+  }, [categories, visible, t]);
 
   if (services.length === 0) {
     return (
@@ -108,6 +137,7 @@ export default function ServicesList({
   }
 
   const filterRow = categories && categories.length > 1;
+  let rowIndex = 0;
 
   return (
     <section id="services" className="mk-shell py-[length:var(--section-y)]">
@@ -118,7 +148,7 @@ export default function ServicesList({
             {title}
           </h2>
           {subtitle ? (
-            <p className="mk-lead" style={{ marginTop: "1.25rem" }}>
+            <p className="mk-lead" style={{ marginTop: "1.15rem" }}>
               {subtitle}
             </p>
           ) : null}
@@ -152,71 +182,67 @@ export default function ServicesList({
       {visible.length === 0 ? (
         <p className="mk-empty">{t("landing.noMatches")}</p>
       ) : (
-        <div className="mk-svc-grid">
-          {visible.map((service, index) => (
-            <article key={service.id ?? `${service.name}-${index}`} className="mk-svc">
-              <div className="mk-svc-top">
-                {/*
-                  The service photo. Real data shown small so the cards stay
-                  cards; the large version lives on the service's own page.
-                  `alt=""` because the name is the adjacent heading —
-                  announcing both would double-read it.
-                */}
-                {service.image ? (
-                  <img
-                    src={service.image}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    className="mk-svc-thumb"
-                  />
-                ) : null}
+        <div className="mk-menu">
+          {groups.map((group) => (
+            <div key={group.id} className="mk-menu-group">
+              {group.name ? (
+                <h3 className="mk-menu-group-title">{group.name}</h3>
+              ) : null}
+              {group.services.map((service) => {
+                rowIndex += 1;
+                return (
+                  <article
+                    key={service.id ?? `${service.name}-${rowIndex}`}
+                    className="mk-menu-row"
+                    data-featured={service.featured ? "true" : "false"}
+                  >
+                    <span className="mk-menu-num" aria-hidden="true">
+                      {String(rowIndex).padStart(2, "0")}
+                    </span>
 
-                {/*
-                  The service name links to its own page. A `Service` with an
-                  `Offer` at a stable URL is what lets a search result show a
-                  price instead of making the visitor click through, and it is
-                  the page a stylist's regular client bookmarks.
-                */}
-                <h4>
-                  {salonSlug ? (
-                    <a href={`/salon/${salonSlug}/service/${service.id}`}>{service.name}</a>
-                  ) : (
-                    service.name
-                  )}
-                </h4>
+                    <div className="min-w-0">
+                      <h4 className="mk-menu-name">
+                        {salonSlug ? (
+                          <a href={`/salon/${salonSlug}/service/${service.id}`}>
+                            {service.name}
+                          </a>
+                        ) : (
+                          service.name
+                        )}
+                      </h4>
 
-                <span className="mk-price numeric">
-                  {service.price} {currency}
-                </span>
-              </div>
+                      {service.description ? (
+                        <p className="mk-menu-desc">{service.description}</p>
+                      ) : null}
 
-              {service.description ? <p className="mk-svc-desc">{service.description}</p> : null}
+                      <div className="mk-menu-meta">
+                        {service.duration ? (
+                          <span className="numeric">{service.duration}</span>
+                        ) : null}
+                        {service.featured ? (
+                          <span style={{ color: "var(--c-accent)" }}>
+                            {t("landing.featured")}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
 
-              <div className="mk-svc-meta">
-                {/* `duration` arrives fully localized ("30 دقيقة") from the page. */}
-                {service.duration ? (
-                  <span className="numeric">{service.duration}</span>
-                ) : null}
+                    <span className="mk-menu-price">
+                      {service.price} <small>{currency}</small>
+                    </span>
 
-                {/*
-                  One chip per card: the owner's `featured` flag wins, then the
-                  computed premium band.
-                */}
-                {service.featured ? (
-                  <span className="mk-tag">{t("landing.featured")}</span>
-                ) : service.tier === "premium" ? (
-                  <span className="mk-tier mk-tier-premium">{t("landing.tierPremium")}</span>
-                ) : (
-                  <span className="mk-tier mk-tier-basic">{t("landing.tierBasic")}</span>
-                )}
-
-                <button type="button" onClick={() => onBook(service)} className="mk-book-link">
-                  {t("landing.bookService")}
-                  <ArrowUpLeft size={14} aria-hidden="true" className="rtl:rotate-180" />
-                </button>
-              </div>
-            </article>
+                    <button
+                      type="button"
+                      onClick={() => onBook(service)}
+                      className="mk-menu-book"
+                    >
+                      {t("landing.bookService")}
+                      <ArrowUpLeft size={13} aria-hidden="true" className="rtl:rotate-180" />
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
           ))}
         </div>
       )}
@@ -240,10 +266,7 @@ export function toServiceItems(
     return {
       id: service.id as string | number | undefined,
       name: asText(service.name_ar) || asText(service.name) || t("landing.serviceFallbackName"),
-      description:
-        asText(service.description_ar) ||
-        asText(service.description) ||
-        t("landing.serviceFallbackDescription"),
+      description: asText(service.description_ar) || asText(service.description),
       image: image ? `${image}${image.includes("?") ? "&" : "?"}w=160` : null,
       duration: duration ? duration : undefined,
       price: Number.isFinite(price) ? price : 0,

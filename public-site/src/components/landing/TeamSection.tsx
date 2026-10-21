@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Scissors, User, CalendarCheck2, Clock3 } from "lucide-react";
+import { CalendarCheck2, Clock3 } from "lucide-react";
 
 import type { BrandTheme } from "../../lib/theme";
 import { resolveAssetUrl } from "../../lib/imageOptimizer";
@@ -136,6 +136,20 @@ function TeamCard({
   const href = salonSlug ? `/salon/${salonSlug}/barber/${member.id}` : undefined;
 
   /**
+   * Job titles are stored as stable ids (`barber`, `colorist`, …), not as copy.
+   * Printing the id put the word "barber" in English on an otherwise Arabic
+   * card. Translation keys exist for every bookable title; an unknown title
+   * falls back to the raw value rather than to a `team.role.*` key.
+   */
+  const roleId = member.role?.trim() || "";
+  const roleKey = roleId ? `team.role.${roleId}` : "";
+  const translatedRole = roleKey ? t(roleKey) : "";
+  const roleLabel =
+    translatedRole && translatedRole !== roleKey ? translatedRole : roleId;
+
+  const initial = member.name.trim().charAt(0).toUpperCase();
+
+  /**
    * A stored photo path that no longer resolves is not the same as having no
    * photo: the row keeps `/uploads/profiles/<uuid>.jpg` after the file is gone,
    * so `image` is a truthy URL that answers 404 and the browser shows a broken
@@ -174,20 +188,48 @@ function TeamCard({
                 src={image as string}
                 alt={member.name}
                 className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]"
+                style={{ objectPosition: "center 25%" }}
                 loading="lazy"
                 decoding="async"
                 onError={() => setPhotoBroken(true)}
               />
             ) : (
+              /*
+                No photo is a normal state for a new salon, and an empty black
+                box reads as a broken upload. The initial in the display face is
+                a deliberate placeholder rather than a missing one.
+              */
               <div
                 className="flex h-full w-full items-center justify-center"
                 style={{ backgroundColor: `${theme.accent}14`, color: theme.accent }}
                 aria-hidden="true"
               >
-                <User size={48} strokeWidth={1.25} />
+                <span
+                  style={{
+                    fontFamily: "var(--font-editorial)",
+                    fontSize: "4.5rem",
+                    lineHeight: 1,
+                  }}
+                >
+                  {initial}
+                </span>
               </div>
             )}
           </div>
+
+          {/*
+            Fade the photo into the card at its bottom edge. Portraits shot in
+            the salon's dark style used to end on a hard line, which read as a
+            broken image rather than a photograph; the wash makes the crop
+            deliberate and the info band below feels continuous with it.
+          */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundImage: `linear-gradient(to bottom, transparent 55%, ${theme.card} 102%)`,
+            }}
+          />
         </div>
 
         <div className="mk-member-info">
@@ -206,10 +248,14 @@ function TeamCard({
               {member.name}
             </h3>
           )}
-          {member.role ? (
+          {roleLabel ? (
             <p className="mk-member-role" style={{ color: theme.accent }}>
-              <Scissors size={13} aria-hidden="true" />
-              {member.role}
+              <span
+                aria-hidden="true"
+                className="inline-block h-px w-4"
+                style={{ backgroundColor: "currentColor" }}
+              />
+              {roleLabel}
             </p>
           ) : null}
           {showBios && member.bio ? (

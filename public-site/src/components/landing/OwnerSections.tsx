@@ -20,7 +20,7 @@ export interface OwnerSectionsProps {
   /** Owner's WhatsApp/phone, for the quick-actions row. */
   contactLinks: { phone?: string; whatsapp?: string; maps?: string };
   address?: string;
-  workingHours: { dayLabel: string; range: string; isOpen: boolean }[];
+  workingHours: { dayLabel: string; range: string; isOpen: boolean; isToday?: boolean }[];
   isOpenNow: boolean;
   onBook: () => void;
   t: Translate;
@@ -137,7 +137,7 @@ export default function OwnerSections({
   locale,
   reviews,
 }: OwnerSectionsProps) {
-  const { copy, portfolio, stats, features, trustBadges, testimonials } = content;
+  const { copy, portfolio, features, trustBadges, testimonials } = content;
   const [lightbox, setLightbox] = useState<{ index: number; src: string; alt: string } | null>(null);
 
   /**
@@ -152,9 +152,9 @@ export default function OwnerSections({
         .filter((src): src is string => Boolean(src))
         .map((src, index) => ({
           src,
-          alt: `${copy.landingPortfolioTitle || "gallery"} ${index + 1}`,
+          alt: `${copy.landingPortfolioTitle || t("landing.galleryTitle")} — ${index + 1}`,
         })),
-    [portfolio, copy.landingPortfolioTitle],
+    [portfolio, copy.landingPortfolioTitle, t],
   );
 
   return (
@@ -176,34 +176,10 @@ export default function OwnerSections({
         </section>
       ) : null}
 
-      {stats.length > 0 ? (
-        <section aria-label={t("landing.stats")} className="mx-auto w-full max-w-7xl px-4 pt-16 sm:px-6 lg:px-8">
-          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat) => (
-              <Card key={`${stat.value}-${stat.label}`} theme={theme} className="text-center">
-                <dt className="sr-only">{stat.label}</dt>
-                <dd>
-                  <span
-                    className="block text-3xl font-bold leading-none"
-                    style={{ color: theme.accent }}
-                  >
-                    {stat.value}
-                  </span>
-                  <span className="mt-2 block text-xs font-bold" style={{ color: theme.muted }}>
-                    {stat.label}
-                  </span>
-                </dd>
-              </Card>
-            ))}
-          </dl>
-        </section>
-      ) : null}
-
       {features.length > 0 ? (
         <Section
           eyebrow={copy.landingServicesEyebrow}
-          title={copy.landingServicesTitle || t("landing.featuresTitle")}
-          subtitle={copy.landingServicesSubtitle}
+          title={t("landing.featuresTitle")}
           theme={theme}
         >
           <ul className="grid gap-5 md:grid-cols-3">
@@ -313,10 +289,12 @@ export default function OwnerSections({
             <span
               className="inline-flex self-center items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold"
               style={{
-                borderColor: isOpenNow ? "rgba(16,185,129,0.35)" : "rgba(244,63,94,0.35)",
-                color: isOpenNow ? "#10B981" : "#F43F5E",
+                borderColor: isOpenNow ? theme.okLine : theme.stopLine,
+                color: isOpenNow ? theme.ok : theme.stop,
               }}
             >
+              {/* The live pulse dot: because "open" is a state, not a badge. */}
+              <span className="mk-pulse" aria-hidden="true" />
               <Clock3 size={14} aria-hidden="true" />
               {isOpenNow
                 ? copy.landingLocationOpenLabel || t("common.open")
@@ -326,8 +304,13 @@ export default function OwnerSections({
             <dl className="mk-c-card w-full p-0">
               <ul className="mk-hours" style={{ marginTop: 0 }}>
                 {workingHours.map((row) => (
-                  <li key={row.dayLabel}>
-                    <span style={{ color: theme.text }}>{row.dayLabel}</span>
+                  <li key={row.dayLabel} className={row.isToday ? "mk-hours-today" : undefined}>
+                    <span style={{ color: theme.text }}>
+                      {row.dayLabel}
+                      {row.isToday ? (
+                        <span className="mk-hours-today-tag">{t("common.today")}</span>
+                      ) : null}
+                    </span>
                     {/*
                       `.numeric` isolates the range so RTL does not reverse it,
                       and the rule already sets `white-space: nowrap` on the row
@@ -335,7 +318,13 @@ export default function OwnerSections({
                     */}
                     <span
                       className="numeric whitespace-nowrap"
-                      style={{ color: row.isOpen ? theme.accent : "#F43F5E" }}
+                      style={{
+                        color: row.isOpen
+                          ? row.isToday
+                            ? theme.accent
+                            : theme.text
+                          : theme.faint,
+                      }}
                     >
                       {row.range}
                     </span>

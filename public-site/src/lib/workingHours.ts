@@ -63,15 +63,31 @@ export const CLOSED_LABEL = {
   en: "Closed",
 } as const;
 
+/**
+ * Wrap an LTR run so it survives an RTL paragraph.
+ *
+ * A time range is a bidirectional island: the digits run left-to-right, the
+ * dash is neutral and the "(+1)" marker is punctuation. Dropped into an Arabic
+ * sentence unchanged, the browser re-orders the whole run and "22:00 – 03:00
+ * (+1)" renders as "(1+ 03:00 – 22:00" — with the overnight marker first and
+ * its plus sign detached. Unicode isolate characters tell the bidi algorithm
+ * to lay this run out on its own, in LTR order, without affecting the
+ * surrounding Arabic.
+ */
+export const isolateLtr = (value: string): string =>
+  `\u2066${value}\u2069`;
+
 /** "22:00 – 03:00 (+1)" for an overnight window, plain range otherwise. */
 export const formatHoursRange = (
   entry?: WorkingHourEntry,
   closedLabel: string = CLOSED_LABEL.ar,
 ): string => {
   if (!entry?.is_open || !entry.open_time || !entry.close_time) return closedLabel;
-  return crossesMidnight(entry)
-    ? `${entry.open_time} – ${entry.close_time} (+1)`
-    : `${entry.open_time} – ${entry.close_time}`;
+  return isolateLtr(
+    crossesMidnight(entry)
+      ? `${entry.open_time} – ${entry.close_time} (+1)`
+      : `${entry.open_time} – ${entry.close_time}`,
+  );
 };
 
 /** Zone-aware "what day and time is it at the salon" for the browser clock. */

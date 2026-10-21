@@ -118,10 +118,22 @@
     --gutter: clamp(1.25rem, 4vw, 2.5rem);
     --section-y: clamp(4.5rem, 9vw, 8rem);
 
-    --r-sm: 0.5rem;
-    --r-md: 0.75rem;
-    --r-lg: 1.25rem;
-    --r-xl: 1.75rem;
+    --r-sm: 0.25rem;
+    --r-md: 0.375rem;
+    --r-lg: 0.5rem;
+    --r-xl: 0.75rem;
+
+    /*
+      The editorial display face. Arabic is a Naskh serif (Amiri); Latin is
+      Cormorant Garamond. The switch lives on the document's lang attribute,
+      which `I18nContext` already keeps in sync, so one class name covers both
+      scripts.
+    */
+    --font-editorial: "Cormorant Garamond", "Amiri", "Times New Roman", serif;
+  }
+
+  html[lang="ar"] {
+    --font-editorial: "Amiri", "Cormorant Garamond", "Times New Roman", serif;
   }
 
   /* ── Shell ────────────────────────────────────────────────────────────── */
@@ -133,9 +145,14 @@
   }
 
   /* ── Announcement bar ────────────────────────────────────────────────── */
+  /*
+    The strip is ink, not accent. A full-width saturated bar is the loudest
+    thing on the page and it sits above the brand mark; copper belongs on the
+    one action per screen, not on a status line.
+  */
   .mk-topbar {
-    background-color: var(--c-accent);
-    color: var(--c-on-accent);
+    background-color: var(--c-text);
+    color: var(--c-bg);
     font-size: var(--step--2);
     font-weight: 700;
     padding-block: 0.6rem;
@@ -151,7 +168,7 @@
     gap: 0.5rem;
     border: 0;
     cursor: pointer;
-    border-radius: 999px;
+    border-radius: var(--r-sm);
     font-weight: 700;
     text-decoration: none;
     transition:
@@ -195,18 +212,71 @@
   }
 
   /* ── Hero ────────────────────────────────────────────────────────────── */
+  /*
+    An editorial split, not a photograph with type on top.
+
+    The photograph is a framed portrait on one side; the type sits on the paper
+    ground with real contrast, so the headline never depends on what happens to
+    be behind it. The booking controls move into a thin reservation bar beneath
+    the fold, which is what stops the hero from being a form with a headline
+    attached.
+  */
   .mk-hero {
     position: relative;
     overflow: hidden;
+    padding-block: clamp(2.5rem, 5vw, 4.5rem) 0;
   }
 
-  .mk-hero-bg {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
+  .mk-hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+    gap: clamp(2rem, 5vw, 5.5rem);
+    align-items: end;
   }
 
-  .mk-hero-bg img {
+  .mk-hero-copy {
+    padding-block-end: clamp(1.5rem, 3vw, 2.75rem);
+  }
+
+  .mk-hero-title {
+    font-family: var(--font-editorial);
+    font-weight: 700;
+    font-size: clamp(2.7rem, 1.6rem + 4.4vw, 5.2rem);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    color: var(--c-text);
+    text-wrap: balance;
+  }
+
+  html[lang="ar"] .mk-hero-title {
+    line-height: 1.22;
+    letter-spacing: 0;
+  }
+
+  .mk-hero-sub {
+    margin-top: 1.35rem;
+    max-width: 46ch;
+    font-size: var(--step-1);
+    line-height: 1.85;
+    color: var(--c-muted);
+  }
+
+  .mk-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 2.25rem;
+  }
+
+  .mk-hero-media {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    border-radius: var(--r-lg);
+    background-color: var(--c-inset);
+  }
+
+  .mk-hero-media img {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -214,42 +284,126 @@
   }
 
   /*
-    Two scrims, not one.
-
-    The horizontal one keeps the type column legible against a photograph whose
-    right-hand side may be bright — the salon chair, a window. The vertical one
-    anchors the top and bottom edges to the chrome and the next section, which
-    is what stops the hero looking like a photograph pasted onto a page. The
-    middle is left open so the image still reads as a place.
+    A salon that has not uploaded a cover gets a composed plate: the monogram
+    in the display face over a hairline rule. It is a finished composition
+    rather than a grey rectangle that reads as a failed download.
   */
-  .mk-hero-bg::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(
-        90deg,
-        rgba(0, 0, 0, 0.94) 0%,
-        rgba(0, 0, 0, 0.8) 38%,
-        rgba(0, 0, 0, 0.4) 68%,
-        rgba(0, 0, 0, 0.3) 100%
-      ),
-      linear-gradient(
-        180deg,
-        rgba(0, 0, 0, 0.7) 0%,
-        rgba(0, 0, 0, 0.34) 40%,
-        rgba(0, 0, 0, 0.97) 100%
-      );
+  .mk-hero-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    height: 100%;
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent 0 55px,
+      var(--c-border) 55px 56px
+    );
   }
 
-  .mk-hero-inner {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    grid-template-columns: 1.05fr 0.95fr;
-    gap: 4rem;
+  .mk-hero-placeholder span {
+    font-family: var(--font-editorial);
+    font-size: clamp(7rem, 16vw, 12rem);
+    line-height: 0.9;
+    color: var(--c-accent);
+  }
+
+  .mk-hero-placeholder i {
+    width: 3rem;
+    height: 1px;
+    background-color: var(--c-accent);
+  }
+
+  /*
+    A hairline frame offset from the photograph's corner. It is the one
+    decorative element in the hero, and it is drawn in the accent at low alpha
+    rather than a shadow so it works on both the ivory and the espresso ground.
+  */
+  .mk-hero-frame {
+    position: absolute;
+    inset-block-start: 1rem;
+    inset-inline-start: -1rem;
+    inset-block-end: -1rem;
+    inset-inline-end: 1rem;
+    border: 1px solid var(--c-accent-line);
+    border-radius: var(--r-lg);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .mk-hero-media .mk-hero-status {
+    position: absolute;
+    inset-block-end: 1rem;
+    inset-inline-end: 1rem;
+    inset-inline-start: 1rem;
+    display: flex;
     align-items: center;
-    padding-block: 5.5rem 4.5rem;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.8rem 1rem;
+    border-radius: var(--r-md);
+    background-color: var(--c-glass-strong);
+    backdrop-filter: blur(10px);
+    font-size: var(--step--1);
+    font-weight: 700;
+    color: var(--c-text);
+  }
+
+  /* ── Reservation bar ─────────────────────────────────────────────────── */
+  .mk-reserve {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr 1fr auto;
+    align-items: stretch;
+    margin-top: clamp(2.25rem, 4vw, 3.5rem);
+    border: 1px solid var(--c-border-strong);
+    border-radius: var(--r-md);
+    background-color: var(--c-card);
+    overflow: hidden;
+  }
+
+  .mk-reserve-field {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+    padding: 0.9rem 1.15rem;
+    border-inline-end: 1px solid var(--c-border);
+  }
+
+  .mk-reserve-field label {
+    font-size: var(--step--2);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--c-faint);
+  }
+
+  .mk-reserve-field select {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    background-color: transparent;
+    color: var(--c-text);
+    font: inherit;
+    font-weight: 700;
+    font-size: var(--step-0);
+    cursor: pointer;
+  }
+
+  .mk-reserve-field select:focus-visible {
+    outline: 2px solid var(--c-accent-2);
+    outline-offset: 2px;
+  }
+
+  .mk-reserve-cta {
+    display: flex;
+    align-items: stretch;
+    padding: 0.5rem;
+  }
+
+  .mk-reserve-cta .mk-btn {
+    height: 100%;
+    padding-inline: 1.6rem;
   }
 
   /* ── Open/closed pill ────────────────────────────────────────────────── */
@@ -322,23 +476,28 @@
   /* ── Trust row ───────────────────────────────────────────────────────── */
   .mk-trust {
     display: flex;
-    gap: 2.5rem;
-    margin-top: 3rem;
+    gap: clamp(1.5rem, 4vw, 3rem);
+    margin-top: clamp(2rem, 4vw, 3rem);
     flex-wrap: wrap;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--c-border);
   }
 
-  .mk-trust strong {
-    display: block;
-    font-size: var(--step-2);
-    font-weight: 900;
-    color: #fff;
-    line-height: 1.2;
+  .mk-trust dd {
+    font-family: var(--font-editorial);
+    font-size: var(--step-3);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--c-text);
   }
 
-  .mk-trust span {
+  .mk-trust dt {
+    margin-top: 0.55rem;
     font-size: var(--step--2);
-    color: var(--c-muted);
     font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--c-faint);
   }
 
   /* ── About ───────────────────────────────────────────────────────────── */
@@ -423,19 +582,37 @@
   }
 
   .mk-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
     font-size: var(--step--2);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.16em;
-    color: var(--c-accent-2);
+    color: var(--c-accent);
+  }
+
+  .mk-eyebrow::before {
+    content: "";
+    width: 1.75rem;
+    height: 1px;
+    background-color: currentColor;
+    flex: 0 0 auto;
   }
 
   .mk-h2 {
+    font-family: var(--font-editorial);
     font-size: var(--step-4);
-    font-weight: 900;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.015em;
     color: var(--c-text);
+    text-wrap: balance;
+  }
+
+  html[lang="ar"] .mk-h2 {
+    line-height: 1.3;
+    letter-spacing: 0;
   }
 
   .mk-h3 {
@@ -483,151 +660,168 @@
     }
   }
 
-  /* ── Service cards ───────────────────────────────────────────────────── */
-  .mk-svc-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.15rem;
+  /* ── Service menu ────────────────────────────────────────────────────── */
+  /*
+    A printed menu, not a card grid.
+
+    Each service is a row: index, name, duration, price, action. The price is
+    on the same baseline as the name so the list can be scanned vertically,
+    which is how someone decides what to book. `featured` is a small copper
+    rule in the margin instead of a badge — a badge on every third row stops
+    meaning anything.
+  */
+  .mk-menu {
+    border-top: 1px solid var(--c-border-strong);
   }
 
-  .mk-svc {
-    background-color: var(--c-card);
-    border: 1px solid var(--c-border);
-    border-radius: var(--r-lg);
-    padding: 1.5rem;
+  .mk-menu-group + .mk-menu-group {
+    margin-top: clamp(2rem, 4vw, 3.25rem);
+  }
+
+  .mk-menu-group-title {
     display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
-    transition:
-      transform 0.22s ease,
-      border-color 0.22s ease;
-  }
-
-  @media (hover: hover) {
-    .mk-svc:hover {
-      transform: translateY(-4px);
-      border-color: var(--c-border-strong);
-    }
-  }
-
-  .mk-svc-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .mk-price {
+    align-items: baseline;
+    gap: 0.9rem;
+    padding-block: 1.1rem 0.4rem;
+    font-family: var(--font-editorial);
     font-size: var(--step-1);
-    font-weight: 900;
-    color: var(--c-accent);
-    white-space: nowrap;
-  }
-
-  .mk-svc-meta {
-    display: flex;
-    gap: 1rem;
-    font-size: var(--step--2);
-    color: var(--c-faint);
-    font-weight: 600;
-    padding-top: 0.85rem;
-    border-top: 1px solid var(--c-border);
-    margin-top: auto;
-  }
-
-  /* ── Tier chips ──────────────────────────────────────────────────────── */
-  .mk-tier {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.15rem 0.6rem;
-    border-radius: 999px;
-    font-size: var(--step--2);
     font-weight: 700;
-    border: 1px solid;
-  }
-
-  .mk-tier-basic {
-    background-color: var(--c-muted-wash);
-    border-color: var(--c-border-strong);
-    color: var(--c-muted);
-  }
-
-  .mk-tier-premium {
-    background-color: var(--c-accent-wash);
-    border-color: var(--c-accent-line);
-    color: var(--c-accent-2);
-  }
-
-  .mk-tag {
-    display: inline-block;
-    background-color: var(--c-accent-wash);
-    color: var(--c-accent-2);
-    border: 1px solid var(--c-accent-line);
-    padding: 0.15rem 0.6rem;
-    border-radius: var(--r-sm);
-    font-size: var(--step--2);
-    font-weight: 700;
-  }
-
-  .mk-svc-top h4 {
-    min-width: 0;
-    font-size: var(--step-0);
-    font-weight: 700;
-    line-height: 1.4;
     color: var(--c-text);
   }
 
-  .mk-svc-top h4 a {
+  .mk-menu-group-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background-color: var(--c-border);
+  }
+
+  .mk-menu-row {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: clamp(0.75rem, 2vw, 1.5rem);
+    padding-block: 1.05rem;
+    border-bottom: 1px solid var(--c-border);
+    transition: background-color 0.2s ease;
+  }
+
+  @media (hover: hover) {
+    .mk-menu-row:hover {
+      background-color: var(--c-accent-wash);
+    }
+  }
+
+  .mk-menu-num {
+    font-family: var(--font-editorial);
+    font-size: var(--step--1);
+    color: var(--c-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mk-menu-row[data-featured="true"] .mk-menu-num {
+    color: var(--c-accent);
+    font-weight: 700;
+  }
+
+  .mk-menu-name {
+    min-width: 0;
+    font-size: var(--step-0);
+    font-weight: 700;
+    line-height: 1.5;
+    color: var(--c-text);
+  }
+
+  .mk-menu-name a {
     color: inherit;
     text-decoration: none;
   }
 
   @media (hover: hover) {
-    .mk-svc-top h4 a:hover {
-      color: var(--c-accent-2);
+    .mk-menu-name a:hover {
+      color: var(--c-accent);
     }
   }
 
-  .mk-svc-thumb {
-    width: 3rem;
-    height: 3rem;
-    flex: none;
-    border-radius: var(--r-sm);
-    border: 1px solid var(--c-border);
-    object-fit: cover;
-  }
-
-  .mk-svc-desc {
+  .mk-menu-desc {
+    margin-top: 0.2rem;
+    max-width: 54ch;
     font-size: var(--step--1);
-    line-height: 1.8;
+    line-height: 1.7;
     color: var(--c-muted);
   }
 
-  .mk-svc-meta .mk-book-link {
+  .mk-menu-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.35rem;
+    font-size: var(--step--2);
+    font-weight: 600;
+    color: var(--c-faint);
+  }
+
+  .mk-menu-price {
+    font-family: var(--font-editorial);
+    font-size: var(--step-1);
+    font-weight: 700;
+    color: var(--c-text);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mk-menu-price small {
+    font-family: inherit;
+    font-size: 0.62em;
+    font-weight: 600;
+    color: var(--c-faint);
+  }
+
+  .mk-menu-book {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    margin-inline-start: auto;
-    background: none;
-    border: 0;
-    padding: 0;
-    cursor: pointer;
+    padding: 0.45rem 0.9rem;
+    border: 1px solid var(--c-border-strong);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-text);
     font-weight: 700;
-    color: var(--c-accent-2);
+    font-size: var(--step--1);
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      border-color 0.2s ease,
+      background-color 0.2s ease,
+      color 0.2s ease;
   }
 
   @media (hover: hover) {
-    .mk-svc-meta .mk-book-link:hover {
-      color: var(--c-accent);
-      text-decoration: underline;
-      text-underline-offset: 4px;
+    .mk-menu-book:hover {
+      border-color: var(--c-accent);
+      background-color: var(--c-accent);
+      color: var(--c-on-accent);
     }
   }
 
-  @media (max-width: 480px) {
-    .mk-svc-top {
-      flex-wrap: wrap;
+  .mk-menu-book:focus-visible {
+    outline: 2px solid var(--c-accent-2);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 640px) {
+    .mk-menu-row {
+      grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+    }
+
+    .mk-menu-book {
+      grid-column: 2 / -1;
+      justify-self: start;
+      margin-top: 0.35rem;
+    }
+
+    .mk-menu-price {
+      justify-self: end;
     }
   }
 
@@ -656,6 +850,41 @@
   .mk-offer {
     padding-inline-start: 1.5rem;
     border-inline-start: 2px solid var(--c-accent);
+  }
+
+  /* The owner-uploaded offer photo. Full-bleed across the card's top, offset
+     against the accent rule to the opposite edge so the two read as one frame:
+     the rule starts below the media instead of competing with it. */
+  .mk-offer:has(> .mk-offer__media) {
+    padding-inline-start: 0;
+    border-inline-start-width: 0;
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+
+  .mk-offer__media {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
+
+  .mk-offer__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s ease;
+  }
+
+  @media (hover: hover) {
+    .mk-offer:hover .mk-offer__media img {
+      transform: scale(1.06);
+    }
+  }
+
+  .mk-offer__media-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.35), transparent 45%);
   }
 
   .mk-offer__old {
@@ -712,39 +941,84 @@
   }
 
   /* ── Team ────────────────────────────────────────────────────────────── */
+  /*
+    Editorial portraits: no card frame, no border, no drop shadow. The photo
+    and the name are the unit; a card around each stylist turned a team into a
+    product grid.
+  */
   .mk-team-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: clamp(1.25rem, 3vw, 2.5rem);
   }
 
   .mk-member {
-    background-color: var(--c-card);
-    border: 1px solid var(--c-border);
-    border-radius: var(--r-lg);
-    overflow: hidden;
-    transition:
-      transform 0.22s ease,
-      border-color 0.22s ease;
+    background-color: transparent;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    transition: transform 0.3s ease;
   }
 
   @media (hover: hover) {
     .mk-member:hover {
-      transform: translateY(-4px);
-      border-color: var(--c-border-strong);
+      transform: translateY(-3px);
+    }
+  }
+
+  .mk-member > .parallax {
+    border-radius: var(--r-md);
+    /* A slight desaturation keeps a row of portraits coherent; the colour
+       returns on hover so the face still feels alive. */
+    filter: grayscale(35%) contrast(1.02);
+    transition: filter 0.5s ease;
+  }
+
+  @media (hover: hover) {
+    .mk-member:hover > .parallax {
+      filter: grayscale(0%) contrast(1);
     }
   }
 
   .mk-member .mk-btn {
     width: 100%;
+    margin-top: 0.9rem;
+  }
+
+  .mk-member-info {
+    padding: 1rem 0 0;
+    border-top: 1px solid var(--c-border);
     margin-top: 1rem;
   }
 
-  .mk-member-info { padding: 1.35rem; }
-  .mk-member-name { font-size: var(--step-0); font-weight: 700; line-height: 1.4; margin: 0; }
-  .mk-member-role { font-size: var(--step--1); color: var(--c-accent-2); font-weight: 700; margin-top: 0.15rem; display: flex; align-items: center; gap: 0.5rem; }
-  .mk-member-bio { font-size: var(--step--2); color: var(--c-muted); margin-top: 0.4rem; }
-.mk-availability {
+  .mk-member-name {
+    font-family: var(--font-editorial);
+    font-size: var(--step-1);
+    font-weight: 700;
+    line-height: 1.35;
+    margin: 0;
+  }
+
+  .mk-member-role {
+    font-size: var(--step--2);
+    color: var(--c-accent);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .mk-member-bio {
+    font-size: var(--step--1);
+    line-height: 1.75;
+    color: var(--c-muted);
+    margin-top: 0.6rem;
+  }
+
+  .mk-availability {
     color: var(--c-ok);
     font-weight: 700;
   }
@@ -1027,6 +1301,87 @@
     color: var(--c-muted);
   }
 
+  /* Today's row is circled the way a printed schedule circles its day. */
+  .mk-hours-today {
+    background: var(--c-accent-wash);
+    border-bottom: 0 !important;
+    border-radius: var(--r-md);
+    padding-inline: 0.65rem;
+  }
+
+  .mk-hours-today + li {
+    border-top: 0;
+  }
+
+  .mk-hours-today span:first-child {
+    color: var(--c-accent-2);
+    font-weight: 800;
+  }
+
+  .mk-hours-today-tag {
+    display: inline-block;
+    margin-inline-start: 0.5rem;
+    padding: 0.05rem 0.55rem;
+    border-radius: 999px;
+    background-color: var(--c-accent);
+    color: var(--c-bg);
+    font-size: var(--step--2);
+    font-weight: 800;
+    vertical-align: middle;
+  }
+
+  /* The live dot on the open/closed pill: "open" is a state, not a badge. */
+  .mk-pulse {
+    position: relative;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background-color: currentColor;
+    flex: none;
+  }
+
+  .mk-pulse::after {
+    content: "";
+    position: absolute;
+    inset: -0.18rem;
+    border-radius: inherit;
+    border: 1.5px solid currentColor;
+    opacity: 0.7;
+    animation: mk-pulse 1.8s ease-out infinite;
+  }
+
+  @keyframes mk-pulse {
+    0% {
+      transform: scale(0.55);
+      opacity: 0.85;
+    }
+    100% {
+      transform: scale(1.7);
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mk-pulse::after {
+      animation: none;
+    }
+  }
+
+  /* FAQ rows sit flush in a divided card; a soft wash marks the row the
+     pointer is over without competing with the open state. */
+  @media (hover: hover) {
+    details.faq-item > summary:hover {
+      background-color: var(--c-muted-wash);
+      border-radius: var(--r-md);
+    }
+  }
+
+  /* Tabular figures for money/phone/counter text that opts in: digits hold
+     equal width, so totals stop jittering as they count or change. */
+  .numeric {
+    font-variant-numeric: tabular-nums;
+  }
+
   /* ── Footer ──────────────────────────────────────────────────────────── */
   /*
   Scoped to `.mk-footer`, not the bare `footer` element: the review cards are
@@ -1134,11 +1489,46 @@
 
   /* ── Responsive ──────────────────────────────────────────────────────── */
   @media (max-width: 1000px) {
+    .mk-hero-grid,
     .mk-hero-inner,
     .mk-about-grid,
     .mk-c-grid {
       grid-template-columns: 1fr;
       gap: 2.75rem;
+    }
+
+    /* The portrait should not become a billboard once it is full width. */
+    .mk-hero-media {
+      max-width: 34rem;
+      margin-inline: auto;
+      width: 100%;
+    }
+
+    /* The frame hangs outside the box; on a single column it can collide with
+       the screen edge, so it is inset to the plate instead. */
+    .mk-hero-frame {
+      inset-inline-start: -0.5rem;
+      inset-block-end: -0.5rem;
+    }
+
+    .mk-reserve {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    /* The CTA owns the full second row instead of being squeezed into a cell. */
+    .mk-reserve-cta {
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--c-border);
+    }
+
+    .mk-reserve-field:nth-child(2) {
+      border-inline-end: 0;
+    }
+
+    .mk-reserve-field:nth-child(3) {
+      grid-column: 1 / -1;
+      border-inline-end: 0;
+      border-top: 1px solid var(--c-border);
     }
 
     .mk-hero-inner {
@@ -1185,6 +1575,23 @@
     .mk-offers,
     .mk-about-photo {
       padding: 1.25rem;
+    }
+
+    /* One control per row: a native select narrower than its label truncates
+       the service name, which is the one thing the strip exists to show. */
+    .mk-reserve {
+      grid-template-columns: 1fr;
+    }
+
+    .mk-reserve-field,
+    .mk-reserve-field:nth-child(2),
+    .mk-reserve-field:nth-child(3) {
+      border-inline-end: 0;
+      border-top: 1px solid var(--c-border);
+    }
+
+    .mk-reserve-field:first-child {
+      border-top: 0;
     }
   }
 }

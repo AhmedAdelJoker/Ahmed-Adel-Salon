@@ -20,6 +20,8 @@ export interface OfferItem {
   originalPrice?: number | null;
   /** Percent off, used to derive the strike-through original price. */
   discountPercent?: number | null;
+  /** Owner-uploaded offer image, already resolved to an absolute URL. */
+  image?: string | null;
   currency: string;
 }
 
@@ -76,6 +78,22 @@ export default function OffersSection({
 
           return (
             <article key={offer.id ?? offer.name} className="mk-offer">
+              {offer.image ? (
+                /* Same media band pattern as the service cards: the photo sits
+                   edge-to-edge on the inline-start edge and zooms softly on
+                   hover. A dimmed scrim keeps the band's dark gradient
+                   underneath coherent when the photo is bright. */
+                <div className="mk-offer__media" aria-hidden="true">
+                  <img
+                    src={offer.image}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span className="mk-offer__media-scrim" />
+                </div>
+              ) : null}
+
               {finalPrice != null ? (
                 <p className="mk-offer__prices numeric">
                   {originalPrice != null ? (

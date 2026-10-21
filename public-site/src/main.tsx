@@ -23,6 +23,21 @@ import "@fontsource/cairo/600.css";
 import "@fontsource/cairo/700.css";
 import "@fontsource/cairo/900.css";
 
+/*
+ * The editorial display face.
+ *
+ * Arabic gets Amiri (a Naskh serif) and Latin gets Cormorant Garamond, weighted
+ * to the two sizes the layout actually uses. Both are self-hosted for the same
+ * reason as Cairo: no third-party request, no third-party cookie.
+ *
+ * They are display faces only — headline and section titles — so the body text
+ * stays on Cairo, which is far more legible at 14–16px.
+ */
+import "@fontsource/amiri/arabic-400.css";
+import "@fontsource/amiri/arabic-700.css";
+import "@fontsource/cormorant-garamond/latin-400.css";
+import "@fontsource/cormorant-garamond/latin-600.css";
+
 // Register the service worker for PWA install + offline support.
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {

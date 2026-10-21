@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CalendarCheck2, Menu, Scissors, X } from "lucide-react";
 
@@ -47,7 +47,7 @@ import OwnerSections from "../components/landing/OwnerSections";
 import ScrollProgress from "../components/landing/ScrollProgress";
 import ScrollReveal from "../components/landing/ScrollReveal";
 import ContactSection from "../components/landing/ContactSection";
-import GallerySection from "../components/landing/GallerySection";
+
 import { useMotionEnabled } from "../hooks/useMotionEnabled";
 import { ServiceRowSkeleton } from "../components/landing/Skeleton";
 
@@ -75,9 +75,6 @@ import { ServiceRowSkeleton } from "../components/landing/Skeleton";
  * as a template. Sections are separated by hairlines and whitespace instead of
  * by a box, and a box is now reserved for things that can be acted on.
  */
-
-const FALLBACK_HERO =
-  "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=1800&auto=format&fit=crop";
 
 /**
  * The FAQ questions, as translation keys.
@@ -233,10 +230,21 @@ export default function LandingPage() {
   // components, so there is a single place that decides.
   const motionEnabled = useMotionEnabled(content.motionEnabled);
 
+  /*
+    No stock photograph.
+
+    The previous fallback was a remote Unsplash URL, so a salon that had not
+    uploaded a cover shipped someone else's barbershop as its shopfront — and
+    the page made a third-party request in a build that otherwise self-hosts
+    everything. A salon with no cover now gets a typographic panel instead.
+  */
   const heroImage =
     resolveAssetUrl(
       settings.landingCoverImageUrl || settings.landing_cover_image_url,
-    ) || FALLBACK_HERO;
+    ) || null;
+  /* The social card still needs an absolute image, so it falls back to the
+     site's own OG asset rather than to a remote photo. */
+  const seoImage = heroImage || absoluteUrl("/og-image.png");
   const heroImageAlt =
     settings.landingHeroImageAlt ||
     settings.landing_hero_image_alt ||
@@ -263,6 +271,7 @@ export default function LandingPage() {
   const workingHours = useMemo(() => {
     const source =
       settings.workingHours || settings.working_hours || ({} as Record<string, any>);
+    const todayKey = WORKING_HOURS_DAYS[new Date().getDay()];
 
     return WORKING_HOURS_DAYS.map((key) => {
       const entry = source[key];
@@ -273,6 +282,9 @@ export default function LandingPage() {
         // "22:00 – 02:00" reads as one overnight shift rather than a typo.
         range: formatHoursRange(entry, t("common.closed")),
         isOpen,
+        // Highlights this row as today in the hours list, the way a printed
+        // schedule circles its current day.
+        isToday: key === todayKey,
         // Carried through for the inline booking picker's suggested slots: the
         // list needs the actual window, not just the formatted label.
         openTime: entry?.open_time ?? undefined,
@@ -318,19 +330,49 @@ export default function LandingPage() {
 
   /* ── Collections, shaped for the components that render them ────────── */
 
+  /**
+   * Locale-aware content.
+   *
+   * The catalogue ships both languages where the owner has filled them in
+   * (`name_ar`/`name_en`, `description_ar`/`description_en`). Reading only the
+   * Arabic columns is why the English page still showed Arabic service names
+   * and descriptions. The fallback chain tries the active locale first, then
+   * the other one, then the base column — so a missing translation shows the
+   * owner's actual content rather than an empty row.
+   */
+  const pickLocalized = useCallback(
+    (ar: unknown, en: unknown, base?: unknown): string => {
+      const a = typeof ar === "string" ? ar.trim() : "";
+      const e = typeof en === "string" ? en.trim() : "";
+      const b = typeof base === "string" ? base.trim() : "";
+      return locale === "en" ? e || b || a : a || b || e;
+    },
+    [locale],
+  );
+
   const serviceItems = useMemo(
     () =>
-      (catalog?.services ?? []).slice(0, 12).map((service: any) => {
-        // Thumb sized in the card list; the large version lives on the service page.
-        const thumb = resolveAssetUrl(service.image_url);
-        return {
-          id: service.id,
-          name: service.name_ar || service.name || t("landing.serviceFallbackName"),
-          description:
-            service.description_ar ||
-            service.description ||
-            t("landing.serviceFallbackDescription"),
-          image: thumb ? `${thumb}${thumb.includes("?") ? "&" : "?"}w=160` : null,
+      (catalog?.services ?? []).slice(0, 24).map((service: any) => {
+          const thumb = resolveAssetUrl(service.image_url);
+          return {
+            id: service.id,
+            name:
+              pickLocalized(service.name_ar, service.name_en, service.name) ||
+              t("landing.serviceFallbackName"),
+            /*
+              No fallback sentence. If the owner has not written a description,
+              the row shows its duration and category instead — invented copy
+              on every row (the old "خدمة مصممة بعناية…") reached the page, the
+              JSON-LD and the meta description.
+            */
+            description: pickLocalized(
+              service.description_ar,
+              service.description_en,
+              service.description,
+            ),
+            // 480: the media band is roughly half of a full-width column, so 160
+            // pixelisated; the middleware caches this width like any other.
+            image: thumb ? `${thumb}${thumb.includes("?") ? "&" : "?"}w=480` : null,
           duration:
             service.duration_minutes || service.duration
               ? `${service.duration_minutes || service.duration} ${t("common.minutes")}`
@@ -352,7 +394,7 @@ export default function LandingPage() {
           null,
         };
       }),
-    [catalog, t],
+    [catalog, pickLocalized, t],
   );
 
   /**
@@ -369,7 +411,12 @@ export default function LandingPage() {
       ? catalog.categories
           .map((entry: any) => ({
             id: String(entry?.id ?? ""),
-            name: entry?.name_ar || entry?.name || "",
+            /*
+              Categories carry `name` (the base column, usually English) and
+              `name_ar`; there is no `name_en` column. Picking by locale is
+              therefore a two-way choice, not a three-way one.
+            */
+            name: pickLocalized(entry?.name_ar, entry?.name, entry?.name),
           }))
           .filter((entry: { id: string; name: string }) => entry.id && entry.name)
       : [];
@@ -384,17 +431,26 @@ export default function LandingPage() {
       if (id && service.categoryName && !seen.has(id)) seen.set(id, service.categoryName);
     }
     return Array.from(seen, ([id, name]) => ({ id, name }));
-  }, [catalog, serviceItems]);
+  }, [catalog, pickLocalized, serviceItems]);
 
   const offerItems = useMemo(
     () =>
       (catalog?.offers ?? []).slice(0, 6).map((offer: any) => ({
         id: offer.id,
-        name: offer.name_ar || offer.name || t("landing.specialOffer"),
-        description: offer.description_ar || offer.description || t("landing.limitedOffer"),
+        name:
+          pickLocalized(offer.name_ar, offer.name_en, offer.name) ||
+          t("landing.specialOffer"),
+        description: pickLocalized(
+          offer.description_ar,
+          offer.description_en,
+          offer.description,
+        ),
         price: Number(offer.offer_price || offer.price || 0),
         originalPrice: Number(offer.original_price || 0) || undefined,
         discountPercent: Number(offer.discount_percentage || 0) || undefined,
+        // The owner-uploaded offer image; resolved from a relative path. The
+        // card still renders without one — the band is text-first by design.
+        image: resolveAssetUrl(offer.image_url),
         currency,
       })),
     [catalog, currency, t],
@@ -407,10 +463,10 @@ export default function LandingPage() {
         id: barber.id,
         name: barber.display_name || t("landing.teamFallbackTitle"),
         role: barber.job_title || undefined,
-        bio: barber.bio_ar || barber.bio_en || barber.bio || undefined,
+        bio: pickLocalized(barber.bio_ar, barber.bio_en, barber.bio) || undefined,
         image: barber.profile_image_url ?? null,
       })),
-    [catalog, t],
+    [catalog, pickLocalized, t],
   );
 
   useSEO({
@@ -419,13 +475,13 @@ export default function LandingPage() {
       settings.metaDescription ||
       t("landing.metaDescription") ||
       `${salonName} — ${t("landing.servicesTitle")}`,
-    image: heroImage,
+    image: seoImage,
     url: absoluteUrl(salonPath),
     type: "website",
     siteName: salonName,
     locale: "ar_EG",
     keywords: settings.metaKeywords || `${salonName}, صالون, حلاقة, حجز أونلاين`,
-    preloadImage: heroImage,
+    preloadImage: heroImage || undefined,
     // The site ships one locale (Arabic), so `ar` and `x-default` name the
     // same document. Omitting `x-default` makes language pickers fall back to
     // whatever locale the crawler guessed — usually English on bot crawlers.
@@ -441,7 +497,7 @@ export default function LandingPage() {
       buildHairSalonSchema({
         settings,
         salonName,
-        heroImage,
+        heroImage: seoImage,
         url: absoluteUrl(salonPath),
         address,
       }),
@@ -689,12 +745,13 @@ export default function LandingPage() {
 
       <main id="main-content" className="relative z-10" tabIndex={-1}>
         {/* ── Hero ───────────────────────────────────────────────────── */}
-        <div id="home">
+        <div>
           <Hero
             theme={theme}
             t={t}
             heroImage={heroImage}
             heroImageAlt={heroImageAlt}
+            salonName={salonName}
             heroVideo={content.heroVideo}
             badge={
               content.copy.landingHeroBadge || t("landing.professionalSalon")
@@ -713,12 +770,7 @@ export default function LandingPage() {
             onJumpToServices={() =>
               document.getElementById("services")?.scrollIntoView({ behavior: "smooth" })
             }
-            stats={{
-              services: (catalog?.services ?? []).length,
-              barbers: (catalog?.barbers ?? []).length,
-            }}
             isOpenNow={isOpenNow}
-            openLabel={t("landing.statusLabel")}
             location={address}
             phone={phone}
             highlight={
@@ -770,25 +822,6 @@ export default function LandingPage() {
             }}
           />
         </div>
-
-        {/* ── Count rail ─────────────────────────────────────────────── */}
-        <section className="rule border-b">
-          <dl className="reveal shell grid grid-cols-2 divide-x divide-line sm:grid-cols-4">
-            <StatCell label={t("landing.statServices")} value={serviceItems.length} />
-            <StatCell
-              label={t("landing.statBarbers")}
-              value={showStaff ? teamMembers.length : 0}
-            />
-            <StatCell
-              label={t("landing.statOpen")}
-              value={isOpenNow ? t("common.open") : t("common.closed")}
-            />
-            <StatCell
-              label={t("landing.statHours")}
-              value={workingHours.filter((day) => day.isOpen).length}
-            />
-          </dl>
-        </section>
 
         {/* ── Services ───────────────────────────────────────────────── */}
         <ServicesList
@@ -883,21 +916,6 @@ salonSlug={salonSlug}
           t={t}
           locale={locale}
           reviews={reviews}
-        />
-
-        {/* ── Gallery ────────────────────────────────────────────────── */}
-        {/*
-          Owner-uploaded images from `landingPortfolio`. Renders nothing when
-          no images are configured.
-        */}
-        <GallerySection
-          eyebrow={content.copy.landingPortfolioEyebrow}
-          title={content.copy.landingPortfolioTitle || t("landing.galleryTitle")}
-          images={content.portfolio.map((img, i) => ({
-            id: img,
-            src: img,
-            alt: `صورة رقم ${i + 1}`,
-          }))}
         />
 
         {/*
@@ -1025,16 +1043,3 @@ function buildSuggestedSlots(
   return slots;
 }
 
-/** One cell of the count rail. A zero count renders an em dash, not a "0". */
-function StatCell({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="px-4 py-6 text-center">
-      <dd className="numeric text-[length:var(--step-2)] font-bold text-accent">
-        {value === 0 || value === "" ? "—" : value}
-      </dd>
-      <dt className="mt-1.5 text-[length:var(--step--2)] text-ink-faint">
-        {label}
-      </dt>
-    </div>
-  );
-}

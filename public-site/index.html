@@ -1,11 +1,11 @@
 <!doctype html>
 <!--
-  `class="dark"` is the default because midnight is the default palette. It is
-  replaced by `applyThemeMode()` as soon as a salon with a light theme resolves,
-  and it must be here in the served HTML so the very first paint is correct —
-  set from an effect, a light-theme salon flashes dark cards first.
+  The default ground is the ivory palette, so the served document starts light.
+  `applyThemeMode()` rewrites the custom properties as soon as the salon's
+  palette resolves; declaring the default here is what makes the first paint
+  match it instead of flashing a dark card on a paper page.
 -->
-<html lang="ar" dir="rtl" class="dark" style="color-scheme: dark">
+<html lang="ar" dir="rtl" style="color-scheme: light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />

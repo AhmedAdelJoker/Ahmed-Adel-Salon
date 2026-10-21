@@ -21,7 +21,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/amiri": "^5.3.0",
     "@fontsource/cairo": "^5.3.0",
+    "@fontsource/cormorant-garamond": "^5.3.0",
     "@fontsource/tajawal": "^5.3.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
