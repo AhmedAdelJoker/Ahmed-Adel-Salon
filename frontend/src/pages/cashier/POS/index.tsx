@@ -7,16 +7,17 @@ import SessionsQueue from "@/pages/cashier/POS/components/SessionsQueue";
 import ItemSelection from "@/pages/cashier/POS/components/ItemSelection";
 import CheckoutBar from "@/pages/cashier/POS/components/CheckoutBar";
 import SuccessOverlay from "@/pages/cashier/POS/components/SuccessOverlay";
+import ManagerApprovalModal from "@/pages/cashier/POS/components/ManagerApprovalModal";
 import POSBottomNav from "@/pages/cashier/POS/components/POSBottomNav";
-import { Grid, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { toast } from "react-hot-toast";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Clock, RefreshCw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Grid, Clock, RefreshCw, Zap, WifiOff, UploadCloud } from "lucide-react";
 import { ErrorState } from "@/components/shared/AsyncState";
 import InlineNotice from "@/components/shared/InlineNotice";
 import { PageShell } from "@/components/shared/PageShell";
+import { useOfflineSync } from "@/lib/offline/useOfflineSync";
 import type { ID } from "@/types/common";
 import type { POSRecord } from "@/features/pos/types";
 
@@ -36,8 +37,6 @@ const POSLayout = () => {
   const {
     loading,
     readyAppointments,
-    activeInvoiceId,
-    activeAppointmentId,
     cart,
     shiftError,
     readyAppointmentsError,
@@ -47,12 +46,19 @@ const POSLayout = () => {
     setActiveAppointmentId,
     setSelectedCustomerId,
     setSelectedBarberId,
-    setIsReviewing,
+    activeAppointmentId,
   } = usePOS();
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("sessions"); // "sessions" or "items"
   const [mobileView, setMobileView] = useState("ops"); // "ops" (Shift/Sessions), "items", "cart"
+  // Quick-sale mode: products/services without an appointment context. A
+  // session handoff (or loading one from the queue) turns it off again.
+  const [quickSale, setQuickSale] = useState(false);
+
+  // Offline money-safety: LAN/server down keeps the till alive — invoices are
+  // queued locally under their idempotency key and auto-replayed on reconnect.
+  const { isOffline, pendingCount, replaying, replay } = useOfflineSync();
 
   // Which middle-column panel exists where. On mobile `mobileView` picks one
   // panel; on desktop (where mobileView never leaves "ops") `activeTab`
@@ -83,7 +89,6 @@ const POSLayout = () => {
       handoff?.customerId ? String(handoff.customerId) : "walk_in",
     );
     if (handoff?.barberId) setSelectedBarberId(String(handoff.barberId));
-    setIsReviewing(true);
     const serviceCount = (handoff?.services ?? []).length;
     if (serviceCount > 0) {
       toast.success("تم تحميل الحجز في نقطة البيع للمراجعة");
@@ -96,7 +101,19 @@ const POSLayout = () => {
     // The cart view is where the prepared session is reviewed, on mobile.
     setMobileView("cart");
     navigate("/pos", { replace: true, state: null });
-  }, [loading, handoffBookingId, handoff, barbers, navigate, setCart, setActiveAppointmentId, setSelectedCustomerId, setSelectedBarberId, setIsReviewing]);
+  }, [loading, handoffBookingId, handoff, barbers, navigate, setCart, setActiveAppointmentId, setSelectedCustomerId, setSelectedBarberId]);
+
+  // Loading a real session cancels quick-sale mode.
+  useEffect(() => {
+    if (activeAppointmentId) setQuickSale(false);
+  }, [activeAppointmentId]);
+
+  const startQuickSale = () => {
+    setQuickSale(true);
+    setActiveTab("items");
+    setMobileView("items");
+    toast.success("بيع سريع — أضف البنود وأكمل الدفع");
+  };
 
   // Global keyboard shortcut: Ctrl+Enter = Checkout
   useEffect(() => {
@@ -111,10 +128,8 @@ const POSLayout = () => {
           checkoutBtn.click();
         }
       }
-      if (e.key === "Escape") {
-        // Escape clears selection / closes modals
-        // Could trigger resetPOS or close modals
-      }
+      // Escape intentionally does nothing here: Radix dialogs close it
+      // themselves, and no custom selection-clearing is wired.
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -153,6 +168,7 @@ const POSLayout = () => {
     <PageShell fixed className="max-h-[calc(100vh-80px)]">
       {/* Success Overlay & Modals */}
       <SuccessOverlay />
+      <ManagerApprovalModal />
 
       {/* Load failures that must not be mistaken for "nothing to do". */}
       {(shiftError || readyAppointmentsError) && (
@@ -163,17 +179,35 @@ const POSLayout = () => {
         </div>
       )}
 
-      {/* Edit Mode Badge - Fixed at top */}
-      {activeInvoiceId && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60]">
-          <Badge
-            variant="warning"
-            size="lg"
-            className="shadow-premium px-4 py-1.5 flex gap-2 items-center text-xs"
-          >
-            <ShieldCheck size={14} /> نمط التعديل نشط: الفاتورة #
-            {activeInvoiceId}
-          </Badge>
+      {/* Offline banner: queued invoices + auto-replay on reconnect. */}
+      {(isOffline || pendingCount > 0) && (
+        <div className="px-2 lg:px-0">
+          <InlineNotice tone="warning">
+            <div className="flex items-center justify-between gap-3 min-w-0">
+              <span className="flex items-start gap-2 min-w-0">
+                <WifiOff size={16} className="shrink-0 mt-0.5" />
+                <span className="min-w-0">
+                  {isOffline
+                    ? "أنت تعمل بدون اتصال بالخادم — الفواتير تُحفَظ محلياً بمفتاح تكرار-آمن وتُرسَل تلقائياً عند رجوع الاتصال. الكتالوج قد يكون على آخر حالة محفوظة."
+                    : `${pendingCount} فاتورة مؤجلة لديك في انتظار الإرسال للخادم.`}
+                </span>
+              </span>
+              {pendingCount > 0 && (
+                <button
+                  onClick={() => void replay()}
+                  disabled={replaying || isOffline}
+                  className="shrink-0 h-8 px-3 rounded-lg border border-warning-border bg-soft hover:bg-soft/70 transition-all font-black text-[11px] flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {replaying ? (
+                    <RefreshCw size={13} className="animate-spin" />
+                  ) : (
+                    <UploadCloud size={13} />
+                  )}
+                  إرسال الآن
+                </button>
+              )}
+            </div>
+          </InlineNotice>
         </div>
       )}
 
@@ -203,10 +237,15 @@ const POSLayout = () => {
           {/* Tab Switcher - Only visible on Desktop or when needed */}
           <div className="hidden lg:flex items-center gap-2 p-1 bg-soft/50 rounded-xl self-center border border-border/40">
             <button
-              onClick={() => setActiveTab("sessions")}
+              onClick={() => {
+                setActiveTab("sessions");
+                // Desktop tab switching must unwind a quick-sale's mobileView,
+                // or showSessions stays false forever after.
+                setMobileView("ops");
+              }}
               className={`px-4 sm:px-6 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${
                 activeTab === "sessions"
-                  ? "bg-white dark:bg-slate-800 text-primary shadow-sm"
+                  ? "bg-card text-primary shadow-sm border border-border/40"
                   : "text-muted hover:text-main"
               }`}
             >
@@ -222,7 +261,7 @@ const POSLayout = () => {
             </button>
             <button
               onClick={() => {
-                if (!activeAppointmentId) {
+                if (!activeAppointmentId && !quickSale) {
                   toast.error("يرجى اختيار جلسة أولاً لإضافة خدمات إضافية");
                   return;
                 }
@@ -230,7 +269,7 @@ const POSLayout = () => {
               }}
               className={`px-4 sm:px-6 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${
                 activeTab === "items"
-                  ? "bg-white dark:bg-slate-800 text-primary shadow-sm"
+                  ? "bg-card text-primary shadow-sm border border-border/40"
                   : activeAppointmentId
                     ? "text-muted hover:text-main"
                     : "opacity-40 cursor-not-allowed"
@@ -258,17 +297,26 @@ const POSLayout = () => {
                   showItems ? "block" : "hidden",
                 )}
               >
-                {activeAppointmentId ? (
+                {activeAppointmentId || quickSale ? (
                   <ItemSelection />
                 ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
-                    <Clock size={48} className="text-primary mb-4" />
-                    <h3 className="text-base font-black text-main">
-                      بانتظار اختيار جلسة
-                    </h3>
-                    <p className="text-xs font-bold text-muted mt-2">
-                      يرجى اختيار جلسة من قائمة الاستقبال للبدء.
-                    </p>
+                  <div className="h-full flex flex-col justify-center text-center p-8">
+                    <div className="opacity-40 flex flex-col items-center gap-3">
+                      <Clock size={48} className="text-primary" />
+                      <h3 className="text-base font-black text-main">
+                        بانتظار اختيار جلسة
+                      </h3>
+                      <p className="text-xs font-bold text-muted mt-2">
+                        يرجى اختيار جلسة من قائمة الاستقبال للبدء.
+                      </p>
+                    </div>
+                    <button
+                      onClick={startQuickSale}
+                      className="mt-5 mx-auto h-12 px-6 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 transition-all font-black text-xs shadow-md flex items-center gap-2 self-center hover:scale-[1.02] active:scale-95"
+                    >
+                      <Zap size={16} fill="currentColor" />
+                      بيع سريع بدون جلسة
+                    </button>
                   </div>
                 )}
               </div>

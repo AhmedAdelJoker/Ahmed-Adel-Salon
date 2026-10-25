@@ -25,7 +25,6 @@ export interface CheckoutTotalsProps {
   setSplitCashAmount: Dispatch<SetStateAction<number>>;
   setSplitCardAmount: Dispatch<SetStateAction<number>>;
   isReady: boolean;
-  isEditMode: boolean;
   isSubmitting: boolean;
   onCheckout: () => void;
 }
@@ -45,10 +44,20 @@ export const CheckoutTotals = ({
   setSplitCashAmount,
   setSplitCardAmount,
   isReady,
-  isEditMode,
   isSubmitting,
   onCheckout,
 }: CheckoutTotalsProps) => {
+  // Keep the manual discount inside sane bounds: never negative and never
+  // larger than the subtotal (the server rejects both).
+  const handleDiscountChange = (raw: string) => {
+    const value = Number(raw);
+    setDiscount(
+      Number.isFinite(value) && raw !== ""
+        ? Math.max(0, Math.min(subtotal, value))
+        : 0,
+    );
+  };
+
   const handleCashChange = (val: string) => {
     const cash = Number(val || 0);
     setSplitCashAmount(val as unknown as number);
@@ -76,8 +85,9 @@ export const CheckoutTotals = ({
           <div className="flex items-center gap-2 bg-red-50 dark:bg-red-500/10 px-2 py-1 rounded-lg border border-red-100 dark:border-red-900/20">
             <input
               type="number"
+              min="0"
               value={discount}
-              onChange={(e) => setDiscount(Number(e.target.value))}
+              onChange={(e) => handleDiscountChange(e.target.value)}
               className="w-14 h-10 bg-transparent text-left focus:outline-none font-black text-red-600 text-xs touch-target"
               aria-label="مبلغ الخصم"
             />
@@ -87,7 +97,7 @@ export const CheckoutTotals = ({
 
         {Number(loyaltyDiscount) > 0 && (
           <div className="flex justify-between items-center text-success">
-            <span className="text-[9px] font-black uppercase flex items-center gap-1">
+            <span className="text-[10px] font-black uppercase flex items-center gap-1">
               <Star size={10} className="fill-success" /> خصم الولاء
             </span>
             <span className="text-xs font-black">-{formatCurrency(loyaltyDiscount)}</span>
@@ -159,7 +169,7 @@ export const CheckoutTotals = ({
                   size={16}
                   className="group-hover:scale-110 transition-transform"
                 />
-                <span className="text-[9px] font-black uppercase tracking-tight">
+                <span className="text-[10px] font-black uppercase tracking-tight">
                   {method.label}
                 </span>
               </button>
@@ -173,7 +183,7 @@ export const CheckoutTotals = ({
               <div className="space-y-1">
                 <label
                   htmlFor="split-cash"
-                  className="text-[9px] font-black text-muted uppercase me-1"
+                  className="text-[10px] font-black text-muted uppercase me-1"
                 >
                   نقدي
                 </label>
@@ -195,7 +205,7 @@ export const CheckoutTotals = ({
               <div className="space-y-1">
                 <label
                   htmlFor="split-card"
-                  className="text-[9px] font-black text-muted uppercase me-1"
+                  className="text-[10px] font-black text-muted uppercase me-1"
                 >
                   شبكة
                 </label>
@@ -217,7 +227,7 @@ export const CheckoutTotals = ({
             </div>
 
             <div className="flex justify-between items-center pt-1 border-t border-border/20">
-              <div className="text-[9px] font-bold text-muted">
+              <div className="text-[10px] font-bold text-muted">
                 المجموع:{" "}
                 <span
                   className={cn(
@@ -255,9 +265,7 @@ export const CheckoutTotals = ({
         className={cn(
           "w-full h-14 rounded-2xl font-black text-base transition-all duration-300 shadow-xl group",
           isReady
-            ? isEditMode
-              ? "bg-amber-500 text-white shadow-amber-500/20"
-              : "bg-primary text-white shadow-primary/20"
+            ? "bg-primary text-white shadow-primary/20"
             : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed",
         )}
         disabled={!isReady || isSubmitting}
@@ -268,12 +276,8 @@ export const CheckoutTotals = ({
             <RefreshCw className="animate-spin" size={20} />
           ) : (
             <>
-              {isEditMode ? (
-                <RefreshCw size={18} />
-              ) : (
-                <Zap size={18} fill="currentColor" />
-              )}
-              <span>{isEditMode ? "حفظ التعديلات" : "تأكيد وإصدار (Ctrl+Enter)"}</span>
+              <Zap size={18} fill="currentColor" />
+              <span>تأكيد وإصدار (Ctrl+Enter)</span>
             </>
           )}
         </div>

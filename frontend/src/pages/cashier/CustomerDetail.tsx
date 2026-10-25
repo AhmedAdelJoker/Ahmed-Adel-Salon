@@ -35,6 +35,9 @@ import {
   CustomerEditDialog,
   BookingModal,
 } from "@/features/customers";
+import { InvoiceDetailsDialog } from "@/features/invoices";
+import { printThermalReceipt } from "@/lib/print/receipt";
+import { useSalon } from "@/context/SalonContext";
 import { PageHeader } from "@/components/shared/PremiumUI";
 import { Badge } from "@/components/ui/badge";
 
@@ -74,6 +77,14 @@ function CustomerDetailPage() {
   } = useCustomerDetailPage(customerId);
 
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Row -> invoice details. State lives here (page level) because the dialog
+  // is the invoices feature's shared component; the tab stays page-agnostic
+  // and simply reports which row was opened.
+  const [selectedInvoice, setSelectedInvoice] = useState<
+    Record<string, unknown> | null
+  >(null);
+  const { settings } = useSalon();
 
   if (customerLoading) {
     return (
@@ -327,7 +338,11 @@ function CustomerDetailPage() {
             loading={appointmentsLoading}
           />
 
-          <CustomerInvoicesTab invoices={invoices} loading={invoicesLoading} />
+          <CustomerInvoicesTab
+            invoices={invoices}
+            loading={invoicesLoading}
+            onViewInvoice={(inv) => setSelectedInvoice(inv ?? null)}
+          />
         </Tabs>
 
         {/* Edit Dialog */}
@@ -348,6 +363,15 @@ function CustomerDetailPage() {
           onSuccess={async () => {
             setIsBookingOpen(false);
             await queryClient.invalidateQueries({ queryKey: ["customers"] });
+          }}
+        />
+
+        {/* Invoice details (row eye button in the invoices tab) */}
+        <InvoiceDetailsDialog
+          selectedInvoice={selectedInvoice}
+          onClose={() => setSelectedInvoice(null)}
+          onPrintSelected={() => {
+            if (selectedInvoice) void printThermalReceipt(selectedInvoice, settings);
           }}
         />
 

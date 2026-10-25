@@ -18,7 +18,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Badge } from "@/components/ui/badge";
 import { AnimatePresence } from "framer-motion";
 
-const ITEM_HEIGHT = 180; // Approximate height of each session card
+const ESTIMATED_ITEM_HEIGHT = 180; // First guess; each card is measured after it renders.
 
 const SessionsQueue = () => {
   const {
@@ -26,11 +26,10 @@ const SessionsQueue = () => {
     readyAppointmentsLoading,
     fetchReadyAppointments,
     setActiveAppointmentId,
-    setIsReviewing,
+    setSelectedBarberId,
     setCart,
     setSelectedCustomerId,
     selectedBarberId,
-    setSelectedBarberId,
     setCompletedCustomerName,
     activeAppointmentId,
     barbers,
@@ -62,7 +61,6 @@ const SessionsQueue = () => {
       setSelectedCustomerId(String(appointment.customer_id || "walk_in"));
       // Auto-fill completed customer name for success screen
       setCompletedCustomerName(appointment.customer_name || "عميل");
-      setIsReviewing(true);
       toast.success("تم تحميل بيانات الجلسة للمراجعة");
     },
     [
@@ -73,7 +71,6 @@ const SessionsQueue = () => {
       setActiveAppointmentId,
       setSelectedCustomerId,
       setCompletedCustomerName,
-      setIsReviewing,
     ],
   );
 
@@ -81,7 +78,12 @@ const SessionsQueue = () => {
   const virtualizer = useVirtualizer({
     count: readyAppointments.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ITEM_HEIGHT,
+    // Only the first estimate. The real height is measured per card (see
+    // `virtualizer.measureElement` below) because a session card's height
+    // depends on how many services it lists — a fixed estimate made the
+    // cards overlap the next one, or left gaps, as soon as the list held
+    // anything other than average-length cards.
+    estimateSize: () => ESTIMATED_ITEM_HEIGHT,
     overscan: 5,
   });
 
@@ -146,33 +148,46 @@ const SessionsQueue = () => {
                 }}
               >
                 {virtualizer.getVirtualItems().map((virtualRow) => (
-                  <motion.div
+                  // The positioning lives on a plain wrapper, NOT on the
+                  // motion.div: framer-motion owns the `transform` style
+                  // property, so the virtualizer's translateY was being
+                  // overwritten by the enter animation. The wrapper also
+                  // carries the measurement ref and index that
+                  // `virtualizer.measureElement` needs.
+                  <div
                     key={
                       readyAppointments[virtualRow.index]?.appointment_id ||
                       readyAppointments[virtualRow.index]?.id
                     }
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ delay: virtualRow.index * 0.02 }}
+                    data-index={virtualRow.index}
+                    ref={virtualizer.measureElement}
                     style={{
                       position: "absolute",
                       top: 0,
                       left: 0,
                       right: 0,
                       transform: `translateY(${virtualRow.start}px)`,
-                      willChange: "transform",
                     }}
                   >
-                    <SessionCard
-                      appt={readyAppointments[virtualRow.index]}
-                      index={virtualRow.index}
-                      activeAppointmentId={activeAppointmentId}
-                      handleLoadAppointment={handleLoadAppointment}
-                      barbers={barbers}
-                      formatCurrency={formatCurrency}
-                    />
-                  </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      // Capped: the old `index * 0.02` delay reached a full
+                      // second by the 50th card, so a long queue visibly
+                      // filled in one card at a time.
+                      transition={{ delay: Math.min(virtualRow.index, 8) * 0.02 }}
+                    >
+                      <SessionCard
+                        appt={readyAppointments[virtualRow.index]}
+                        index={virtualRow.index}
+                        activeAppointmentId={activeAppointmentId}
+                        handleLoadAppointment={handleLoadAppointment}
+                        barbers={barbers}
+                        formatCurrency={formatCurrency}
+                      />
+                    </motion.div>
+                  </div>
                 ))}
               </div>
             </motion.div>
@@ -199,7 +214,10 @@ const SessionCard = React.memo(
     return (
       <Card
         className={cn(
-          "p-3 sm:p-4 group cursor-pointer transition-all duration-300 border border-border/50 rounded-2xl relative overflow-hidden bg-white/60 dark:bg-white/5 backdrop-blur-xl shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950",
+          // bg-card (no backdrop-blur): one of these cards can be on screen
+          // per waiting session, and the blur behind a near-opaque surface was
+          // a visual no-op costing compositor time on every card.
+          "p-3 sm:p-4 group cursor-pointer transition-all duration-300 border border-border/50 rounded-2xl relative overflow-hidden bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950",
           isActive
             ? "border-primary bg-primary/5 shadow-md shadow-primary/5"
             : "hover:border-primary/30 hover:shadow-md hover:shadow-primary/5",
@@ -224,21 +242,21 @@ const SessionCard = React.memo(
         <div className="flex items-start justify-between relative z-10 gap-2">
           <div className="space-y-2 min-w-0 flex-1">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-slate-100 dark:bg-white/10 flex items-center justify-center text-primary shrink-0 group-hover:scale-105 transition-transform">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-soft flex items-center justify-center text-primary shrink-0 group-hover:scale-105 transition-transform">
                 <User size={16} className="sm:size-5" />
               </div>
               <div className="min-w-0">
-                <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight truncate">
+                <h4 className="text-xs sm:text-sm font-black text-main leading-tight truncate">
                   {appt.customer_name || "عميل مجهول"}
                 </h4>
                 <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5">
                   <Badge
                     variant="secondary"
-                    className="text-[7px] sm:text-[8px] font-black h-3.5 sm:h-4 px-1 bg-slate-100 dark:bg-white/10 text-slate-500 border-none"
+                    className="text-[10px] sm:text-[10px] font-black h-3.5 sm:h-4 px-1 bg-soft text-muted border-none"
                   >
                     #{appointmentId}
                   </Badge>
-                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 flex items-center gap-1 bg-slate-50 dark:bg-white/5 px-1 sm:px-1.5 py-0.5 rounded-md border border-slate-100 dark:border-white/5">
+                  <span className="text-[10px] sm:text-[10px] font-bold text-muted flex items-center gap-1 bg-soft px-1 sm:px-1.5 py-0.5 rounded-md border border-border/50">
                     <Clock size={8} />
                     {(() => {
                       const timeStr = appt.appointment_time;
@@ -260,7 +278,7 @@ const SessionCard = React.memo(
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1 px-1.5 py-0.5 sm:py-1 rounded-lg bg-primary/5 border border-primary/10 max-w-full">
                 <Zap size={10} className="text-primary shrink-0" />
-                <span className="text-[9px] sm:text-[10px] font-black text-primary truncate">
+                <span className="text-[10px] sm:text-[10px] font-black text-primary truncate">
                   {appt.employee_name || appt.barber_name || "بدون خبير"}
                 </span>
               </div>
@@ -268,14 +286,14 @@ const SessionCard = React.memo(
           </div>
 
           <div className="text-left flex flex-col items-end gap-1.5 shrink-0">
-            <div className="bg-white dark:bg-slate-800 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl shadow-sm border border-slate-100 dark:border-white/5 group-hover:border-primary/20 transition-all">
+            <div className="bg-card px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl shadow-sm border border-border/50 group-hover:border-primary/20 transition-all">
               <p className="text-xs sm:text-base font-black text-primary tabular-nums">
                 {formatCurrency(
                   appt.total_estimated_price ?? appt.total_amount ?? 0,
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-1 text-primary text-[8px] sm:text-[9px] font-black opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0 duration-300 uppercase">
+            <div className="flex items-center gap-1 text-primary text-[10px] sm:text-[10px] font-black opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0 duration-300 uppercase">
               مراجعة <ChevronLeft size={10} strokeWidth={3} />
             </div>
           </div>
@@ -285,7 +303,7 @@ const SessionCard = React.memo(
           {(appt.services || []).map((svc, sIdx) => (
             <span
               key={sIdx}
-              className="px-1.5 py-0.5 rounded-md sm:rounded-lg bg-white/50 dark:bg-white/5 text-[8px] sm:text-[9px] font-black text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-white/10 group-hover:border-primary/20 transition-all truncate max-w-[120px]"
+              className="px-1.5 py-0.5 rounded-md sm:rounded-lg bg-soft text-[10px] sm:text-[10px] font-black text-muted border border-border/50 group-hover:border-primary/20 transition-all truncate max-w-[120px]"
             >
               {svc.service_name_snapshot || svc.service_name || svc.name}
             </span>

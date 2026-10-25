@@ -1,22 +1,24 @@
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import {
-  FileText,
-  Filter,
+  Archive,
+  CalendarDays,
+  CircleSlash,
+  Plus,
+  Receipt,
   RefreshCw,
   ShieldCheck,
-  Activity,
-  CreditCard,
-  Zap,
-  Receipt,
-  Archive,
+  TrendingUp,
+  Wallet,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useSalon } from "@/context/SalonContext";
 import { printThermalReceipt } from "@/lib/print/receipt";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/core/utils";
-import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";
+import { PageHeader } from "@/components/shared/PremiumUI";
 import { PageShell } from "@/components/shared/PageShell";
 import InlineNotice from "@/components/shared/InlineNotice";
 import {
@@ -30,32 +32,50 @@ import {
   AdjustmentRequestDialog,
 } from "@/features/invoices";
 
+function rangeLabel(from: string, to: string): string {
+  if (!from || !to) return "كل الفترات";
+  const start = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return `${from} — ${to}`;
+  }
+  const month = (date: Date) =>
+    date.toLocaleDateString("ar-EG-u-nu-latn", { month: "long" });
+  if (
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth()
+  ) {
+    return `${month(start)} ${start.getFullYear()}`;
+  }
+  if (start.getFullYear() === end.getFullYear()) {
+    return `${start.toLocaleDateString("ar-EG-u-nu-latn", { day: "2-digit", month: "short" })} — ${end.toLocaleDateString("ar-EG-u-nu-latn", { day: "2-digit", month: "short" })} ${end.getFullYear()}`;
+  }
+  return `${start.toLocaleDateString("ar-EG-u-nu-latn", { day: "2-digit", month: "short", year: "numeric" })} — ${end.toLocaleDateString("ar-EG-u-nu-latn", { day: "2-digit", month: "short", year: "numeric" })}`;
+}
 
 export default function Invoices() {
   const { settings } = useSalon();
   const { user } = useAuth();
-
   const navigate = useNavigate();
   const {
-    invoices,
-    adjustments,
-    invoicesLoading,
-    adjustmentsLoading,
+    adjustmentsError,
+    error,
     loading,
     query,
     setQuery,
+    searchPending,
     paymentFilter,
     setPaymentFilter,
     statusFilter,
     setStatusFilter,
     fromDate,
-    setFromDate,
     toDate,
-    setToDate,
     currentPage,
     setCurrentPage,
     timePreset,
-    setTimePreset,
+    applyPreset,
+    applyRange,
+    shiftMonth,
     sortConfig,
     showColumnPicker,
     setShowColumnPicker,
@@ -64,7 +84,7 @@ export default function Invoices() {
     visibleColumns,
     toggleColumn,
     handleSort,
-    fetchInvoices,
+    refreshAll,
     filteredInvoices,
     summary,
     exportToCSV,
@@ -74,147 +94,141 @@ export default function Invoices() {
     busyPdfId,
     selectedInvoice,
     setSelectedInvoice,
-    averageInvoice,
-    totalPages,
     pendingAdjustments,
     openInvoicePdf,
+    openAdjustmentDialog,
     submitAdjustmentRequest,
-    adjustmentsError,
   } = useInvoicesData();
+
+  const canReviewAdjustments = ["OWNER", "ADMIN", "MANAGER", "SUPER_ADMIN"].includes(
+    String(user?.role ?? "").toUpperCase(),
+  );
+  const hasFilters =
+    Boolean(query.trim()) ||
+    paymentFilter !== "all" ||
+    statusFilter !== "all";
 
   return (
     <PageShell contained>
-        <PageHeader className={undefined}
-          title="الفواتير"
-          subtitle="تتبع المبيعات وإدارة الفواتير والمدفوعات"
-          badge="العمليات المالية"
-          icon={Receipt}
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              {["OWNER", "ADMIN", "MANAGER"].includes(user?.role ?? "") && (
-                <Button
-                  variant="outline"
-                  className="h-10 rounded-xl px-3"
-                  onClick={() => navigate("/owner/adjustment-requests")}
-                >
-                  <ShieldCheck size={14} className="ms-1.5" />
-                  <span className="hidden sm:inline">طلبات التعديل</span>
-                </Button>
-              )}
+      <PageHeader
+        title="الفواتير"
+        subtitle="دفتر المبيعات والمدفوعات — كل فاتورة في مكانها"
+        badge="العمليات المالية"
+        icon={Receipt}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {canReviewAdjustments && (
               <Button
                 variant="outline"
                 className="h-10 rounded-xl px-3"
-                onClick={() => navigate("/invoices/archive")}
+                onClick={() => navigate("/owner/adjustment-requests")}
+                aria-label="طلبات التعديل"
               >
-                <Archive size={14} className="ms-1.5" />
-                <span className="hidden sm:inline">الأرشيف</span>
+                <ShieldCheck size={14} className="ms-1.5" />
+                <span className="hidden sm:inline">طلبات التعديل</span>
+                {pendingAdjustments > 0 && (
+                  <span className="ms-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-warning px-1 text-[10px] font-black text-white">
+                    {pendingAdjustments}
+                  </span>
+                )}
               </Button>
-              <Button
-                onClick={fetchInvoices}
-                disabled={loading}
-                className="h-10 rounded-xl px-3"
-              >
-                <RefreshCw
-                  size={14}
-                  className={cn("ms-1.5", loading && "animate-spin")}
-                />
-                <span className="hidden sm:inline">تحديث</span>
-              </Button>
-            </div>
-          }
-        />
+            )}
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl px-3"
+              onClick={() => navigate("/invoices/archive")}
+              aria-label="أرشيف الفواتير"
+            >
+              <Archive size={14} className="ms-1.5" />
+              <span className="hidden sm:inline">الأرشيف</span>
+            </Button>
+            <Button
+              className="h-10 rounded-xl px-4"
+              onClick={() => navigate("/pos")}
+            >
+              <Plus size={15} className="ms-1.5" />
+              فاتورة جديدة
+            </Button>
+          </div>
+        }
+      />
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <PremiumCard className="group p-3 sm:p-5">
-            <div className="flex items-center gap-3">
-              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary transition-transform group-hover:scale-105 sm:flex">
-                <FileText size={18} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[9px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  إجمالي الفواتير
-                </div>
-                <div className="text-lg font-black tabular-nums text-main sm:text-xl">
-                  {summary.count}
-                </div>
-              </div>
-              <span className="shrink-0 text-[8px] font-black text-muted sm:text-[9px]">
-                {filteredInvoices.length}
+      <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-primary-strong via-primary to-primary-strong px-5 py-5 text-white shadow-premium sm:px-7 sm:py-6">
+        <div className="pointer-events-none absolute -end-20 -top-24 h-64 w-64 rounded-full border border-white/10" />
+        <div className="pointer-events-none absolute -start-14 -bottom-24 h-56 w-56 rounded-full border border-white/10" />
+        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-white/70">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10">
+                <Wallet size={14} />
+              </span>
+              <span>صافي مبيعات الفترة</span>
+              <span className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-[10px] font-black text-white/90">
+                <CalendarDays size={11} />
+                {rangeLabel(fromDate, toDate)}
               </span>
             </div>
-          </PremiumCard>
-          <PremiumCard className="group p-3 sm:p-5">
-            <div className="flex items-center gap-3">
-              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success-soft text-success transition-transform group-hover:scale-105 sm:flex">
-                <Zap size={18} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[9px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  الصافي النقدي
-                </div>
-                <div className="truncate text-lg font-black tabular-nums text-main sm:text-xl">
-                  {formatCurrency(summary.total)}
-                </div>
-              </div>
-              <span className="hidden shrink-0 rounded-md bg-success-soft px-1.5 py-0.5 text-[8px] font-black text-success sm:inline-block">
-                {summary.paid} مدفوعة
-              </span>
-            </div>
-          </PremiumCard>
-          <PremiumCard className="group p-3 sm:p-5">
-            <div className="flex items-center gap-3">
-              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-info-soft text-info transition-transform group-hover:scale-105 sm:flex">
-                <CreditCard size={18} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[9px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  متوسط الفاتورة
-                </div>
-                <div className="truncate text-lg font-black tabular-nums text-main sm:text-xl">
-                  {formatCurrency(averageInvoice)}
-                </div>
-              </div>
-            </div>
-          </PremiumCard>
-          <PremiumCard className="group p-3 sm:p-5">
-            <div className="flex items-center gap-3">
-              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-soft text-warning transition-transform group-hover:scale-105 sm:flex">
-                <Filter size={18} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[9px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  نتائج البحث
-                </div>
-                <div className="text-lg font-black tabular-nums text-main sm:text-xl">
-                  {filteredInvoices.length}
-                </div>
-              </div>
-              {pendingAdjustments > 0 && (
-                <span className="flex shrink-0 items-center gap-1 rounded-md bg-danger-soft px-1.5 py-0.5 text-[8px] font-black text-danger">
-                  <Activity size={8} /> {pendingAdjustments}
-                </span>
+            <p
+              className={cn(
+                "mt-2 text-3xl font-black tabular-nums tracking-tight sm:text-4xl",
+                loading && summary.count === 0 && "opacity-40",
               )}
-            </div>
-          </PremiumCard>
+            >
+              {loading && summary.count === 0
+                ? "—"
+                : formatCurrency(summary.total)}
+            </p>
+            <p className="mt-1 text-[11px] font-bold text-white/60">
+              {loading && summary.count === 0
+                ? "جارٍ تحميل ملخص الفترة…"
+                : `${summary.count} فاتورة بعد الخصومات • ${summary.closed} ملغاة`}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[540px]">
+            <HeroStat
+              icon={Receipt}
+              label="عدد الفواتير"
+              value={loading && summary.count === 0 ? "—" : summary.count}
+            />
+            <HeroStat
+              icon={TrendingUp}
+              label="متوسط الفاتورة"
+              value={
+                loading && summary.count === 0
+                  ? "—"
+                  : formatCurrency(summary.average)
+              }
+            />
+            <HeroStat
+              icon={CircleSlash}
+              label="ملغاة"
+              value={loading && summary.count === 0 ? "—" : summary.closed}
+            />
+            <HeroStat
+              icon={ShieldCheck}
+              label="طلبات تعديل"
+              value={pendingAdjustments}
+            />
+          </div>
         </div>
+      </section>
 
-        {adjustmentsError && !loading && (
-          <InlineNotice tone="warning">{adjustmentsError}</InlineNotice>
-        )}
-
+      <div className="mt-4">
         <InvoicesToolbar
           query={query}
           setQuery={setQuery}
+          searchPending={searchPending}
           fromDate={fromDate}
-          setFromDate={setFromDate}
           toDate={toDate}
-          setToDate={setToDate}
+          timePreset={timePreset}
+          onApplyPreset={applyPreset}
+          onApplyRange={applyRange}
+          onShiftMonth={shiftMonth}
           paymentFilter={paymentFilter}
           setPaymentFilter={setPaymentFilter}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
-          timePreset={timePreset}
-          setTimePreset={setTimePreset}
           setCurrentPage={setCurrentPage}
           showColumnPicker={showColumnPicker}
           setShowColumnPicker={setShowColumnPicker}
@@ -222,62 +236,123 @@ export default function Invoices() {
           toggleColumn={toggleColumn}
           exportToCSV={exportToCSV}
         />
+      </div>
 
-        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-soft">
-          <InvoicesTable
-            loading={loading}
-            filteredInvoices={filteredInvoices}
-            visibleColumns={visibleColumns}
-            sortConfig={sortConfig}
-            handleSort={handleSort}
-            busyPdfId={busyPdfId}
-            onSelectInvoice={(invoice) => setSelectedInvoice(invoice)}
-            onPrintInvoice={(invoice) => printThermalReceipt(invoice, settings)}
-            onOpenPdf={(invoice) => openInvoicePdf(invoice)}
-            onRequestAdjustment={(invoice) => {
-              if (!isInvoiceEditable(invoice)) {
-                toast.error("انتهت فترة التعديل (ساعة)");
-                return;
-              }
-              setAdjustmentDialog({
-                ...adjustmentDialog,
-                open: true,
-                invoice,
-              });
-            }}
-            onResetFilters={() => {
-              setQuery("");
-              setPaymentFilter("all");
-              setStatusFilter("all");
-              setTimePreset("month");
-            }}
-          />
+      {adjustmentsError && !loading && (
+        <div className="mt-3">
+          <InlineNotice tone="warning">{adjustmentsError}</InlineNotice>
+        </div>
+      )}
 
-          {!loading && filteredInvoices.length > 0 && (
-            <InvoicesPagination
-              currentPage={currentPage}
-              pageSize={pageSize}
-              totalCount={totalCount}
-              filteredCount={filteredInvoices.length}
-              invoicesCount={invoices.length}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          )}
+      <div className="mt-4 overflow-hidden rounded-3xl border border-border/70 bg-card shadow-soft">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-black text-main">سجل الفواتير</h2>
+            <Badge variant="secondary" size="sm">
+              {totalCount}
+            </Badge>
+            {searchPending && (
+              <span className="text-[10px] font-bold text-muted">
+                جارٍ البحث…
+              </span>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-lg"
+            onClick={refreshAll}
+            disabled={loading}
+            aria-label="تحديث الفواتير"
+            title="تحديث"
+          >
+            <RefreshCw size={15} className={cn(loading && "animate-spin")} />
+          </Button>
         </div>
 
-        <InvoiceDetailsDialog
-          selectedInvoice={selectedInvoice}
-          onClose={() => setSelectedInvoice(null)}
-          onPrintSelected={() => printThermalReceipt(selectedInvoice, settings)}
+        {error && filteredInvoices.length > 0 && (
+          <div className="border-b border-border/60 p-2">
+            <InlineNotice tone="warning">{error}</InlineNotice>
+          </div>
+        )}
+
+        <InvoicesTable
+          loading={loading}
+          error={error}
+          filteredInvoices={filteredInvoices}
+          visibleColumns={visibleColumns}
+          sortConfig={sortConfig}
+          handleSort={handleSort}
+          busyPdfId={busyPdfId}
+          hasFilters={hasFilters}
+          onSelectInvoice={(invoice) => setSelectedInvoice(invoice)}
+          onPrintInvoice={(invoice) => printThermalReceipt(invoice, settings)}
+          onOpenPdf={(invoice) => openInvoicePdf(invoice)}
+          onRequestAdjustment={(invoice) => {
+            if (!isInvoiceEditable(invoice)) {
+              toast.error("انتهت فترة التعديل (ساعة) أو أن الفاتورة ملغاة");
+              return;
+            }
+            openAdjustmentDialog(invoice);
+          }}
+          onResetFilters={() => {
+            setQuery("");
+            setPaymentFilter("all");
+            setStatusFilter("all");
+            applyPreset("month");
+          }}
+          onRetry={refreshAll}
         />
 
-        <AdjustmentRequestDialog
-          adjustmentDialog={adjustmentDialog}
-          onAdjustmentDialogChange={setAdjustmentDialog}
-          adjustmentSubmitting={adjustmentSubmitting}
-          onSubmit={submitAdjustmentRequest}
-        />
+        {!loading && filteredInvoices.length > 0 && (
+          <InvoicesPagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            onPageChange={setCurrentPage}
+          />
+        )}
+      </div>
+
+      <InvoiceDetailsDialog
+        selectedInvoice={selectedInvoice}
+        onClose={() => setSelectedInvoice(null)}
+        onPrintSelected={() => {
+          if (selectedInvoice) printThermalReceipt(selectedInvoice, settings);
+        }}
+        onOpenPdfSelected={() => {
+          if (selectedInvoice) openInvoicePdf(selectedInvoice);
+        }}
+      />
+
+      <AdjustmentRequestDialog
+        adjustmentDialog={adjustmentDialog}
+        onAdjustmentDialogChange={setAdjustmentDialog}
+        adjustmentSubmitting={adjustmentSubmitting}
+        onSubmit={submitAdjustmentRequest}
+      />
     </PageShell>
+  );
+}
+
+function HeroStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2.5 backdrop-blur-sm">
+      <div className="flex items-center gap-1.5 text-[9px] font-bold text-white/60">
+        <Icon size={12} />
+        {label}
+      </div>
+      <p className="mt-1 truncate text-base font-black tabular-nums">
+        {value}
+      </p>
+    </div>
   );
 }

@@ -454,10 +454,10 @@ const BarberEarnings = () => {
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant={c.paid ? "success" : "warning"}
+                              variant={c.voided ? "danger" : "success"}
                               className="h-5 text-[9px] font-black"
                             >
-                              {c.paid ? "مدفوع" : "معلق"}
+                              {c.voided ? "ملغاة" : "مدفوع"}
                             </Badge>
                           </TableCell>
                         </TableRow>

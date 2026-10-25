@@ -15,7 +15,24 @@
 
 const BUILD_ID = __BUILD_ID__ || "dev";
 const CACHE_NAME = `salonpro-${BUILD_ID}`;
+const CATALOG_CACHE = `salonpro-catalog-${BUILD_ID}`;
 const OFFLINE_URL = "/index.html";
+
+/*
+ * Catalog GET endpoints the POS must be able to sell from when the LAN drops.
+ * Always fetched live first; the cached copy is only a fallback, so an online
+ * cashier never sees stale prices and an offline cashier sees the last known
+ * truth instead of an empty till. Money endpoints (/invoices, /pos-shifts)
+ * are deliberately NOT cached.
+ */
+const CATALOG_RE = new RegExp(
+  [
+    "^/api(?:/v1)?/",
+    "(?:services|products|customers|service-categories|",
+    "business-settings|employees/pos|offers/active|",
+    "appointments/ready-for-payment)/?$",
+  ].join(""),
+);
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -24,9 +41,10 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
+      const keep = [CACHE_NAME, CATALOG_CACHE];
       const keys = await caches.keys();
       await Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)),
+        keys.filter((key) => !keep.includes(key)).map((key) => caches.delete(key)),
       );
       await self.clients.claim();
     })(),
@@ -43,6 +61,24 @@ async function cachePut(request, response) {
     await cache.put(request, response);
   } catch {
     /* quota exceeded or opaque response — ignore */
+  }
+}
+
+async function networkFirstCatalog(request) {
+  const cache = await caches.open(CATALOG_CACHE);
+  try {
+    const response = await fetch(request);
+    if (response && response.status === 200) {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    return new Response(JSON.stringify({ detail: "Offline" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
 
@@ -87,7 +123,13 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   // API traffic: always live, with a JSON 503 instead of a thrown TypeError.
+  // Catalog lists get a cached last-known-good fallback so the offline till
+  // still offers the salon's items (network-first, never stale-when-online).
   if (url.pathname.startsWith("/api/")) {
+    if (CATALOG_RE.test(url.pathname)) {
+      event.respondWith(networkFirstCatalog(request));
+      return;
+    }
     event.respondWith(
       fetch(request).catch(
         () =>

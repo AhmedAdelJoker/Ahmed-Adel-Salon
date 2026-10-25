@@ -51,7 +51,7 @@ const ItemSelection = () => {
               className={`px-4 py-3 rounded-xl text-[10px] font-black whitespace-nowrap transition-all border touch-target ${
                 activeCategory === tab
                   ? "bg-primary text-white border-primary shadow-sm"
-                  : "bg-white dark:bg-white/5 text-muted border-border/50 hover:border-primary/20"
+                  : "bg-soft text-muted border-border/50 hover:border-primary/20"
               }`}
             >
               {tab}
@@ -63,7 +63,7 @@ const ItemSelection = () => {
       {/* Items Grid */}
       <div className="flex-1 overflow-y-auto no-scrollbar pb-4">
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-2 p-0.5">
-          <AnimatePresence mode="popLayout">
+          <AnimatePresence>
             {filteredItems.length === 0 ? (
               <div className="col-span-full py-12 text-center opacity-40">
                 <ShoppingBag size={32} className="text-muted mx-auto mb-2" />
@@ -83,13 +83,20 @@ const ItemSelection = () => {
                 return (
                   <motion.div
                     key={`${type}-${item.id || idx}`}
-                    layout
+                    // No `layout` prop: it makes framer-motion measure and
+                    // animate the position of EVERY card on every render of
+                    // the list, which is real work on a till that shows a
+                    // hundred services. The grid never reorders, so the
+                    // layout animation bought nothing.
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    // whileHover stays: it only runs for the card under the
+                    // pointer, so it costs nothing.
                     whileHover={{ y: -2 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Card className="p-2.5 sm:p-3 h-full flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-primary/40 transition-all duration-300 border border-border/50 group bg-white dark:bg-white/5 backdrop-blur-md rounded-2xl relative overflow-hidden shadow-sm">
+                    <Card className="p-2.5 sm:p-3 h-full flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-primary/40 transition-all duration-300 border border-border/50 group bg-card rounded-2xl relative overflow-hidden shadow-sm">
                       <div className="space-y-1.5 sm:space-y-2 relative z-10">
                         <div className="flex justify-between items-start">
                           <div
@@ -110,16 +117,30 @@ const ItemSelection = () => {
                               <Zap size={14} className="sm:size-4" />
                             )}
                           </div>
-                          <Badge
-                            variant="secondary"
-                            className="text-[6px] sm:text-[7px] font-black h-3 sm:h-3.5 px-1 bg-slate-100 dark:bg-white/10 text-slate-500 border-none uppercase"
-                          >
-                            {activeCategory === "المنتجات"
-                              ? "منتج"
-                              : activeCategory === "العروض"
-                                ? "عرض"
-                                : "خدمة"}
-                          </Badge>
+                          {type === "product" ? (
+                            // Live stock badge — the server rejects a sale
+                            // once stock hits zero, so surface it upfront.
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "text-[10px] sm:text-[10px] font-black h-3.5 sm:h-4 px-1.5 border-none uppercase",
+                                Number(item.quantity) <= 0
+                                  ? "bg-red-100 dark:bg-red-500/15 text-red-600"
+                                  : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600",
+                              )}
+                            >
+                              {Number(item.quantity) <= 0
+                                ? "غير متوفر"
+                                : `متاح: ${Math.floor(Number(item.quantity))}`}
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] sm:text-[10px] font-black h-3.5 sm:h-4 px-1.5 bg-soft text-muted border-none uppercase"
+                            >
+                              {activeCategory === "العروض" ? "عرض" : "خدمة"}
+                            </Badge>
+                          )}
                         </div>
                         <h4 className="text-[10px] sm:text-[11px] font-black text-slate-800 dark:text-white leading-tight line-clamp-2 min-h-[1.2rem] sm:min-h-[1.5rem] group-hover:text-primary transition-colors">
                           {item.name_ar ||
@@ -141,7 +162,12 @@ const ItemSelection = () => {
                             e.stopPropagation();
                             addToCart(item, type);
                           }}
-                          className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center text-slate-300 hover:bg-primary hover:text-white transition-all duration-300 border border-slate-100 dark:border-white/5 touch-target"
+                          className={cn(
+                            "h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center transition-all duration-300 border border-slate-100 dark:border-white/5 touch-target",
+                            type === "product" && Number(item.quantity) <= 0
+                              ? "bg-slate-100 dark:bg-white/5 text-slate-300 cursor-not-allowed opacity-60"
+                              : "bg-slate-50 dark:bg-white/5 text-slate-300 hover:bg-primary hover:text-white",
+                          )}
                           aria-label="أضف للسلة"
                         >
                           <PlusCircle size={16} className="sm:size-5" />

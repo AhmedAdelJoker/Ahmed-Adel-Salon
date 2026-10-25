@@ -25,9 +25,11 @@ export const JOB_TITLES = [
   { value: "manager", label: "مدير" },
   { value: "accountant", label: "محاسب" },
   { value: "barber", label: "حلاق" },
+  { value: "hairstylist", label: "مصفف شعر (ستايلست)" },
   { value: "colorist", label: "أخصائي صبغة" },
   { value: "esthetician", label: "أخصائي بشرة" },
-  { value: "barber_assistant", label: "مساعد فني" },
+  { value: "nail_technician", label: "فني أظافر" },
+  { value: "barber_assistant", label: "مساعد حلاق" },
   { value: "cashier", label: "كاشير" },
   { value: "receptionist", label: "استقبال" },
   { value: "cleaner", label: "عامل نظافة" },
@@ -96,6 +98,18 @@ export const JOB_TITLE_BLUEPRINTS: Record<
     cardBg: "bg-soft",
     badgeClass: "bg-success-soft text-success border-success/20",
   },
+  hairstylist: {
+    eyebrow: "فن التصفيف",
+    title: "مصفف شعر",
+    summary:
+      "متخصص في السشوار والتسريحات وتجهيز الإطلالات — بخبرة في أحدث صيحات التصفيف.",
+    focus: ["سشوار وتصفيف", "تسريحات المناسبات", "العناية بالشعر"],
+    accent: "bg-warning",
+    colors: { primary: "warning", secondary: "success" },
+    icon: Scissors,
+    cardBg: "bg-soft",
+    badgeClass: "bg-warning-soft text-warning border-warning/20",
+  },
   colorist: {
     eyebrow: "فن الألوان",
     title: "أخصائي صبغة",
@@ -120,9 +134,21 @@ export const JOB_TITLE_BLUEPRINTS: Record<
     cardBg: "bg-soft",
     badgeClass: "bg-info-soft text-info border-info/20",
   },
+  nail_technician: {
+    eyebrow: "عناية بالأظافر",
+    title: "فني أظافر",
+    summary:
+      "متخصص في المنيكير والباديكير وتنسيق الأظافر مع أعلى معايير التعقيم والنظافة.",
+    focus: ["منيكير", "باديكير", "تنسيق الأظافر"],
+    accent: "bg-info",
+    colors: { primary: "info", secondary: "success" },
+    icon: Sparkles,
+    cardBg: "bg-soft",
+    badgeClass: "bg-info-soft text-info border-info/20",
+  },
   barber_assistant: {
     eyebrow: "إسناد فني",
-    title: "مساعد فني",
+    title: "مساعد حلاق",
     summary:
       "دعم لوجستي وفني كامل لخبراء الحلاقة، ضمان راحة العميل في منطقة الغسيل والتحضير.",
     focus: ["تحضير العميل", "تقنيات الغسيل", "تنظيم الأدوات"],
@@ -286,9 +312,15 @@ export const FORM_STEP_RULES: Partial<
   Record<FormStepId, { jobTitles: string[]; reason: string }>
 > = {
   skills: {
-    jobTitles: ["barber", "colorist", "esthetician"],
+    jobTitles: [
+      "barber",
+      "hairstylist",
+      "colorist",
+      "esthetician",
+      "nail_technician",
+    ],
     reason:
-      "المؤهلات والخدمة تُسجَّل لمقدمي الخدمة (حلاق، صبغة، بشرة) فقط.",
+      "المؤهلات والخدمة تُسجَّل لمقدمي الخدمة (حلاق، مصفف شعر، صبغة، بشرة، أظافر) فقط.",
   },
   assistant: {
     jobTitles: ["barber_assistant"],

@@ -1,18 +1,32 @@
 /**
- * Invoices feature: constants + pure helpers (moved from Invoices page).
+ * Invoices feature: constants + pure helpers.
  */
 import { formatCurrency as formatCurrencyShared } from "@/lib/core/utils";
 
-export const paymentLabels = {
+export type InvoiceStatus = "open" | "closed";
+
+export const PAYMENT_METHOD_OPTIONS = [
+  { value: "cash", label: "نقدي" },
+  { value: "card", label: "شبكة / فيزا" },
+  { value: "wallet", label: "محفظة إلكترونية" },
+  { value: "bank_transfer", label: "تحويل بنكي" },
+  { value: "split", label: "دفع مقسّم" },
+] as const;
+
+export const paymentLabels: Record<string, string> = {
   cash: "نقدي",
   card: "شبكة",
   visa: "فيزا",
   mada: "مدى",
   wallet: "محفظة",
+  bank_transfer: "تحويل بنكي",
   instapay: "انستا باي",
+  split: "دفع مقسّم",
 };
 
-export const statusLabels = {
+export const statusLabels: Record<string, string> = {
+  open: "مكتملة",
+  closed: "ملغاة",
   paid: "مدفوعة",
   completed: "مكتملة",
   pending: "معلقة",
@@ -21,69 +35,105 @@ export const statusLabels = {
   refunded: "مرتجعة",
 };
 
-export function asNumber(value) {
+export const statusOptions = [
+  { value: "all", label: "كل الحالات" },
+  { value: "open", label: "مكتملة" },
+  { value: "closed", label: "ملغاة" },
+] as const;
+
+export function asNumber(value: unknown): number {
   const n = Number(value ?? 0);
   return Number.isFinite(n) ? n : 0;
 }
 
-export function formatCurrency(value) {
+export function formatCurrency(value: unknown): string {
   return formatCurrencyShared(value);
 }
 
-export function formatDate(value) {
-  if (!value) return "-";
-  try {
-    return new Date(value).toLocaleString("ar-EG", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch (err) {
-    return String(value);
-  }
+export interface InvoiceDateParts {
+  date: string;
+  time: string;
+  full: string;
 }
 
-export function invoiceId(invoice) {
+export function formatDateParts(value: unknown): InvoiceDateParts {
+  if (!value) return { date: "—", time: "", full: "—" };
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) {
+    return { date: String(value), time: "", full: String(value) };
+  }
+  const datePart = date.toLocaleDateString("ar-EG-u-nu-latn", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const timePart = date.toLocaleTimeString("ar-EG-u-nu-latn", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return { date: datePart, time: timePart, full: `${datePart} • ${timePart}` };
+}
+
+export function formatDate(value: unknown): string {
+  return formatDateParts(value).full;
+}
+
+export function invoiceId(invoice: any): number | string | undefined {
   return invoice?.id || invoice?.invoice_id || invoice?.invoiceId;
 }
 
-export function invoiceNo(invoice) {
+export function invoiceNo(invoice: any): string {
   return (
     invoice?.invoice_no ||
     invoice?.invoiceNo ||
     invoice?.number ||
     invoiceId(invoice) ||
-    "-"
+    "—"
   );
 }
 
-export function invoiceCustomer(invoice) {
-  return (
+export function invoiceCustomer(invoice: any): string {
+  const name =
     invoice?.customer_name ||
     invoice?.customerName ||
     invoice?.customer?.name ||
-    invoice?.client_name ||
-    "عميل نقدي"
-  );
+    invoice?.client_name;
+  if (!name || name === "N/A") return "عميل نقدي";
+  return name;
 }
 
-export function invoicePayment(invoice) {
+export function invoicePayment(invoice: any): string {
   return String(
     invoice?.payment_method || invoice?.paymentMethod || invoice?.payment || "",
   ).toLowerCase();
 }
 
-export function invoiceStatus(invoice) {
-  return String(
-    invoice?.status ||
-      invoice?.invoice_status ||
-      invoice?.invoiceStatus ||
-      "paid",
-  ).toLowerCase();
+export function invoicePaymentLabel(invoice: any): string {
+  const method = invoicePayment(invoice);
+  return paymentLabels[method] || method || "—";
 }
 
-export function invoiceTotal(invoice) {
+export function invoiceIsClosed(invoice: any): boolean {
+  if (!invoice) return false;
+  if (typeof invoice.is_closed === "boolean") return invoice.is_closed;
+  if (typeof invoice.isClosed === "boolean") return invoice.isClosed;
+  const status = String(
+    invoice?.status || invoice?.invoice_status || invoice?.invoiceStatus || "",
+  ).toLowerCase();
+  return ["closed", "cancelled", "canceled", "voided", "void", "refunded"].includes(
+    status,
+  );
+}
+
+export function invoiceStatus(invoice: any): InvoiceStatus {
+  return invoiceIsClosed(invoice) ? "closed" : "open";
+}
+
+export function invoiceStatusLabel(invoice: any): string {
+  return statusLabels[invoiceStatus(invoice)] || "مكتملة";
+}
+
+export function invoiceTotal(invoice: any): number {
   return asNumber(
     invoice?.total_amount ??
       invoice?.totalAmount ??
@@ -93,7 +143,15 @@ export function invoiceTotal(invoice) {
   );
 }
 
-export function invoiceCreatedAt(invoice) {
+export function invoiceSubtotal(invoice: any): number {
+  return asNumber(invoice?.subtotal_amount ?? invoice?.subtotalAmount);
+}
+
+export function invoiceDiscount(invoice: any): number {
+  return asNumber(invoice?.discount_amount ?? invoice?.discountAmount);
+}
+
+export function invoiceCreatedAt(invoice: any): string | undefined {
   return (
     invoice?.created_at ||
     invoice?.createdAt ||
@@ -103,7 +161,7 @@ export function invoiceCreatedAt(invoice) {
   );
 }
 
-export function rowsFromInvoice(invoice) {
+export function rowsFromInvoice(invoice: any): any[] {
   return Array.isArray(invoice?.items)
     ? invoice.items
     : Array.isArray(invoice?.invoice_items)
@@ -113,7 +171,7 @@ export function rowsFromInvoice(invoice) {
         : [];
 }
 
-export function itemName(item) {
+export function itemName(item: any): string {
   return (
     item?.service_name ||
     item?.serviceName ||
@@ -125,11 +183,11 @@ export function itemName(item) {
   );
 }
 
-export function itemQty(item) {
+export function itemQty(item: any): number {
   return asNumber(item?.quantity ?? item?.qty ?? 1) || 1;
 }
 
-export function itemTotal(item) {
+export function itemTotal(item: any): number {
   const unit = asNumber(
     item?.unit_price ??
       item?.unitPrice ??
@@ -142,13 +200,13 @@ export function itemTotal(item) {
   );
 }
 
-export function invoiceBarber(invoice) {
-  if (invoice?.barber_name) return invoice.barber_name;
-  if (invoice?.barberName) return invoice.barberName;
-  if (invoice?.employee_name) return invoice?.employee_name;
+export function invoiceBarber(invoice: any): string {
+  const direct =
+    invoice?.barber_name || invoice?.barberName || invoice?.employee_name;
+  if (direct && direct !== "N/A") return direct;
 
   const items = rowsFromInvoice(invoice);
-  if (!items.length) return "-";
+  if (!items.length) return "—";
   const names = [
     ...new Set(
       items
@@ -161,22 +219,20 @@ export function invoiceBarber(invoice) {
             i.employee?.full_name ||
             i.employee?.fullName,
         )
-        .filter(Boolean),
+        .filter((name) => Boolean(name) && name !== "N/A"),
     ),
   ];
-  if (names.length === 0) return "-";
-  if (names.length === 1) return names[0];
+  if (names.length === 0) return "—";
+  if (names.length === 1) return String(names[0]);
   return "متعدد";
 }
 
-export function isInvoiceEditable(invoice) {
-  if (!invoice) return false;
-  const createdAt = invoice.created_at || invoice.createdAt || invoice.date;
+export function isInvoiceEditable(invoice: any): boolean {
+  if (!invoice || invoiceIsClosed(invoice)) return false;
+  const createdAt = invoiceCreatedAt(invoice);
   if (!createdAt) return true;
 
   const createdTime = new Date(createdAt).getTime();
-  const now = new Date().getTime();
-  const oneHourInMs = 60 * 60 * 1000;
-
-  return now - createdTime <= oneHourInMs;
+  if (Number.isNaN(createdTime)) return false;
+  return Date.now() - createdTime <= 60 * 60 * 1000;
 }

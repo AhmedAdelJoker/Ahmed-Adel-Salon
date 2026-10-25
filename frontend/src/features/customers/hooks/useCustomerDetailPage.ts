@@ -51,8 +51,10 @@ export function useCustomerDetailPage(customerId: number) {
     const avgSpend = visits > 0 ? totalSpend / visits : 0;
     const noShowRate =
       visits > 0 ? Math.round((cancellations / visits) * 100) : 0;
+    // "المدفوع" = الفواتير الصادرة غير الملغاة. `is_closed` علامة إلغاء
+    // الفاتورة منفردة، وقفل الشهر في جدول مستقل لا يمر على الفاتورة أصلًا.
     const totalPaid = invoices
-      .filter((i) => i.is_closed)
+      .filter((i) => !i.is_closed)
       .reduce((sum, i) => sum + Number(i.total_amount || i.amount || 0), 0);
     const upcomingAppts = appointments.filter((a) =>
       ["pending", "confirmed", "waiting"].includes(

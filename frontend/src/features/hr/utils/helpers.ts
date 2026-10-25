@@ -8,8 +8,10 @@ import { JOB_TITLES } from "@/features/hr/utils/constants";
  */
 export const SERVICE_PROVIDER_JOB_TITLES = [
   "barber",
+  "hairstylist",
   "colorist",
   "esthetician",
+  "nail_technician",
 ];
 
 export const isServiceProviderJobTitle = (value: any) =>

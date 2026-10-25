@@ -1,5 +1,6 @@
 /** Customers CustomerInvoicesTab (moved from CustomerDetail page, no logic changes). */
-import { Receipt } from "lucide-react";
+import { Eye, Receipt } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, formatCurrency } from "@/lib/core/utils";
 import { getInvoiceStatusConfig } from "@/features/customers/utils/customer";
@@ -9,9 +10,14 @@ import { TabsContent } from "@/components/ui/tabs";
 export default function CustomerInvoicesTab({
   invoices,
   loading,
+  onViewInvoice,
 }: {
   invoices: any[];
   loading: boolean;
+  /** When provided, every row gets a details button. The dialog itself lives
+   * on the page: `InvoiceDetailsDialog` belongs to the invoices feature's
+   * public API, and pages may import cross-feature barrels. */
+  onViewInvoice?: (invoice: (typeof invoices)[number]) => void;
 }) {
   return (
           <TabsContent value="invoices" className="mt-4">
@@ -44,6 +50,11 @@ export default function CustomerInvoicesTab({
                       <th className="px-3 py-2 text-[10px] font-black uppercase text-muted">
                         الحالة
                       </th>
+                      {onViewInvoice && (
+                        <th className="px-3 py-2 text-[10px] font-black uppercase text-muted">
+                          <span className="sr-only">إجراءات</span>
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/30">
@@ -73,6 +84,20 @@ export default function CustomerInvoicesTab({
                               {conf.label}
                             </span>
                           </td>
+                          {onViewInvoice && (
+                            <td className="px-3 py-2">
+                              <Button
+                                variant="secondary"
+                                size="icon"
+                                className="h-8 w-8 rounded-lg"
+                                title="تفاصيل الفاتورة"
+                                aria-label="تفاصيل الفاتورة"
+                                onClick={() => onViewInvoice(inv)}
+                              >
+                                <Eye size={15} />
+                              </Button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}

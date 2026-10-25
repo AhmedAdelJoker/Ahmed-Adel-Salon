@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { usePOS } from "@/pages/cashier/POS/POSContext";
 import { useSalon } from "@/context/SalonContext";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Zap,
@@ -13,9 +14,11 @@ import {
   FileText,
   AlertCircle,
   User,
+  RefreshCw,
 } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/core/utils";
 import { posShiftService } from "@/services/posShiftService";
+import { isOpenShiftStatus } from "@/features/pos/utils";
 import { toast } from "react-hot-toast";
 import {
   Dialog,
@@ -37,29 +40,118 @@ const ShiftSidebar = () => {
     fetchShift,
     readyAppointments,
     isShopOpen,
+    businessSettings,
   } = usePOS();
   const { drawerBalance, valutBalance, vaultCashBalance, refreshBalance } = useSalon();
+  const { user } = useAuth();
+  // A manager/owner/admin closing their own shift is trusted with the figure:
+  // the server only asks a cashier for a co-signature.
+  const needsManagerCoSignature = !["manager", "owner", "admin"].includes(
+    String(user?.role || "").toLowerCase(),
+  );
 
   const [openingCash, setOpeningCash] = useState("0");
   const [isOpeningShift, setIsOpeningShift] = useState(false);
   const [showCloseShift, setShowCloseShift] = useState(false);
   const [closingCash, setClosingCash] = useState("0");
   const [isClosingShift, setIsClosingShift] = useState(false);
+  // High-variance close policy: the server asks for an explanatory note and,
+  // for cashiers, a manager co-signature once the counted cash drifts beyond
+  // financial_rules.maxCashDiscrepancyWithoutNote.
+  const [closingNote, setClosingNote] = useState("");
+  const [approverName, setApproverName] = useState("");
+  const [approverPassword, setApproverPassword] = useState("");
+  const [needsApproval, setNeedsApproval] = useState(false);
+  // Shift history (own closed shifts; supervisory roles see everyone's).
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyShifts, setHistoryShifts] = useState<Record<string, any>[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const manualCloseRef = React.useRef(false);
 
-  // Auto-refresh shift status from server every 1 minute to catch auto-closures
+  // Live money-grade stats for the open shift. `currentShift.total_sales` and
+  // `invoice_count` are only populated on close, so the sidebar must use this
+  // endpoint to show anything useful while the shift is still running.
+  const [liveStats, setLiveStats] = useState<Record<string, number> | null>(null);
+
+  const fetchStats = useCallback(async () => {
+    if (!isOpenShiftStatus(currentShift)) {
+      setLiveStats(null);
+      return;
+    }
+    try {
+      const stats = (await posShiftService.currentStats()) as unknown as
+        | Record<string, number>
+        | null;
+      setLiveStats(stats);
+    } catch {
+      // Never block the POS over a stats refresh — the tiles keep the last
+      // known figures and the close dialog falls back to local arithmetic.
+    }
+  }, [currentShift]);
+
+  // Auto-refresh shift status + live stats from server every 1 minute to catch
+  // auto-closures and keep the money tiles current.
   React.useEffect(() => {
     const timer = setInterval(() => {
       fetchShift();
+      fetchStats();
     }, 60000);
     return () => clearInterval(timer);
-  }, [fetchShift]);
+  }, [fetchShift, fetchStats]);
 
-  const hasOpenShift = Boolean(
-    currentShift &&
-    ["open", "opened", "OPEN", "OPENED"].includes(
-      String(currentShift.status || "open"),
-    ),
-  );
+  React.useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  // Refresh once when the close dialog opens so the cashier counts against a
+  // figure that includes invoices issued in the last minute.
+  React.useEffect(() => {
+    if (showCloseShift) fetchStats();
+  }, [showCloseShift, fetchStats]);
+
+  const hasOpenShift = isOpenShiftStatus(currentShift);
+
+  // The scheduler closes forgotten shifts server-side; a manual close is
+  // flagged so the transition open→closed only announces itself when it
+  // happened behind the cashier's back.
+  const wasOpenRef = React.useRef<boolean | null>(null);
+  React.useEffect(() => {
+    if (wasOpenRef.current === true && !hasOpenShift && !manualCloseRef.current) {
+      toast.success("انتهت الوردية تلقائياً بعد نهاية الدوام الرسمي");
+    }
+    wasOpenRef.current = hasOpenShift;
+  }, [hasOpenShift]);
+
+  // financial_rules.shiftCloseWarningMinutes arrives pre-computed from
+  // /pos-shifts/current/stats as closing_in_minutes; the server is the single
+  // source of truth since financial-rules is owner-only. Fires once per shift
+  // so the 60s polling never spams.
+  const warnedShiftRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const closingIn = liveStats?.closing_in_minutes;
+    const warnBefore = liveStats?.warning_minutes;
+    const shiftId =
+      currentShift && (currentShift as Record<string, unknown>).id != null
+        ? String((currentShift as Record<string, unknown>).id)
+        : null;
+    if (
+      shiftId &&
+      hasOpenShift &&
+      closingIn != null &&
+      warnBefore != null &&
+      Number(warnBefore) > 0 &&
+      Number(closingIn) <= Number(warnBefore)
+    ) {
+      if (warnedShiftRef.current !== shiftId) {
+        warnedShiftRef.current = shiftId;
+        const mins = Math.max(1, Math.round(Number(closingIn)));
+        toast(
+          `تنبيه: الوردية ستُغلق تلقائياً بعد ${mins} دقيقة — جهّز الكاش وابدأ الجرد`,
+          { icon: "⏰", duration: 8000 },
+        );
+      }
+    }
+  }, [liveStats, hasOpenShift, currentShift]);
 
   const handleOpenShift = async () => {
     if (!isShopOpen) {
@@ -69,6 +161,7 @@ const ShiftSidebar = () => {
     try {
       setIsOpeningShift(true);
       await posShiftService.open({ openingCash });
+      manualCloseRef.current = false;
       await fetchShift();
       await refreshBalance();
       toast.success("تم فتح الوردية بنجاح — تم التحديث في الخزنة المركزية");
@@ -84,30 +177,125 @@ const ShiftSidebar = () => {
   const handleCloseShift = async () => {
     try {
       setIsClosingShift(true);
+      manualCloseRef.current = true;
       const shiftId = currentShift?.id || currentShift?.shift_id;
-      const response = await posShiftService.close(shiftId, { closingCash });
+      const response = await posShiftService.close(shiftId, {
+        closingCash,
+        closing_note: closingNote,
+        approver_username: approverName,
+        approver_password: approverPassword,
+      });
 
-       
       const closedData = (response as any)?.data || response;
       await fetchShift();
       await refreshBalance();
       setShowCloseShift(false);
+      setNeedsApproval(false);
       toast.success("تم إنهاء الوردية بنجاح — الخزنة محدثة");
 
       // Print enriched report
       printShiftReport(closedData);
     } catch (error) {
       console.error("Close shift error:", error);
-      toast.error("فشل إنهاء الوردية");
+      const err = error as {
+        response?: { status?: number; data?: { detail?: unknown } };
+      };
+      const detail = err?.response?.data?.detail;
+      const status = err?.response?.status;
+      // The variance gate: over-limit drift from a cashier needs an
+      // explanatory note and a manager's co-signature — keep the dialog open
+      // and surface the approval fields instead of making the cashier guess
+      // what the refusal wanted.
+      if (status === 403) {
+        setNeedsApproval(true);
+      } else if (
+        status === 400 &&
+        typeof detail === "string" &&
+        detail.includes("ملاحظة")
+      ) {
+        setNeedsApproval(true);
+      }
+      toast.error(
+        typeof detail === "string" && detail.trim()
+          ? detail
+          : "فشل إنهاء الوردية",
+      );
     } finally {
+      manualCloseRef.current = false;
       setIsClosingShift(false);
     }
   };
 
+  const openCloseDialog = () => {
+    setClosingCash("0");
+    setClosingNote("");
+    setApproverName("");
+    setApproverPassword("");
+    setNeedsApproval(false);
+    setShowCloseShift(true);
+    fetchStats();
+  };
+
+  const openHistory = async () => {
+    setShowHistory(true);
+    setHistoryLoading(true);
+    try {
+      const { items } = (await posShiftService.list({})) as { items: any };
+      setHistoryShifts(
+        ((items || []) as Record<string, any>[])
+          .filter((s) => s.status === "closed")
+          .slice(0, 6),
+      );
+    } catch {
+      toast.error("تعذر تحميل سجل الورديات");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // Reprint an archived shift with its stored-window aggregates so the paper
+  // always reconciles with what close_shift stamped.
+  const printHistoricShift = async (shift: Record<string, any>) => {
+    try {
+      const stats = await posShiftService.shiftStats(shift.id);
+      printShiftReport({
+        shift,
+        stats: {
+          ...stats,
+          cashier_name:
+            shift.user?.full_name || shift.user?.username || "—",
+        } as any,
+      });
+    } catch {
+      toast.error("تعذر تجميع تقرير الوردية للطباعة");
+    }
+  };
+
+  // Server-computed expected closing cash (opening + cash sales - cash
+  // expenses) is the source of truth. The local arithmetic is only a fallback
+  // for a stats payload that arrived without that figure — it subtracts the
+  // cash expenses too, because the old fallback forgot them and reported a
+  // deficit that was never there. When no stats have arrived at all the
+  // expected figure is unknown, and an unknown figure must not be shown as a
+  // deficit.
   const expectedAmount =
-    Number(currentShift?.opening_cash || 0) +
-    Number(currentShift?.total_sales || 0);
-  const difference = Number(closingCash) - expectedAmount;
+    liveStats?.expected_closing_cash != null
+      ? Number(liveStats.expected_closing_cash)
+      : liveStats
+        ? Number(currentShift?.opening_cash || 0) +
+          Number(liveStats.cash_sales ?? 0) -
+          Number(liveStats.cash_expenses ?? 0)
+        : null;
+  const difference =
+    expectedAmount == null ? 0 : Number(closingCash) - expectedAmount;
+
+  // The server's own variance limit, so the note and the manager's
+  // co-signature can be asked for in one pass instead of after a refusal.
+  const discrepancyLimit = Number(liveStats?.discrepancy_limit ?? 0);
+  const overDiscrepancyLimit =
+    discrepancyLimit > 0 && Math.abs(difference) > discrepancyLimit;
+  const showCoSignature =
+    needsManagerCoSignature && (needsApproval || overDiscrepancyLimit);
 
   const printShiftReport = async (data) => {
     const shift = data.shift || data;
@@ -160,9 +348,11 @@ const ShiftSidebar = () => {
       subtotal: Number(shift.total_sales || 0),
       discount: Number(shift.discount_total || 0),
       total: Number(shift.expected_closing_cash || 0),
-      shopName: "صالون برو - تقرير وردية",
-      shopPhone: "",
-      shopAddress: "",
+      // Shop identity comes from the owner's business settings (same source
+      // the invoice PDF uses), not a hardcoded brand string.
+      shopName: `${String(businessSettings?.salon_name || "صالون برو").trim()} - تقرير وردية`,
+      shopPhone: businessSettings?.shop_phone || "",
+      shopAddress: businessSettings?.shop_address || "",
       footer: `نظام صالون برو - ${new Date().getFullYear()} © جميع الحقوق محفوظة`,
       qrDataUrl: "",
       widthMm: 80,
@@ -181,8 +371,10 @@ const ShiftSidebar = () => {
           <head>
             <meta charset="UTF-8">
             <style>
-              @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-              body { font-family: 'Cairo', sans-serif; padding: 30px; color: #1f2937; background: #fff; line-height: 1.5; }
+              /* No @import from fonts.googleapis.com: the fallback print window
+                 must work offline, and Cairo may not even be installed locally —
+                 the Arabic-capable system font stack renders it either way. */
+              body { font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif; padding: 30px; color: #1f2937; background: #fff; line-height: 1.5; }
               .header { text-align: center; border-bottom: 3px solid #D4AF37; padding-bottom: 15px; margin-bottom: 25px; }
               .header h1 { margin: 0; font-size: 26px; font-weight: 900; color: #111827; }
               .header-meta { font-size: 14px; color: #4b5563; margin-top: 8px; font-weight: 700; }
@@ -257,7 +449,10 @@ const ShiftSidebar = () => {
   return (
     <div className="flex flex-col gap-3 sm:gap-4">
       {/* Shift Control Card */}
-      <Card className="p-4 sm:p-5 rounded-2xl border border-border/50 bg-white/60 dark:bg-slate-900/60 backdrop-blur-3xl shadow-sm relative overflow-hidden group shrink-0">
+      {/* bg-card (no backdrop-blur): persistent surface — blur behind a
+          near-opaque background is a visual no-op but a constant per-frame
+          compositor cost on integrated GPUs. */}
+      <Card className="p-4 sm:p-5 rounded-2xl border border-border/50 bg-card shadow-sm relative overflow-hidden group shrink-0">
         <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-2xl -mr-12 -mt-12 group-hover:bg-primary/10 transition-all duration-700" />
 
         <div className="flex items-center justify-between mb-3 sm:mb-4 relative z-10">
@@ -271,7 +466,7 @@ const ShiftSidebar = () => {
           </div>
           <Badge
             className={cn(
-              "rounded-lg px-2 sm:px-2.5 py-0.5 font-black text-[8px] sm:text-[9px] uppercase tracking-wider border-none",
+              "rounded-lg px-2 sm:px-2.5 py-0.5 font-black text-[10px] sm:text-[10px] uppercase tracking-wider border-none",
               hasOpenShift
                 ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/10"
                 : "bg-amber-500 text-white shadow-sm shadow-amber-500/10",
@@ -282,11 +477,11 @@ const ShiftSidebar = () => {
         </div>
 
         {hasOpenShift && (
-          <div className="mb-3 sm:mb-4 p-2 sm:p-2.5 rounded-xl bg-slate-50/50 dark:bg-white/5 border border-slate-100 dark:border-white/10 relative z-10">
-            <div className="flex items-center gap-1.5 text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5 pe-1">
-              <User size={8} className="text-primary" /> المسؤول
+          <div className="mb-3 sm:mb-4 p-2 sm:p-2.5 rounded-xl bg-soft/50 border border-border/50 relative z-10">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-[10px] font-black text-muted uppercase tracking-widest mb-0.5 pe-1">
+              <User size={10} className="text-primary" /> المسؤول
             </div>
-            <div className="text-[11px] sm:text-xs font-black text-slate-700 dark:text-slate-200 truncate">
+            <div className="text-[11px] sm:text-xs font-black text-main truncate">
               {currentShift?.user?.full_name ||
                 currentShift?.user?.username ||
                 "جاري التحميل..."}
@@ -311,7 +506,7 @@ const ShiftSidebar = () => {
             <div className="space-y-1.5 sm:space-y-2">
               <label
                 htmlFor="opening-cash"
-                className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-widest me-1"
+                className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest me-1"
               >
                 الرصيد الافتتاحي
               </label>
@@ -324,7 +519,7 @@ const ShiftSidebar = () => {
                   disabled={!isShopOpen}
                   className="h-10 sm:h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 font-black text-base sm:text-lg px-3 focus:border-primary/40 transition-all shadow-sm disabled:opacity-50 touch-target"
                 />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] sm:text-[9px] font-black text-slate-300">{currencyLabel()}</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] sm:text-[10px] font-black text-slate-300">{currencyLabel()}</span>
               </div>
             </div>
             <Button
@@ -347,7 +542,7 @@ const ShiftSidebar = () => {
             <div className="flex justify-between items-center p-2 sm:p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <Clock size={14} className="text-emerald-600 sm:size-4" />
-                <span className="text-[9px] sm:text-[10px] font-black text-emerald-700 dark:text-emerald-400">
+                <span className="text-[10px] sm:text-[10px] font-black text-emerald-700 dark:text-emerald-400">
                   بدأت
                 </span>
               </div>
@@ -371,13 +566,22 @@ const ShiftSidebar = () => {
             <Button
               variant="outline"
               className="w-full h-9 sm:h-10 border-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl font-black text-[10px] sm:text-xs transition-all flex gap-2"
-              onClick={() => setShowCloseShift(true)}
+              onClick={() => openCloseDialog()}
             >
               <LogOut size={14} className="sm:size-4" />
               إغلاق الوردية
             </Button>
           </div>
         )}
+
+        <Button
+          variant="ghost"
+          className="w-full h-8 rounded-lg font-black text-[10px] sm:text-[10px] text-muted hover:text-primary hover:bg-primary/5 flex gap-1.5 relative z-10"
+          onClick={openHistory}
+        >
+          <Printer size={12} />
+          سجل الورديات السابقة
+        </Button>
       </Card>
 
       {/* Quick Summary Tiles */}
@@ -393,7 +597,7 @@ const ShiftSidebar = () => {
           },
           {
             label: "مبيعات الوردية",
-            value: formatCurrency(currentShift?.total_sales || 0),
+            value: formatCurrency(liveStats?.total_sales || 0),
             icon: Wallet,
             bgClass: "bg-emerald-500/5",
             textClass: "text-emerald-600 dark:text-emerald-400",
@@ -401,7 +605,7 @@ const ShiftSidebar = () => {
           },
           {
             label: "عدد الفواتير",
-            value: currentShift?.invoice_count || 0,
+            value: liveStats?.invoice_count || 0,
             icon: FileText,
             bgClass: "bg-sky-500/5",
             textClass: "text-sky-600 dark:text-sky-400",
@@ -439,7 +643,7 @@ const ShiftSidebar = () => {
             />
 
             <div className="relative z-10 min-w-0">
-              <p className="text-[7px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 pe-1 truncate">
+              <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 pe-1 truncate">
                 {tile.label}
               </p>
               <p
@@ -483,7 +687,7 @@ const ShiftSidebar = () => {
                 <div className="flex justify-between items-center text-sm font-bold">
                   <span className="text-muted">المتوقع بالنظام:</span>
                   <span className="text-xl font-black text-main">
-                    {formatCurrency(expectedAmount)}
+                    {expectedAmount == null ? "—" : formatCurrency(expectedAmount)}
                   </span>
                 </div>
               </div>
@@ -504,15 +708,59 @@ const ShiftSidebar = () => {
                 </div>
               </div>
 
+              {(difference !== 0 || closingNote || overDiscrepancyLimit) && (
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest me-1">
+                    ملاحظة الإغلاق
+                    {(difference !== 0 || overDiscrepancyLimit) &&
+                      " (مطلوبة عند وجود فرق)"}
+                  </label>
+                  <Input
+                    value={closingNote}
+                    onChange={(e) => setClosingNote(e.target.value)}
+                    placeholder="مثال: مصروف غير مسجل / عجل عملاء"
+                    className="h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 font-bold text-xs px-3"
+                  />
+                </div>
+              )}
+
+              {showCoSignature && (
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-3">
+                  <p className="text-[10px] font-black text-amber-700 dark:text-amber-300 leading-relaxed">
+                    الفارق تجاوز الحد المسموح — أدخل ملاحظة السبب واسم مستخدم
+                    المدير وكلمة سره لاعتماد الإغلاق
+                  </p>
+                  <div className="grid grid-cols-1 gap-2">
+                    <Input
+                      value={approverName}
+                      onChange={(e) => setApproverName(e.target.value)}
+                      placeholder="اسم مستخدم المدير"
+                      className="h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 font-bold text-xs px-3"
+                      autoComplete="username"
+                    />
+                    <Input
+                      type="password"
+                      value={approverPassword}
+                      onChange={(e) => setApproverPassword(e.target.value)}
+                      placeholder="كلمة سر المدير"
+                      className="h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 font-bold text-xs px-3"
+                      autoComplete="current-password"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Difference Indicator - The "Red Line" logic */}
               <div
                 className={cn(
                   "p-5 rounded-premium border-2 transition-all duration-500 flex justify-between items-center",
-                  difference === 0
-                    ? "bg-success/5 border-success/20 text-success"
-                    : difference > 0
-                      ? "bg-blue-50 border-blue-100 text-blue-600"
-                      : "bg-red-50 border-red-200 text-red-600 shadow-[0_0_15px_rgba(220,38,38,0.1)]",
+                  expectedAmount == null
+                    ? "bg-soft/50 border-border text-muted"
+                    : difference === 0
+                      ? "bg-success/5 border-success/20 text-success"
+                      : difference > 0
+                        ? "bg-blue-50 border-blue-100 text-blue-600"
+                        : "bg-red-50 border-red-200 text-red-600 shadow-[0_0_15px_rgba(220,38,38,0.1)]",
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -522,13 +770,19 @@ const ShiftSidebar = () => {
                     <CheckCircle2 size={20} />
                   )}
                   <span className="text-sm font-black uppercase">
-                    العجز / الزيادة:
+                    {expectedAmount == null
+                      ? "أرقام الوردية غير محمّلة بعد"
+                      : "العجز / الزيادة:"}
                   </span>
                 </div>
-                <span className="text-xl font-black tabular-nums">
-                  {difference > 0 ? "+" : ""}
-                  {formatCurrency(difference)}
-                </span>
+                {expectedAmount == null ? (
+                  <span className="text-xl font-black tabular-nums">—</span>
+                ) : (
+                  <span className="text-xl font-black tabular-nums">
+                    {difference > 0 ? "+" : ""}
+                    {formatCurrency(difference)}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -548,6 +802,96 @@ const ShiftSidebar = () => {
               className="rounded-2xl h-14 px-8 font-black text-muted hover:bg-soft transition-all"
             >
               إلغاء
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Shift History Dialog — reprint archived reports */}
+      <Dialog open={showHistory} onOpenChange={setShowHistory}>
+        <DialogContent className="max-w-md rounded-[2rem] p-6">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl font-black tracking-tight">
+              سجل الورديات السابقة
+            </DialogTitle>
+            <DialogDescription className="font-bold text-muted text-xs">
+              آخر 6 ورديات مغلقة — اضغط اطبع لاستخراج نسخة تقرير مطابقة للحسابات.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[50vh] overflow-y-auto no-scrollbar space-y-2">
+            {historyLoading ? (
+              <div className="py-10 flex items-center justify-center text-muted">
+                <RefreshCw className="animate-spin" size={20} />
+              </div>
+            ) : historyShifts.length === 0 ? (
+              <div className="py-10 text-center text-xs font-bold text-muted">
+                لا توجد ورديات مغلقة بعد
+              </div>
+            ) : (
+              historyShifts.map((s) => {
+                const actual = Number(s.actual_closing_cash || 0);
+                const expected = Number(s.expected_closing_cash || 0);
+                const variance = Math.round((actual - expected) * 100) / 100;
+                const closedAt = s.closed_at
+                  ? new Date(
+                      s.closed_at.includes("Z") || s.closed_at.includes("+")
+                        ? s.closed_at
+                        : s.closed_at.replace(" ", "T") + "Z",
+                    )
+                  : null;
+                return (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between gap-2 p-3 rounded-xl border border-border/50 bg-soft/40"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-main truncate">
+                        #{s.id} • {s.user?.full_name || s.user?.username || "—"}
+                      </p>
+                      <p className="text-[10px] font-bold text-muted">
+                        {closedAt ? closedAt.toLocaleString("ar-EG") : "—"} •{" "}
+                        {formatCurrency(Number(s.total_sales || 0))}
+                      </p>
+                      <p
+                        className={cn(
+                          "text-[10px] font-black",
+                          variance === 0
+                            ? "text-success"
+                            : variance > 0
+                              ? "text-blue-600"
+                              : "text-red-600",
+                        )}
+                      >
+                        {variance === 0
+                          ? "مطابقة تماماً"
+                          : variance > 0
+                            ? `زيادة +${variance}`
+                            : `عجز ${variance}`}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 px-3 rounded-lg font-black text-[10px] shrink-0"
+                      onClick={() => printHistoricShift(s)}
+                    >
+                      <Printer size={12} className="me-1" />
+                      اطبع
+                    </Button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setShowHistory(false)}
+              className="h-10 w-full rounded-xl font-black text-muted hover:bg-soft"
+            >
+              إغلاق
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -290,7 +290,7 @@ const SuccessOverlay = () => {
                   <span>{nativePrinterError}</span>
                 </div>
               )}
-              <p className="text-[9px] font-bold text-slate-400 text-center">
+              <p className="text-[10px] font-bold text-slate-400 text-center">
                 {printMethod === "browser"
                   ? "يفتح نافذة طباعة في المتصفح — يعمل على أي جهاز"
                   : "يتطلب توصيل طابعة عبر USB أو تطبيق سطح مكتب (Electron/TAURI)"}

@@ -134,15 +134,16 @@ export function getStatusConfig(status) {
 
 /**
  * Invoices have no status column — real state comes from the closed/draft
- * flags on the row itself.
+ * flags on the row itself. `is_closed` marks an invoice that was voided on
+ * its own (a month lock lives in its own table and never touches the row).
  */
 export function getInvoiceStatusConfig(invoice) {
   const key = invoice?.is_closed ? "CLOSED" : invoice?.is_draft ? "DRAFT" : "OPEN";
   const map: Record<string, { label: string; color: string; bg: string }> = {
     CLOSED: {
-      label: "مسددة",
-      color: "text-emerald-500",
-      bg: "bg-emerald-500/10",
+      label: "ملغاة",
+      color: "text-red-500",
+      bg: "bg-red-500/10",
     },
     OPEN: {
       label: "صادرة",

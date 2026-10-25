@@ -3,11 +3,7 @@ import {
   SERVICE_PROVIDER_JOB_TITLES,
   isServiceProviderJobTitle,
 } from "@/features/hr/utils/helpers";
-import {
-  JOB_TITLES,
-  JOB_TITLE_BLUEPRINTS,
-  isFormStepVisible,
-} from "@/features/hr/utils/constants";
+import { JOB_TITLES, isFormStepVisible } from "@/features/hr/utils/constants";
 
 /**
  * Who counts as a service provider — the frontend twin of
@@ -22,8 +18,10 @@ describe("who is a service provider", () => {
   it("lists exactly the customer-facing service titles", () => {
     expect(SERVICE_PROVIDER_JOB_TITLES).toEqual([
       "barber",
+      "hairstylist",
       "colorist",
       "esthetician",
+      "nail_technician",
     ]);
   });
 
@@ -60,20 +58,35 @@ describe("who is a service provider", () => {
 describe("the job title list uses real barbershop titles", () => {
   it("offers the core barbershop roles", () => {
     const values = JOB_TITLES.map((t) => t.value);
-    for (const title of ["barber", "colorist", "esthetician", "barber_assistant"]) {
+    for (const title of [
+      "barber",
+      "hairstylist",
+      "colorist",
+      "esthetician",
+      "nail_technician",
+      "barber_assistant",
+    ]) {
       expect(values, title).toContain(title);
     }
   });
 
-  it("no longer offers the borrowed 'كوافير' title", () => {
+  it("no longer offers the borrowed 'كوافير' label", () => {
     const labels = JOB_TITLES.map((t) => t.label);
     expect(labels).not.toContain("كوافير");
-    expect(JOB_TITLES.map((t) => t.value)).not.toContain("hairstylist");
-    expect(JOB_TITLE_BLUEPRINTS.hairstylist).toBeUndefined();
+    expect(labels).toContain("مصفف شعر (ستايلست)");
+    expect(
+      JOB_TITLES.find((t) => t.value === "hairstylist")?.label,
+    ).toBe("مصفف شعر (ستايلست)");
   });
 
   it("asks for the skills step for the service roles", () => {
-    for (const title of ["barber", "colorist", "esthetician"]) {
+    for (const title of [
+      "barber",
+      "hairstylist",
+      "colorist",
+      "esthetician",
+      "nail_technician",
+    ]) {
       expect(isFormStepVisible("skills", title), title).toBe(true);
     }
   });

@@ -1,4 +1,3 @@
-import React from "react";
 import { ShieldAlert } from "lucide-react";
 import { usePOS } from "@/pages/cashier/POS/POSContext";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+const MAX_DISCOUNT_RATE = 0.4; // mirrors the server-side discount cap (40%)
+
 const ManagerApprovalModal = () => {
   const { showApprovalModal, setShowApprovalModal } = usePOS();
 
@@ -22,11 +23,13 @@ const ManagerApprovalModal = () => {
             <ShieldAlert size={24} />
           </div>
           <DialogTitle className="text-center text-xl font-black">
-            تعديل الفاتورة غير متاح
+            الخصم يتجاوز الحد المسموح
           </DialogTitle>
-          <DialogDescription className="text-center text-xs font-bold text-muted">
-            يتم التعامل مع التعديلات المالية عبر طلبات مراجعة موثقة بدل تجاوز
-            الحماية من شاشة الدفع.
+          <DialogDescription className="text-center text-xs font-bold text-muted leading-relaxed">
+            تم رفض الفاتورة لأن مبلغ الخصم المُدخل يتجاوز النسق المسموح به (
+            {Math.round(MAX_DISCOUNT_RATE * 100)}% من إجمالي الفاتورة).
+            عدّل الخصم وأعد الإصدار، أو اطلب اعتماد الخصم الأكبر من شاشة
+            الإدارة.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -34,7 +37,7 @@ const ManagerApprovalModal = () => {
             onClick={() => setShowApprovalModal(false)}
             className="h-11 w-full rounded-xl font-black"
           >
-            إغلاق
+            تعديل الخصم وإعادة المحاولة
           </Button>
         </DialogFooter>
       </DialogContent>

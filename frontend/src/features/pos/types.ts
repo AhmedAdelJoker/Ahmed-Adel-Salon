@@ -19,7 +19,6 @@ export interface POSContextValue {
   products: POSRecord[];
   offers: POSRecord[];
   barbers: POSRecord[];
-  customers: POSRecord[];
   readyAppointments: POSRecord[];
   businessSettings: POSRecord | null;
   currentShift: POSRecord | null;
@@ -49,11 +48,18 @@ export interface POSContextValue {
   setItemSearchQuery: Dispatch<SetStateAction<string>>;
   customerSearchQuery: string;
   setCustomerSearchQuery: Dispatch<SetStateAction<string>>;
+  /** Server-side typeahead results for the current query. */
+  customerSearchResults: POSRecord[];
+  customerSearchLoading: boolean;
+  customerSearchError: string | null;
+  /** The customer this sale is attached to, with their loyalty tier. */
+  selectedCustomer: POSRecord | null;
+  /** Attach a customer to the sale, or pass null for a walk-in. */
+  selectCustomer: (customer: POSRecord | null) => void;
   activeCategory: string;
   setActiveCategory: Dispatch<SetStateAction<string>>;
   categoryTabs: string[];
   filteredItems: POSRecord[];
-  filteredCustomers: POSRecord[];
   cart: CartItem[];
   setCart: Dispatch<SetStateAction<CartItem[]>>;
   selectedBarberId: string;
@@ -67,10 +73,6 @@ export interface POSContextValue {
   setPaymentMethod: Dispatch<SetStateAction<string>>;
   activeAppointmentId: ID | null;
   setActiveAppointmentId: Dispatch<SetStateAction<ID | null>>;
-  activeInvoiceId: ID | null;
-  setActiveInvoiceId: Dispatch<SetStateAction<ID | null>>;
-  isReviewing: boolean;
-  setIsReviewing: Dispatch<SetStateAction<boolean>>;
   isNewCustomer: boolean;
   setIsNewCustomer: Dispatch<SetStateAction<boolean>>;
   newCustomerFirstName: string;

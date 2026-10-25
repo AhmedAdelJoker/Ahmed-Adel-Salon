@@ -619,7 +619,9 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
               value={rules.autoLockShiftHours}
               onChange={(value) => updateRule("autoLockShiftHours", value)}
               icon={Clock}
-              hint="إغلاق احترازي إذا تُركت الوردية مفتوحة"
+              min={0}
+              max={168}
+              hint="إغلاق احترازي لأي وردية تجاوزت هذه الساعات حتى لو الدوام شغال أو غير مضبوط (0 = بدون قفل)"
             />
 
             <NumberField
@@ -631,7 +633,7 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
               icon={BellRing}
               min={0}
               max={60}
-              hint="تنبيه الكاشير بقرب الإغلاق التلقائي (0 – 60)"
+              hint="قبل نهاية الدوام بهذه الدقائق يُنبه الكاشير أن الوردية ستُغلق تلقائياً (0 = بدون تنبيه)"
             />
 
             <div className="border-t border-border/50 pt-5">
@@ -642,7 +644,7 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
                   updateRule("maxCashDiscrepancyWithoutNote", value)
                 }
                 icon={AlertTriangle}
-                hint="عجز أكبر من هذا المبلغ يتطلب ملاحظة توضيحية"
+                hint="فارق أكبر من هذا المبلغ يتطلب ملاحظة توضيحية واعتماد مدير عند إغلاق الكاشير (0 = بلا ضوابط)"
               />
             </div>
           </div>

@@ -227,6 +227,9 @@ function MainLayout() {
   }, []);
 
   const meta = resolvePageMeta(location.pathname);
+  // POS owns its own bottom bar (POSBottomNav); the global pill nav would
+  // stack underneath it and clutter the till screen.
+  const hideMobileNav = location.pathname.startsWith("/pos");
 
   return (
     <div
@@ -271,7 +274,7 @@ function MainLayout() {
         </main>
       </div>
 
-      <MobileNav />
+      {!hideMobileNav && <MobileNav />}
       <CommandPalette />
 
       <AnimatePresence>

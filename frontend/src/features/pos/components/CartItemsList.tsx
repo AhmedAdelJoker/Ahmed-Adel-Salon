@@ -36,7 +36,7 @@ export const CartItemsList = ({
         </Badge>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar bg-slate-50/30 dark:bg-black/5">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar bg-soft/30">
         {cart.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-40 py-6 text-center">
             <ShoppingBag size={32} className="text-primary mb-2 opacity-20" />
@@ -48,7 +48,7 @@ export const CartItemsList = ({
           cart.map((item) => (
             <div
               key={item.uid}
-              className="flex flex-col gap-1.5 p-2.5 sm:p-3 rounded-2xl bg-white dark:bg-white/5 border border-border/50 group transition-all hover:border-primary/30 hover:shadow-sm relative overflow-hidden"
+              className="flex flex-col gap-1.5 p-2.5 sm:p-3 rounded-2xl bg-card border border-border/50 group transition-all hover:border-primary/30 hover:shadow-sm relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 w-0.5 h-full bg-primary/10 group-hover:bg-primary transition-colors" />
 
@@ -58,13 +58,13 @@ export const CartItemsList = ({
                     {item.name}
                   </p>
                   <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5">
-                    <span className="text-[9px] sm:text-[10px] font-black text-primary px-1 sm:px-1.5 py-0.5 bg-primary/10 rounded-lg whitespace-nowrap">
+                    <span className="text-[10px] sm:text-[10px] font-black text-primary px-1 sm:px-1.5 py-0.5 bg-primary/10 rounded-lg whitespace-nowrap">
                       {formatCurrency(item.price)}
                     </span>
                     {item.type === "product" && (
                       <Badge
                         variant="outline"
-                        className="text-[7px] sm:text-[8px] font-bold h-3 sm:h-3.5 px-1 border-slate-200"
+                        className="text-[10px] sm:text-[10px] font-bold h-3.5 sm:h-4 px-1.5 border-border/60"
                       >
                         منتج
                       </Badge>
@@ -80,13 +80,13 @@ export const CartItemsList = ({
               </div>
 
               {item.type !== "product" && (
-                <div className="flex items-center gap-1.5 mt-0.5 p-1 sm:p-1.5 rounded-lg sm:rounded-xl bg-slate-50/50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                <div className="flex items-center gap-1.5 mt-0.5 p-1 sm:p-1.5 rounded-lg sm:rounded-xl bg-soft/60 border border-border/50">
                   <User size={10} className="text-primary shrink-0" />
                   <Select
                     value={(item.barberId as unknown as string) || ""}
                     onValueChange={(v) => updateCartItemBarber(item.uid, v)}
                   >
-                    <SelectTrigger className="h-10 flex-1 bg-transparent border-none font-black text-[9px] sm:text-[10px] text-main">
+                    <SelectTrigger className="h-10 flex-1 bg-transparent border-none font-black text-[10px] sm:text-[10px] text-main">
                       <SelectValue placeholder="تحديد الخبير" />
                     </SelectTrigger>
                     <SelectContent>

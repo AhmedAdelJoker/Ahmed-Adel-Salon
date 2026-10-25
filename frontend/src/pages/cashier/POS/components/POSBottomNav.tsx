@@ -50,7 +50,10 @@ const POSBottomNav = ({
         aria-label="تنقل نقطة البيع"
       >
         <div className="mx-auto max-w-xl">
-          <div className="rounded-t-[2rem] bg-card/95 backdrop-blur-xl border border-border shadow-premium overflow-hidden">
+          {/* bg-card (no backdrop-blur): the bottom bar is a persistent
+              surface on the mobile till; at 95% opacity the blur was visually
+              a no-op while costing compositor time every frame. */}
+          <div className="rounded-t-[2rem] bg-card border border-border shadow-premium overflow-hidden">
             <div className="grid grid-cols-3 gap-1 p-1.5">
               {TABS.map((tab) => {
                 const isActive = activeView === tab.id;
@@ -100,7 +103,7 @@ const POSBottomNav = ({
                     {showBadge && (
                       <Badge
                         variant={isActive ? "primary" : "outline"}
-                        className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full px-1.5 text-[9px] font-black"
+                        className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full px-1.5 text-[10px] font-black"
                       >
                         {badgeCount > 9 ? "9+" : badgeCount}
                       </Badge>

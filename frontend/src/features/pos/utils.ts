@@ -1,4 +1,9 @@
 import confetti from "canvas-confetti";
+import {
+  normalizeLoyaltySettings,
+  tierForVisits,
+} from "@/features/loyalty/utils/loyaltyHelpers";
+import type { LoyaltyTier } from "@/types/loyalty";
 import type { CartItem, POSRecord } from "@/features/pos/types";
 
 export const triggerSuccessEffect = (): void => {
@@ -22,6 +27,28 @@ export const isOpenShiftStatus = (
   Boolean(
     shift && ["open", "opened"].includes(String(shift.status || "open").toLowerCase()),
   );
+
+/**
+ * The loyalty tier a customer currently belongs to, resolved from their visit
+ * count against the owner's configured ladder.
+ *
+ * The stored `current_tier` string is not used as the key: it holds whatever
+ * name the owner gave the tier (and legacy rows still hold "Bronze" while the
+ * configured names are Arabic), so matching on it silently produced a badge
+ * in the wrong language and a missing discount. `tierForVisits` is the same
+ * algorithm the backend applies when it assigns and prices a tier.
+ */
+export const resolveCustomerTier = (
+  customer: POSRecord | null | undefined,
+  loyaltySettingsRaw: unknown,
+): LoyaltyTier | null => {
+  if (!customer) return null;
+  const settings = normalizeLoyaltySettings(loyaltySettingsRaw);
+  if (!settings.enabled || settings.tiers.length === 0) return null;
+  const visits = Number(customer.visits_count ?? customer.visitsCount ?? 0);
+  if (!Number.isFinite(visits)) return null;
+  return tierForVisits(settings, visits);
+};
 
 /**
  * Build the cart that represents one appointment's services. Used by both

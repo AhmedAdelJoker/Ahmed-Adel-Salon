@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 import { useSocket } from "@/context/SocketContext";
 import { useSalon } from "@/context/SalonContext";
 import { loadErrorMessage } from "@/lib/core/asyncError";
+import { resolveCustomerTier } from "@/features/pos/utils";
 import type { ID } from "@/types/common";
 import type { POSRecord, CartItem, POSContextValue } from "@/features/pos/types";
 
@@ -20,7 +21,6 @@ export function usePOSLogic(): POSContextValue {
   const [products, setProducts] = useState<POSRecord[]>([]);
   const [offers, setOffers] = useState<POSRecord[]>([]);
   const [barbers, setBarbers] = useState<POSRecord[]>([]);
-  const [customers, setCustomers] = useState<POSRecord[]>([]);
   const [readyAppointments, setReadyAppointments] = useState<POSRecord[]>([]);
 
   // UI State
@@ -46,6 +46,25 @@ export function usePOSLogic(): POSContextValue {
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("الكل");
 
+  // Customer lookup is a server-side typeahead, not a client-side filter over
+  // a preloaded roster. The POS used to pull /customers?limit=1000 on every
+  // page open — the whole customer table, with every column, into the till's
+  // memory — and then filtered it locally, for a list no UI ever displayed.
+  // The till now asks the server for exactly what it shows.
+  const [customerSearchResults, setCustomerSearchResults] = useState<
+    POSRecord[]
+  >([]);
+  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
+  const [customerSearchError, setCustomerSearchError] = useState<string | null>(
+    null,
+  );
+  // The one customer this sale is for. Holding the picked record (instead of
+  // a whole roster) is what lets the till drop the 1000-row preload while
+  // still knowing the customer's loyalty tier and name at checkout time.
+  const [selectedCustomer, setSelectedCustomer] = useState<POSRecord | null>(
+    null,
+  );
+
   // Cart/Checkout State
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedBarberId, setSelectedBarberId] = useState("");
@@ -54,8 +73,6 @@ export function usePOSLogic(): POSContextValue {
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [activeAppointmentId, setActiveAppointmentId] =
     useState<ID | null>(null);
-  const [activeInvoiceId, setActiveInvoiceId] = useState<ID | null>(null);
-  const [isReviewing, setIsReviewing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Customer State
@@ -135,20 +152,62 @@ export function usePOSLogic(): POSContextValue {
     barbers,
   ]);
 
-  const filteredCustomers = useMemo(() => {
-    const query = customerSearchQuery.trim().toLowerCase();
-    return customers.filter((c) =>
-      `${c.first_name || c.firstName || ""} ${c.phone_primary || c.phonePrimary || ""} ${c.phone || ""}`
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [customers, customerSearchQuery]);
+  // Server-side customer typeahead. Debounced so a fast typist does not fire
+  // one request per keystroke, and sequence-guarded so a slow response for an
+  // older query cannot overwrite the results of a newer one (the classic
+  // out-of-order race that leaves the list showing the wrong customer).
+  useEffect(() => {
+    const query = customerSearchQuery.trim();
+
+    if (query.length < 2) {
+      setCustomerSearchResults([]);
+      setCustomerSearchError(null);
+      setCustomerSearchLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setCustomerSearchLoading(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await api.get("/customers", {
+          params: { q: query, limit: 20 },
+        });
+        if (cancelled) return;
+        setCustomerSearchResults(adaptList(response));
+        setCustomerSearchError(null);
+      } catch (error) {
+        if (cancelled) return;
+        console.error("POS customer search failed:", error);
+        setCustomerSearchResults([]);
+        setCustomerSearchError(
+          loadErrorMessage(error, "البحث عن العميل"),
+        );
+      } finally {
+        if (!cancelled) setCustomerSearchLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [customerSearchQuery]);
 
   // Actions
   const addToCart = useCallback(
     (item: POSRecord, type: string) => {
       if ((type === "service" || type === "offer") && !selectedBarberId) {
         toast.error("يرجى تحديد الخبير المسؤول أولاً");
+        return;
+      }
+
+      // Shelf guard: a stocked-out product can still be picked from the grid,
+      // so refuse it here before it hides inside the cart and only surfaces as
+      // a 400 when the customer is already standing at the till.
+      if (type === "product" && Number(item.quantity ?? 0) <= 0) {
+        toast.error("المنتج غير متوفر في المخزون");
         return;
       }
 
@@ -257,11 +316,29 @@ export function usePOSLogic(): POSContextValue {
     setDiscount(0);
     setSelectedBarberId("");
     setSelectedCustomerId("walk_in");
+    setSelectedCustomer(null);
+    setCustomerSearchQuery("");
     setPaymentMethod("CASH");
     setActiveAppointmentId(null);
-    setActiveInvoiceId(null);
-    setIsReviewing(false);
     toast.success("تمت إعادة تعيين محطة الـ POS");
+  }, []);
+
+  /**
+   * Attach a customer to this sale. The id and the record are set together:
+   * the id is what the invoice carries, the record is what the till needs for
+   * the loyalty tier and the printed name. Setting one without the other was
+   * the bug that made a walked-in customer silently lose their loyalty
+   * discount.
+   */
+  const selectCustomer = useCallback((customer: POSRecord | null) => {
+    if (!customer) {
+      setSelectedCustomer(null);
+      setSelectedCustomerId("walk_in");
+      return;
+    }
+    setSelectedCustomer(customer);
+    setSelectedCustomerId(String(customer.customer_id ?? customer.id ?? ""));
+    setCustomerSearchQuery("");
   }, []);
 
   const fetchReadyAppointments = useCallback(async () => {
@@ -327,23 +404,38 @@ export function usePOSLogic(): POSContextValue {
       // Set loading to false early to show the UI shell
       setLoading(false);
 
-      // Phase 2: Load secondary data in the background
-      const [productsRes, customersRes, offersRes] = await Promise.all([
+      // Phase 2: Load secondary data in the background. A failure here must
+      // degrade, not brick the till: services (phase 1) are already on
+      // screen, so blocking the whole POS because the customer list timed out
+      // turned a slow network into a dead register. Each fetch settles on its
+      // own; the cashier keeps selling whatever did load.
+      //
+      // Customers are deliberately NOT preloaded: the till searches them
+      // server-side on demand (see the typeahead effect above), so opening
+      // the POS no longer pulls the entire customer table into memory.
+      const [productsOut, offersOut] = await Promise.allSettled([
         api.get("/products", { params: { limit: 1000 } }),
-        api.get("/customers", { params: { limit: 1000 } }),
-        api
-          .get("/offers/active", { params: { limit: 1000 } })
-          .catch(() => ({ data: [] })),
+        api.get("/offers/active", { params: { limit: 1000 } }),
       ]);
 
-      setProducts(
-        adaptList(productsRes).map((p) => ({
-          ...p,
-          price: p.sell_price ?? p.price ?? 0,
-        })),
-      );
-      setCustomers(adaptList(customersRes));
-      setOffers(adaptList(offersRes));
+      if (productsOut.status === "fulfilled") {
+        setProducts(
+          adaptList(productsOut.value).map((p) => ({
+            ...p,
+            price: p.sell_price ?? p.price ?? 0,
+          })),
+        );
+      } else {
+        console.error("POS products fetch failed:", productsOut.reason);
+        toast.error("تعذر تحميل قائمة المنتجات — أعد التحديث لاحقاً");
+      }
+
+      if (offersOut.status === "fulfilled") {
+        setOffers(adaptList(offersOut.value));
+      } else {
+        console.error("POS offers fetch failed:", offersOut.reason);
+        toast.error("تعذر تحميل قائمة العروض — أعد التحديث لاحقاً");
+      }
     } catch (error) {
       console.error("POS data error:", error);
       setCatalogError(loadErrorMessage(error, "بيانات نقطة البيع"));
@@ -396,22 +488,20 @@ export function usePOSLogic(): POSContextValue {
     if (!businessSettings?.loyalty_settings?.enabled) return 0;
     if (selectedCustomerId === "walk_in" || isNewCustomer) return 0;
 
-    const customer = customers.find(
-      (c) => String(c.id || c.customer_id) === String(selectedCustomerId),
+    // The tier comes from the visit count, so the badge and the price always
+    // agree — and a customer whose stored tier name is stale still gets the
+    // discount they actually qualify for.
+    const tier = resolveCustomerTier(
+      selectedCustomer,
+      businessSettings.loyalty_settings,
     );
-    if (!customer) return 0;
+    if (!tier?.discount_percent) return 0;
 
-    const tiers = businessSettings.loyalty_settings.tiers || [];
-    const tier = tiers.find((t) => t.name === customer.current_tier);
-
-    if (tier?.discount_percent) {
-      return (subtotal * Number(tier.discount_percent)) / 100;
-    }
-    return 0;
+    return (subtotal * Number(tier.discount_percent)) / 100;
   }, [
     businessSettings,
+    selectedCustomer,
     selectedCustomerId,
-    customers,
     isNewCustomer,
     subtotal,
   ]);
@@ -475,7 +565,6 @@ export function usePOSLogic(): POSContextValue {
     products,
     offers,
     barbers,
-    customers,
     readyAppointments,
     businessSettings,
     currentShift,
@@ -503,11 +592,15 @@ export function usePOSLogic(): POSContextValue {
     setItemSearchQuery,
     customerSearchQuery,
     setCustomerSearchQuery,
+    customerSearchResults,
+    customerSearchLoading,
+    customerSearchError,
+    selectedCustomer,
+    selectCustomer,
     activeCategory,
     setActiveCategory,
     categoryTabs,
     filteredItems,
-    filteredCustomers,
     // Cart State
     cart,
     setCart,
@@ -522,10 +615,6 @@ export function usePOSLogic(): POSContextValue {
     setPaymentMethod,
     activeAppointmentId,
     setActiveAppointmentId,
-    activeInvoiceId,
-    setActiveInvoiceId,
-    isReviewing,
-    setIsReviewing,
     isNewCustomer,
     setIsNewCustomer,
     newCustomerFirstName,

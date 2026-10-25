@@ -6,3 +6,4 @@ export { ReceiptPreview } from "@/features/pos/components/ReceiptPreview";
 export type { ReceiptPreviewProps } from "@/features/pos/components/ReceiptPreview";
 export { CheckoutTotals } from "@/features/pos/components/CheckoutTotals";
 export type { CheckoutTotalsProps } from "@/features/pos/components/CheckoutTotals";
+export { CustomerSelector } from "@/features/pos/components/CustomerSelector";

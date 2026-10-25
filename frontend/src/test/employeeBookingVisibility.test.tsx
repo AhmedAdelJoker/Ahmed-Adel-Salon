@@ -52,7 +52,13 @@ describe("booking defaults when a job title is picked", () => {
 
   it("turns booking on for every service provider", () => {
     const { result } = renderHook(() => useEmployeeForm(async () => {}));
-    for (const title of ["barber", "colorist", "esthetician"]) {
+    for (const title of [
+      "barber",
+      "hairstylist",
+      "colorist",
+      "esthetician",
+      "nail_technician",
+    ]) {
       act(() => result.current.applyJobTitleDefaults(title));
       expect(result.current.formData.showInBooking, title).toBe(true);
       expect(result.current.formData.showInPos, title).toBe(true);
