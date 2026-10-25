@@ -15,6 +15,18 @@
  * Every answer is in the DOM whether open or not, which is deliberate: the copy
  * is the same copy the schema publishes, and hiding it behind a click is what
  * makes the two drift apart.
+ *
+ * ## The layout
+ *
+ * The section is a *list*, not a stack of panels. A boxed accordion in the
+ * middle of a page whose other sections are rules and columns read as a
+ * widget dropped in from another template, and the questions ended up in a
+ * narrow column stranded to one side of a 1216px box.
+ *
+ * So the header sits on the reading edge and the questions run the full width
+ * of the shell beneath it, one per row, separated by the same hairline the
+ * service menu uses. The `+` rotates into the `×` that says "open" without a
+ * second control.
  */
 
 import { Plus } from "lucide-react";
@@ -44,40 +56,33 @@ export default function FaqSection({
   if (items.length === 0) return null;
 
   return (
-    <section
-      id="faq"
-      className="mx-auto w-full max-w-7xl px-4 py-[length:var(--section-y)] sm:px-6 lg:px-8"
-    >
-      <header className="reveal mb-10 max-w-2xl">
-        {eyebrow ? (
-          <p
-            className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em]"
-            style={{ color: theme.accent }}
+    <section id="faq" className="mk-shell py-[length:var(--section-y)]">
+      {/*
+        The same header as every other section: eyebrow with a rule, serif
+        title, one lead paragraph, all on the reading edge.
+      */}
+      <header className="mk-svc-head">
+        <div>
+          {eyebrow ? <p className="mk-eyebrow">{eyebrow}</p> : null}
+          <h2
+            className="mk-h2"
+            style={{ marginTop: eyebrow ? "0.75rem" : undefined }}
           >
-            {eyebrow}
-          </p>
-        ) : null}
-        <h2
-          className="text-[length:var(--step-2)] font-bold leading-[1.2] tracking-normal text-balance"
-          style={{ color: theme.text }}
-        >
-          {title}
-        </h2>
-        {subtitle ? (
-          <p className="mt-4 text-sm font-bold leading-7 sm:text-base" style={{ color: theme.muted }}>
-            {subtitle}
-          </p>
-        ) : null}
+            {title}
+          </h2>
+          {subtitle ? (
+            <p className="mk-lead" style={{ marginTop: "1.15rem" }}>
+              {subtitle}
+            </p>
+          ) : null}
+        </div>
       </header>
 
-      <div
-        className="reveal divide-y overflow-hidden rounded-[var(--r-lg)] border"
-        style={{ borderColor: theme.border, backgroundColor: theme.card }}
-      >
+      <div className="mk-faq">
         {items.map((item) => (
           <details
             key={item.q}
-            className="faq-item group px-5 py-5 sm:px-7 sm:py-6"
+            className="faq-item group mk-faq__row"
             style={{ borderColor: theme.border }}
           >
             {/*
@@ -85,25 +90,18 @@ export default function FaqSection({
               because there is no attribute for it, and the icon is a sibling
               of the label rather than inside it so it is not announced.
             */}
-            <summary className="faq-item__summary flex cursor-pointer list-none items-center justify-between gap-4 font-bold">
-              <span className="text-[length:var(--step-0)] leading-snug" style={{ color: theme.text }}>
-                {item.q}
-              </span>
+            <summary className="faq-item__summary mk-faq__q">
+              <span className="mk-faq__label">{item.q}</span>
               <span
                 aria-hidden="true"
-                className="faq-item__icon shrink-0 transition-transform duration-300 group-open:rotate-45"
+                className="mk-faq__icon shrink-0"
                 style={{ color: theme.accent }}
               >
                 <Plus size={20} />
               </span>
             </summary>
 
-            <p
-              className="measure-tight mt-3 text-[length:var(--step-0)] font-medium leading-[1.8]"
-              style={{ color: theme.muted }}
-            >
-              {item.a}
-            </p>
+            <p className="mk-faq__a">{item.a}</p>
           </details>
         ))}
       </div>

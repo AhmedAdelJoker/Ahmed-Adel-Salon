@@ -54,10 +54,27 @@ export default function ContactSection({
           </div>
 
           <div className="mk-c-actions">
+            {/*
+              The actions are verbs; the facts are data.
+
+              The call button used to print the number as well ("اتصل بنا
+              01094693361") and the facts row below printed it again, so the
+              same eleven digits appeared twice in one section. The button now
+              says what it does and the number lives once, in the facts row,
+              where it is a `tel:` link like every other piece of data on the
+              page.
+
+              The number is still in the accessible name, so a screen reader
+              hears the digits it is about to dial.
+            */}
             {phone ? (
-              <a href={`tel:${phone}`} className="mk-btn mk-btn-primary mk-btn-lg">
+              <a
+                href={`tel:${phone}`}
+                className="mk-btn mk-btn-primary mk-btn-lg"
+                aria-label={`${t("landing.callUs")} ${phone}`}
+              >
+                <Phone size={16} aria-hidden="true" />
                 {t("landing.callUs")}
-                <span className="numeric ms-2">{phone}</span>
               </a>
             ) : null}
             {whatsappUrl ? (
@@ -84,13 +101,18 @@ export default function ContactSection({
           </div>
         </div>
 
-        <div className="mk-c-grid">
-          <div className="mk-c-card">
+        {/*
+          A facts strip, not a card. The old version wrapped one or two rows in
+          a half-page box, so a salon with a phone number and no street address
+          showed a large empty panel. The rows now share a single rule and the
+          map lives in the header action, where it is a link rather than an
+          empty decorative tile.
+        */}
+        {address || phone ? (
+          <div className="mk-c-facts">
             {address ? (
-              <div className="mk-c-row">
-                <div className="mk-c-row__ic" aria-hidden="true">
-                  <MapPin size={18} />
-                </div>
+              <div className="mk-c-fact">
+                <MapPin size={18} aria-hidden="true" />
                 <div>
                   <h3>{t("landing.addressLabel")}</h3>
                   <p>{address}</p>
@@ -99,42 +121,30 @@ export default function ContactSection({
             ) : null}
 
             {phone ? (
-              <div className="mk-c-row">
-                <div className="mk-c-row__ic" aria-hidden="true">
-                  <Phone size={18} />
-                </div>
+              <div className="mk-c-fact">
+                <Phone size={18} aria-hidden="true" />
                 <div>
                   <h3>{t("landing.phoneLabel")}</h3>
-                  <p className="numeric">{phone}</p>
+                  {/*
+                    A `tel:` link, not plain text: the number is the salon's
+                    primary contact detail and every other piece of data on the
+                    page that can be acted on is a link.
+                  */}
+                  <a
+                    href={`tel:${phone}`}
+                    className="numeric block w-fit transition-opacity duration-200 hover:opacity-75"
+                    style={{ color: "var(--c-text)" }}
+                    dir="ltr"
+                  >
+                    {phone}
+                  </a>
                 </div>
               </div>
             ) : null}
-
-            {!address && !phone ? (
-              <p className="mk-lead">{t("landing.contactMissing")}</p>
-            ) : null}
           </div>
-
-          {/*
-            The map column. A link, not a picture: the pin and the grid were a
-            placeholder in the mockup, and shipping them as-is would show every
-            salon a location that is not theirs.
-          */}
-          {mapsUrl ? (
-            <a
-              href={mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mk-map"
-            >
-              <span className="mk-map__label">
-                <MapPin size={20} aria-hidden="true" />
-                {address || t("landing.viewMap")}
-              </span>
-              <span className="mk-map__cta">{t("landing.viewMap")}</span>
-            </a>
-          ) : null}
-        </div>
+        ) : (
+          <p className="mk-lead">{t("landing.contactMissing")}</p>
+        )}
       </div>
     </section>
   );

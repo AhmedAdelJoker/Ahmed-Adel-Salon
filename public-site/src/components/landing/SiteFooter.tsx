@@ -75,7 +75,10 @@ export default function SiteFooter({
       ) : null}
 
       <div className="mk-shell">
-        <div className="mk-f-grid">
+        <div
+          className="mk-f-grid"
+          data-socials={socialLinks.length > 0 ? "true" : "false"}
+        >
           {/* ── Brand, tagline, contact ──────────────────────────────── */}
           <div>
             <div className="flex items-center gap-3">
@@ -148,7 +151,7 @@ export default function SiteFooter({
           </div>
 
           {/* ── Page links ──────────────────────────────────────────── */}
-          <nav aria-label={t("nav.services")}>
+          <nav aria-label={t("footer.links")}>
             <h2 className="mk-f-h">{t("footer.links")}</h2>
             <ul className="space-y-2.5">
               {navLinks.map((link) => (
@@ -181,9 +184,14 @@ export default function SiteFooter({
           </nav>
 
           {/* ── Social ──────────────────────────────────────────────── */}
-          <div>
-            <h2 className="mk-f-h">{t("footer.followUs")}</h2>
-            {socialLinks.length > 0 ? (
+          {/*
+            The column is omitted, not left empty. A salon that has not added
+            any accounts used to get a "Follow us" heading over nothing, which
+            is both a dead column and an invitation to nothing.
+          */}
+          {socialLinks.length > 0 ? (
+            <div>
+              <h2 className="mk-f-h">{t("footer.followUs")}</h2>
               <ul className="mk-social">
                 {socialLinks.map((item) => (
                   <li key={item.key}>
@@ -193,8 +201,8 @@ export default function SiteFooter({
                   </li>
                 ))}
               </ul>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="mk-f-bot">

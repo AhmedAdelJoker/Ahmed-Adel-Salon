@@ -452,11 +452,23 @@
     font-size: 16px;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    direction: rtl;
+    /*
+      The direction comes from the `dir` attribute, which `I18nContext` sets
+      from the active locale, and the document ships with `dir="rtl"`.
+
+      It was hardcoded to `rtl` here, and a stylesheet declaration outranks
+      the attribute — so switching the page to English changed the language of
+      the copy but not the direction of the layout. The English page rendered
+      right-to-left: the hero's columns swapped, every row of the schedule
+      reversed, and the sentence's full stop jumped to the start of the last
+      line, where the bidi algorithm put it because the run was reversed.
+
+      The attribute is the single source of truth for direction, exactly as
+      `lang` is for the language.
+    */
   }
 
   body {
-    direction: rtl;
     font-family: var(--font-sans);
     font-size: 1rem; /* 16px — base size for readable Arabic */
     line-height: 1.7; /* Slightly looser for Arabic readability */
@@ -1810,7 +1822,6 @@
     body {
       background: white !important;
       color: black !important;
-      direction: rtl;
       font-size: 12pt;
       line-height: 1.6;
     }

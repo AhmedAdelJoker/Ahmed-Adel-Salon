@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ShieldCheck, Sparkles, MapPin, Phone, MessageCircle, Clock3 } from "lucide-react";
+import { ShieldCheck, MapPin, Phone, MessageCircle, Clock3 } from "lucide-react";
 
 import type { BrandTheme } from "../../lib/theme";
 import type { LocaleCode } from "../../context/I18nContext";
@@ -48,15 +48,8 @@ export interface LandingReview {
 
 /* ── shared bits ─────────────────────────────────────────────────────────── */
 
-function Eyebrow({ children, theme }: { children: string; theme: BrandTheme }) {
-  return (
-    <p
-      className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em]"
-      style={{ color: theme.accent }}
-    >
-      {children}
-    </p>
-  );
+function Eyebrow({ children }: { children: string; theme?: BrandTheme }) {
+  return <p className="mk-eyebrow">{children}</p>;
 }
 
 function Section({
@@ -75,42 +68,30 @@ function Section({
   children?: React.ReactNode;
 }) {
   return (
-    <section id={id} className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="mx-auto mb-8 w-full max-w-3xl text-center sm:mb-12">
-        {eyebrow ? <Eyebrow theme={theme}>{eyebrow}</Eyebrow> : null}
-        <h2
-          className="text-2xl font-bold leading-tight tracking-normal text-balance sm:text-4xl"
-          style={{ color: theme.text }}
-        >
-          {title}
-        </h2>
-        {subtitle ? (
-          <p className="mx-auto mt-4 w-full max-w-2xl text-sm font-bold leading-8 sm:text-base" style={{ color: theme.muted }}>
-            {subtitle}
-          </p>
-        ) : null}
-      </div>
+    <section id={id} className="mk-shell py-[length:var(--section-y)]">
+      {/*
+        Same header pattern as the services menu and the contact band: eyebrow
+        with a rule, serif title, one lead paragraph, aligned to the reading
+        edge. Centred headings were the old template's tell.
+      */}
+      <header className="mk-svc-head">
+        <div>
+          {eyebrow ? <Eyebrow theme={theme}>{eyebrow}</Eyebrow> : null}
+          <h2
+            className="mk-h2"
+            style={{ marginTop: eyebrow ? "0.75rem" : undefined }}
+          >
+            {title}
+          </h2>
+          {subtitle ? (
+            <p className="mk-lead" style={{ marginTop: "1.15rem" }}>
+              {subtitle}
+            </p>
+          ) : null}
+        </div>
+      </header>
       {children}
     </section>
-  );
-}
-
-function Card({
-  theme,
-  className = "",
-  children,
-}: {
-  theme: BrandTheme;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className={`min-w-0 rounded-3xl border p-6 shadow-sm ${className}`}
-      style={{ backgroundColor: theme.card, borderColor: theme.border }}
-    >
-      {children}
-    </div>
   );
 }
 
@@ -139,6 +120,12 @@ export default function OwnerSections({
 }: OwnerSectionsProps) {
   const { copy, portfolio, features, trustBadges, testimonials } = content;
   const [lightbox, setLightbox] = useState<{ index: number; src: string; alt: string } | null>(null);
+  /**
+   * Portfolio rows keep their `/uploads/...` path after the file is deleted,
+   * so a truthy string is not a loadable image. Drop the failures instead of
+   * leaving a blank tile (and an out-of-range lightbox index) in the grid.
+   */
+  const [brokenPortfolio, setBrokenPortfolio] = useState<Set<string>>(new Set());
 
   /**
    * Portfolio entries arrive as raw strings that may or may not resolve to a URL.
@@ -149,24 +136,34 @@ export default function OwnerSections({
     () =>
       portfolio
         .map((entry) => resolveAssetUrl(entry))
-        .filter((src): src is string => Boolean(src))
+        .filter(
+          (src): src is string =>
+            typeof src === "string" && !brokenPortfolio.has(src),
+        )
         .map((src, index) => ({
           src,
           alt: `${copy.landingPortfolioTitle || t("landing.galleryTitle")} — ${index + 1}`,
         })),
-    [portfolio, copy.landingPortfolioTitle, t],
+    [portfolio, copy.landingPortfolioTitle, t, brokenPortfolio],
   );
 
   return (
     <>
       {trustBadges.length > 0 ? (
-        <section aria-label={t("landing.trustBadges")} className="mx-auto w-full max-w-7xl px-4 pt-16 sm:px-6 lg:px-8">
-          <ul className="flex flex-wrap items-center justify-center gap-3">
+        <section
+          aria-label={t("landing.trustBadges")}
+          className="mk-shell pt-10"
+        >
+          <ul className="flex flex-wrap items-center gap-2.5 border-t border-line pt-6">
             {trustBadges.map((badge) => (
               <li
                 key={badge.label}
-                className="inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-xs font-bold"
-                style={{ backgroundColor: theme.card, borderColor: theme.border, color: theme.muted }}
+                className="inline-flex items-center gap-2 rounded-[var(--r-sm)] border px-3.5 py-2 text-xs font-bold"
+                style={{
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                  color: theme.muted,
+                }}
               >
                 <ShieldCheck size={14} aria-hidden="true" style={{ color: theme.accent }} />
                 {badge.label}
@@ -178,19 +175,23 @@ export default function OwnerSections({
 
       {features.length > 0 ? (
         <Section
-          eyebrow={copy.landingServicesEyebrow}
+          eyebrow={copy.landingFeaturesEyebrow || t("landing.featuresEyebrow")}
           title={t("landing.featuresTitle")}
           theme={theme}
         >
-          <ul className="grid gap-5 md:grid-cols-3">
-            {features.map((feature) => (
-              <FeatureCard key={feature.title} feature={feature} theme={theme} />
+          <ol className="mk-features">
+            {features.map((feature, index) => (
+              <FeatureCard
+                key={feature.title}
+                feature={feature}
+                index={index + 1}
+              />
             ))}
-          </ul>
+          </ol>
         </Section>
       ) : null}
 
-      {portfolio.length > 0 ? (
+      {galleryImages.length > 0 ? (
         <Section
           id="portfolio"
           eyebrow={copy.landingPortfolioEyebrow}
@@ -206,23 +207,25 @@ export default function OwnerSections({
             kept via `aspect-[4/5]` on the button so activating it does not shift
             the layout.
           */}
-          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
             {galleryImages.map((image, index) => (
               <li key={`${image.src}-${index}`}>
                 <button
                   type="button"
                   onClick={() => setLightbox({ index, src: image.src, alt: image.alt })}
-                  className="group block w-full overflow-hidden rounded-3xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
-                  style={{ borderColor: theme.border }}
+                  className="group block w-full overflow-hidden rounded-[var(--r-sm)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
                   aria-label={t("landing.portfolioOpen", { index: index + 1 })}
                 >
-                  <span className="block aspect-[4/5] overflow-hidden">
+                  <span className="block aspect-[4/5] overflow-hidden bg-inset">
                     <img
                       src={image.src}
                       alt={image.alt}
                       className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                       loading="lazy"
                       decoding="async"
+                      onError={() =>
+                        setBrokenPortfolio((current) => new Set(current).add(image.src))
+                      }
                     />
                   </span>
                 </button>
@@ -258,8 +261,8 @@ export default function OwnerSections({
             <button
               type="button"
               onClick={onBook}
-              className="min-h-14 rounded-2xl px-8 text-base font-bold transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-              style={{ backgroundColor: theme.accent, color: "var(--c-bg)" }}
+              className="mk-btn mk-btn-primary mk-btn-lg"
+              style={{ backgroundColor: theme.accent, color: theme.onAccent }}
             >
               {copy.landingFinalButtonLabel || t("landing.bookAppointment")}
             </button>
@@ -349,7 +352,12 @@ export default function OwnerSections({
           subtitle={copy.landingQuickActionsSubtitle}
           theme={theme}
         >
-          <ul className="mx-auto grid w-full max-w-3xl gap-4 sm:grid-cols-3">
+          {/*
+            Three ways to reach the salon, as a ruled row rather than three
+            cards. A card per action made each one look like a separate
+            product; the salon is one business with three doors.
+          */}
+          <ul className="mk-quick">
             <QuickAction
               href={contactLinks.phone ? `tel:${contactLinks.phone}` : undefined}
               icon={Phone}
@@ -402,25 +410,32 @@ export default function OwnerSections({
       ) : null}
 
       {copy.landingFinalTitle ? (
-        <section className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <div
-            className="mx-auto w-full max-w-4xl rounded-[3rem] border p-10 text-center sm:p-14"
-            style={{ backgroundColor: theme.card, borderColor: theme.border }}
-          >
-            <Sparkles size={28} className="mx-auto mb-4" aria-hidden="true" style={{ color: theme.accent }} />
-            <h2 className="text-2xl font-bold leading-tight text-balance sm:text-4xl" style={{ color: theme.text }}>
-              {copy.landingFinalTitle}
-            </h2>
-            {copy.landingFinalSubtitle ? (
-              <p className="mx-auto mt-4 w-full max-w-2xl text-sm font-bold leading-8 sm:text-base" style={{ color: theme.muted }}>
-                {copy.landingFinalSubtitle}
-              </p>
-            ) : null}
+        <section className="mk-shell pb-[length:var(--section-y)]">
+          {/*
+            The closing band. It used to be a centred card with a 3rem radius
+            and a `Sparkles` icon — the old template's shape, and the one piece
+            of the page that still looked like a different design.
+
+            It is now a band of the same paper as everything else: a rule, a
+            serif title, the owner's sentence, and the one action. The icon is
+            gone because a decorative sparkle in a section whose only job is to
+            be useful is noise.
+          */}
+          <div className="mk-final">
+            <div>
+              <h2 className="mk-h2">{copy.landingFinalTitle}</h2>
+              {copy.landingFinalSubtitle ? (
+                <p className="mk-lead" style={{ marginTop: "1.15rem" }}>
+                  {copy.landingFinalSubtitle}
+                </p>
+              ) : null}
+            </div>
+
             <button
               type="button"
               onClick={onBook}
-              className="mt-8 min-h-14 rounded-2xl px-8 text-base font-bold transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
-              style={{ backgroundColor: theme.accent, color: "var(--c-bg)" }}
+              className="mk-btn mk-btn-primary mk-btn-lg"
+              style={{ backgroundColor: theme.accent, color: theme.onAccent }}
             >
               {copy.landingFinalButtonLabel || t("landing.bookAppointment")}
             </button>
@@ -432,24 +447,20 @@ export default function OwnerSections({
   );
 }
 
-function FeatureCard({ feature, theme }: { feature: LandingFeature; theme: BrandTheme }) {
+function FeatureCard({
+  feature,
+  index,
+}: {
+  feature: LandingFeature;
+  index: number;
+}) {
   return (
-    <li>
-      <Card theme={theme} className="h-full">
-        <div
-          className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl"
-          style={{ backgroundColor: `${theme.accent}22`, color: theme.accent }}
-          aria-hidden="true"
-        >
-          <Sparkles size={20} />
-        </div>
-        <h3 className="text-lg font-bold leading-7" style={{ color: theme.text }}>
-          {feature.title}
-        </h3>
-        <p className="mt-2 text-sm font-bold leading-7" style={{ color: theme.muted }}>
-          {feature.description}
-        </p>
-      </Card>
+    <li className="mk-feature">
+      <span className="mk-feature__n" aria-hidden="true">
+        {String(index).padStart(2, "0")}
+      </span>
+      <h3>{feature.title}</h3>
+      <p>{feature.description}</p>
     </li>
   );
 }
@@ -508,7 +519,7 @@ function VerifiedReviewCard({
   return (
     <li>
       <article className="mk-rev h-full">
-        <div className="mk-rev__q">{formattedDate}</div>
+        <div className="mk-rev__date">{formattedDate}</div>
         <blockquote style={{ marginTop: "0.75rem" }}>{review.comment}</blockquote>
         <div className="mk-stars" aria-label={`${review.rating} / 5`}>
           {Array.from({ length: 5 }, (_, i) => (
@@ -555,8 +566,8 @@ function QuickAction({
       <a
         href={href}
         {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-        className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border px-4 text-sm font-bold transition hover:bg-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        style={{ backgroundColor: theme.card, borderColor: theme.border, color: theme.text }}
+        className="mk-quick__link"
+        style={{ color: theme.text }}
       >
         <Icon size={18} aria-hidden="true" style={{ color: theme.accent }} />
         {label}

@@ -29,6 +29,7 @@ import {
   WORKING_HOURS_DAYS,
   formatHoursRange,
   isOpenNow as isSalonOpenNow,
+  salonClock,
 } from "../lib/workingHours";
 
 import { Button } from "../components/ui/button";
@@ -271,7 +272,18 @@ export default function LandingPage() {
   const workingHours = useMemo(() => {
     const source =
       settings.workingHours || settings.working_hours || ({} as Record<string, any>);
-    const todayKey = WORKING_HOURS_DAYS[new Date().getDay()];
+
+    /*
+      Which day is "today", at the salon.
+
+      `WORKING_HOURS_DAYS` is in the Arabic week order (Saturday first) and
+      `Date.getDay()` is in the JavaScript order (Sunday first), so indexing
+      one with the other was off by one: the schedule highlighted the wrong
+      day and the announcement strip named the wrong one. `salonClock` maps
+      the day correctly *and* reads it in the salon's timezone, so a visitor
+      in another timezone still sees the salon's today.
+    */
+    const todayKey = salonClock().dayKey;
 
     return WORKING_HOURS_DAYS.map((key) => {
       const entry = source[key];
@@ -318,14 +330,23 @@ export default function LandingPage() {
     );
     if (!anyConfigured) return null;
 
-    const todayKey = WORKING_HOURS_DAYS[new Date().getDay()];
+    const todayKey = salonClock().dayKey;
     const today = source?.[todayKey];
     if (!today?.is_open || !today.open_time || !today.close_time) {
-      return isOpenNow ? t("landing.openNowBooking") : t("landing.closedNow");
+      return isOpenNow ? t("landing.openNow") : t("landing.closedNow");
     }
     const todayLabel = t(`day.${todayKey}`);
     const window = formatHoursRange(today, t("common.closed"));
-    return `${isOpenNow ? t("landing.openNowBooking") : t("landing.closedNow")} · ${todayLabel} ${window}`;
+    /*
+      The short status word, not the long sentence.
+
+      `landing.openNowBooking` ("الصالون مفتوح الآن — الحجز متاح اليوم") is
+      the hero's booking line, and using it here made the strip two different
+      lengths depending on the hour: a short "مغلق الآن · …" when the salon
+      was shut and a full sentence when it was open. The strip's job is to
+      answer "is it open, and until when", which is two words and a window.
+    */
+    return `${isOpenNow ? t("landing.openNow") : t("landing.closedNow")} · ${todayLabel} ${window}`;
   }, [settings, isOpenNow, t]);
 
   /* ── Collections, shaped for the components that render them ────────── */
@@ -453,10 +474,26 @@ export default function LandingPage() {
         image: resolveAssetUrl(offer.image_url),
         currency,
       })),
-    [catalog, currency, t],
+    [catalog, currency, pickLocalized, t],
   );
 
-  const showStaff = settings.landingShowStaff !== false;
+  /*
+    The owner's two staff switches, read under either spelling.
+
+    `booking-catalog` forwards `landing_show_staff` and
+    `landing_show_staff_bio`; the admin panel writes them camelCase. Reading
+    only the camelCase form meant both switches were `undefined` and the
+    comparison against `false` was always true — so an owner who turned the
+    team off (or the bios off) still got a team section and a biography on
+    every public page.
+
+    `false` is honoured and a missing value keeps the previous behaviour:
+    the team shows.
+  */
+  const showStaff =
+    (settings.landingShowStaff ?? settings.landing_show_staff) !== false;
+  const showStaffBios =
+    (settings.landingShowStaffBio ?? settings.landing_show_staff_bio) !== false;
   const teamMembers = useMemo(
     () =>
       (catalog?.barbers ?? []).slice(0, 6).map((barber: any) => ({
@@ -628,7 +665,7 @@ export default function LandingPage() {
         </div>
       ) : null}
 
-      <header className="sticky top-0 z-50" data-scrolled={scrolled}>
+      <header className="mk-site-header sticky top-0 z-50" data-scrolled={scrolled}>
         <div className="mk-shell flex items-center gap-8 py-4">
           <a
             href="#home"
@@ -854,7 +891,6 @@ export default function LandingPage() {
             settings.landing_about_image_alt ||
             ""
           }
-          features={content.features}
           yearsExperience={
             content.copy.landingAboutYearsExperience ||
             settings.landing_about_years_experience ||
@@ -887,7 +923,7 @@ export default function LandingPage() {
             subtitle={
               content.copy.landingTeamSubtitle || t("landing.teamSubtitle")
             }
-            showBios={settings.landingShowStaffBio !== false}
+            showBios={showStaffBios}
 salonSlug={salonSlug}
             t={t}
             onBook={(member) => {
@@ -1010,10 +1046,26 @@ salonSlug={salonSlug}
  * run out of availability just because you looked at the page at 20:00.
  */
 function buildSuggestedSlots(
-  workingHours: { isOpen: boolean; openTime?: string; closeTime?: string }[],
+  workingHours: {
+    isOpen: boolean;
+    isToday?: boolean;
+    openTime?: string;
+    closeTime?: string;
+  }[],
   isOpenNow: boolean,
 ): string[] {
-  const day = workingHours.find((entry) => entry.isOpen);
+  /*
+    Today's window, not the first open day in the list.
+
+    `find(entry => entry.isOpen)` returned the earliest open day in the
+    schedule — Saturday — so a visitor looking at the page on Thursday was
+    offered Saturday's hours. When today is closed the next open day is the
+    sensible fallback, since that is the soonest the salon can actually see
+    anyone.
+  */
+  const today = workingHours.find((entry) => entry.isToday && entry.isOpen);
+  const nextOpen = workingHours.find((entry) => entry.isOpen);
+  const day = today ?? nextOpen;
   const open = day?.openTime || "10:00";
   const close = day?.closeTime || "20:00";
 
@@ -1028,8 +1080,12 @@ function buildSuggestedSlots(
   let end = toMinutes(close);
   if (end <= start) end = start + 12 * 60;
 
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  /*
+    "Now" at the salon, not in the browser's timezone. A visitor in another
+    timezone would otherwise have slots skipped by their own clock rather than
+    the salon's, and the strip would offer times that had already passed.
+  */
+  const nowMinutes = salonClock().minutes;
 
   const slots: string[] = [];
   // 45-minute steps: roughly the shortest service, so consecutive suggestions

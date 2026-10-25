@@ -20,7 +20,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { ArrowUpLeft } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 import { buildSizes, buildSrcSet, resolveAssetUrl } from "../../lib/imageOptimizer";
 import type { BrandTheme } from "../../lib/theme";
@@ -237,7 +237,13 @@ export default function ServicesList({
                       className="mk-menu-book"
                     >
                       {t("landing.bookService")}
-                      <ArrowUpLeft size={13} aria-hidden="true" className="rtl:rotate-180" />
+                      {/*
+                        The arrow points the way the row reads. `ArrowUpLeft`
+                        with `rtl:rotate-180` faced backwards in both
+                        directions — in Latin it pointed into the label, and in
+                        Arabic it pointed the wrong way entirely.
+                      */}
+                      <ArrowUpRight size={13} aria-hidden="true" className="rtl:rotate-180" />
                     </button>
                   </article>
                 );

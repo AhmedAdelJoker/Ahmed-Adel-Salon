@@ -7,6 +7,8 @@
  * old→new price line, and a booking action.
  */
 
+import { ArrowRight } from "lucide-react";
+
 import type { BrandTheme } from "../../lib/theme";
 import type { Translate } from "./OwnerSections";
 
@@ -101,7 +103,13 @@ export default function OffersSection({
                       <span className="mk-offer__old">
                         {formatPrice(originalPrice, offer.currency)}
                       </span>
-                      <span aria-hidden="true">→</span>
+                      {/*
+                        The arrow points from the old price to the new one.
+                        A literal "→" is a left-to-right arrow, so in an
+                        Arabic page it pointed back at the old price instead
+                        of leading to the new one.
+                      */}
+                      <ArrowRight size={16} aria-hidden="true" className="rtl:rotate-180" />
                     </>
                   ) : null}
                   <span className="mk-offer__new">{formatPrice(finalPrice, offer.currency)}</span>

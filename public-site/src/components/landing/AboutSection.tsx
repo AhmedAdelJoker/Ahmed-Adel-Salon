@@ -21,8 +21,6 @@
  * hanging off a photograph is worse than no badge.
  */
 
-import { Scissors, Clock3, Star } from "lucide-react";
-
 import { useParallax } from "../../hooks/useParallax";
 
 export interface AboutSectionProps {
@@ -33,8 +31,6 @@ export interface AboutSectionProps {
   /** Owner-uploaded about photograph. */
   image?: string | null;
   imageAlt?: string;
-  /** `landingFeatures` from the owner settings. */
-  features?: { title: string; description: string }[];
   /** Owner's `landingStats` entry for years of experience, if any. */
   yearsExperience?: string;
   /** Owner's `landingMotionEnabled`; gates the photo parallax. */
@@ -56,6 +52,22 @@ export interface AboutSectionProps {
 const DEFAULT_BODY =
   "نعرض خدماتنا وأسعارنا وأوقات عملنا بوضوح قبل أن تحجز، حتى تختار بثقة وتعرف المدة والتكلفة مسبقًا.";
 
+/**
+ * Whether the owner's badge text already carries its own unit.
+ *
+ * The field is free text: an owner may type "12 سنة" or "أكثر من 12 سنة" or
+ * "since 1998", and any of those already says "years". Printing the static
+ * "سنوات خبرة" next to them produced "12 سنة | سنوات خبرة" — the same fact
+ * twice, in two registers.
+ *
+ * A value with a digit and a word ("12 سنة") is self-describing, so the label
+ * is dropped. A bare number ("12") is not, so the label is kept and supplies
+ * the unit the owner left out.
+ */
+function carriesItsOwnUnit(value: string): boolean {
+  return /\d/.test(value) && /[^\d\s.,+]/.test(value);
+}
+
 export default function AboutSection({
   t,
   title,
@@ -63,14 +75,15 @@ export default function AboutSection({
   eyebrow,
   image,
   imageAlt,
-  features,
   yearsExperience,
   ownerMotionEnabled,
 }: AboutSectionProps) {
   const body = content?.trim() || DEFAULT_BODY;
   const heading = title?.trim();
   const hasImage = Boolean(image);
-  const hasBadge = Boolean(yearsExperience?.trim());
+  const years = yearsExperience?.trim();
+  const hasBadge = Boolean(years);
+  const showYearsLabel = hasBadge && !carriesItsOwnUnit(years as string);
 
   // Parallax on the photograph only, and only when there is one. Without a
   // photograph the hook would still mount and observe an empty box.
@@ -92,21 +105,23 @@ export default function AboutSection({
           the heading in a 190px measure and it wraps to four lines.
         */}
         {hasImage ? (
-          <div className="mk-about-photo reveal">
-            <div ref={layerRef} className="parallax__layer h-full w-full scale-[1.1]">
-              <img
-                src={image as string}
-                alt={imageAlt || ""}
-                className="h-full w-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
+          <div className="mk-about-media reveal">
+            <div className="mk-about-photo">
+              <div ref={layerRef} className="parallax__layer h-full w-full scale-[1.1]">
+                <img
+                  src={image as string}
+                  alt={imageAlt || ""}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
             </div>
 
             {hasBadge ? (
               <div className="mk-badge-float">
-                <strong>{yearsExperience}</strong>
-                <span>{t("landing.yearsExperience")}</span>
+                <strong>{years}</strong>
+                {showYearsLabel ? <span>{t("landing.yearsExperience")}</span> : null}
               </div>
             ) : null}
           </div>
@@ -114,14 +129,7 @@ export default function AboutSection({
 
         <div className={hasImage ? "" : "lg:col-span-2"}>
           {eyebrow ? <p className="mk-eyebrow mb-3">{eyebrow}</p> : null}
-          {heading ? (
-            <h2
-              className="text-[length:var(--step-4)] font-black leading-[1.15] text-[color:var(--c-text)]"
-              style={{ letterSpacing: "-0.02em" }}
-            >
-              {heading}
-            </h2>
-          ) : null}
+          {heading ? <h2 className="mk-h2">{heading}</h2> : null}
 
           {/* `whitespace-pre-line` so a salon that typed three paragraphs gets
               three paragraphs. The field is a textarea in the admin panel, so
@@ -135,33 +143,15 @@ export default function AboutSection({
           </p>
 
           {/*
-            The owner's own feature list. Icons cycle through three glyphs by
-            index rather than being stored per feature: the settings panel has a
-            title and a description and no icon field, and inventing one here
-            would mean a feature's icon depends on its position in the array.
+            The owner's feature list is *not* repeated here.
+
+            `landingFeatures` already has its own band further down the page
+            ("لماذا يختارنا العملاء"), and rendering the same three items a
+            second time in the about column printed the salon's selling points
+            twice on one screen. The icons that used to sit beside them cycled
+            through Scissors/Clock/Star by array position, so a feature's
+            meaning depended on where it happened to sit in the list.
           */}
-          {features && features.length > 0 ? (
-            <ul className="mt-8 grid gap-4">
-              {features.slice(0, 4).map((feature, index) => (
-                <li key={`${feature.title}-${index}`} className="mk-feat">
-                  <span className="mk-feat__icon" aria-hidden="true">
-                    {[<Scissors key="s" />, <Clock3 key="c" />, <Star key="r" />][index % 3]}
-                  </span>
-                  <div>
-                    <h3 className="text-[length:var(--step-0)] font-bold text-[color:var(--c-text)]">
-                      {feature.title}
-                    </h3>
-                    <p
-                      className="mt-1 text-[length:var(--step--1)] leading-[1.7] text-[color:var(--c-muted)]"
-                      style={{ letterSpacing: "var(--tracking-body)" }}
-                    >
-                      {feature.description}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : null}
         </div>
       </div>
     </section>

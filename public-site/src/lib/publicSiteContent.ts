@@ -143,8 +143,31 @@ const DEFAULT_COPY: Record<string, string> = {
   landingTestimonialsSubtitle: "",
 };
 
-/** Keys that are booleans or otherwise non-string in the settings payload. */
-const NON_COPY_KEYS = new Set(["landingShowStaff", "landingShowStaffBio", "landingThemeId"]);
+/**
+ * Keys that are booleans or otherwise non-string in the settings payload.
+ *
+ * Both spellings are listed because the admin panel writes camelCase and
+ * `booking-catalog` forwards snake_case, and the passthrough below sees
+ * whichever one the payload happens to carry.
+ */
+const NON_COPY_KEYS = new Set([
+  "landingShowStaff",
+  "landingShowStaffBio",
+  "landingThemeId",
+  "landingMotionEnabled",
+  "landing_show_staff",
+  "landing_show_staff_bio",
+  "landing_theme_id",
+  "landing_motion_enabled",
+]);
+
+/** `landingServicesTitle` → `landing_services_title`. */
+const toSnake = (key: string): string =>
+  key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+
+/** `landing_services_title` → `landingServicesTitle`. */
+const toCamel = (key: string): string =>
+  key.replace(/_([a-z0-9])/g, (_match, char: string) => char.toUpperCase());
 
 function asText(value: unknown): string {
   if (typeof value === "string") return value.trim();
@@ -221,15 +244,34 @@ export function buildLandingSiteContent(settings: Record<string, unknown> = {}):
 
   const copy: Record<string, string> = {};
   for (const key of Object.keys(DEFAULT_COPY)) {
-    copy[key] = asText(settings[key]) || DEFAULT_COPY[key];
+    /*
+      Both spellings are read, and the reason is the same as `listSetting`:
+      the admin panel writes camelCase (`landingServicesTitle`) and
+      `booking-catalog` forwards snake_case (`landing_services_title`).
+
+      Reading only the camelCase form is why the owner's own copy never
+      reached the page. The section headings fell back to the interface's
+      generic strings — the services band read "خدمات واضحة وأسعار ظاهرة"
+      instead of the owner's "ماذا نقدم لك؟", the contact band read the salon
+      name instead of "يسعدنا سماع صوتك" — while the settings panel reported
+      every edit as saved. Nothing raised and nothing was logged.
+    */
+    copy[key] = asText(settings[key]) || asText(settings[toSnake(key)]) || DEFAULT_COPY[key];
   }
-  // Any copy key the owner adds later still passes through, so the page does not
-  // need a code change to pick up a new field.
+  /*
+    Any copy key the owner adds later still passes through, so the page does
+    not need a code change to pick up a new field. The key is normalised to
+    camelCase because that is the spelling every component reads; a
+    snake_case key forwarded by the API would otherwise land under a name
+    nothing looks up.
+  */
   for (const [key, value] of Object.entries(settings)) {
-    if (key.startsWith("landing") && !NON_COPY_KEYS.has(key) && !copy[key]) {
-      const text = asText(value);
-      if (text) copy[key] = text;
-    }
+    if (!key.startsWith("landing")) continue;
+    const camel = toCamel(key);
+    if (NON_COPY_KEYS.has(key) || NON_COPY_KEYS.has(camel)) continue;
+    if (copy[camel]) continue;
+    const text = asText(value);
+    if (text) copy[camel] = text;
   }
 
   /**

@@ -160,6 +160,40 @@
     letter-spacing: 0.02em;
   }
 
+  /* ── Site header ─────────────────────────────────────────────────────── */
+  /*
+    The header is sticky, so it must paint its own ground. It was left
+    transparent: at rest that looked fine because the page starts beneath it,
+    but once the visitor scrolled, the hero and the service list ran visibly
+    through the wordmark.
+  */
+  .mk-site-header {
+    background-color: var(--c-bg);
+    transition:
+      background-color 0.25s ease,
+      border-color 0.25s ease,
+      box-shadow 0.25s ease;
+    border-bottom: 1px solid transparent;
+  }
+
+  .mk-site-header[data-scrolled="true"] {
+    background-color: var(--c-glass-strong);
+    backdrop-filter: blur(12px);
+    border-bottom-color: var(--c-border);
+  }
+
+  /*
+    `.shell` is used by the booking, entity and skeleton pages but was never
+    defined, so those pages had no horizontal container. Alias it to the one
+    shell the landing page uses.
+  */
+  .shell {
+    width: 100%;
+    max-width: 1240px;
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
   /* ── Buttons ─────────────────────────────────────────────────────────── */
   .mk-btn {
     display: inline-flex;
@@ -513,6 +547,19 @@
     align-items: center;
   }
 
+  /*
+    The badge hangs off the photograph's edge, so it cannot live inside it.
+
+    The photograph clips its own overflowing image (`overflow: hidden` is what
+    keeps the scaled parallax layer inside the rounded frame), and the badge —
+    offset to the inline-start edge — was being cut by that same clip. A
+    wrapper that does not clip holds the badge instead, and the frame below
+    still hides the image overflow.
+  */
+  .mk-about-media {
+    position: relative;
+  }
+
   .mk-about-photo {
     position: relative;
     border-radius: var(--r-xl);
@@ -571,6 +618,46 @@
     font-size: 1.1rem;
   }
 
+  /* ── Features ────────────────────────────────────────────────────────── */
+  /*
+    Numbered columns over a rule, not cards. Three claims do not need three
+    boxes; the rule is enough to structure them, and the numerals give the row
+    the same rhythm as the service menu.
+  */
+  .mk-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: clamp(1.5rem, 4vw, 3rem);
+    border-top: 1px solid var(--c-border-strong);
+  }
+
+  .mk-feature {
+    padding-top: 1.3rem;
+  }
+
+  .mk-feature__n {
+    font-family: var(--font-editorial);
+    font-size: var(--step--1);
+    color: var(--c-accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mk-feature h3 {
+    margin-top: 0.4rem;
+    font-family: var(--font-editorial);
+    font-size: var(--step-1);
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--c-text);
+  }
+
+  .mk-feature p {
+    margin-top: 0.5rem;
+    font-size: var(--step--1);
+    line-height: 1.85;
+    color: var(--c-muted);
+  }
+
   /* ── Section headings ────────────────────────────────────────────────── */
   .mk-svc-head {
     display: flex;
@@ -579,6 +666,44 @@
     gap: 2rem;
     flex-wrap: wrap;
     margin-bottom: 3rem;
+  }
+
+  /*
+    Letter-spacing is a Latin display device, and it damages Arabic.
+
+    Arabic is a cursive script: the letters join along a baseline, and any
+    tracking — positive *or* negative — pulls the joins apart or overlaps
+    them. A name set with -0.02em tracking is measurably tighter than the
+    same name set without it, and a label set with 0.16em tracking reads as
+    loose, disconnected letters rather than a word.
+
+    The uppercase transform has the same problem in reverse: Arabic has no
+    upper case, so `text-transform: uppercase` does nothing there, while the
+    letter-spacing it is paired with still breaks the joins.
+
+    So the tracking is neutralised for the Arabic locale across every label,
+    and the transform is dropped with it. The rules stay in place for Latin,
+    where they are the point.
+  */
+  html[lang="ar"] .mk-eyebrow,
+  html[lang="ar"] .mk-trust dt,
+  html[lang="ar"] .mk-reserve-field label,
+  html[lang="ar"] .mk-member-role,
+  html[lang="ar"] .mk-c-fact h3,
+  html[lang="ar"] .mk-offer__old,
+  html[lang="ar"] .mk-h2,
+  html[lang="ar"] .mk-hero-title,
+  html[lang="ar"] .mk-member-name,
+  html[lang="ar"] .mk-menu-name,
+  html[lang="ar"] .mk-offers h2,
+  html[lang="ar"] .mk-offers h4,
+  html[lang="ar"] .mk-lead,
+  html[lang="ar"] .mk-faq__label {
+    letter-spacing: normal;
+  }
+
+  html[lang="ar"] .mk-eyebrow {
+    text-transform: none;
   }
 
   .mk-eyebrow {
@@ -946,9 +1071,14 @@
     and the name are the unit; a card around each stylist turned a team into a
     product grid.
   */
+  /*
+    `auto-fill`, not `auto-fit`: with two stylists the card tracks would
+    otherwise stretch to half the page each, turning two portraits into two
+    billboards. The tracks stay card-sized and the row simply ends.
+  */
   .mk-team-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
     gap: clamp(1.25rem, 3vw, 2.5rem);
   }
 
@@ -1044,12 +1174,28 @@
     padding: 1.6rem;
   }
 
+  /*
+    The quote mark.
+
+    It was set as a letter-spaced, uppercase fragment of body text, so it
+    rendered as a stray speck in the corner of the card — a piece of a word
+    rather than a mark. It is now a full-size glyph in the accent colour,
+    and the verified-review date no longer borrows the same styling: a date
+    in 0.14em tracking reads as a typo.
+  */
   .mk-rev__q {
+    font-family: var(--font-editorial);
+    font-size: 2.75rem;
+    line-height: 0.6;
+    color: var(--c-accent);
+    opacity: 0.55;
+  }
+
+  .mk-rev__date {
     font-size: var(--step--2);
-    color: var(--c-faint);
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.02em;
+    color: var(--c-faint);
   }
 
   .mk-rev blockquote {
@@ -1104,84 +1250,11 @@
     margin-top: 0.55rem;
   }
 
-  /* ── Gallery masonry ─────────────────────────────────────────────────── */
-  /*
-    A 12-column grid with explicit row spans rather than `columns: 3`. Column
-    packing fills top-to-bottom per column, so a short and a tall image land in
-    different columns and the visual rhythm breaks; an explicit grid keeps the
-    large tile top-right exactly where the composition puts it.
-  */
-  .mk-gallery-grid {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    grid-auto-rows: 170px;
-    gap: 1rem;
-  }
-
-  .mk-work {
-    position: relative;
-    overflow: hidden;
-    border-radius: var(--r-lg);
-    border: 1px solid var(--c-border);
-    background-color: var(--c-card);
-  }
-
-  /* RTL note: these are physical columns on purpose. The composition is
-     asymmetric — one large tile — and mirroring it per direction would put the
-     large tile on the opposite side in RTL, which is a different image. */
-  .mk-work img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.35s ease;
-  }
-
-  /* Explicit span utilities so each tile can claim its column width without
-     depending on its position in the list. */
-  .mk-work-span-2 { grid-column: span 2; }
-  .mk-work-span-3 { grid-column: span 3; }
-  .mk-work-span-4 { grid-column: span 4; }
-  .mk-work-span-5 { grid-column: span 5; }
-  .mk-work-span-6 { grid-column: span 6; }
-  .mk-work-span-7 { grid-column: span 7; }
-
-  @media (hover: hover) {
-    .mk-work:hover img {
-      transform: scale(1.04);
-    }
-  }
-
-  .mk-work span {
-    position: absolute;
-    inset-inline: 1rem;
-    inset-block-end: 1rem;
-    background-color: var(--c-glass);
-    backdrop-filter: blur(8px);
-    padding: 0.55rem 0.8rem;
-    border-radius: 999px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    width: max-content;
-    max-width: calc(100% - 2rem);
-    color: var(--c-text);
-  }
-
   /* ── Contact ─────────────────────────────────────────────────────────── */
   .mk-contact {
     background-color: var(--c-surface);
     border-block: 1px solid var(--c-border);
     padding-block: var(--section-y);
-  }
-
-  .mk-c-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4rem;
-  }
-
-  /* No maps URL means no second column, so the card takes the whole row. */
-  .mk-c-grid > .mk-c-card:only-child {
-    grid-column: 1 / -1;
   }
 
   .mk-c-card {
@@ -1191,90 +1264,55 @@
     padding: 1.6rem;
   }
 
-  .mk-c-row {
+  /*
+    The closing facts: address and phone side by side over one rule. Sharing a
+    line rather than stacking inside a card keeps the band short, and a salon
+    with only one of the two does not leave a hole where the other would be.
+  */
+  .mk-c-facts {
     display: flex;
-    gap: 1rem;
-    padding-block: 1.1rem;
-    border-bottom: 1px solid var(--c-border);
+    flex-wrap: wrap;
+    gap: 1.5rem clamp(2rem, 6vw, 5rem);
+    border-top: 1px solid var(--c-border-strong);
+    padding-top: 1.75rem;
   }
 
-  .mk-c-row:last-child {
-    border-bottom: 0;
-    padding-bottom: 0;
+  .mk-c-fact {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
   }
 
-  .mk-c-row:first-child {
-    padding-top: 0;
-  }
-
-  .mk-c-row__ic {
-    width: 40px;
-    height: 40px;
+  .mk-c-fact > svg {
+    margin-top: 0.15rem;
     flex: 0 0 auto;
-    border-radius: var(--r-md);
-    background-color: var(--c-accent-wash);
     color: var(--c-accent);
-    display: grid;
-    place-items: center;
   }
 
-  .mk-c-row h3 {
-    font-size: var(--step--1);
+  .mk-c-fact h3 {
+    font-size: var(--step--2);
     font-weight: 700;
-    color: var(--c-muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--c-faint);
   }
 
-  .mk-c-row p {
+  /* The fact's value. It is a `tel:` link on the public page, so the rule
+     covers both the link and the plain-text case. */
+  .mk-c-fact p,
+  .mk-c-fact a {
+    margin-top: 0.2rem;
     font-size: var(--step-0);
     font-weight: 700;
-    margin-top: 0.15rem;
+    line-height: 1.6;
     color: var(--c-text);
+    text-decoration: none;
   }
 
   .mk-c-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
-  }
-
-  /*
-    The map column. The mockup drew a CSS grid with a pin and a caption that
-    linked nowhere; this renders only when the owner configured a maps URL, and
-    then the whole tile is that link, so there is no decorative location on a
-    page that belongs to someone else's salon.
-  */
-  .mk-map {
-    border: 1px solid var(--c-border);
-    border-radius: var(--r-lg);
-    background-color: var(--c-inset);
-    aspect-ratio: 16 / 11;
-    display: grid;
-    place-content: center;
-    gap: 1rem;
-    text-align: center;
-    padding: 2rem;
-    transition: border-color 0.25s ease, transform 0.25s ease;
-  }
-
-  .mk-map:hover {
-    border-color: var(--c-accent);
-    transform: translateY(-2px);
-  }
-
-  .mk-map__label {
-    display: grid;
-    justify-items: center;
-    gap: 0.5rem;
-    font-weight: 700;
-    color: var(--c-accent);
-  }
-
-  .mk-map__cta {
-    font-size: var(--step--2);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    color: var(--c-muted);
   }
 
   .mk-hours {
@@ -1367,7 +1405,125 @@
     }
   }
 
-  /* FAQ rows sit flush in a divided card; a soft wash marks the row the
+  /* ── Closing band ────────────────────────────────────────────────────── */
+  /*
+    The last thing on the page. It was a centred card with a 3rem radius —
+    the old template's shape — and it is now a band of the same paper as
+    everything else: a rule, a serif title, the owner's sentence, one action.
+  */
+  .mk-final {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(1.5rem, 4vw, 3.5rem);
+    flex-wrap: wrap;
+    padding-block: clamp(2.25rem, 5vw, 3.5rem);
+    border-top: 1px solid var(--c-border-strong);
+    border-bottom: 1px solid var(--c-border);
+  }
+
+  .mk-final > div {
+    min-width: 0;
+    flex: 1 1 22rem;
+  }
+
+  /* ── Quick actions ───────────────────────────────────────────────────── */
+  /*
+    Three ways to reach the salon, as one ruled row. A card per action made
+    each door look like a separate product.
+  */
+  .mk-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border-top: 1px solid var(--c-border-strong);
+  }
+
+  .mk-quick > li {
+    flex: 1 1 12rem;
+  }
+
+  .mk-quick__link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1.15rem 1.5rem;
+    font-size: var(--step-0);
+    font-weight: 700;
+    text-decoration: none;
+    border-bottom: 1px solid var(--c-border);
+    transition: color 0.2s ease, background-color 0.2s ease;
+  }
+
+  @media (hover: hover) {
+    .mk-quick__link:hover {
+      background-color: var(--c-muted-wash);
+      color: var(--c-accent-2);
+    }
+  }
+
+  .mk-quick__link:focus-visible {
+    outline: 2px solid var(--c-accent-2);
+    outline-offset: -2px;
+  }
+
+  /* ── FAQ ─────────────────────────────────────────────────────────────── */
+  /*
+    A list of questions, not a stack of panels.
+
+    The boxed accordion this replaced was a widget in the middle of a page
+    whose other sections are rules and columns, and the questions were
+    stranded in a narrow column to one side of a 1216px box. Here the rows run
+    the full width of the shell, separated by the same hairline the service
+    menu uses, and the `+` rotates into the `×` that says "open".
+  */
+  .mk-faq {
+    border-top: 1px solid var(--c-border-strong);
+  }
+
+  .mk-faq__row {
+    border-bottom: 1px solid var(--c-border);
+  }
+
+  .mk-faq__q {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    width: 100%;
+    padding-block: 1.35rem;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .mk-faq__label {
+    font-size: var(--step-0);
+    font-weight: 700;
+    line-height: 1.6;
+    color: var(--c-text);
+  }
+
+  .mk-faq__icon {
+    display: grid;
+    place-items: center;
+    transition: transform 0.3s ease;
+  }
+
+  /* The `+` becomes an `×` when the row is open, so the state is legible
+     from the glyph alone and no second control is needed. */
+  .mk-faq__row[open] .mk-faq__icon {
+    transform: rotate(45deg);
+  }
+
+  .mk-faq__a {
+    max-width: 68ch;
+    padding-bottom: 1.5rem;
+    font-size: var(--step--1);
+    line-height: 1.9;
+    color: var(--c-muted);
+  }
+
+  /* FAQ rows sit flush in a divided list; a soft wash marks the row the
      pointer is over without competing with the open state. */
   @media (hover: hover) {
     details.faq-item > summary:hover {
@@ -1397,6 +1553,12 @@
     display: grid;
     grid-template-columns: 2fr 1fr 1fr;
     gap: 3rem;
+  }
+
+  /* No social accounts: let the links take the second track instead of
+     reserving a third one for an empty column. */
+  .mk-f-grid[data-socials="false"] {
+    grid-template-columns: 2fr 1fr;
   }
 
   .mk-mark {
@@ -1491,8 +1653,7 @@
   @media (max-width: 1000px) {
     .mk-hero-grid,
     .mk-hero-inner,
-    .mk-about-grid,
-    .mk-c-grid {
+    .mk-about-grid {
       grid-template-columns: 1fr;
       gap: 2.75rem;
     }
@@ -1551,19 +1712,6 @@
   }
 
   @media (max-width: 700px) {
-    .mk-gallery-grid {
-      grid-template-columns: 1fr;
-      grid-auto-rows: 240px;
-    }
-
-    /* Every span collapses: on one column a 7-wide tile is just a tall cell
-       with a hole under it. */
-    .mk-work,
-    .mk-work:nth-child(n) {
-      grid-column: auto;
-      grid-row: auto;
-    }
-
     .mk-bookcard {
       padding: 1.2rem;
     }

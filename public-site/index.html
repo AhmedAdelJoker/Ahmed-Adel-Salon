@@ -66,6 +66,11 @@
     <link rel="alternate" hreflang="x-default" href="__SITE_URL__/" />
 
     <script src="/theme-init.js"></script>
+    <!--
+      Applies the stored locale to `lang`/`dir` before the first paint, so an
+      English visitor never sees a frame of the right-to-left layout.
+    -->
+    <script src="/locale-init.js"></script>
   </head>
   <!--
     `mk-skin` opts this document into the landing skin: the themed selection

@@ -66,22 +66,14 @@ export default function TeamSection({
 
   return (
     <section id="team" className="mk-shell py-[length:var(--section-y)]">
-      <header className="reveal mb-10 flex flex-wrap items-end justify-between gap-4 sm:mb-14">
-        <div className="max-w-2xl">
-          <p
-            className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em]"
-            style={{ color: theme.accent }}
-          >
-            {t("nav.team")}
-          </p>
-          <h2
-            className="text-[length:var(--step-2)] font-bold leading-[1.2] tracking-normal text-balance"
-            style={{ color: theme.text }}
-          >
+      <header className="mk-svc-head">
+        <div>
+          <p className="mk-eyebrow">{t("nav.team")}</p>
+          <h2 className="mk-h2" style={{ marginTop: "0.75rem" }}>
             {title}
           </h2>
           {subtitle ? (
-            <p className="mt-4 max-w-xl text-sm font-bold leading-7 sm:text-base" style={{ color: theme.muted }}>
+            <p className="mk-lead" style={{ marginTop: "1.15rem" }}>
               {subtitle}
             </p>
           ) : null}

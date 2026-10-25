@@ -21,7 +21,7 @@
  */
 
 import { useState } from "react";
-import { ArrowLeft, MapPin, Phone } from "lucide-react";
+import { ArrowRight, MapPin, Phone } from "lucide-react";
 
 import { buildSizes, buildSrcSet } from "../../lib/imageOptimizer";
 import { usePrefersReducedMotion } from "../../hooks/usePrefersReducedMotion";
@@ -178,10 +178,17 @@ export default function Hero({
                 style={{ backgroundColor: theme.accent, color: theme.onAccent }}
               >
                 {ctaLabel}
-                <ArrowLeft
+                {/*
+                  The arrow points the way the text reads: rightwards in
+                  Latin, leftwards in Arabic. `ArrowLeft` with `rtl:rotate-180`
+                  pointed *away* from the reading direction in both — in Latin
+                  it faced backwards into the label, and in Arabic it faced
+                  the wrong way entirely.
+                */}
+                <ArrowRight
                   size={17}
                   aria-hidden="true"
-                  className={`transition-transform duration-300 ${reduced ? "" : "group-hover:-translate-x-1"} rtl:rotate-180`}
+                  className={`transition-transform duration-300 ${reduced ? "" : "group-hover:translate-x-1"} rtl:rotate-180`}
                 />
               </button>
 
@@ -427,7 +434,13 @@ export function CountUpStat({
 
   return (
     <div>
-      <dd className="numeric">
+      {/*
+        `dir="ltr"` because the owner's value is written "3500+" and Arabic
+        bidi reorders it to "+3500" — which reads as a negative sign. The
+        value is Latin figures, so its own direction is the honest one; the
+        label below stays in the page direction.
+      */}
+      <dd className="numeric" dir="ltr">
         {animatable ? formatCountUp(counted, value) : value}
       </dd>
       <dt>{label}</dt>

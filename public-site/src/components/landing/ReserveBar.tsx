@@ -135,7 +135,10 @@ export default function ReserveBar({
             style={{ backgroundColor: theme.accent, color: theme.onAccent }}
           >
             <CalendarCheck2 size={18} aria-hidden="true" />
-            {t("landing.reserveCta")}
+            {/* Same label as the inline booking step: the hero button directly
+                above already says "book", and two identical CTAs in one
+                viewport make the second one look like a different action. */}
+            {t("landing.inlineBookingConfirm")}
           </button>
         </div>
       </div>
