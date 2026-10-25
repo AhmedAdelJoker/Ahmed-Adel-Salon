@@ -4,18 +4,19 @@ from pathlib import Path
 from datetime import date, datetime
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
-from sqlalchemy import func
+from sqlalchemy import case, extract, func
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
-from app.api.deps import require_cashier_manager_owner
+from app.api.deps import require_archive_manager, require_cashier_manager_owner
 from app.models.user import User
 from app.models.invoice import Invoice
 from app.models.invoice_counter import InvoiceCounter
 from app.models.invoice_item import InvoiceItem
+from app.models.month_closure import MonthClosure
 from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.service import Service
@@ -30,7 +31,6 @@ from app.services.pdf_service import generate_invoice_pdf
 from app.services.inventory_service import deduct_stock_for_invoice
 from app.core.audit import audit_log
 from app.models.business_settings import BusinessSettings
-from app.models.service_session import ServiceSession
 import hashlib
 import json
 from decimal import Decimal, InvalidOperation
@@ -236,6 +236,18 @@ def create_manual_invoice(
     current_user: User = Depends(require_cashier_manager_owner),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
+    # End-of-day guard: when official hours are over, close the operator's
+    # stale shift before accepting a sale. The scheduler only ticks every 15
+    # minutes, so without this a sale landing right after closing time is
+    # tracked on a shift that is about to be sealed without it. On failure the
+    # sale proceeds — the bounded windows on close keep the totals correct.
+    try:
+        from app.services.pos_shift_service import auto_close_expired_shifts
+
+        auto_close_expired_shifts(db)
+    except Exception:
+        logger.exception("Pre-sale shift auto-close failed")
+
     # Enforce shift requirement if enabled (warn-only for now to keep tests passing)
     try:
         from app.services.runtime_settings_service import get_runtime_settings
@@ -413,17 +425,14 @@ def create_manual_invoice(
 
     # 6. Update Customer Loyalty Data
     update_customer_loyalty(db, customer_id, final_amount)
-    
-    # 7. Deduct stock for the invoice
-    linked_session = None
-    if payload.appointment_id:
-        linked_session = (
-            db.query(ServiceSession)
-            .filter(ServiceSession.appointment_id == payload.appointment_id)
-            .first()
-        )
-    if linked_session is None:
-        deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=current_user.id)
+
+    # 7. Deduct stock for every invoice. The old gate skipped the call whenever
+    # the appointment already had a ServiceSession — but no other code path
+    # deducts stock for a session (`deduct_stock_for_session` is unreferenced),
+    # so direct product items sold on session-based invoices silently never
+    # left stock. The per-(source, product) guard in remove_stock makes a
+    # repeat call a no-op.
+    deduct_stock_for_invoice(db, invoice_id=invoice.id, created_by_user_id=current_user.id)
 
     payment_label = {
         "cash": "نقدي",
@@ -568,6 +577,9 @@ def _serialize_invoice(invoice: Invoice, customer: Customer | None, barber: Empl
         "discount_amount": float(invoice.discount_amount or 0),
         "total_amount": float(invoice.total_amount or 0),
         "pdf_path": invoice.pdf_path,
+        "is_closed": bool(invoice.is_closed),
+        "closed_at": invoice.closed_at,
+        "status": "closed" if invoice.is_closed else "open",
         "created_at": invoice.created_at,
         "items": [
             {
@@ -615,127 +627,222 @@ def list_today_invoices(
         result.append(_serialize_invoice(invoice, invoice.customer, invoice.barber))
     return result
 
+def _month_closure(db: Session, year: int, month: int) -> MonthClosure | None:
+    return (
+        db.query(MonthClosure)
+        .filter(MonthClosure.year == year, MonthClosure.month == month)
+        .first()
+    )
+
+
+def _invoice_month_closure(db: Session, invoice: Invoice) -> MonthClosure | None:
+    """قفل الشهر الذي تنتمي إليه الفاتورة (إن وُجد)."""
+    if invoice is None or invoice.created_at is None:
+        return None
+    return _month_closure(db, invoice.created_at.year, invoice.created_at.month)
+
+
 @router.get("/archive/monthly")
 def get_monthly_archive(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    """تجميع الفواتير حسب الشهر مع الإحصائيات"""
-    from sqlalchemy import func, extract
+    """تجميع الفواتير النهائية حسب الشهر مع الإحصائيات.
 
-    # NOTE: items are NOT needed for month aggregates — do not eager-load them
-    # (previously joinedload(items) fetched every line item of every invoice).
-    # Full-history scan is required for correct totals; move to SQL GROUP BY
-    # if this becomes a bottleneck (see Phase 2 backlog).
-    rows = db.query(Invoice).order_by(Invoice.created_at.desc()).all()
-    
-    months = {}
-    for invoice in rows:
-        created = invoice.created_at
-        if not created:
-            continue
-        key = created.strftime("%Y-%m")
-        label = created.strftime("%B %Y")
-        
-        if key not in months:
-            months[key] = {
-                "key": key,
-                "label": label,
-                "label_ar": _month_name_ar(created.month) + " " + str(created.year),
-                "year": created.year,
-                "month": created.month,
-                "invoice_count": 0,
-                "total_amount": 0.0,
-                "paid_count": 0,
-                "cancelled_count": 0,
-                "paid_amount": 0.0,
-                "refunded_amount": 0.0,
-                "is_closed": False,
-                "closed_at": None,
-            }
-        
-        months[key]["invoice_count"] += 1
-        total = float(invoice.total_amount or 0)
-        months[key]["total_amount"] += total
-        
-        if getattr(invoice, "is_closed", False):
-            months[key]["is_closed"] = True
-            if invoice.closed_at:
-                months[key]["closed_at"] = invoice.closed_at
-        
-        if getattr(invoice, "is_draft", False):
-            continue
+    قفل الشهر مصدره جدول `month_closures` وحده، و`invoices.is_closed` يبقى
+    لعنصر واحد: فاتورة أُلغيت أو أُقفلت منفردة. لذلك لا يمكن خلط الاثنين.
+    """
+    year_col = extract("year", Invoice.created_at)
+    month_col = extract("month", Invoice.created_at)
+    finalized = Invoice.is_draft.is_(False)
+    voided_finalized = finalized & Invoice.is_closed.is_(True)
 
-        months[key]["paid_count"] += 1
-        months[key]["paid_amount"] += total
-    
-    result = sorted(months.values(), key=lambda x: x["key"], reverse=True)
+    rows = (
+        db.query(
+            year_col.label("year"),
+            month_col.label("month"),
+            func.sum(case((finalized, 1), else_=0)).label("invoice_count"),
+            func.sum(
+                case((Invoice.is_draft.is_(True), 1), else_=0)
+            ).label("draft_count"),
+            func.coalesce(
+                func.sum(case((finalized, Invoice.total_amount), else_=0)), 0
+            ).label("total_amount"),
+            func.sum(case((voided_finalized, 1), else_=0)).label("voided_count"),
+        )
+        .filter(Invoice.created_at.isnot(None))
+        .group_by(year_col, month_col)
+        .order_by(year_col.desc(), month_col.desc())
+        .all()
+    )
 
-    now = datetime.now()
+    closures = {
+        (int(row.year), int(row.month)): row
+        for row in db.query(MonthClosure).all()
+        if row.year is not None and row.month is not None
+    }
+
+    now = salon_now()
     current_key = now.strftime("%Y-%m")
-    result = [m for m in result if m["key"] < current_key]
+    months: dict[str, dict] = {}
+    for row in rows:
+        if row.year is None or row.month is None:
+            continue
+        year, month = int(row.year), int(row.month)
+        key = f"{year:04d}-{month:02d}"
+        invoice_count = int(row.invoice_count or 0)
+        draft_count = int(row.draft_count or 0)
+        # شهر فيه مسودات فقط يظهر أيضًا: وإلا اختفى عن الأرشيف ولا يقدر
+        # المستخدم يكملها أو يحذفها قبل قفل الشهر.
+        if key >= current_key or (invoice_count == 0 and draft_count == 0):
+            continue
 
-    for i, m in enumerate(result):
-        if i > 0:
-            prev_total = result[i - 1]["total_amount"]
-            if prev_total > 0:
-                change = ((m["total_amount"] - prev_total) / prev_total) * 100
-                m["change_percent"] = round(change, 1)
-            else:
-                m["change_percent"] = 0.0
+        voided_count = int(row.voided_count or 0)
+        closure = closures.get((year, month))
+        if closure is not None:
+            status = "locked"
+        elif voided_count > 0:
+            status = "partial"
         else:
-            m["change_percent"] = 0.0
-    
+            status = "open"
+        total_amount = float(row.total_amount or 0)
+        created = datetime(year, month, 1)
+
+        months[key] = {
+            "key": key,
+            "label": created.strftime("%B %Y"),
+            "label_ar": _month_name_ar(month) + " " + str(year),
+            "year": year,
+            "month": month,
+            "invoice_count": invoice_count,
+            "draft_count": draft_count,
+            "voided_count": voided_count,
+            "total_amount": total_amount,
+            "paid_count": invoice_count,
+            "cancelled_count": voided_count,
+            "paid_amount": total_amount,
+            "refunded_amount": 0.0,
+            "is_locked": closure is not None,
+            "locked_at": closure.closed_at if closure is not None else None,
+            "locked_by_user_id": (
+                closure.closed_by_user_id if closure is not None else None
+            ),
+            "status": status,
+            "change_percent": None,
+        }
+
+    result = sorted(months.values(), key=lambda item: item["key"], reverse=True)
+
+    def previous_key(key: str) -> str:
+        year, month = (int(part) for part in key.split("-"))
+        if month == 1:
+            return f"{year - 1:04d}-12"
+        return f"{year:04d}-{month - 1:02d}"
+
+    for month_data in result:
+        previous = months.get(previous_key(month_data["key"]))
+        if previous and previous["total_amount"] > 0:
+            change = (
+                (month_data["total_amount"] - previous["total_amount"])
+                / previous["total_amount"]
+            ) * 100
+            month_data["change_percent"] = round(change, 1)
+
     return result
+
+
+def _parse_year_month(year_month: str) -> tuple[int, int]:
+    try:
+        year_text, month_text = year_month.split("-")
+        year, month = int(year_text), int(month_text)
+    except (AttributeError, ValueError):
+        raise HTTPException(status_code=400, detail="صيغة الشهر غير صحيحة")
+    if not 1 <= month <= 12:
+        raise HTTPException(status_code=400, detail="صيغة الشهر غير صحيحة")
+    return year, month
+
+
+def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
+    start = datetime(year, month, 1)
+    if month == 12:
+        end = datetime(year + 1, 1, 1)
+    else:
+        end = datetime(year, month + 1, 1)
+    return start, end
 
 
 @router.post("/archive/monthly/{year_month}/close")
 def close_month(
     year_month: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner),
+    current_user: User = Depends(require_archive_manager),
 ):
-    """إغلاق شهر شهري ومنع التعديل"""
-    try:
-        year, month = year_month.split("-")
-        year, month = int(year), int(month)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="صيغة غير صحيحة")
-    
-    from datetime import time
-    start = datetime(year, month, 1)
-    if month == 12:
-        end = datetime(year + 1, 1, 1)
-    else:
-        end = datetime(year, month + 1, 1)
-    
+    """قفل شهر منتهٍ ومنع التعديل على فواتيره.
+
+    القفل صف في `month_closures`، لا تعديل على `invoices.is_closed`. فواتير
+    الشهر الملغاة منفردة تبقى ملغاة بعد إعادة الفتح.
+    """
+    year, month = _parse_year_month(year_month)
+    start, end = _month_bounds(year, month)
+
+    if _month_closure(db, year, month) is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="هذا الشهر مقفل بالفعل. أعد فتحه أولًا.",
+        )
+
+    draft_count = db.query(func.count(Invoice.id)).filter(
+        Invoice.created_at >= start,
+        Invoice.created_at < end,
+        Invoice.is_draft.is_(True),
+    ).scalar() or 0
+    if draft_count:
+        raise HTTPException(
+            status_code=400,
+            detail="لا يمكن قفل الشهر لوجود مسودات غير مكتملة. أكمل أو احذف المسودات أولًا.",
+        )
+
     invoices = db.query(Invoice).filter(
         Invoice.created_at >= start,
         Invoice.created_at < end,
+        Invoice.is_draft.is_(False),
     ).all()
-    
-    closed_count = 0
-    for inv in invoices:
-        if not getattr(inv, "is_closed", False):
-            inv.is_closed = True
-            inv.closed_at = utc_now_naive()
-            inv.closed_by_user_id = getattr(current_user, "id", None)
-            closed_count += 1
-    
+    if not invoices:
+        raise HTTPException(
+            status_code=400,
+            detail="لا توجد فواتير نهائية في هذا الشهر.",
+        )
+
+    total_amount = sum(
+        (Decimal(str(invoice.total_amount or 0)) for invoice in invoices),
+        Decimal("0.00"),
+    )
+    closure = MonthClosure(
+        year=year,
+        month=month,
+        closed_at=utc_now_naive(),
+        closed_by_user_id=getattr(current_user, "id", None),
+        invoice_count=len(invoices),
+        total_amount=total_amount,
+    )
+    db.add(closure)
     db.commit()
-    
+
     log_activity(
         db,
         user_id=getattr(current_user, "id", None),
         action="month_closed",
         entity_type="invoice_archive",
-        entity_id=0,
-        description=f"تم إغلاق شهر {year_month}: {closed_count} فاتورة",
+        entity_id=closure.id,
+        description=f"تم قفل شهر {year_month}: {len(invoices)} فاتورة",
     )
-    
+
     return {
-        "message": f"تم إغلاق شهر {year_month}",
-        "closed_count": closed_count,
+        "message": f"تم قفل شهر {year_month}",
+        "is_locked": True,
+        "invoice_count": len(invoices),
+        "draft_count": 0,
+        "total_amount": float(total_amount),
     }
 
 
@@ -743,34 +850,23 @@ def close_month(
 def reopen_month(
     year_month: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner),
+    current_user: User = Depends(require_archive_manager),
 ):
-    """إعادة فتح شهر مغلق للمراجعة والتعديل"""
-    try:
-        year, month = year_month.split("-")
-        year, month = int(year), int(month)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="صيغة غير صحيحة")
+    """إعادة فتح شهر مقفل للمراجعة والتعديل.
 
-    start = datetime(year, month, 1)
-    if month == 12:
-        end = datetime(year + 1, 1, 1)
-    else:
-        end = datetime(year, month + 1, 1)
+    الفتح يلغي قفل الشهر فقط. الفواتير الملغاة منفردة تبقى ملغاة.
+    """
+    year, month = _parse_year_month(year_month)
 
-    invoices = db.query(Invoice).filter(
-        Invoice.created_at >= start,
-        Invoice.created_at < end,
-    ).all()
+    closure = _month_closure(db, year, month)
+    if closure is None:
+        raise HTTPException(
+            status_code=400,
+            detail="هذا الشهر غير مقفل.",
+        )
 
-    reopened_count = 0
-    for inv in invoices:
-        if getattr(inv, "is_closed", False):
-            inv.is_closed = False
-            inv.closed_at = None
-            inv.closed_by_user_id = None
-            reopened_count += 1
-
+    invoice_count = closure.invoice_count or 0
+    db.delete(closure)
     db.commit()
 
     log_activity(
@@ -779,13 +875,65 @@ def reopen_month(
         action="month_reopened",
         entity_type="invoice_archive",
         entity_id=0,
-        description=f"تم إعادة فتح شهر {year_month} للمراجعة: {reopened_count} فاتورة",
+        description=f"تم إعادة فتح شهر {year_month} للمراجعة: {invoice_count} فاتورة",
     )
 
     return {
         "message": f"تم إعادة فتح شهر {year_month}",
-        "reopened_count": reopened_count,
+        "is_locked": False,
+        "invoice_count": invoice_count,
     }
+
+
+@router.get("/archive/{year_month}/drafts")
+def list_archive_month_drafts(
+    year_month: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+):
+    """مسودات شهر منتهٍ، حتى يكملها المستخدم أو يحذفها قبل قفل الشهر."""
+    year, month = _parse_year_month(year_month)
+    start, end = _month_bounds(year, month)
+
+    rows = (
+        db.query(Invoice)
+        .options(joinedload(Invoice.items))
+        .filter(
+            Invoice.is_draft.is_(True),
+            Invoice.created_at >= start,
+            Invoice.created_at < end,
+        )
+        .order_by(Invoice.created_at.desc())
+        .all()
+    )
+    customer_ids = {inv.customer_id for inv in rows if inv.customer_id}
+    barber_ids = {inv.barber_id for inv in rows if inv.barber_id}
+    customers = (
+        {
+            c.customer_id: c
+            for c in db.query(Customer)
+            .filter(Customer.customer_id.in_(customer_ids))
+            .all()
+        }
+        if customer_ids
+        else {}
+    )
+    barbers = (
+        {
+            b.id: b
+            for b in db.query(Employee).filter(Employee.id.in_(barber_ids)).all()
+        }
+        if barber_ids
+        else {}
+    )
+    return [
+        _serialize_invoice(
+            invoice,
+            customers.get(invoice.customer_id),
+            barbers.get(invoice.barber_id),
+        )
+        for invoice in rows
+    ]
 
 
 def _month_name_ar(month: int) -> str:
@@ -806,6 +954,8 @@ def list_invoices(
     payment_method: str | None = Query(None),
     status: str | None = Query(None),
     customer_id: int | None = Query(None, description="Filter invoices of one customer"),
+    sort: str = Query("created_at", description="created_at | total_amount | invoice_no"),
+    order: str = Query("desc", description="asc | desc"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
     page: int | None = Query(None, ge=1),
@@ -854,10 +1004,12 @@ def list_invoices(
     if payment_method and payment_method != "all":
         query = query.filter(Invoice.payment_method.ilike(payment_method))
 
-    if status and status != "all":
-        # Map status to is_closed logic: cancelled/voided/refunded are treated as closed? For now simple filter on payment_method, leave amount check
-        # Invoices have no status column, so we skip filtering and let frontend handle, but we acknowledge param to avoid 422
-        pass
+    status_key = (status or "").strip().lower()
+    if status_key in {"closed", "cancelled", "canceled", "voided", "void"}:
+        query = query.filter(Invoice.is_closed.is_(True))
+    elif status_key and status_key != "all":
+        # "open", "paid" and "completed" all mean a normal, non-voided invoice.
+        query = query.filter(Invoice.is_closed.is_(False))
 
     if q:
         # Escape % and _ for LIKE
@@ -871,7 +1023,36 @@ def list_invoices(
         )
 
     total = query.count()
-    rows = query.order_by(Invoice.id.desc()).offset(skip).limit(limit).all()
+
+    # Totals must describe the whole filtered period, not the current page:
+    # the page header cards used to add up only the 20 rows on screen.
+    summary_count, summary_total, summary_closed = query.with_entities(
+        func.count(Invoice.id),
+        func.coalesce(func.sum(Invoice.total_amount), 0),
+        func.coalesce(
+            func.sum(case((Invoice.is_closed.is_(True), 1), else_=0)), 0
+        ),
+    ).one()
+    summary_count = int(summary_count or 0)
+    summary_total = float(summary_total or 0)
+
+    sort_columns = {
+        "created_at": Invoice.created_at,
+        "date": Invoice.created_at,
+        "total": Invoice.total_amount,
+        "total_amount": Invoice.total_amount,
+        "amount": Invoice.total_amount,
+        "invoice_no": Invoice.invoice_no,
+        "id": Invoice.id,
+    }
+    sort_col = sort_columns.get((sort or "created_at").strip().lower(), Invoice.created_at)
+    sort_dir = sort_col.asc() if (order or "desc").strip().lower() == "asc" else sort_col.desc()
+    rows = (
+        query.order_by(sort_dir, Invoice.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     # Bulk fetch to avoid N+1
     customer_ids = {inv.customer_id for inv in rows if inv.customer_id}
     barber_ids = {inv.barber_id for inv in rows if inv.barber_id}
@@ -888,7 +1069,18 @@ def list_invoices(
         customer = customers.get(invoice.customer_id)
         barber = barbers.get(invoice.barber_id)
         result.append(_serialize_invoice(invoice, customer, barber))
-    return {"items": result, "total": total, "skip": skip, "limit": limit}
+    return {
+        "items": result,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "summary": {
+            "count": summary_count,
+            "total": summary_total,
+            "average": round(summary_total / summary_count, 2) if summary_count else 0,
+            "closed": int(summary_closed or 0),
+        },
+    }
 
 @router.get("/drafts")
 def list_draft_invoices(
@@ -1007,7 +1199,13 @@ def update_draft_invoice(
     draft = db.query(Invoice).filter(Invoice.id == draft_id, Invoice.is_draft == True).first()
     if not draft:
         raise HTTPException(status_code=404, detail="المسودة غير موجودة")
-    
+
+    if _invoice_month_closure(db, draft) is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="الشهر مقفل. أعد فتحه قبل تعديل المسودة.",
+        )
+
     if payload.payment_method == "split":
         raise HTTPException(status_code=400, detail="الدفع المقسوم غير متاح في المسودات")
 
@@ -1077,7 +1275,13 @@ def finalize_draft(
     draft = db.query(Invoice).filter(Invoice.id == draft_id, Invoice.is_draft == True).first()
     if not draft:
         raise HTTPException(status_code=404, detail="المسودة غير موجودة")
-    
+
+    if _invoice_month_closure(db, draft) is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="لا يمكن إتمام مسودة في شهر مقفل. أعد فتح الشهر أولًا.",
+        )
+
     if not draft.customer_id or draft.customer_id == 1:
         raise HTTPException(status_code=400, detail="يرجى تحديد العميل")
     

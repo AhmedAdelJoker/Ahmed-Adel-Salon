@@ -53,7 +53,13 @@ PHONE_MAX_DIGITS = 15
 # even if the switch was flipped by a mistyped role change. Keep in sync with
 # `SERVICE_PROVIDER_JOB_TITLES` in the frontend
 # (frontend/src/features/hr/utils/helpers.ts).
-SERVICE_PROVIDER_JOB_TITLES = ("barber", "colorist", "esthetician")
+SERVICE_PROVIDER_JOB_TITLES = (
+    "barber",
+    "hairstylist",
+    "colorist",
+    "esthetician",
+    "nail_technician",
+)
 
 
 def is_service_provider_job_title(value: Any) -> bool:

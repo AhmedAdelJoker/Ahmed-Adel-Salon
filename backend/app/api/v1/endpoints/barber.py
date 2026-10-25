@@ -16,6 +16,7 @@ from app.models.employee_time_off import EmployeeTimeOff
 from app.models.appointment import Appointment
 from app.models.appointment_service import AppointmentService
 from app.models.customer import Customer
+from app.models.month_closure import MonthClosure
 from app.models.salary_advance import SalaryAdvance
 from app.core.clock import salon_now, utc_now_naive
 from app.core.pos import normalize_payment_method
@@ -282,6 +283,7 @@ def get_barber_stats(
     total_sales = db.query(func.sum(Invoice.subtotal_amount)).filter(
         Invoice.barber_id == barber.id,
         Invoice.is_draft == False,  # noqa: E712 — SQL, not Python
+        Invoice.is_closed == False,  # noqa: E712 — SQL, not Python
         func.date(Invoice.created_at) == today
     ).scalar() or 0
 
@@ -1231,12 +1233,18 @@ def get_barber_earnings_summary(
     today = salon_now().date()
 
     def _sales(start: date, end: date) -> Decimal:
-        """Sum of non-draft invoices in the closed window `[start, end)`."""
+        """Sum of non-draft invoices in the closed window `[start, end)`.
+
+        Voided invoices are excluded: `invoices.is_closed` now means exactly
+        "this invoice was cancelled on its own", and a cancelled invoice earns
+        no commission and must not inflate the day, the week or the month.
+        """
         return _dec(
             db.query(func.sum(Invoice.subtotal_amount))
             .filter(
                 Invoice.barber_id == barber_id,
                 Invoice.is_draft == False,  # noqa: E712 — SQL, not Python
+                Invoice.is_closed == False,  # noqa: E712 — SQL, not Python
                 func.date(Invoice.created_at) >= start,
                 func.date(Invoice.created_at) < end,
             )
@@ -1251,11 +1259,20 @@ def get_barber_earnings_summary(
     week_sales = _sales(week_start, week_end)
     month_sales = _sales(month_start, month_end)
 
-    # `pending` used to be a duplicate of `month`. It now means something
-    # specific and checkable: commission earned this month on invoices the shop
-    # has not closed yet. An invoice is closed when it has been paid out, so
-    # this is the figure that is genuinely still owed.
-    unclosed_sales = _dec(
+    # `pending` used to be a duplicate of `month`. It now means: commission
+    # earned this month that the shop has not settled yet.
+    #
+    # Two things decide that, and neither of them is a plain invoice row any
+    # more:
+    #   * a voided invoice (`invoices.is_closed`) is never owed anything;
+    #   * a month locked in the archive (`month_closures`) has been finalised,
+    #     so its invoices are settled and no longer pending.
+    # The month lock used to be marked by setting `invoices.is_closed` on every
+    # row of that month, so `is_closed == False` meant "neither locked nor
+    # voided". The lock now lives in its own table, so the pending figure has
+    # to ask that table — reading the invoice rows alone would count a locked
+    # month as still owed.
+    live_month_sales = _dec(
         db.query(func.sum(Invoice.subtotal_amount))
         .filter(
             Invoice.barber_id == barber_id,
@@ -1265,6 +1282,13 @@ def get_barber_earnings_summary(
             func.date(Invoice.created_at) < month_end,
         )
         .scalar()
+    )
+    locked_months = {
+        (row.year, row.month)
+        for row in db.query(MonthClosure.year, MonthClosure.month).all()
+    }
+    pending_sales = (
+        Decimal("0") if (today.year, today.month) in locked_months else live_month_sales
     )
 
     # ── Real payment breakdown ────────────────────────────────────────────
@@ -1280,6 +1304,7 @@ def get_barber_earnings_summary(
         .filter(
             Invoice.barber_id == barber_id,
             Invoice.is_draft == False,  # noqa: E712
+            Invoice.is_closed == False,  # noqa: E712
             func.date(Invoice.created_at) >= today_start,
             func.date(Invoice.created_at) < today_end,
         )
@@ -1299,7 +1324,7 @@ def get_barber_earnings_summary(
         "today": _money(_commission(today_sales, rate)),
         "week": _money(_commission(week_sales, rate)),
         "month": _money(_commission(month_sales, rate)),
-        "pending": _money(_commission(unclosed_sales, rate)),
+        "pending": _money(_commission(pending_sales, rate)),
         "cash": _money(buckets["cash"]),
         "card": _money(buckets["card"]),
         "transfer": _money(buckets["transfer"]),
@@ -1355,11 +1380,21 @@ def get_barber_commissions(
             "date": str(inv.created_at.date()) if inv.created_at else str(start),
             "amount": _money(inv.subtotal_amount),
             # Decimal throughout, so this row's commission can be summed
-            # against the summary's figure without a rounding drift.
-            "commission": _money(_commission(inv.subtotal_amount, rate)),
+            # against the summary's figure without a rounding drift. A voided
+            # invoice is listed for the record but earns nothing, so it must
+            # not add commission the summary does not report.
+            "commission": _money(
+                Decimal("0")
+                if inv.is_closed
+                else _commission(inv.subtotal_amount, rate)
+            ),
             "customer_name": customer_name,
             "service_name": ", ".join(item_names[:2]) or "خدمة",
-            "paid": bool(inv.is_closed),
+            # The customer paid at the till when the invoice was issued, so an
+            # issued invoice is paid. `is_closed` now means the invoice was
+            # voided on its own — which is the opposite of paid.
+            "paid": not bool(inv.is_closed),
+            "voided": bool(inv.is_closed),
         })
     return items
 
@@ -1382,6 +1417,7 @@ def get_barber_earnings_chart(
         Invoice.barber_id == barber_id,
         func.date(Invoice.created_at) >= start,
         Invoice.is_draft == False,
+        Invoice.is_closed == False,
     ).group_by(func.date(Invoice.created_at)).all()
     by_day = {str(r[0]): float(r[1] or 0) for r in rows}
 

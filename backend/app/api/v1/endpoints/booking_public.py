@@ -389,11 +389,17 @@ def get_booking_catalog(
         "services": [
             {
                 "id": s.id,
+                # The public site is bilingual, and both languages live on the
+                # row. Forwarding only the Arabic columns made the English page
+                # print Arabic service names and drop English descriptions that
+                # the owner had already written.
                 "name": s.name,
                 "name_ar": s.name_ar,
+                "name_en": getattr(s, "name_en", None),
                 "price": float(s.price or 0),
                 "duration_minutes": int(getattr(s, "duration_minutes", 30) or 30),
                 "description_ar": getattr(s, "description_ar", ""),
+                "description_en": getattr(s, "description_en", None),
                 "image_url": getattr(s, "image_url", None),
                 "category_id": getattr(s, "category_id", None),
             }
@@ -415,6 +421,7 @@ def get_booking_catalog(
                 "job_title": b.job_title,
                 "profile_image_url": b.profile_image_url,
                 "bio_ar": getattr(b, "bio_ar", ""),
+                "bio_en": getattr(b, "bio_en", None),
             }
             for b in barbers
         ],
@@ -423,7 +430,9 @@ def get_booking_catalog(
                 "id": o.id,
                 "name": o.name,
                 "name_ar": o.name_ar,
+                "name_en": getattr(o, "name_en", None),
                 "description_ar": o.description_ar,
+                "description_en": getattr(o, "description_en", None),
                 "offer_price": float(o.offer_price or 0),
                 "original_price": float(o.original_price or 0),
                 "discount_percentage": float(o.discount_percentage or 0),

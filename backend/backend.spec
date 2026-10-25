@@ -6,7 +6,7 @@
 # `.pyd`/`.so` does not, so the frozen build imports cleanly and then raises
 # OSError on the first password hash. Collecting the dynamic libraries below is
 # what actually fixes it.
-from PyInstaller.utils.collectors import collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_dynamic_libs
 
 _argon2_libs = collect_dynamic_libs('argon2_cffi_bindings')
 _cffi_libs = collect_dynamic_libs('cffi')

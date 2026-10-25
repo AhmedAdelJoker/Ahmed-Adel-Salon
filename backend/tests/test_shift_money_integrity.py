@@ -7,7 +7,7 @@ every shift report. The window is now bounded at both ends.
 from datetime import timedelta
 from decimal import Decimal
 
-from app.core.clock import salon_now
+from app.core.clock import salon_now, utc_now_naive
 from app.core.working_hours import DAY_KEYS, day_key
 from app.models.business_settings import BusinessSettings
 from app.models.invoice import Invoice
@@ -73,11 +73,11 @@ def _open_hours(db):
 
 
 def _shift(db, user, *, opened_ago_minutes=180, opening_cash="500"):
-    now = salon_now()
+    # UTC wall per the storage convention — the service ages shifts off UTC.
     shift = PosShift(
         user_id=user.id,
         status="open",
-        opened_at=now - timedelta(minutes=opened_ago_minutes),
+        opened_at=utc_now_naive() - timedelta(minutes=opened_ago_minutes),
         opening_cash=Decimal(str(opening_cash)),
     )
     db.add(shift)

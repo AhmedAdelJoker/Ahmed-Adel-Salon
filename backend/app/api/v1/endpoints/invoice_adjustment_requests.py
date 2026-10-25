@@ -13,6 +13,7 @@ from app.crud.core_business import create_audit_log
 from app.db.session import get_db
 from app.models.invoice import Invoice
 from app.models.invoice_adjustment_request import InvoiceAdjustmentRequest
+from app.models.month_closure import MonthClosure
 from app.models.notification import Notification
 from app.models.user import User
 
@@ -65,6 +66,25 @@ def _serialize_request(row: InvoiceAdjustmentRequest) -> dict[str, Any]:
         "created_at": row.created_at,
         "reviewed_at": row.reviewed_at,
     }
+
+
+def _month_is_locked(db: Session, invoice: Invoice) -> bool:
+    """هل الشهر الذي تنتمي إليه الفاتورة مقفل في الأرشيف؟
+
+    قفل الشهر يمنع أي تعديل على فواتيره (خصم، طريقة دفع، إلغاء)، والفواتير
+    الملغاة منفردة تبقى ملغاة.
+    """
+    if invoice is None or invoice.created_at is None:
+        return False
+    return (
+        db.query(MonthClosure)
+        .filter(
+            MonthClosure.year == invoice.created_at.year,
+            MonthClosure.month == invoice.created_at.month,
+        )
+        .first()
+        is not None
+    )
 
 
 def _parse_nonnegative_decimal(value: Any) -> Decimal:
@@ -193,6 +213,11 @@ def create_invoice_adjustment_request(
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if invoice is None:
         raise HTTPException(status_code=404, detail="الفاتورة غير موجودة")
+    if _month_is_locked(db, invoice):
+        raise HTTPException(
+            status_code=400,
+            detail="الشهر مقفل. أعد فتحه قبل طلب تعديل الفاتورة.",
+        )
     if not _request_is_within_edit_window(invoice):
         raise HTTPException(
             status_code=400,
@@ -299,6 +324,12 @@ def _decide_request(
     row.status = "processing"
 
     if approved:
+        if _month_is_locked(db, row.invoice):
+            db.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail="الشهر مقفل. أعد فتحه قبل الموافقة على تعديل الفاتورة.",
+            )
         _apply_approved_request(db, row, reviewer)
 
     row.status = "approved" if approved else "rejected"

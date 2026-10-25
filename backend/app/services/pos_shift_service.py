@@ -3,15 +3,20 @@ from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
 from app.models.pos_shift import PosShift
 from app.models.invoice import Invoice
+from app.models.invoice_item import InvoiceItem
 from app.models.expense import Expense
 from app.models.business_settings import BusinessSettings
 from app.models.user import User
-from app.core.clock import coerce_naive, salon_now
+from app.core.clock import coerce_naive, salon_now, utc_now_naive
 from app.core.working_hours import current_window
 from app.services.activity_log_service import log_activity
 from app.services.notification_service import create_notification
+from app.services.runtime_settings_service import get_runtime_settings
 
 CASH_SETTLED_STATUSES = ("approved", "recorded")
+
+DEFAULT_AUTO_LOCK_HOURS = 24
+DEFAULT_AUTO_CLOSE_ENABLED = True
 
 
 def is_within_working_hours(db: Session) -> bool:
@@ -42,6 +47,142 @@ def _grace_period(settings: BusinessSettings) -> int:
         return 30
 
 
+def _auto_lock_hours() -> float:
+    """Safety-net age limit for open shifts, in hours (0 disables it)."""
+    rules = get_runtime_settings(
+        "financial_rules", {"autoLockShiftHours": DEFAULT_AUTO_LOCK_HOURS}
+    )
+    try:
+        return max(
+            0.0,
+            float(
+                rules.get("autoLockShiftHours", DEFAULT_AUTO_LOCK_HOURS) or 0
+            ),
+        )
+    except (TypeError, ValueError):
+        return float(DEFAULT_AUTO_LOCK_HOURS)
+
+
+def _auto_close_enabled() -> bool:
+    """Master switch. Typed strictly like the financial-rules payload so a
+    stale hand-edited runtime file still reads as a real boolean."""
+    rules = get_runtime_settings(
+        "financial_rules",
+        {"enableAutoShiftClose": DEFAULT_AUTO_CLOSE_ENABLED},
+    )
+    value = rules.get("enableAutoShiftClose", DEFAULT_AUTO_CLOSE_ENABLED)
+    if isinstance(value, str):
+        value = value.strip().lower() not in ("", "false", "0", "no", "off")
+    return bool(value)
+
+
+def shift_window_totals(
+    db: Session,
+    *,
+    user_id: int,
+    start: datetime,
+    end: datetime,
+    opening_cash: Decimal | None = None,
+) -> dict:
+    """The one implementation of the shift money arithmetic.
+
+    Every figure the POS shows or stamps is derived here: the live tiles, the
+    close arithmetic, the archived reprint and the auto-closer. Those were
+    four separate copies of the same sums, and four copies are four chances
+    for the drawer to disagree with the receipt — a window or an expense
+    filter changed in one place and not in the others, and the shift closed
+    on a number the cashier never saw.
+
+    The window carries a 1s tolerance at both ends. SQLite stores server-side
+    CURRENT_TIMESTAMP without microseconds while bound datetimes carry
+    ".000000", so an invoice created in the same wall-clock second as the
+    shift opened (or closed) would otherwise string-compare as outside the
+    window and silently drop out of the totals.
+    """
+    lower = start - timedelta(seconds=1)
+    upper = end + timedelta(seconds=1)
+
+    invoices = (
+        db.query(Invoice)
+        .filter(
+            Invoice.created_by_user_id == user_id,
+            Invoice.created_at >= lower,
+            Invoice.created_at <= upper,
+            Invoice.is_draft == False,  # noqa: E712  (SQLAlchemy needs the literal)
+        )
+        .all()
+    )
+    expenses = (
+        db.query(Expense)
+        .filter(
+            Expense.created_by_user_id == user_id,
+            Expense.created_at >= start,
+            Expense.created_at <= upper,
+            Expense.status.in_(CASH_SETTLED_STATUSES),
+        )
+        .all()
+    )
+
+    total_sales = Decimal("0")
+    cash_sales = Decimal("0")
+    card_sales = Decimal("0")
+    split_sales = Decimal("0")
+    discount_total = Decimal("0")
+    for inv in invoices:
+        amount = Decimal(str(inv.total_amount or 0))
+        total_sales += amount
+        discount_total += Decimal(str(inv.discount_amount or 0))
+        method = (inv.payment_method or "").upper()
+        if method == "CASH":
+            cash_sales += amount
+        elif method == "CARD":
+            card_sales += amount
+        else:
+            split_sales += amount
+
+    invoice_ids = [inv.id for inv in invoices]
+    service_count = 0
+    product_count = 0
+    if invoice_ids:
+        items = db.query(InvoiceItem).filter(InvoiceItem.invoice_id.in_(invoice_ids)).all()
+        for item in items:
+            if item.service_id:
+                service_count += item.quantity or 1
+            elif item.product_id:
+                product_count += item.quantity or 1
+
+    total_expenses = sum(
+        (Decimal(str(expense.amount or 0)) for expense in expenses), Decimal("0")
+    )
+    cash_expenses = sum(
+        (
+            Decimal(str(expense.amount or 0))
+            for expense in expenses
+            if str(expense.payment_method or "cash").lower() == "cash"
+        ),
+        Decimal("0"),
+    )
+    expected_closing_cash = (
+        Decimal(str(opening_cash or 0)) + cash_sales - cash_expenses
+    )
+
+    return {
+        "invoices": invoices,
+        "expenses": expenses,
+        "total_sales": total_sales,
+        "cash_sales": cash_sales,
+        "card_sales": card_sales,
+        "split_sales": split_sales,
+        "discount_total": discount_total,
+        "invoice_count": len(invoices),
+        "service_count": service_count,
+        "product_count": product_count,
+        "total_expenses": total_expenses,
+        "cash_expenses": cash_expenses,
+        "expected_closing_cash": expected_closing_cash,
+    }
+
+
 def _shift_totals(db: Session, shift: PosShift, closed_at: datetime) -> dict:
     """Sales/cash for a shift, bounded by the shift's own window.
 
@@ -52,52 +193,14 @@ def _shift_totals(db: Session, shift: PosShift, closed_at: datetime) -> dict:
     opened_at = coerce_naive(shift.opened_at)
     upper = coerce_naive(closed_at) or opened_at
 
-    invoices = (
-        db.query(Invoice)
-        .filter(
-            Invoice.created_by_user_id == shift.user_id,
-            Invoice.created_at >= opened_at,
-            Invoice.created_at <= upper,
-        )
-        .all()
+    totals = shift_window_totals(
+        db,
+        user_id=shift.user_id,
+        start=opened_at,
+        end=upper,
+        opening_cash=shift.opening_cash,
     )
-    expenses = (
-        db.query(Expense)
-        .filter(
-            Expense.created_by_user_id == shift.user_id,
-            Expense.created_at >= opened_at,
-            Expense.created_at <= upper,
-            Expense.status.in_(CASH_SETTLED_STATUSES),
-        )
-        .all()
-    )
-
-    total_sales = sum((Decimal(str(inv.total_amount or 0)) for inv in invoices), Decimal("0"))
-    cash_sales = sum(
-        Decimal(str(inv.total_amount or 0))
-        for inv in invoices
-        if (inv.payment_method or "").upper() == "CASH"
-    )
-    cash_expenses = sum(
-        Decimal(str(expense.amount or 0))
-        for expense in expenses
-        if str(expense.payment_method or "cash").lower() == "cash"
-    )
-    discounts = sum(
-        (Decimal(str(inv.discount_amount or 0)) for inv in invoices), Decimal("0")
-    )
-
-    return {
-        "invoices": invoices,
-        "expenses": expenses,
-        "total_sales": total_sales,
-        "cash_sales": cash_sales,
-        "cash_expenses": cash_expenses,
-        "discount_total": discounts,
-        "invoice_count": len(invoices),
-        "opened_at": opened_at,
-        "closed_at": upper,
-    }
+    return {**totals, "opened_at": opened_at, "closed_at": upper}
 
 
 def recompute_shift_totals(db: Session, shift: PosShift) -> dict:
@@ -119,17 +222,33 @@ def auto_close_expired_shifts(db: Session):
 
     A shift younger than the grace period is never touched, so opening a shift a
     minute before closing does not get slammed shut underneath the cashier.
+
+    Additionally, ``financial_rules.autoLockShiftHours`` acts as a safety net:
+    any open shift older than that many hours is closed even mid-window or when
+    working hours are not configured at all (0 disables the net entirely).
+
+    Shift ages are measured on the UTC wall: every stored timestamp is UTC per
+    the storage convention, so subtracting the salon wall from a fresh stamp
+    would claim a barely-opened shift is three hours old and slam it shut.
     """
     settings = db.query(BusinessSettings).first()
-    if not settings or not settings.working_hours:
+    if not _auto_close_enabled():
         return 0
-
     grace = _grace_period(settings)
     now = salon_now()
-    window = current_window(settings.working_hours, now)
+    now_utc = utc_now_naive()
+    lock_hours = _auto_lock_hours()
 
-    if window is not None and now <= (window[2] + timedelta(minutes=grace)):
+    hours_known = bool(settings and settings.working_hours)
+    if not hours_known and lock_hours <= 0:
         return 0
+
+    window = current_window(settings.working_hours, now) if hours_known else None
+    in_active_window = bool(
+        hours_known
+        and window is not None
+        and now <= (window[2] + timedelta(minutes=grace))
+    )
 
     open_shifts = (
         db.query(PosShift)
@@ -142,12 +261,10 @@ def auto_close_expired_shifts(db: Session):
 
     managers = db.query(User).filter(User.role.in_(["manager", "owner"])).all()
     closed_count = 0
+    currency = getattr(settings, "currency", None) or "ج.م"
 
-    for shift in open_shifts:
-        opened_at = coerce_naive(shift.opened_at)
-        if opened_at is not None and now < (opened_at + timedelta(minutes=grace)):
-            continue
-
+    def _close_shift(shift: PosShift, reason_note: str) -> None:
+        nonlocal closed_count
         totals = _shift_totals(db, shift, now)
         operator = shift.user.full_name if shift.user else "غير معروف"
 
@@ -163,8 +280,7 @@ def auto_close_expired_shifts(db: Session):
         )
         shift.actual_closing_cash = shift.expected_closing_cash
         shift.closing_note = (
-    "إغلاق تلقائي بواسطة النظام لنهاية ساعات العمل "
-    f"(حتى {totals['closed_at'].strftime('%Y-%m-%d %H:%M')})"
+            f"{reason_note} (حتى {totals['closed_at'].strftime('%Y-%m-%d %H:%M')})"
         )
 
         log_activity(
@@ -175,7 +291,7 @@ def auto_close_expired_shifts(db: Session):
             entity_id=str(shift.id),
             description=(
                 f"تم إغلاق وردية {operator} تلقائياً — "
-                f"{totals['invoice_count']} فاتورة بإجمالي {totals['total_sales']} {settings.currency}"
+                f"{totals['invoice_count']} فاتورة بإجمالي {totals['total_sales']} {currency}"
             ),
             commit=False,
         )
@@ -186,14 +302,35 @@ def auto_close_expired_shifts(db: Session):
                 user_id=mgr.id,
                 title="إغلاق تلقائي للوردية",
                 message=(
-                    f"تم إغلاق وردية {operator} تلقائياً لنهاية الدوام. "
-                    f"إجمالي المبيعات: {totals['total_sales']} {settings.currency} "
+                    f"تم إغلاق وردية {operator} تلقائياً. "
+                    f"إجمالي المبيعات: {totals['total_sales']} {currency} "
                     f"({totals['invoice_count']} فاتورة)."
                 ),
                 commit=False,
             )
 
         closed_count += 1
+
+    end_of_hours_note = "إغلاق تلقائي بواسطة النظام لنهاية ساعات العمل"
+    safety_note = (
+        "إغلاق تلقائي احترازي لتجاوز الوردية مدة القفل المسموحة "
+        f"({lock_hours:g} ساعة)"
+    )
+
+    for shift in open_shifts:
+        opened_at_utc = coerce_naive(shift.opened_at)
+        if opened_at_utc is None:
+            continue
+
+        age_minutes = (now_utc - opened_at_utc).total_seconds() / 60.0
+        over_aged = lock_hours > 0 and age_minutes >= lock_hours * 60
+
+        if in_active_window and not over_aged:
+            continue
+        if not over_aged and age_minutes < grace:
+            continue
+
+        _close_shift(shift, safety_note if over_aged else end_of_hours_note)
 
     if closed_count:
         db.commit()

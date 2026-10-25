@@ -23,6 +23,7 @@ from app.models.appointment import Appointment  # noqa
 from app.models.appointment_service import AppointmentService  # noqa
 from app.models.invoice import Invoice  # noqa
 from app.models.invoice_item import InvoiceItem  # noqa
+from app.models.month_closure import MonthClosure  # noqa
 # Registers `invoice_counters`, which migration b8e2f3a4c5d6 creates. This
 # module is the only thing that populates the `target_metadata` Alembic's
 # autogenerate compares against, so a model imported *only* by a router is

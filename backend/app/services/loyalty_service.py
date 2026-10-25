@@ -176,8 +176,31 @@ def refresh_customer_tier(db: Session, customer: Customer) -> None:
             break
 
 
+def _tier_for_visits(tiers, visits: int):
+    """أعلى مستوى يحققه عدد الزيارات — نفس منطق `update_customer_loyalty`."""
+    ordered = sorted(tiers, key=lambda t: t.get("min_visits", 0), reverse=True)
+    for tier in ordered:
+        if visits >= tier.get("min_visits", 0):
+            return tier
+    return None
+
+
 def calculate_loyalty_discount(db: Session, customer_id: int, current_total: Decimal) -> Decimal:
-    """Calculates the discount based on the customer's current tier."""
+    """Calculates the discount based on the customer's current tier.
+
+    The tier is resolved from `visits_count`, not from the stored
+    `current_tier` string. The stored name is a fragile key: it is written
+    from the owner-editable tier names, so renaming a tier in settings, or a
+    row still holding a legacy value ("Bronze" while the configured names are
+    Arabic), silently voided the customer's discount. The visit count is the
+    authority the tier is derived from in the first place — `update_customer_loyalty`
+    and `refresh_customer_tier` both assign it that way — so it is what the
+    price is matched on too, and the two can never disagree.
+
+    A customer below the first rung of the ladder has no tier and therefore no
+    discount. That is deliberate: honouring a stale stored name there would
+    resurrect exactly the silent-discount-loss this function exists to close.
+    """
     customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
     if not customer:
         return Decimal("0.00")
@@ -187,13 +210,14 @@ def calculate_loyalty_discount(db: Session, customer_id: int, current_total: Dec
         return Decimal("0.00")
 
     tiers = settings.get("tiers", [])
-    discount_percent = 0
+    if not tiers:
+        return Decimal("0.00")
 
-    for tier in tiers:
-        if tier.get("name") == customer.current_tier:
-            discount_percent = tier.get("discount_percent", 0)
-            break
+    tier = _tier_for_visits(tiers, int(customer.visits_count or 0))
+    if tier is None:
+        return Decimal("0.00")
 
+    discount_percent = tier.get("discount_percent", 0)
     if discount_percent > 0:
         return (current_total * Decimal(str(discount_percent))) / Decimal("100")
 

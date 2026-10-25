@@ -1,11 +1,12 @@
 """The online-booking switch is owner intent *within* a classification.
 
-Only service providers — barber, colorist, esthetician — can ever have
-`show_in_booking` on. The server forces it off for every other job title on
-both create and update, so a mis-clicked toggle, a direct API call, or a role
-change that turns a barber into an accountant cannot leak staff to the public
-site. `/time-slots` enforces the same predicate, so a stale `barber_id` link
-cannot resurrect a hidden employee either.
+Only service providers — barber, hairstylist, colorist, esthetician, nail
+technician — can ever have `show_in_booking` on. The server forces it off for
+every other job title on both create and update, so a mis-clicked toggle, a
+direct API call, or a role change that turns a barber into an accountant
+cannot leak staff to the public site. `/time-slots` enforces the same
+predicate, so a stale `barber_id` link cannot resurrect a hidden employee
+either.
 """
 from datetime import date
 

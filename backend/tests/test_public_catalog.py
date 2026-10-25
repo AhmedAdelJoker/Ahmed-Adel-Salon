@@ -24,17 +24,19 @@ def test_only_service_providers_are_offered_to_the_public(client, db_session):
     """`show_in_booking` defaults to True, so the flag alone is not a gate.
 
     Who may be booked online is a classification: every service-providing
-    title — barber, colorist, esthetician — is offered when the owner's switch
-    is on, while an accountant, cashier, manager, receptionist or unlinked
-    assistant never is. The job-title filter is the one that keeps admin staff
-    off the public site.
+    title — barber, hairstylist, colorist, esthetician, nail technician — is
+    offered when the owner's switch is on, while an accountant, cashier,
+    manager, receptionist or unlinked assistant never is. The job-title filter
+    is the one that keeps admin staff off the public site.
     """
     _publish(client, db_session)
 
     providers = [
         ("حلاق", "barber", "01000000001"),
+        ("مصفف شعر", "hairstylist", "01000000002"),
         ("خبير صبغة", "colorist", "01000000003"),
         ("أخصائي بشرة", "esthetician", "01000000004"),
+        ("فني أظافر", "nail_technician", "01000000005"),
     ]
     for name, title, phone in providers:
         db_session.add(
@@ -52,7 +54,7 @@ def test_only_service_providers_are_offered_to_the_public(client, db_session):
         ("محاسب", "accountant", "01000000012"),
         ("مدير", "manager", "01000000013"),
         ("سفير خدمة", "receptionist", "01000000014"),
-        ("مساعد فني", "barber_assistant", "01000000015"),
+        ("مساعد حلاق", "barber_assistant", "01000000015"),
     ]
     for name, title, phone in never_public:
         db_session.add(
