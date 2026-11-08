@@ -1515,7 +1515,8 @@
       "packCapacityLabel": "Pack capacity",
       "idLabel": "ID: #{{id}}",
       "readOnlyNote": "Read-only view. Use edit from the inventory page if you have permission.",
-      "movementLog": "Movement log"
+      "movementLog": "Movement log",
+      "name": "Product name"
     }
   },
   "productBundles": {

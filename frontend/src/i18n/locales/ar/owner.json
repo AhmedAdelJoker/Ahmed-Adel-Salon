@@ -1515,7 +1515,8 @@
       "packCapacityLabel": "سعة العبوة",
       "idLabel": "معرف: #{{id}}",
       "readOnlyNote": "عرض قراءة فقط. استخدم التعديل من صفحة المخزون إذا كانت لديك صلاحية.",
-      "movementLog": "سجل الحركات"
+      "movementLog": "سجل الحركات",
+      "name": "اسم الصنف"
     }
   },
   "productBundles": {

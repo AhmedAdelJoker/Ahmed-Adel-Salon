@@ -1,4 +1,5 @@
 import { Package, History, Eye, FileText } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,218 +31,109 @@ export function ProductDetailsModal({
   staticBaseUrl,
   onOpenHistory,
 }: ProductDetailsModalProps) {
+  const { t } = useTranslation("owner");
   const viewProduct = product;
+  const unit = getUnitMeta(viewProduct?.unit);
+  const isLow = viewProduct && Number(viewProduct.quantity) <= Number(viewProduct.min_quantity_alert);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-lg rounded-[2rem] border-0 p-0 overflow-hidden bg-card shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)]"
-      >
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white relative overflow-hidden">
-          <div className="absolute -left-10 -top-10 h-32 w-32 rounded-full bg-white/5" />
-          <div className="absolute -right-10 -bottom-10 h-24 w-24 rounded-full bg-accent/10" />
+      <DialogContent className="max-w-lg overflow-hidden rounded-[2rem] border-0 bg-card p-0 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)]">
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white">
           <div className="relative flex items-start justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-2xl bg-white/10 backdrop-blur flex items-center justify-center border border-white/10 overflow-hidden">
+              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/10 backdrop-blur">
                 {viewProduct?.image_url ? (
                   <img
-                    src={
-                      viewProduct.image_url.startsWith("http")
-                        ? viewProduct.image_url
-                        : `${staticBaseUrl}${viewProduct.image_url}`
-                    }
-alt={viewProduct.name}
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
+                    src={viewProduct.image_url.startsWith("http") ? viewProduct.image_url : `${staticBaseUrl}${viewProduct.image_url}`}
+                    alt={viewProduct.name || ""}
+                    className="h-full w-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
                 ) : (
                   <Package size={22} className="text-white" />
                 )}
               </div>
               <div>
-                <DialogTitle className="text-lg font-black text-white leading-tight">
-                  {viewProduct?.name || "---"}
-                </DialogTitle>
-                <DialogDescription className="text-xs font-bold text-slate-300">
-                  عرض تفاصيل الصنف - قراءة فقط
-                </DialogDescription>
+                <DialogTitle className="text-lg font-black leading-tight text-white">{viewProduct?.name || "---"}</DialogTitle>
+                <DialogDescription className="text-xs font-bold text-slate-300">{t("inventory.modal.detailsTitle")} — {t("inventory.modal.readOnly")}</DialogDescription>
               </div>
             </div>
-            <Badge
-              className={cn(
-                "rounded-full px-3 py-1 text-[10px] font-black border-0 shrink-0",
-                viewProduct?.is_archived
-                  ? "bg-slate-600 text-white"
-                  : "bg-emerald-500 text-white",
-              )}
-            >
-              {viewProduct?.is_archived ? "مؤرشف" : "نشط"}
+            <Badge className={cn("shrink-0 rounded-full border-0 px-3 py-1 text-[10px] font-black", viewProduct?.is_archived ? "bg-slate-600 text-white" : "bg-emerald-500 text-white")}>
+              {viewProduct?.is_archived ? t("inventory.archived") : t("inventory.activeTab")}
             </Badge>
           </div>
         </div>
 
         {viewProduct ? (
-          <div className="p-6 space-y-5">
+          <div className="space-y-5 p-6">
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-soft border border-border/60 p-4">
-                <div className="text-[9px] font-black text-muted uppercase tracking-widest mb-1">
-                  الكود / SKU
+              {[
+                [t("inventory.modal.skuLabel"), viewProduct.sku || "---"],
+                [t("inventory.modal.category"), viewProduct.category || "---"],
+                [t("inventory.modal.company"), viewProduct.company_name || "---"],
+                [t("inventory.modal.unitLabel"), `${unit.label} (${unit.shortLabel})`],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-2xl border border-border/60 bg-soft p-4">
+                  <div className="mb-1 text-[9px] font-black uppercase tracking-widest text-muted">{label}</div>
+                  <div className="truncate text-sm font-black text-main">{value}</div>
                 </div>
-                <div className="text-sm font-black text-main font-mono">
-                  {viewProduct.sku || "---"}
-                </div>
-              </div>
-              <div className="rounded-2xl bg-soft border border-border/60 p-4">
-                <div className="text-[9px] font-black text-muted uppercase tracking-widest mb-1">
-                  التصنيف
-                </div>
-                <div className="text-sm font-black text-main">
-                  {viewProduct.category || "---"}
-                </div>
-              </div>
-              <div className="rounded-2xl bg-soft border border-border/60 p-4">
-                <div className="text-[9px] font-black text-muted uppercase tracking-widest mb-1">
-                  الشركة
-                </div>
-                <div className="text-sm font-black text-main truncate">
-                  {viewProduct.company_name || "---"}
-                </div>
-              </div>
-              <div className="rounded-2xl bg-soft border border-border/60 p-4">
-                <div className="text-[9px] font-black text-muted uppercase tracking-widest mb-1">
-                  الوحدة
-                </div>
-                <div className="text-sm font-black text-main">
-                  {getUnitMeta(viewProduct.unit).label} (
-                  {getUnitMeta(viewProduct.unit).shortLabel})
-                </div>
-              </div>
+              ))}
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-2xl bg-card border border-border p-3 text-center">
-                <div className="text-[9px] font-black text-muted uppercase">
-                  الرصيد
-                </div>
-                <div className="text-sm font-black text-primary mt-1">
-                  {formatNumber(viewProduct.quantity || 0)}{" "}
-                  {getUnitMeta(viewProduct.unit).shortLabel}
-                </div>
-                {viewProduct.weight ? (
-                  <div className="text-[10px] font-bold text-muted">
-                    {formatNumber(getAvailablePacks(viewProduct))} عبوة
-                  </div>
-                ) : null}
+              <div className="rounded-2xl border border-border bg-card p-3 text-center">
+                <div className="text-[9px] font-black uppercase text-muted">{t("inventory.modal.balance")}</div>
+                <div className="mt-1 text-sm font-black text-primary">{formatNumber(viewProduct.quantity || 0)} {unit.shortLabel}</div>
+                {viewProduct.weight ? <div className="text-[10px] font-bold text-muted">{formatNumber(getAvailablePacks(viewProduct))} {t("inventory.modal.pack")}</div> : null}
               </div>
-              <div className="rounded-2xl bg-card border border-border p-3 text-center">
-                <div className="text-[9px] font-black text-muted uppercase">
-                  سعر البيع
-                </div>
-                <div className="text-sm font-black text-success mt-1">
-                  {formatCurrency(viewProduct.sell_price || 0)}
-                </div>
+              <div className="rounded-2xl border border-border bg-card p-3 text-center">
+                <div className="text-[9px] font-black uppercase text-muted">{t("inventory.modal.sellPrice")}</div>
+                <div className="mt-1 text-sm font-black text-success">{formatCurrency(viewProduct.sell_price || 0)}</div>
               </div>
-              <div className="rounded-2xl bg-card border border-border p-3 text-center">
-                <div className="text-[9px] font-black text-muted uppercase">
-                  التكلفة
-                </div>
-                <div className="text-sm font-black text-main mt-1">
-                  {formatCurrency(viewProduct.cost_price || 0)}
-                </div>
-                {viewProduct.weight ? (
-                  <div className="text-[10px] font-bold text-muted">
-                    {formatCurrency(getEstimatedUnitCost(viewProduct))} /{" "}
-                    {getUnitMeta(viewProduct.unit).shortLabel}
-                  </div>
-                ) : null}
+              <div className="rounded-2xl border border-border bg-card p-3 text-center">
+                <div className="text-[9px] font-black uppercase text-muted">{t("inventory.modal.cost")}</div>
+                <div className="mt-1 text-sm font-black text-main">{formatCurrency(viewProduct.cost_price || 0)}</div>
+                {viewProduct.weight ? <div className="text-[10px] font-bold text-muted">{formatCurrency(getEstimatedUnitCost(viewProduct))} / {unit.shortLabel}</div> : null}
               </div>
             </div>
 
             <div className="space-y-2">
-              <div className="text-[10px] font-black text-muted uppercase tracking-widest flex items-center gap-1">
-                <FileText size={12} /> الوصف
-              </div>
-              <div className="rounded-2xl border border-border bg-soft/50 p-4 min-h-[60px]">
-                <p className="text-sm font-bold leading-relaxed text-main whitespace-pre-wrap">
-                  {viewProduct.description || "لا يوجد وصف."}
-                </p>
+              <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-muted"><FileText size={12} /> {t("inventory.modal.description")}</div>
+              <div className="min-h-[60px] rounded-2xl border border-border bg-soft/50 p-4">
+                <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-main">{viewProduct.description || t("inventory.modal.noDescription")}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="rounded-xl bg-soft border border-border p-3">
-                <div className="text-[9px] font-black text-muted uppercase mb-1">
-                  حد الإنذار
-                </div>
-                <div className="font-black text-main">
-                  {formatNumber(viewProduct.min_quantity_alert || 0)}{" "}
-                  {getUnitMeta(viewProduct.unit).shortLabel}
-                </div>
-                <div
-                  className={cn(
-                    "text-[10px] font-bold mt-1",
-                    Number(viewProduct.quantity) <=
-                      Number(viewProduct.min_quantity_alert)
-                      ? "text-rose-600"
-                      : "text-emerald-600",
-                  )}
-                >
-                  {Number(viewProduct.quantity) <=
-                  Number(viewProduct.min_quantity_alert)
-                    ? "• منخفض - يحتاج توريد"
-                    : "• مستقر"}
+              <div className="rounded-xl border border-border bg-soft p-3">
+                <div className="mb-1 text-[9px] font-black uppercase text-muted">{t("inventory.modal.alertLimit")}</div>
+                <div className="font-black text-main">{formatNumber(viewProduct.min_quantity_alert || 0)} {unit.shortLabel}</div>
+                <div className={cn("mt-1 text-[10px] font-bold", isLow ? "text-rose-600" : "text-emerald-600")}>
+                  {isLow ? `• ${t("inventory.modal.lowNeedsSupply")}` : `• ${t("inventory.stable")}`}
                 </div>
               </div>
-              <div className="rounded-xl bg-soft border border-border p-3">
-                <div className="text-[9px] font-black text-muted uppercase mb-1">
-                  سعة العبوة
-                </div>
-                <div className="font-black text-main">
-                  {viewProduct.weight
-                    ? `${formatNumber(viewProduct.weight)} ${getUnitMeta(viewProduct.unit).shortLabel}`
-                    : "---"}
-                </div>
-                <div className="text-[10px] font-bold text-muted mt-1">
-                  معرف: #{viewProduct.id}
-                </div>
+              <div className="rounded-xl border border-border bg-soft p-3">
+                <div className="mb-1 text-[9px] font-black uppercase text-muted">{t("inventory.modal.packCapacityLabel")}</div>
+                <div className="font-black text-main">{viewProduct.weight ? `${formatNumber(viewProduct.weight)} ${unit.shortLabel}` : "---"}</div>
+                <div className="mt-1 text-[10px] font-bold text-muted">{t("inventory.modal.idLabel", { id: viewProduct.id })}</div>
               </div>
             </div>
 
-            <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 flex gap-3">
-              <div className="h-8 w-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
-                <Eye size={14} />
-              </div>
-              <p className="text-[11px] font-bold leading-relaxed text-amber-800">
-                عرض قراءة فقط - لا يمكن التعديل من هنا. استخدم زر{" "}
-                <span className="underline">تعديل</span> في صفحة المخزون إذا كنت
-                مالكاً.
-              </p>
+            <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white"><Eye size={14} /></div>
+              <p className="text-[11px] font-bold leading-relaxed text-amber-800">{t("inventory.modal.readOnlyNote")}</p>
             </div>
 
             <div className="flex gap-2 pt-2">
-              <Button
-                onClick={() => onOpenChange(false)}
-                variant="outline"
-                className="flex-1 h-11 rounded-xl font-black"
-              >
-                إغلاق
-              </Button>
-              <Button
-                onClick={() => {
-                  onOpenChange(false);
-                  onOpenHistory(viewProduct);
-                }}
-                className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black"
-              >
-                <History size={14} className="ms-2" /> سجل الحركات
+              <Button onClick={() => onOpenChange(false)} variant="outline" className="h-11 flex-1 rounded-xl font-black">{t("inventory.modal.close")}</Button>
+              <Button onClick={() => { onOpenChange(false); if (viewProduct) onOpenHistory(viewProduct); }} className="h-11 flex-1 rounded-xl bg-slate-900 font-black text-white hover:bg-slate-800">
+                <History size={14} className="me-2" /> {t("inventory.modal.movementLog")}
               </Button>
             </div>
           </div>
         ) : (
-          <div className="p-10 text-center text-muted font-bold">
-            جاري التحميل...
-          </div>
+          <div className="p-10 text-center font-bold text-muted">{t("inventory.modal.loading")}</div>
         )}
       </DialogContent>
     </Dialog>
