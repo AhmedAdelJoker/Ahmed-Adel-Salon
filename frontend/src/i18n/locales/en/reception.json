@@ -1,0 +1,115 @@
+{
+  "board": {
+    "title": "Control & Operations",
+    "subtitle": "Track the customer journey inside the salon",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "connection_live": "Live connection active",
+    "connection_reconnecting": "Reconnecting...",
+    "refresh": "Refresh data",
+    "new_client": "Quick Client Registration",
+    "kpi_total": "Total Today",
+    "kpi_waiting": "Waiting",
+    "kpi_in_service": "In Service",
+    "kpi_cashier": "At Cashier",
+    "kpi_done": "Completed Today",
+    "kpi_revenue": "Today's Revenue",
+    "toolbar_search_placeholder": "Search by name or phone...",
+    "toolbar_clear": "Clear search",
+    "toolbar_all_barbers": "All Barbers",
+    "toolbar_done_today": "Done Today ({{count}})",
+    "error_title": "Error loading data",
+    "error_message": "Failed to load appointments from the server. Please try again.",
+    "error_retry": "Retry",
+    "empty_column": "Column empty",
+    "empty_column_desc": "No customers at this stage currently."
+  },
+  "columns": {
+    "waiting": {
+      "title": "Waiting List",
+      "desc": "Waiting for their turn or arrival confirmation"
+    },
+    "in_service": {
+      "title": "In Service",
+      "desc": "Clients currently receiving their services"
+    },
+    "review": {
+      "title": "Financial Review",
+      "desc": "Awaiting final invoice review"
+    },
+    "cashier": {
+      "title": "Cashier",
+      "desc": "Waiting for customer at the cashier"
+    }
+  },
+  "card": {
+    "unknown_customer": "Unknown Customer",
+    "phone_unavailable": "Unavailable",
+    "service_general": "General Service",
+    "barber_label": "Barber",
+    "barber_auto": "Automatic assignment",
+    "more_services": "+{{count}} more",
+    "action_direct_barber": "Assign to Barber",
+    "action_confirm_arrival": "Confirm Arrival",
+    "action_edit": "Edit",
+    "action_cancel": "Cancel",
+    "action_complete": "Complete & Send to Review",
+    "action_ready_payment": "Confirm Ready for Payment",
+    "status_collecting": "Collecting now",
+    "action_reassign": "Change Service Barber",
+    "waiting_minutes": "{{mins}}m ago",
+    "waiting_hours": "{{h}}h {{m}}m ago",
+    "waiting_now": "Now"
+  },
+  "fast_client": {
+    "title": "Quick Client Registration",
+    "subtitle": "Add a new or existing client directly to the operations path",
+    "phone_label": "Phone Number",
+    "phone_placeholder": "01xxxxxxxxx",
+    "name_label": "Client Name",
+    "name_placeholder": "Full name",
+    "vip_customer": "VIP Customer",
+    "visits_count": "Total {{count}} previous visits",
+    "archived_data": "Archived Data",
+    "services_label": "Select Required Services",
+    "services_selected": "Services Selected",
+    "category_all": "All",
+    "summary_title": "Operation Summary",
+    "summary_services": "Total Services:",
+    "summary_duration": "Estimated Time:",
+    "summary_minutes": "minutes",
+    "summary_total": "Total Due:",
+    "barber_label": "Select Barber",
+    "barber_auto": "Automatic (first available)",
+    "notes_label": "Cashier Notes",
+    "notes_placeholder": "Any special details...",
+    "saving": "Saving...",
+    "save": "Save and Confirm Client Registration",
+    "validation_service": "Please select at least one service",
+    "validation_phone_name": "Please enter phone number and client name",
+    "validation_phone_invalid": "Please enter a valid mobile number (e.g., 01012345678)",
+    "error_barber_busy": "The barber is booked at this time, please choose another time or barber",
+    "success": "Client registered successfully",
+    "error": "Failed to register client",
+    "customer_found": "Customer found: {{name}}"
+  },
+  "time": {
+    "label": "Appointment Time",
+    "placeholder": "Select time",
+    "today": "Today"
+  },
+  "dialogs": {
+    "reassign_title": "Change Barber",
+    "reassign_desc": "Select another barber for this appointment",
+    "cancel_title": "Confirm Appointment Cancellation",
+    "cancel_desc": "Are you sure you want to cancel {{name}}'s appointment? This cannot be undone.",
+    "cancel_back": "Go Back",
+    "cancel_confirm": "Confirm Cancellation"
+  },
+  "done_panel": {
+    "title": "Completed Today",
+    "subtitle": "{{count}} clients served today",
+    "empty_title": "No completions today",
+    "empty_desc": "No services have been completed yet."
+  }
+}

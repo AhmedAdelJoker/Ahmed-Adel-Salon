@@ -1,4 +1,5 @@
 /** Customers CustomerKpis — system-wide figures from GET /customers/stats. */
+import { useTranslation } from "react-i18next";
 import { TrendingUp, UserCheck, UserPlus, Users, Star } from "lucide-react";
 import { formatCurrency } from "@/lib/core/utils";
 import CustomerKpi from "@/features/customers/components/CustomerKpi";
@@ -9,34 +10,35 @@ export default function CustomerKpis({
 }: {
   stats: CustomerStats;
 }) {
+  const { t } = useTranslation("customers");
   return (
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
         <CustomerKpi
-          label="إجمالي العملاء"
+          label={t("stats.total")}
           value={stats.total || ""}
           icon={Users}
           color="bg-primary"
         />
         <CustomerKpi
-          label="نخبة VIP"
+          label={t("stats.vip")}
           value={stats.vip_count || ""}
           icon={Star}
           color="bg-warning"
         />
         <CustomerKpi
-          label="عملاء منتظمون"
+          label={t("stats.regular")}
           value={stats.regular_count || ""}
           icon={UserCheck}
           color="bg-info"
         />
         <CustomerKpi
-          label="عملاء جدد"
+          label={t("stats.new")}
           value={stats.new_count || ""}
           icon={UserPlus}
           color="bg-success"
         />
         <CustomerKpi
-          label="متوسط الإنفاق"
+          label={t("stats.avgSpend")}
           value={formatCurrency(stats.avg_spend) || ""}
           icon={TrendingUp}
           color="bg-danger"

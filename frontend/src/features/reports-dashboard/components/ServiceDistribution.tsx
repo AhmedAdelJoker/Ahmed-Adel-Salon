@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 import { Scissors } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { useTranslation } from "react-i18next";
 import { ContentPanel } from "@/components/shared/PremiumUI";
 import { cn } from "@/lib/core/utils";
 import type { ServiceSlice } from "@/features/reports-dashboard/constants";
@@ -27,13 +28,14 @@ export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceD
   // `null` is "the query failed", and rendering it as 0% would report an empty
   // salon on the days the database was unreachable. An em dash says the figure
   // is unavailable without asserting a value in either direction.
+  const { t } = useTranslation("owner");
   const occupancyLabel = occupancy == null ? "—" : `${occupancy}%`;
   const occupancyMuted = occupancy == null;
 
   return (
     <ContentPanel className="h-full" title={undefined} subtitle={undefined} actions={undefined}>
       <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted mb-4">
-        توزيع مبيعات الخدمات
+        {t("serviceDistribution.title")}
       </h4>
       <div className="relative h-[280px] sm:h-[320px] w-full" dir="ltr">
         {serviceDistribution.length > 0 ? (
@@ -48,7 +50,9 @@ export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceD
                 {occupancyLabel}
               </div>
               <div className="mt-0.5 text-[8px] font-black uppercase tracking-widest text-muted">
-                {occupancyMuted ? "تعذّر الحساب" : "متوسط الإشغال"}
+                {occupancyMuted
+                  ? t("serviceDistribution.couldNotCalculate")
+                  : t("serviceDistribution.avgOccupancy")}
               </div>
             </div>
             <ResponsiveContainer width="100%" height="100%">
@@ -76,7 +80,7 @@ export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceD
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value, name) => [value + "%", name || "النسبة"]}
+                  formatter={(value, name) => [value + "%", name || t("serviceDistribution.ratio")]}
                   contentStyle={{
                     borderRadius: "12px",
                     border: "1px solid var(--border)",
@@ -90,7 +94,7 @@ export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceD
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-muted">
             <PieChart {...({ className: "opacity-20", size: 64 } as unknown as ComponentProps<typeof PieChart>)} />
-            <p className="mt-4 text-sm font-bold">لا توجد بيانات خدمات</p>
+            <p className="mt-4 text-sm font-bold">{t("serviceDistribution.noServicesData")}</p>
           </div>
         )}
       </div>
@@ -115,8 +119,8 @@ export function ServiceDistribution({ serviceDistribution, occupancy }: ServiceD
             <div className="mx-auto mb-3 p-4 rounded-full bg-soft/50 w-20 h-20 flex items-center justify-center">
               <Scissors size={32} className="opacity-30" />
             </div>
-            <p className="text-base font-bold text-main">لا توجد بيانات لتوزيع الخدمات</p>
-            <p className="text-sm text-muted mt-1">ستظهر البيانات عند إضافة خدمات ومواعيد</p>
+            <p className="text-base font-bold text-main">{t("serviceDistribution.noDistributionData")}</p>
+            <p className="text-sm text-muted mt-1">{t("serviceDistribution.noDistributionHint")}</p>
           </div>
         )}
       </div>

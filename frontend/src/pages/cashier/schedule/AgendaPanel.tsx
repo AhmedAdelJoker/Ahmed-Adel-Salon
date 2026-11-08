@@ -1,4 +1,5 @@
 import { memo, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import { cn, formatTime12h } from "@/lib/core/utils";
 import MiniCalendar from "@/pages/cashier/schedule/MiniCalendar";
@@ -16,6 +17,7 @@ const AgendaPanel = memo(function AgendaPanel({
   isDragActive,
   onClose,
 }: any) {
+  const { t, i18n } = useTranslation("schedule");
   const dayAppts = useMemo(
     () =>
       appointments
@@ -51,7 +53,7 @@ const AgendaPanel = memo(function AgendaPanel({
   }, [dayAppts]);
 
   const dateLabel = new Date(selectedDate + "T00:00:00").toLocaleDateString(
-    "ar-EG",
+    i18n.language === "ar" ? "ar-EG" : "en-US",
     {
       weekday: "long",
       day: "numeric",
@@ -66,14 +68,14 @@ const AgendaPanel = memo(function AgendaPanel({
       exit={{ opacity: 0, x: 20 }}
       transition={{ duration: 0.3 }}
       className="space-y-5"
-      aria-label="الشريط الجانبي للجدول"
+      aria-label={t("agenda.sidebarAria")}
     >
       <div className="bg-card rounded-3xl border border-border shadow-sm p-5 relative overflow-hidden">
         <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-accent via-accent/50 to-transparent" />
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-[10px] font-black text-muted uppercase tracking-widest">
-              التنقل السريع
+              {t("agenda.quickNav")}
             </p>
             <p className="text-sm font-black text-main mt-0.5">{dateLabel}</p>
           </div>
@@ -81,7 +83,7 @@ const AgendaPanel = memo(function AgendaPanel({
             <button
               onClick={onClose}
               className="lg:hidden h-8 w-8 flex items-center justify-center rounded-lg bg-soft text-muted hover:text-accent transition-all"
-              aria-label="إغلاق الشريط الجانبي"
+              aria-label={t("agenda.closeSidebar")}
             >
               <ArrowLeft size={16} />
             </button>
@@ -101,20 +103,20 @@ const AgendaPanel = memo(function AgendaPanel({
               {summary.total}
             </p>
             <p className="text-[8px] font-black text-muted mt-0.5">
-              إجمالي المواعيد
+              {t("agenda.total")}
             </p>
           </div>
           <div className="rounded-2xl bg-soft p-3 text-center">
             <p className="text-xl font-black text-accent tabular-nums">
               {summary.active}
             </p>
-            <p className="text-[8px] font-black text-muted mt-0.5">نشطة</p>
+            <p className="text-[8px] font-black text-muted mt-0.5">{t("agenda.active")}</p>
           </div>
           <div className="rounded-2xl bg-soft p-3 text-center">
             <p className="text-xl font-black text-emerald-500 tabular-nums">
               {summary.done}
             </p>
-            <p className="text-[8px] font-black text-muted mt-0.5">مكتملة</p>
+            <p className="text-[8px] font-black text-muted mt-0.5">{t("agenda.done")}</p>
           </div>
         </div>
       </div>
@@ -125,13 +127,13 @@ const AgendaPanel = memo(function AgendaPanel({
             <div className="w-8 h-8 rounded-xl bg-accent/10 text-accent flex items-center justify-center">
               <Activity size={15} />
             </div>
-            <p className="text-sm font-black text-main">أجندة اليوم</p>
+            <p className="text-sm font-black text-main">{t("agenda.todayAgenda")}</p>
           </div>
           <Badge
             variant="outline"
             className="text-[9px] font-black bg-soft border-border/60"
           >
-            {upcoming.length} قادمة
+            {t("agenda.coming", { count: upcoming.length })}
           </Badge>
         </div>
 
@@ -141,7 +143,7 @@ const AgendaPanel = memo(function AgendaPanel({
               <div className="py-8 flex flex-col items-center gap-3 opacity-40">
                 <CalendarDays size={28} className="text-muted" />
                 <p className="text-[10px] font-bold text-muted">
-                  لا توجد مواعيد قادمة
+                  {t("agenda.noUpcoming")}
                 </p>
               </div>
             ) : (
@@ -181,7 +183,7 @@ const AgendaPanel = memo(function AgendaPanel({
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-black text-main truncate">
-                        {appt.customer_name || "عميل مجهول"}
+                        {appt.customer_name || t("appointmentCard.unknownCustomer")}
                       </p>
                       <p className="text-[9px] font-bold text-muted truncate mt-0.5">
                         {barber?.display_name ||

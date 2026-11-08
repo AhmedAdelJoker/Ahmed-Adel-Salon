@@ -36,5 +36,27 @@
   "save_business_settings": "Save Business Settings",
   "send_to_customer": "Send to Customer",
   "download_pdf": "Download PDF",
-  "print_invoice": "Print Invoice"
+  "print_invoice": "Print Invoice",
+  "open_sidebar": "Open sidebar",
+  "open_search": "Open smart search",
+  "smart_search": "Smart search",
+  "switch_light": "Switch to light mode",
+  "switch_dark": "Switch to dark mode",
+  "user_menu": "User menu",
+  "account_settings": "Account settings",
+  "end_session": "End session",
+  "vault": "Vault",
+  "vault_hint": "Central cashbox — linked to the vault (cash + digital)",
+  "cash": "Cash",
+  "switch_to_english": "Switch language to English",
+  "switch_to_arabic": "Switch language to Arabic",
+  "role": {
+    "owner": "Owner",
+    "admin": "System Admin",
+    "manager": "Manager",
+    "cashier": "Cashier",
+    "barber": "Barber",
+    "accountant": "Accountant",
+    "user": "User"
+  }
 }

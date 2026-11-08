@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { POSProvider, usePOS } from "@/pages/cashier/POS/POSContext";
-import { appointmentToCartItems } from "@/features/pos";
-import ShiftSidebar from "@/pages/cashier/POS/components/ShiftSidebar";
 import SessionsQueue from "@/pages/cashier/POS/components/SessionsQueue";
 import ItemSelection from "@/pages/cashier/POS/components/ItemSelection";
 import CheckoutBar from "@/pages/cashier/POS/components/CheckoutBar";
+import POSStartPanel from "@/pages/cashier/POS/components/POSStartPanel";
+import POSHeader from "@/pages/cashier/POS/components/POSHeader";
 import SuccessOverlay from "@/pages/cashier/POS/components/SuccessOverlay";
 import ManagerApprovalModal from "@/pages/cashier/POS/components/ManagerApprovalModal";
 import POSBottomNav from "@/pages/cashier/POS/components/POSBottomNav";
 import { cn } from "@/lib/core/utils";
 import { toast } from "react-hot-toast";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Grid, Clock, RefreshCw, Zap, WifiOff, UploadCloud } from "lucide-react";
+import { RefreshCw, UploadCloud, WifiOff } from "lucide-react";
 import { ErrorState } from "@/components/shared/AsyncState";
 import InlineNotice from "@/components/shared/InlineNotice";
 import { PageShell } from "@/components/shared/PageShell";
@@ -34,6 +34,7 @@ interface BookingHandoffState {
 }
 
 const POSLayout = () => {
+  const { t } = useTranslation("pos");
   const {
     loading,
     readyAppointments,
@@ -41,85 +42,61 @@ const POSLayout = () => {
     shiftError,
     readyAppointmentsError,
     catalogError,
-    barbers,
-    setCart,
-    setActiveAppointmentId,
-    setSelectedCustomerId,
-    setSelectedBarberId,
-    activeAppointmentId,
+    saleMode,
+    loadSession,
   } = usePOS();
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("sessions"); // "sessions" or "items"
-  const [mobileView, setMobileView] = useState("ops"); // "ops" (Shift/Sessions), "items", "cart"
-  // Quick-sale mode: products/services without an appointment context. A
-  // session handoff (or loading one from the queue) turns it off again.
-  const [quickSale, setQuickSale] = useState(false);
+  const [mobileView, setMobileView] = useState("ops"); // "ops" | "items" | "cart"
 
   // Offline money-safety: LAN/server down keeps the till alive — invoices are
   // queued locally under their idempotency key and auto-replayed on reconnect.
   const { isOffline, pendingCount, replaying, replay } = useOfflineSync();
 
-  // Which middle-column panel exists where. On mobile `mobileView` picks one
-  // panel; on desktop (where mobileView never leaves "ops") `activeTab`
-  // switches between them, so exactly one renders for every viewport.
-  const showSessions = activeTab === "sessions" && mobileView !== "items";
-  const showItems = activeTab === "items" || mobileView === "items";
-
   const handoff = (location.state ?? null) as BookingHandoffState | null;
   const handoffBookingId = handoff?.bookingId ?? null;
+  const consumedHandoff = useRef(false);
+
+  // Mobile follows the sale: a loaded session lands on the cart, a product
+  // sale lands on the catalogue, finishing/resetting returns to the queue.
+  useEffect(() => {
+    if (saleMode === "idle") setMobileView("ops");
+    else if (saleMode === "session") setMobileView("cart");
+    else if (saleMode === "products") setMobileView("items");
+  }, [saleMode]);
 
   // Consume the `/bookings` handoff once the catalogue has loaded (the barber
   // list arrives in phase 1), then clear the navigation state so a browser
   // refresh does not re-apply it.
   useEffect(() => {
-    if (loading || !handoffBookingId) return;
-    setCart(
-      appointmentToCartItems(
-        {
-          id: handoffBookingId,
-          barber_id: handoff?.barberId ?? "",
-          services: handoff?.services ?? [],
-        },
-        barbers,
-      ),
+    if (loading || !handoffBookingId || consumedHandoff.current) return;
+    consumedHandoff.current = true;
+
+    const services = handoff?.services ?? [];
+    loadSession(
+      {
+        id: handoffBookingId,
+        barber_id: handoff?.barberId ?? "",
+        customer_id: handoff?.customerId ?? null,
+        services,
+      },
+      { notify: false },
     );
-    setActiveAppointmentId(handoffBookingId);
-    setSelectedCustomerId(
-      handoff?.customerId ? String(handoff.customerId) : "walk_in",
-    );
-    if (handoff?.barberId) setSelectedBarberId(String(handoff.barberId));
-    const serviceCount = (handoff?.services ?? []).length;
-    if (serviceCount > 0) {
-      toast.success("تم تحميل الحجز في نقطة البيع للمراجعة");
+
+    if (services.length > 0) {
+      toast.success(t("logic.handoff_loaded"));
     } else {
-      toast(
-        "الحجز محمّل في نقطة البيع، لكنه لا يحتوي خدمات — أضف البنود يدوياً",
-        { icon: "⚠️" },
-      );
+      toast(t("logic.handoff_no_services"), { icon: "⚠️" });
     }
-    // The cart view is where the prepared session is reviewed, on mobile.
     setMobileView("cart");
     navigate("/pos", { replace: true, state: null });
-  }, [loading, handoffBookingId, handoff, barbers, navigate, setCart, setActiveAppointmentId, setSelectedCustomerId, setSelectedBarberId]);
-
-  // Loading a real session cancels quick-sale mode.
-  useEffect(() => {
-    if (activeAppointmentId) setQuickSale(false);
-  }, [activeAppointmentId]);
-
-  const startQuickSale = () => {
-    setQuickSale(true);
-    setActiveTab("items");
-    setMobileView("items");
-    toast.success("بيع سريع — أضف البنود وأكمل الدفع");
-  };
+  }, [loading, handoffBookingId, handoff, loadSession, navigate, t]);
 
   // Global keyboard shortcut: Ctrl+Enter = Checkout
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        e.preventDefault();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
         // Find and click the checkout button
         const checkoutBtn = document.querySelector(
           'button[data-pos-checkout="true"]',
@@ -137,11 +114,11 @@ const POSLayout = () => {
 
   if (loading) {
     return (
-      <PageShell fixed className="h-[60vh] flex items-center justify-center">
+      <PageShell fixed className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-primary">
           <RefreshCw className="h-10 w-10 animate-spin" />
-          <p className="text-sm font-bold tracking-widest text-muted uppercase">
-            تنشيط محطة الـ POS الآمنة...
+          <p className="text-sm font-bold uppercase tracking-widest text-muted">
+            {t("boot.activating")}
           </p>
         </div>
       </PageShell>
@@ -152,10 +129,10 @@ const POSLayout = () => {
   // present an empty grid the cashier could mistake for a stocked-but-quiet day.
   if (catalogError) {
     return (
-      <PageShell fixed className="h-[60vh] flex items-center justify-center">
+      <PageShell fixed className="flex h-[60vh] items-center justify-center">
         <div className="w-full p-4">
           <ErrorState
-            title="تعذر تحميل محطة نقطة البيع"
+            title={t("boot.load_failed_title")}
             message={catalogError}
             onRetry={() => window.location.reload()}
           />
@@ -165,10 +142,16 @@ const POSLayout = () => {
   }
 
   return (
-    <PageShell fixed className="max-h-[calc(100vh-80px)]">
+    <PageShell fixed>
       {/* Success Overlay & Modals */}
       <SuccessOverlay />
       <ManagerApprovalModal />
+
+      <POSHeader
+        isOffline={isOffline}
+        pendingCount={pendingCount}
+        onSaleStarted={() => setMobileView("items")}
+      />
 
       {/* Load failures that must not be mistaken for "nothing to do". */}
       {(shiftError || readyAppointmentsError) && (
@@ -183,27 +166,28 @@ const POSLayout = () => {
       {(isOffline || pendingCount > 0) && (
         <div className="px-2 lg:px-0">
           <InlineNotice tone="warning">
-            <div className="flex items-center justify-between gap-3 min-w-0">
-              <span className="flex items-start gap-2 min-w-0">
-                <WifiOff size={16} className="shrink-0 mt-0.5" />
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <span className="flex min-w-0 items-start gap-2">
+                <WifiOff size={16} className="mt-0.5 shrink-0" />
                 <span className="min-w-0">
                   {isOffline
-                    ? "أنت تعمل بدون اتصال بالخادم — الفواتير تُحفَظ محلياً بمفتاح تكرار-آمن وتُرسَل تلقائياً عند رجوع الاتصال. الكتالوج قد يكون على آخر حالة محفوظة."
-                    : `${pendingCount} فاتورة مؤجلة لديك في انتظار الإرسال للخادم.`}
+                    ? t("offline.offline")
+                    : t("offline.pending", { count: pendingCount })}
                 </span>
               </span>
               {pendingCount > 0 && (
                 <button
+                  type="button"
                   onClick={() => void replay()}
                   disabled={replaying || isOffline}
-                  className="shrink-0 h-8 px-3 rounded-lg border border-warning-border bg-soft hover:bg-soft/70 transition-all font-black text-[11px] flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-warning/30 bg-soft px-3 text-[11px] font-black transition-all hover:bg-soft/70 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {replaying ? (
                     <RefreshCw size={13} className="animate-spin" />
                   ) : (
                     <UploadCloud size={13} />
                   )}
-                  إرسال الآن
+                  {t("offline.send_now")}
                 </button>
               )}
             </div>
@@ -211,135 +195,52 @@ const POSLayout = () => {
         </div>
       )}
 
-      {/* Desktop Layout (Grid) / Mobile Layout (Conditional Rendering) */}
-      {/* Extra mobile clearance: the shell covers the global pill nav, this
-          page's own bottom bar needs ~16px more. */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr_1.5fr] xl:grid-cols-[1.2fr_2.5fr_1.8fr] gap-4 flex-1 min-h-0 overflow-hidden px-2 lg:px-0 pb-4 lg:pb-0">
-        {/* Right Column: Shift & Quick Stats (Always on Desktop, Tabbed on Mobile) */}
-        <div
+      {/* Desktop: sessions | catalogue | cart. On lg (900px–1279px) we show 2
+          columns so the checkout CTA is never clipped; on xl (≥1280px) we show
+          all 3. Mobile: one panel at a time via bottom nav. */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden px-2 pb-2 lg:grid-cols-[1fr_1.3fr] lg:px-0 lg:pb-0 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(28rem,2.1fr)_minmax(21rem,1.3fr)]">
+        {/* Right column: the reception queue, shown only on xl desktop. */}
+        <aside
+          aria-label={t("sessions.title")}
           className={cn(
-            "flex flex-col gap-4 overflow-y-auto no-scrollbar pb-4",
-            mobileView !== "ops" && "hidden lg:flex",
+            "min-h-0 overflow-hidden",
+            "hidden xl:block",
+            mobileView !== "ops" && "hidden",
           )}
         >
-          <ShiftSidebar />
-        </div>
+          <Card className="flex h-full min-h-0 flex-col overflow-hidden border-border/60 bg-card p-3 shadow-sm">
+            <SessionsQueue />
+          </Card>
+        </aside>
 
-        {/* Middle Column: Selection Area (Always on Desktop, Tabbed on Mobile) */}
-        <Card
+        {/* Middle column: start panel when idle, catalogue during a sale. */}
+        <section
           className={cn(
-            "flex flex-col gap-4 overflow-hidden p-4 sm:p-6 shadow-sm border-border/50",
-            // Hidden on mobile only while the cart owns the screen; on desktop
-            // the three-column grid shows every column regardless.
-            mobileView === "cart" && "hidden lg:flex",
+            "min-h-0 overflow-hidden",
+            mobileView !== "items" && "hidden lg:block",
           )}
         >
-          {/* Tab Switcher - Only visible on Desktop or when needed */}
-          <div className="hidden lg:flex items-center gap-2 p-1 bg-soft/50 rounded-xl self-center border border-border/40">
-            <button
-              onClick={() => {
-                setActiveTab("sessions");
-                // Desktop tab switching must unwind a quick-sale's mobileView,
-                // or showSessions stays false forever after.
-                setMobileView("ops");
-              }}
-              className={`px-4 sm:px-6 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${
-                activeTab === "sessions"
-                  ? "bg-card text-primary shadow-sm border border-border/40"
-                  : "text-muted hover:text-main"
-              }`}
-            >
-              <Clock size={16} />
-              <span>الجلسات من الاستقبال</span>
-              <Badge
-                variant={activeTab === "sessions" ? "primary" : "outline"}
-                size="sm"
-                className="rounded-full px-1.5 min-w-[20px] justify-center"
-              >
-                {readyAppointments.length}
-              </Badge>
-            </button>
-            <button
-              onClick={() => {
-                if (!activeAppointmentId && !quickSale) {
-                  toast.error("يرجى اختيار جلسة أولاً لإضافة خدمات إضافية");
-                  return;
-                }
-                setActiveTab("items");
-              }}
-              className={`px-4 sm:px-6 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${
-                activeTab === "items"
-                  ? "bg-card text-primary shadow-sm border border-border/40"
-                  : activeAppointmentId
-                    ? "text-muted hover:text-main"
-                    : "opacity-40 cursor-not-allowed"
-              }`}
-            >
-              <Grid size={16} />
-              <span>إضافة خدمات إضافية</span>
-            </button>
-          </div>
+          <Card className="flex h-full min-h-0 flex-col overflow-hidden border-border/60 bg-card p-3 shadow-sm">
+            {saleMode === "idle" ? <POSStartPanel /> : <ItemSelection />}
+          </Card>
+        </section>
 
-          <div className="flex-1 min-h-0 overflow-hidden">
-            {/* Logic for what to show in middle column based on desktop tabs or mobile view */}
-            <div className="h-full">
-              <div
-                className={cn(
-                  "h-full",
-                  showSessions ? "block" : "hidden lg:block",
-                )}
-              >
-                {showSessions && <SessionsQueue />}
-              </div>
-              <div
-                className={cn(
-                  "h-full",
-                  showItems ? "block" : "hidden",
-                )}
-              >
-                {activeAppointmentId || quickSale ? (
-                  <ItemSelection />
-                ) : (
-                  <div className="h-full flex flex-col justify-center text-center p-8">
-                    <div className="opacity-40 flex flex-col items-center gap-3">
-                      <Clock size={48} className="text-primary" />
-                      <h3 className="text-base font-black text-main">
-                        بانتظار اختيار جلسة
-                      </h3>
-                      <p className="text-xs font-bold text-muted mt-2">
-                        يرجى اختيار جلسة من قائمة الاستقبال للبدء.
-                      </p>
-                    </div>
-                    <button
-                      onClick={startQuickSale}
-                      className="mt-5 mx-auto h-12 px-6 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 transition-all font-black text-xs shadow-md flex items-center gap-2 self-center hover:scale-[1.02] active:scale-95"
-                    >
-                      <Zap size={16} fill="currentColor" />
-                      بيع سريع بدون جلسة
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Left Column: Cart & Checkout (Always on Desktop, Tabbed on Mobile) */}
-        <div
+        {/* Left column: buyer, cart, payment. */}
+        <aside
+          aria-label={t("cart.title")}
           className={cn(
-            "flex flex-col gap-4 min-h-0 overflow-hidden",
-            mobileView !== "cart" && "hidden lg:flex",
+            "min-h-0 overflow-hidden",
+            mobileView !== "cart" && "hidden lg:block",
           )}
         >
           <CheckoutBar />
-        </div>
+        </aside>
       </div>
 
       {/* Mobile Bottom Navigation (POS-specific 3-tab) */}
       <POSBottomNav
         activeView={mobileView}
         setActiveView={setMobileView}
-        activeAppointmentId={activeAppointmentId}
         cartLength={cart.length}
         readyAppointmentsLength={readyAppointments.length}
       />

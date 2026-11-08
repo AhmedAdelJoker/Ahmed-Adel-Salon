@@ -2,6 +2,7 @@ import { AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
 import type { DayAnomaly } from "@/lib/money/financialAnalytics";
 
 export interface AnomalyAlertsProps {
@@ -10,6 +11,7 @@ export interface AnomalyAlertsProps {
 }
 
 export function AnomalyAlerts({ anomalies, onInspectDay }: AnomalyAlertsProps) {
+  const { t } = useTranslation("owner");
   if (anomalies.length === 0) return null;
   return (
     <Card className="border-amber-500/40 bg-amber-500/5">
@@ -19,9 +21,9 @@ export function AnomalyAlerts({ anomalies, onInspectDay }: AnomalyAlertsProps) {
             <AlertTriangle size={18} />
           </div>
           <div>
-            <CardTitle>تنبيهات الشذوذ الإحصائي</CardTitle>
+            <CardTitle>{t("finFeat.anomaly.title")}</CardTitle>
             <CardDescription>
-              أيام خارج النمط المعتاد (انحراف ±2σ أو قفزة 3 أضعاف الوسيط) — راجعها قبل اعتماد التقرير
+              {t("finFeat.anomaly.subtitle")}
             </CardDescription>
           </div>
         </div>
@@ -40,17 +42,17 @@ export function AnomalyAlerts({ anomalies, onInspectDay }: AnomalyAlertsProps) {
               <p className="text-xs font-black text-main">{a.message}</p>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="text-[9px]">
-                  {a.kind === "rev_spike" ? "قفزة إيرادات" : a.kind === "exp_spike" ? "قفزة مصروفات" : "هبوط الصافي"}
+                  {a.kind === "rev_spike" ? t("finFeat.anomaly.rev") : a.kind === "exp_spike" ? t("finFeat.anomaly.exp") : t("finFeat.anomaly.drop")}
                 </Badge>
                 {a.severity === "high" && (
-                  <Badge className="bg-rose-600 text-[9px] text-white">حرج</Badge>
+                  <Badge className="bg-rose-600 text-[9px] text-white">{t("finFeat.anomaly.severityHigh")}</Badge>
                 )}
                 <button
                   type="button"
                   onClick={() => onInspectDay(a.date)}
                   className="text-[10px] font-black text-primary hover:underline"
                 >
-                  فحص اليوم ←
+                  {t("finFeat.anomaly.inspect")}
                 </button>
               </div>
             </div>

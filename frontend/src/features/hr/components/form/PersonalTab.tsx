@@ -21,6 +21,7 @@ import {
 import { normalizeNumericInput } from "@/features/hr/utils/digits";
 import { validatePersonName, NAME_MAX } from "@/features/hr/utils/validators";
 import FieldError from "./FieldError";
+import { useTranslation } from "react-i18next";
 
 export default function PersonalTab({
   formData,
@@ -39,6 +40,7 @@ export default function PersonalTab({
   onImageChange: (e: ChangeEvent<HTMLInputElement>) => void;
   blueprint: { title: string };
 }) {
+  const { t } = useTranslation("owner");
   // An empty field is not an error while the owner is still filling it in; only
   // speak up once something has been typed and looks wrong.
   const typedName = String(formData.fullName ?? "").trim();
@@ -57,7 +59,7 @@ export default function PersonalTab({
   */
   const birthMismatch =
     idAnalysis.info && formData.birthDate && formData.birthDate !== idAnalysis.info.birthDate
-      ? `تاريخ الميلاد لا يطابق الرقم القومي (${idAnalysis.info.birthDate})`
+      ? t("hr.idBirthDateMismatch")
       : null;
 
   const handleNationalIdChange = (raw: string) => {
@@ -84,7 +86,7 @@ export default function PersonalTab({
                     <img
                       src={imagePreview}
                       className="h-full w-full object-cover"
-                      alt={formData?.fullName || "صورة الموظف"}
+                      alt={formData?.fullName || t("hr.employeeImage")}
                       onError={(e) => {
                         e.currentTarget.style.display = "none";
                         setImagePreview(null);
@@ -95,13 +97,13 @@ export default function PersonalTab({
                       <div className="h-14 w-14 rounded-2xl bg-card border border-border flex items-center justify-center shadow-sm">
                         <ImageIcon size={26} className="text-muted/30" />
                       </div>
-                      <span className="text-xs font-black uppercase tracking-widest">أضف صورة</span>
+                      <span className="text-xs font-black uppercase tracking-widest">{t("hr.addPhoto")}</span>
                     </div>
                   )}
                   {uploading && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-sm">
                       <div className="h-8 w-8 rounded-full border-2 border-accent/20 border-t-accent animate-spin" />
-                      <span className="text-xs font-black text-accent animate-pulse">جاري الرفع...</span>
+                      <span className="text-xs font-black text-accent animate-pulse">{t("hr.uploading")}</span>
                     </div>
                   )}
                 </div>
@@ -117,7 +119,7 @@ export default function PersonalTab({
                       setFormData((p) => ({ ...p, profileImageUrl: "" }));
                     }}
                     className="absolute -top-2 -left-2 h-8 w-8 rounded-full bg-danger-soft text-danger shadow-sm flex items-center justify-center hover:bg-danger/15 transition-colors border-2 border-card"
-                    title="إزالة الصورة"
+                    title={t("hr.removePhoto")}
                   >
                     <X size={14} strokeWidth={3} />
                   </button>
@@ -125,19 +127,19 @@ export default function PersonalTab({
               </div>
               <div className="text-center space-y-1">
                 <h3 className="text-[17px] font-black text-main leading-tight">
-                  {formData.fullName || "اسم الموظف الجديد"}
+                  {formData.fullName || t("hr.noName")}
                 </h3>
                 <p className="text-[11px] font-bold text-accent uppercase tracking-widest flex items-center justify-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent" /> {blueprint.title}
                 </p>
-                <p className="text-xs font-bold text-muted">يُفضل صورة مربعة 500×500 بصيغة JPG أو PNG</p>
+                <p className="text-xs font-bold text-muted">{t("hr.photoHint")}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <User size={14} /> الاسم الكامل
+                  <User size={14} /> {t("hr.fullName")}
                 </label>
                 <Input
                   value={formData.fullName}
@@ -145,7 +147,7 @@ export default function PersonalTab({
                     setFormData({ ...formData, fullName: e.target.value })
                   }
                   className={FIELD_INPUT_CLASS}
-                  placeholder="أدخل الاسم الثلاثي..."
+                  placeholder={t("hr.employeeName")}
                   maxLength={NAME_MAX}
                   aria-invalid={Boolean(nameError)}
                   aria-describedby={nameError ? "employee-name-error" : undefined}
@@ -156,7 +158,7 @@ export default function PersonalTab({
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <Phone size={14} /> الجوال الأساسي
+                  <Phone size={14} /> {t("hr.phonePrimary")}
                 </label>
                 <Input
                   value={formData.phonePrimary}
@@ -187,7 +189,7 @@ export default function PersonalTab({
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <Mail size={14} /> البريد الإلكتروني
+                  <Mail size={14} /> {t("hr.email")}
                 </label>
                 <Input
                   type="email"
@@ -207,7 +209,7 @@ export default function PersonalTab({
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <ShieldCheck size={14} /> رقم الهوية
+                  <ShieldCheck size={14} /> {t("hr.nationalId")}
                 </label>
                 <Input
                   value={formData.nationalId}
@@ -231,18 +233,18 @@ export default function PersonalTab({
                   */
                   <p className="flex items-center gap-1.5 text-xs font-bold text-success">
                     <CheckCircle2 size={13} className="shrink-0" aria-hidden="true" />
-                    مولود في {idAnalysis.info.birthDate} — {idAnalysis.info.governorateName}
+                    {t("hr.birthDateAuto", { date: idAnalysis.info.birthDate, governorate: idAnalysis.info.governorateName })}
                   </p>
                 ) : (
                   <p className="text-[11px] font-bold text-muted">
-                    {NATIONAL_ID_LENGTH} رقمًا تبدأ بـ 2 أو 3 — يُستخرج منها تاريخ
-                    الميلاد تلقائيًا
+                    {t("hr.idInfo")}
+            
                   </p>
                 )}
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <Calendar size={14} /> تاريخ الميلاد
+                  <Calendar size={14} /> {t("hr.birthDate")}
                 </label>
                 <Input
                   type="date"
@@ -260,7 +262,7 @@ export default function PersonalTab({
               </div>
               <div className="md:col-span-2 space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <MapPin size={14} /> العنوان التفصيلي
+                  <MapPin size={14} /> {t("hr.address")}
                 </label>
                 <Input
                   value={formData.detailedAddress}
@@ -275,7 +277,7 @@ export default function PersonalTab({
               </div>
               <div className="md:col-span-2 space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <FileText size={14} /> نبذة مهنية (بالعربية)
+                  <FileText size={14} /> {t("hr.professionalBioAr")}
                 </label>
                 <textarea
                   value={formData.bioAr}

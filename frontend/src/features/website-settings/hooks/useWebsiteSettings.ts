@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import api from "@/services/api";
 import { adaptObject } from "@/services/apiAdapter";
 import type { BusinessSettings, SettingsState } from "@/types/website";
@@ -25,36 +26,12 @@ import {
 } from "../lib/heroVideo";
 
 const SUB_TABS = [
-  {
-    id: "content",
-    label: "المحتوى",
-    description: "العنوان الرئيسي، وصف الصفحة، وقسم من نحن.",
-  },
-  {
-    id: "sections",
-    label: "الأقسام",
-    description: "عناوين الأقسام، بطاقات الإحصاءات، وشارات الثقة.",
-  },
-  {
-    id: "portfolio",
-    label: "المعرض",
-    description: "صورة الغلاف الرئيسية وصور المعرض التي تظهر للعملاء.",
-  },
-  {
-    id: "social",
-    label: "التواصل",
-    description: "روابط السوشيال التي تظهر في صفحة العميل.",
-  },
-  {
-    id: "extras",
-    label: "نصوص إضافية",
-    description: "الشارات والعناوين العلوية ونصوص الختام.",
-  },
-  {
-    id: "design",
-    label: "التصميم",
-    description: "لون الهوية وخلفية الموقع كما ستظهر للزائر.",
-  },
+  { id: "content", key: "website.tabContent", descKey: "website.tabContentDesc" },
+  { id: "sections", key: "website.tabSections", descKey: "website.tabSectionsDesc" },
+  { id: "portfolio", key: "website.tabPortfolio", descKey: "website.tabPortfolioDesc" },
+  { id: "social", key: "website.tabSocial", descKey: "website.tabSocialDesc" },
+  { id: "extras", key: "website.tabExtras", descKey: "website.tabExtrasDesc" },
+  { id: "design", key: "website.tabDesign", descKey: "website.tabDesignDesc" },
 ];
 
 interface UseWebsiteSettingsProps {
@@ -63,6 +40,7 @@ interface UseWebsiteSettingsProps {
 }
 
 export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSettingsProps) {
+  const { t } = useTranslation("owner");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState("content");
@@ -217,7 +195,7 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
       });
     } catch (_err) {
       console.error("Failed to fetch website settings:", _err);
-      toast.error("فشل تحميل إعدادات الموقع");
+      toast.error(t("website.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -231,11 +209,11 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
     setSaving(true);
     try {
       await api.put("/business-settings", settings);
-      toast.success("تم حفظ إعدادات الموقع بنجاح");
+      toast.success(t("website.saveSuccess"));
       onSaved?.();
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
-      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || "فشل الحفظ — تحقق من البيانات ثم أعد المحاولة";
+      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || t("website.saveFailed");
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -246,7 +224,7 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
     const file = e.target.files?.[0];
     if (!file || !validateImageSize(file, GALLERY_UPLOAD_MAX_SIZE)) return;
     if ((settings.landingPortfolio?.length || 0) >= 20) {
-      toast.error("الحد الأقصى 20 صورة في المعرض");
+      toast.error(t("website.galleryMax"));
       e.target.value = "";
       return;
     }
@@ -255,7 +233,7 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
     formData.append("file", file);
 
     try {
-      toast.loading("جاري رفع الصورة...", { id: "upload" });
+      toast.loading(t("website.imageUploading"), { id: "upload" });
       const res = await api.post("/business-settings/media", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
@@ -266,10 +244,10 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
         ...prev,
         landingPortfolio: [...(prev.landingPortfolio || []), newUrl],
       }));
-      toast.success("تم إضافة الصورة للمعرض", { id: "upload" });
+      toast.success(t("website.imageAdded"), { id: "upload" });
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
-      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || "فشل رفع الصورة";
+      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || t("website.imageUploadFailed");
       toast.error(msg, { id: "upload" });
     } finally {
       e.target.value = "";
@@ -284,7 +262,7 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
     formData.append("file", file);
 
     try {
-      toast.loading("جاري رفع صورة الغلاف...", { id: "cover-upload" });
+      toast.loading(t("website.coverUploading"), { id: "cover-upload" });
       const res = await api.post("/business-settings/media", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
@@ -294,10 +272,10 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
         ...prev,
         landingCoverImageUrl: data.url || "",
       }));
-      toast.success("تم تحديث صورة الغلاف", { id: "cover-upload" });
+      toast.success(t("website.coverUpdated"), { id: "cover-upload" });
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
-      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || "فشل رفع صورة الغلاف";
+      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || t("website.coverUploadFailed");
       toast.error(msg, { id: "cover-upload" });
     } finally {
       e.target.value = "";
@@ -330,13 +308,13 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
     if (!file) return;
 
     if (!HERO_VIDEO_ACCEPT.split(",").some((ext) => file.name.toLowerCase().endsWith(ext))) {
-      toast.error("صيغة الفيديو غير مدعومة. استخدم MP4 أو WebM.", { id: "video-upload" });
+      toast.error(t("website.videoFormat"), { id: "video-upload" });
       e.target.value = "";
       return;
     }
     if (file.size > HERO_VIDEO_MAX_SIZE) {
       toast.error(
-        `حجم الفيديو كبير جداً (${(file.size / 1024 / 1024).toFixed(1)} م.ب). الحد الأقصى 25 م.ب.`,
+        t("website.videoTooBig", { size: (file.size / 1024 / 1024).toFixed(1) }),
         { id: "video-upload" },
       );
       e.target.value = "";
@@ -356,12 +334,12 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
     formData.append("file", file);
 
     try {
-      toast.loading("جاري رفع فيديو الغلاف...", { id: "video-upload" });
+      toast.loading(t("website.videoUploading"), { id: "video-upload" });
       const res = await api.post("/business-settings/hero-video", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       const data = adaptObject(res, {}) as { url?: string };
-      if (!data.url) throw new Error("لم يُرجع الخادم رابطاً للفيديو");
+      if (!data.url) throw new Error(t("website.videoNoUrl"));
 
       setSettings((prev) => ({
         ...prev,
@@ -372,10 +350,10 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
         landingVideoAutoplay: true,
         landingVideoMuted: true,
       }));
-      toast.success("تم رفع فيديو الغلاف", { id: "video-upload" });
+      toast.success(t("website.videoUploaded"), { id: "video-upload" });
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
-      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || "فشل رفع الفيديو";
+      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || t("website.videoUploadFailed");
       toast.error(msg, { id: "video-upload" });
     } finally {
       e.target.value = "";

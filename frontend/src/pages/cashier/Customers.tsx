@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui";
 import InlineNotice from "@/components/shared/InlineNotice";
 
@@ -24,6 +26,7 @@ import {
   CustomerFormDialog,
   CustomerDeleteDialog,
 } from "@/features/customers";
+import { customerId } from "@/features/customers/utils/customer";
 
 export default function Customers() {
   return (
@@ -34,12 +37,14 @@ export default function Customers() {
 }
 
 function CustomersInner() {
+  const { t } = useTranslation("customers");
   const navigate = useNavigate();
   const { user } = useAuth();
   const isOwner = user?.role === "owner" || user?.role === "admin";
   const isManagerOrOwner =
     isOwner || user?.role === "manager" || user?.role === "accountant";
   const [isMergeOpen, setIsMergeOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
   const {
     searchTerm,
     setSearchTerm,
@@ -79,21 +84,46 @@ function CustomersInner() {
   } = useCustomerDialogs(refreshAll, removeCustomer);
 
   const isFiltering = searchTerm.trim() !== "" || activeFilter !== "الكل";
+
+  const toggleSelect = (id: number | string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.size === customers.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(customers.map((c) => customerId(c)).filter(Boolean)));
+    }
+  };
+  const isAllSelected = customers.length > 0 && selectedIds.size === customers.length;
+  const isSomeSelected = selectedIds.size > 0;
+
+  const handleBulkDelete = () => {
+    if (!window.confirm(t("bulk.deleteConfirm", { count: selectedIds.size }))) return;
+    selectedIds.forEach((id) => removeCustomer(id));
+    setSelectedIds(new Set());
+  };
+
   const emptyTitle =
-    stats.total === 0 ? "لا يوجد عملاء" : "لا توجد نتائج مطابقة";
+    stats.total === 0 ? t("empty.noCustomers") : t("empty.noResults");
   const emptyHint =
     stats.total === 0
-      ? "أضف أول عميل من زر إضافة عميل"
-      : "جرّب كلمة بحث مختلفة أو غيّر الفلتر";
+      ? t("empty.noCustomersHint")
+      : t("empty.noResultsHint");
 
   if (loading && customers.length === 0) {
     return (
       <PageShell>
         <PageHeader
-          title="سجل العملاء"
-          subtitle="إدارة قاعدة البيانات وبناء علاقات ولاء مستدامة"
+          title={t("page.title")}
+          subtitle={t("page.subtitle")}
         />
-        <LoadingState variant="page" label="جاري تحميل العملاء..." />
+        <LoadingState variant="page" label={t("page.loading")} />
       </PageShell>
     );
   }
@@ -108,9 +138,35 @@ function CustomersInner() {
         onImported={refreshAll}
       />
 
-      {statsError && !loading && (
-        <InlineNotice tone="warning">{statsError}</InlineNotice>
-      )}
+        {isSomeSelected && (
+          <div className="p-4 bg-soft border border-border/40 rounded-xl flex items-center justify-between">
+            <span className="font-bold text-main">
+              {t("bulk.selected", { count: selectedIds.size })}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleSelectAll}
+                className="h-8 text-xs"
+              >
+                {isAllSelected ? t("bulk.selectNone") : t("bulk.selectAll")}
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleBulkDelete}
+                className="h-8 text-xs"
+                aria-label={t("bulk.deleteSelected")}
+              >
+                {t("bulk.delete")}
+              </Button>
+            </div>
+          </div>
+        )}
+        {statsError && !loading && (
+          <InlineNotice tone="warning">{statsError}</InlineNotice>
+        )}
 
       <CustomerKpis stats={stats} />
 
@@ -153,6 +209,10 @@ function CustomersInner() {
               setSearchTerm("");
               setActiveFilter("الكل");
             }}
+            selectedIds={selectedIds}
+            onSelect={toggleSelect}
+            onSelectAll={toggleSelectAll}
+            isAllSelected={isAllSelected}
           />
         )}
 
@@ -170,6 +230,8 @@ function CustomersInner() {
               setSearchTerm("");
               setActiveFilter("الكل");
             }}
+            selectedIds={selectedIds}
+            onSelect={toggleSelect}
           />
         )}
         {totalPages > 1 ? (

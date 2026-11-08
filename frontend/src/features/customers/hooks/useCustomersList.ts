@@ -14,6 +14,7 @@ import { normalizeListResponse } from "@/services/apiAdapter";
 import { exportService } from "@/services/exportService";
 import { CUSTOMERS_PAGE_SIZE } from "@/features/customers/constants";
 import { customerId } from "@/features/customers/utils/customer";
+import { useTranslation } from "react-i18next";
 
 const SEGMENT_BY_FILTER: Record<string, string> = {
   "الكل": "all",
@@ -67,6 +68,7 @@ function readStats(res: unknown): CustomerStats {
 }
 
 export function useCustomersList() {
+  const { t } = useTranslation("customers");
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeFilter, setActiveFilterState] = useState("الكل");
@@ -119,7 +121,7 @@ export function useCustomersList() {
       // The KPI row above the list was silently zero, which reads as "you have no
       // customers" rather than "the totals could not be loaded".
       console.error("Customers stats error:", error);
-      setStatsError(loadErrorMessage(error, "إحصائيات العملاء"));
+      setStatsError(loadErrorMessage(error, t("toasts.statsFailed")));
     }
   }, []);
 
@@ -140,7 +142,7 @@ export function useCustomersList() {
       setTotalCount(readTotal(response, items.length));
     } catch (error) {
       console.error("Customers fetch error:", error);
-      toast.error("فشل في تحميل بيانات العملاء");
+      toast.error(t("toasts.loadFailed"));
       setCustomers([]);
     } finally {
       setLoading(false);

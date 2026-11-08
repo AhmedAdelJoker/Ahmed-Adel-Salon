@@ -51,7 +51,7 @@ const alert = (over: Record<string, unknown> = {}) => ({
   message: "INV-1042",
   priority: "high",
   occurred_at: "2026-10-04T09:00:00",
-  destination: "/owner/adjustment-requests",
+  destination: "/approvals",
   ...over,
 });
 

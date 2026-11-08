@@ -57,6 +57,12 @@ function getUserId(user: AuthUser | null | undefined): ID | null {
 }
 
 function buildSocketUrl(userId: ID): string {
+  // The router lives under the API prefix (`app.include_router(api_router,
+  // prefix="/api/v1")` in `backend/app/main.py`), so the socket is at
+  // `/api/v1/notifications/ws/{user_id}`. The un-prefixed default never
+  // matched: the handshake 404'd, the socket retried three times and fell back
+  // to 30-second polling — silently, because a failed upgrade is only a console
+  // line. The env override stays for a packaged build served from another base.
   const basePath =
     import.meta.env.VITE_WS_NOTIFICATIONS_PATH || "/api/v1/notifications/ws";
   const configuredBase = import.meta.env.VITE_WS_URL?.replace(/\/$/, "");
@@ -141,7 +147,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         // Fallback to polling
         pollIntervalRef.current = setInterval(pollNotifications, 30000);
         pollNotifications(); // initial
-        setConnected(true);
+        setConnected(false);
         return;
       }
 

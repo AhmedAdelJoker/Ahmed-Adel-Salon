@@ -4,6 +4,19 @@
  */
 import { useEffect, useMemo, useState } from "react";
 
+/**
+ * normalizeArabic — يزيلiformات الهمزة ويوحد الألف للتMatcher البحث بغض النظر عن
+ * طريقة كتابة الهمزة (أ، إ، آ، ا) في قاعدة البيانات أو حقل البحث.
+ */
+function normalizeArabic(text: string): string {
+  return text
+    .replace(/[أإآ]/g, "ا")
+    .replace(/[ة]/g, "ه")
+    .replace(/[ى]/g, "ي")
+    .toLowerCase()
+    .trim();
+}
+
 export function useReceptionBoard(appointments: any[] = []) {
   const [searchTerm, setSearchTerm] = useState("");
   const [barberFilter, setBarberFilter] = useState("all");
@@ -17,7 +30,7 @@ export function useReceptionBoard(appointments: any[] = []) {
     return () => clearInterval(t);
   }, []);
 
-  const q = searchTerm.trim().toLowerCase();
+  const q = normalizeArabic(searchTerm.trim());
 
   const filteredAppointments = useMemo(() => {
     const list = appointments || [];
@@ -26,8 +39,9 @@ export function useReceptionBoard(appointments: any[] = []) {
       if (barberFilter !== "all" && String(a.barber_id) !== barberFilter)
         return false;
       if (q) {
-        const hay =
-          `${a.customer_name || ""} ${a.customer_phone || ""}`.toLowerCase();
+        const hay = normalizeArabic(
+          `${a.customer_name || ""} ${a.customer_phone || ""}`,
+        );
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -50,16 +64,12 @@ export function useReceptionBoard(appointments: any[] = []) {
   );
   const reviewList = useMemo(
     () =>
-      filteredAppointments.filter(
-        (a) => a.status?.toLowerCase() === "completed",
-      ),
+      filteredAppointments.filter((a) => a.status?.toLowerCase() === "completed"),
     [filteredAppointments],
   );
   const atCashierList = useMemo(
     () =>
-      filteredAppointments.filter(
-        (a) => a.status?.toLowerCase() === "ready_for_payment",
-      ),
+      filteredAppointments.filter((a) => a.status?.toLowerCase() === "ready_for_payment"),
     [filteredAppointments],
   );
   const doneList = useMemo(

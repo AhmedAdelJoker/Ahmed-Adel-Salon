@@ -136,7 +136,7 @@ describe("route registry integrity", () => {
       "/inventory/bundles",
       "/expenses/archive",
       "/owner/expenses/archive",
-      "/owner/hr/archive",
+      "/manager/hr/archive",
       "/owner/payroll/archive",
     ]);
     for (const path of DRILLDOWNS) reachable.add(path);
@@ -159,7 +159,7 @@ describe("route registry integrity", () => {
       "/inventory/bundles": "/inventory",
       "/expenses/archive": "/expenses",
       "/owner/expenses/archive": "/expenses",
-      "/owner/hr/archive": "/owner/hr",
+      "/manager/hr/archive": "/manager/hr",
       "/owner/payroll/archive": "/owner/payroll",
     };
     for (const [drilldown, parent] of Object.entries(PAIRS)) {

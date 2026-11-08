@@ -50,6 +50,7 @@ import {
 import { staticURL } from "@/services/api";
 import { useProductBundles } from "@/features/product-bundles";
 import { currencyLabel } from "@/lib/core/currency";
+import { useTranslation } from "react-i18next";
 
 function resolveBundleImage(offer: any): string {
   if (!offer?.image_url) return "";
@@ -57,6 +58,7 @@ function resolveBundleImage(offer: any): string {
 }
 
 export default function ProductBundles() {
+  const { t } = useTranslation("owner");
   const navigate = useNavigate();
   const {
     offers,
@@ -157,9 +159,9 @@ export default function ProductBundles() {
     return (
       <div className="erp-page space-y-6 pb-10">
         <PageHeader
-          title="حزم المنتجات"
-          subtitle="تحفيز المبيعات عبر باقات ذكية — قراءة وإدارة"
-          badge="إدارة الحزم"
+          title={t("productBundles.title")}
+          subtitle={t("productBundles.subtitle")}
+          badge={t("productBundles.badge")}
           icon={Gift}
         />
         <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -181,9 +183,9 @@ export default function ProductBundles() {
   return (
     <div className="erp-page space-y-6 pb-10">
       <PageHeader
-        title="حزم المنتجات"
-        subtitle="تحفيز المبيعات عبر باقات اقتصادية مربوطة بالمخزون — إدارة ذكية"
-        badge="إدارة الحزم"
+        title={t("productBundles.title")}
+        subtitle={t("productBundles.subtitle2")}
+        badge={t("productBundles.badge2")}
         icon={Gift}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -192,13 +194,13 @@ export default function ProductBundles() {
               onClick={() => navigate("/inventory")}
               className="h-11 rounded-xl px-4 font-black border-border bg-card"
             >
-              المستودع
+              {t("productBundles.warehouse")}
             </Button>
             <Button
               onClick={openCreate}
               className="h-11 rounded-xl px-5 font-black shadow-lg shadow-primary/20"
             >
-              <Gift size={16} className="ms-1.5" /> إنشاء باقة
+              <Gift size={16} className="ms-1.5" /> {t("productBundles.createBundle")}
             </Button>
           </div>
         }
@@ -206,11 +208,11 @@ export default function ProductBundles() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <StatCard label="إجمالي الحزم" value={formatNumber(stats.total)} icon={Gift} variant="primary" delay={0} />
-        <StatCard label="النشط" value={formatNumber(stats.active)} icon={CheckCircle2} variant="success" delay={0.05} />
-        <StatCard label="المنشور بالموقع" value={formatNumber(stats.pub)} icon={Globe} variant="info" delay={0.1} />
+        <StatCard label={t("productBundles.statTotal")} value={formatNumber(stats.total)} icon={Gift} variant="primary" delay={0} />
+        <StatCard label={t("productBundles.statActive")} value={formatNumber(stats.active)} icon={CheckCircle2} variant="success" delay={0.05} />
+        <StatCard label={t("productBundles.statPublished")} value={formatNumber(stats.pub)} icon={Globe} variant="info" delay={0.1} />
         <StatCard
-          label="متوسط الخصم"
+          label={t("productBundles.statAvgDiscount")}
           value={`${formatNumber(stats.avgDiscount)}%`}
           icon={Tag}
           variant={stats.avgDiscount >= 30 ? "success" : stats.avgDiscount >= 10 ? "warning" : "secondary"}
@@ -222,7 +224,7 @@ export default function ProductBundles() {
       <PremiumCard className="p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-3">
           <Search size={14} className="text-primary" />
-          <span className="text-xs font-black text-muted uppercase tracking-widest">بحث وفلترة الحزم</span>
+          <span className="text-xs font-black text-muted uppercase tracking-widest">{t("productBundles.searchFilter")}</span>
           {hasActiveFilters && (
             <Button
               variant="ghost"
@@ -230,14 +232,14 @@ export default function ProductBundles() {
               onClick={handleResetFilters}
               className="me-auto h-8 gap-1 rounded-xl text-xs font-black"
             >
-              <RotateCcw size={12} /> إعادة ضبط
+              <RotateCcw size={12} /> {t("productBundles.reset")}
             </Button>
           )}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1.6fr_1fr_auto]">
           <div className="space-y-1.5">
             <label htmlFor="bundle-search" className="text-[10px] font-black text-muted uppercase">
-              بحث في الحزم
+              {t("productBundles.searchAria")}
             </label>
             <div className="relative">
               <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
@@ -245,31 +247,31 @@ export default function ProductBundles() {
                 id="bundle-search"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="ابحث باسم الحزمة أو الوصف..."
-                aria-label="بحث في الحزم"
+                placeholder={t("productBundles.searchPlaceholder")}
+                aria-label={t("productBundles.searchAria")}
                 className="h-11 pe-10 rounded-xl bg-soft border-border font-bold"
               />
             </div>
           </div>
           <div className="space-y-1.5">
             <label htmlFor="bundle-status" className="text-[10px] font-black text-muted uppercase">
-              حالة الحزمة
+              {t("productBundles.statusFilter")}
             </label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger id="bundle-status" className="h-11 w-full rounded-xl bg-soft border-border font-bold">
-                <SelectValue placeholder="الحالة" />
+                <SelectValue placeholder={t("productBundles.statusShort")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">الكل</SelectItem>
-                <SelectItem value="active">النشط فقط</SelectItem>
-                <SelectItem value="inactive">المعطل</SelectItem>
-                <SelectItem value="public">المنشور بالموقع</SelectItem>
+                <SelectItem value="all">{t("productBundles.statusAll")}</SelectItem>
+                <SelectItem value="active">{t("productBundles.statusActive")}</SelectItem>
+                <SelectItem value="inactive">{t("productBundles.statusInactive")}</SelectItem>
+                <SelectItem value="public">{t("productBundles.statusPublic")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="flex items-end">
             <Badge variant="primary" className="rounded-full h-11 px-5 text-xs font-black tabular-nums">
-              {formatNumber(filteredOffers.length)} من {formatNumber(offers.length)} حزمة
+              {t("productBundles.countLabel", { filtered: formatNumber(filteredOffers.length), total: formatNumber(offers.length) })}
             </Badge>
           </div>
         </div>
@@ -307,7 +309,7 @@ export default function ProductBundles() {
                       <div className="h-14 w-14 rounded-2xl bg-card border border-border flex items-center justify-center shadow-sm">
                         <Gift size={26} className="opacity-60" />
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest opacity-60">بدون صورة</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest opacity-60">{t("productBundles.noImage")}</span>
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent pointer-events-none" />
@@ -317,11 +319,11 @@ export default function ProductBundles() {
                       size="sm"
                       className="rounded-full border shadow-sm"
                     >
-                      {isOffActive ? "نشط" : "معطل"}
+                      {isOffActive ? t("productBundles.active") : t("productBundles.inactive")}
                     </Badge>
                     {offer.is_public && (
                       <Badge variant="primary" size="sm" className="rounded-full border shadow-sm">
-                        <Globe size={10} /> منشور
+                        <Globe size={10} /> {t("productBundles.published")}
                       </Badge>
                     )}
                   </div>
@@ -334,12 +336,12 @@ export default function ProductBundles() {
 
                 <div className="p-5 sm:p-6 space-y-4 flex-1 flex flex-col">
                   <p className="text-xs font-bold text-muted leading-relaxed min-h-[2.2rem] line-clamp-2">
-                    {offer.description_ar || "— بدون وصف"}
+                    {offer.description_ar || t("productBundles.noDescription")}
                   </p>
 
                   <div className="space-y-2 flex-1">
                     <div className="text-[10px] font-black text-muted uppercase tracking-widest flex items-center gap-1.5">
-                      <Package size={12} className="text-primary" /> محتويات الحزمة
+                      <Package size={12} className="text-primary" /> {t("productBundles.contents")}
                       <span className="me-auto tabular-nums text-[10px] bg-soft border border-border rounded-full px-2 py-0.5">
                         {offer.offer_products?.length || 0}
                       </span>
@@ -358,17 +360,17 @@ export default function ProductBundles() {
                         </div>
                       ))}
                       {(offer.offer_products?.length || 0) > 4 && (
-                        <div className="text-[11px] font-bold text-muted text-center">+{offer.offer_products.length - 4} منتجات أخرى</div>
+                        <div className="text-[11px] font-bold text-muted text-center">{t("productBundles.moreProducts", { count: offer.offer_products.length - 4 })}</div>
                       )}
                       {(offer.offer_products?.length || 0) === 0 && (
-                        <div className="text-[11px] font-bold text-muted text-center py-2">لا توجد منتجات</div>
+                        <div className="text-[11px] font-bold text-muted text-center py-2">{t("productBundles.noProducts")}</div>
                       )}
                     </div>
                   </div>
 
                   <div className="pt-4 border-t border-dashed flex items-end justify-between gap-3">
                     <div className="space-y-1 min-w-0">
-                      <div className="text-[9px] font-black text-muted uppercase tracking-[0.18em]">سعر العرض</div>
+                      <div className="text-[9px] font-black text-muted uppercase tracking-[0.18em]">{t("productBundles.offerPrice")}</div>
                       <div className="text-2xl font-black text-success tabular-nums truncate">{formatCurrency(offer.offer_price)}</div>
                     </div>
                     <div className="text-left space-y-1 shrink-0">
@@ -379,7 +381,7 @@ export default function ProductBundles() {
                         variant={discount >= 30 ? "success" : discount >= 10 ? "warning" : "secondary"}
                         className="rounded-full font-black tabular-nums"
                       >
-                        وفر {discount}%
+                        {t("productBundles.save", { discount })}
                       </Badge>
                     </div>
                   </div>
@@ -390,8 +392,8 @@ export default function ProductBundles() {
                       size="icon"
                       onClick={() => setDeleteTarget(offer)}
                       className="h-10 w-10 rounded-xl text-danger hover:bg-danger-soft hover:text-danger border border-transparent hover:border-danger/20 shrink-0"
-                      title="حذف"
-                      aria-label={`حذف ${offer.name_ar || offer.name}`}
+                      title={t("productBundles.delete")}
+                      aria-label={t("productBundles.deleteAria", { name: offer.name_ar || offer.name })}
                     >
                       <Trash2 size={16} />
                     </Button>
@@ -400,8 +402,8 @@ export default function ProductBundles() {
                       size="icon"
                       onClick={() => openDuplicate(offer)}
                       className="h-10 w-10 rounded-xl border-border bg-card hover:bg-soft hover:border-primary/20 text-muted hover:text-primary shrink-0"
-                      title="استنساخ الحزمة"
-                      aria-label={`نسخ ${offer.name_ar || offer.name}`}
+                      title={t("productBundles.duplicate")}
+                      aria-label={t("productBundles.duplicateAria", { name: offer.name_ar || offer.name })}
                     >
                       <Copy size={16} />
                     </Button>
@@ -415,7 +417,7 @@ export default function ProductBundles() {
                           ? "text-muted hover:text-danger hover:bg-danger-soft hover:border-danger/20"
                           : "text-success hover:bg-success-soft border-success/20",
                       )}
-                      title={isOffActive ? "تعطيل" : "تفعيل"}
+                      title={isOffActive ? t("productBundles.toggleDisable") : t("productBundles.toggleEnable")}
                     >
                       {togglingId === offer.id ? (
                         <RefreshCw size={14} className="animate-spin" />
@@ -424,14 +426,14 @@ export default function ProductBundles() {
                       ) : (
                         <Power size={14} className="ms-1" />
                       )}
-                      <span className="hidden xs:inline">{isOffActive ? "تعطيل" : "تفعيل"}</span>
+                      <span className="hidden xs:inline">{isOffActive ? t("productBundles.toggleDisable") : t("productBundles.toggleEnable")}</span>
                     </Button>
                     <Button
                       variant="outline"
                       onClick={() => openEdit(offer)}
                       className="flex-1 h-10 rounded-xl font-black text-xs hover:bg-primary hover:text-white hover:border-primary transition-colors min-w-0"
                     >
-                      تعديل
+                      {t("productBundles.edit")}
                     </Button>
                   </div>
                 </div>
@@ -444,23 +446,23 @@ export default function ProductBundles() {
           <div className="p-4 sm:p-6">
             {offers.length === 0 ? (
               <EmptyState
-                title="لا توجد عروض منتجات"
-                message="ابدأ بإنشاء أول حزمة منتجات (Bundle) لزيادة مبيعاتك وتفريغ المخزون الراكد."
+                title={t("productBundles.noOffers")}
+                message={t("productBundles.noOffersHint")}
                 icon={Gift}
                 action={
                   <Button onClick={openCreate} className="h-11 rounded-xl px-6 font-black">
-                    إنشاء حزمة
+                    {t("productBundles.createBundle")}
                   </Button>
                 }
               />
             ) : (
               <EmptyState
-                title="لا نتائج"
-                message="لم نجد حزماً تطابق بحثك — جرب توسيع الفلتر أو مسح البحث."
+                title={t("productBundles.noResults")}
+                message={t("productBundles.noResultsHint")}
                 icon={Search}
                 action={
                   <Button variant="outline" onClick={handleResetFilters} className="h-10 rounded-xl font-black">
-                    <RotateCcw size={14} className="ms-1.5" /> مسح الفلترة
+                    <RotateCcw size={14} className="ms-1.5" /> {t("productBundles.clearFilter")}
                   </Button>
                 }
               />
@@ -473,10 +475,10 @@ export default function ProductBundles() {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(v) => !v && setDeleteTarget(null)}
-        title="حذف الحزمة؟"
-        description={deleteTarget ? `سيتم حذف "${deleteTarget.name_ar || deleteTarget.name}" نهائياً ولا يمكن التراجع.` : undefined}
-        confirmText="حذف"
-        cancelText="إلغاء"
+        title={t("productBundles.deleteTitle")}
+        description={deleteTarget ? t("productBundles.deleteDesc", { name: String(deleteTarget.name_ar || deleteTarget.name) }) : undefined}
+        confirmText={t("productBundles.deleteConfirm")}
+        cancelText={t("productBundles.deleteCancel")}
         variant="danger"
         loading={deleting}
         onConfirm={onConfirmDelete}
@@ -491,10 +493,10 @@ export default function ProductBundles() {
               <div className="h-11 w-11 rounded-2xl bg-primary text-white flex items-center justify-center shadow-md shrink-0">
                 <Sparkles size={22} />
               </div>
-              <span className="truncate">{editingId ? "تعديل حزمة المنتجات" : "هندسة حزمة منتجات احترافية"}</span>
+              <span className="truncate">{editingId ? t("productBundles.editBundle") : t("productBundles.newBundle")}</span>
             </DialogTitle>
             <DialogDescription className="text-muted font-bold mt-2 me-[52px] text-xs sm:text-sm">
-              قم بدمج المنتجات وتحديد السعر التنافسي لجذب العملاء.
+              {t("productBundles.newBundleDesc")}
             </DialogDescription>
           </DialogHeader>
 
@@ -502,7 +504,7 @@ export default function ProductBundles() {
             {/* Right form */}
             <div className="lg:col-span-5 space-y-6">
               <div className="space-y-3">
-                <span className="text-[10px] font-black text-muted uppercase tracking-widest">هوية العرض البصرية</span>
+                <span className="text-[10px] font-black text-muted uppercase tracking-widest">{t("productBundles.visualIdentity")}</span>
                 <div className="relative group aspect-[16/10] rounded-[1.6rem] border-2 border-dashed border-border bg-soft/50 flex flex-col items-center justify-center transition-all hover:border-primary/30 overflow-hidden">
                   {formData.image_url ? (
                     <>
@@ -521,7 +523,7 @@ export default function ProductBundles() {
                           onClick={() => (document.getElementById("bundle-img") as HTMLInputElement | null)?.click()}
                           className="rounded-xl font-black h-9"
                         >
-                          تغيير
+                          {t("productBundles.changeImage")}
                         </Button>
                         <Button
                           size="sm"
@@ -529,7 +531,7 @@ export default function ProductBundles() {
                           onClick={() => setFormData((p: any) => ({ ...p, image_url: "" }))}
                           className="rounded-xl font-black h-9"
                         >
-                          حذف
+                          {t("productBundles.deleteImage")}
                         </Button>
                       </div>
                     </>
@@ -548,8 +550,8 @@ export default function ProductBundles() {
                      >
 
                       {uploading ? <RefreshCw className="h-9 w-9 animate-spin" /> : <ImageIcon className="h-9 w-9" />}
-                      <span className="text-xs font-black">اسحب الصورة أو انقر هنا</span>
-                      <span className="text-[10px] font-bold opacity-60">PNG / JPG حتى 5MB</span>
+                      <span className="text-xs font-black">{t("productBundles.dropImage")}</span>
+                      <span className="text-[10px] font-bold opacity-60">{t("productBundles.imageFormat")}</span>
                     </div>
                   )}
                   <input id="bundle-img" type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
@@ -558,21 +560,21 @@ export default function ProductBundles() {
 
               <div className="space-y-4">
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-black text-main">اسم الحزمة التسويقي *</span>
+                  <span className="text-xs font-black text-main">{t("productBundles.bundleName")}</span>
                   <Input
                     value={formData.name_ar}
                     onChange={(e) => setFormData((p: any) => ({ ...p, name_ar: e.target.value }))}
-                    placeholder="مثلاً: صندوق العناية الرمضاني..."
+                    placeholder={t("productBundles.bundleNamePlaceholder")}
                     className="h-12 rounded-xl font-bold border-border bg-card"
                   />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-black text-main">نص العرض الإقناعي</span>
+                  <span className="text-xs font-black text-main">{t("productBundles.bundleDesc")}</span>
                   <textarea
                     value={formData.description_ar}
                     onChange={(e) => setFormData((p: any) => ({ ...p, description_ar: e.target.value }))}
                     className="w-full min-h-28 p-4 rounded-xl border border-border bg-card font-bold text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
-                    placeholder="اشرح للعميل لماذا يجب عليه شراء هذه الحزمة الآن..."
+                    placeholder={t("productBundles.bundleDescPlaceholder")}
                   />
                 </label>
               </div>
@@ -583,10 +585,10 @@ export default function ProductBundles() {
                 other page happened to leave — usually none.
               */}
               <div className="space-y-3">
-                <span className="text-[10px] font-black text-muted uppercase tracking-widest">نافذة الصلاحية</span>
+                <span className="text-[10px] font-black text-muted uppercase tracking-widest">{t("productBundles.validityPeriod")}</span>
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block space-y-1.5">
-                    <span className="text-xs font-black text-main">من تاريخ</span>
+                    <span className="text-xs font-black text-main">{t("productBundles.fromDate")}</span>
                     <Input
                       type="date"
                       value={formData.startDate}
@@ -595,7 +597,7 @@ export default function ProductBundles() {
                     />
                   </label>
                   <label className="block space-y-1.5">
-                    <span className="text-xs font-black text-main">إلى تاريخ</span>
+                    <span className="text-xs font-black text-main">{t("productBundles.toDate")}</span>
                     <Input
                       type="date"
                       value={formData.endDate}
@@ -605,25 +607,25 @@ export default function ProductBundles() {
                   </label>
                 </div>
                 {formData.startDate && formData.endDate && formData.endDate < formData.startDate && (
-                  <p className="text-[11px] font-bold text-danger">تاريخ النهاية قبل تاريخ البداية.</p>
+                  <p className="text-[11px] font-bold text-danger">{t("productBundles.invalidDateRange")}</p>
                 )}
               </div>
 
               <div className="p-5 sm:p-6 rounded-[1.6rem] bg-success-soft/50 border border-success/15 space-y-4">
                 <h4 className="font-black text-success flex items-center gap-2 text-sm">
-                  <Tag size={16} /> خوارزمية التسعير
+                  <Tag size={16} /> {t("productBundles.pricing")}
                 </h4>
                 <div className="flex items-center justify-between bg-card p-3.5 rounded-xl border border-border">
-                  <span className="text-xs font-black text-muted">إجمالي سعر المنتجات</span>
+                  <span className="text-xs font-black text-muted">{t("productBundles.totalPrice")}</span>
                   <span className="text-base font-black text-main tabular-nums">{formatCurrency(totalPrice)}</span>
                 </div>
                 <label className="block space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-main">سعر البيع المقترح *</span>
+                    <span className="text-xs font-black text-main">{t("productBundles.proposedPrice")}</span>
                     {discountPreview !== null && (
-                      <Badge variant="success" className="rounded-full font-black text-[10px]">خصم {discountPreview}%</Badge>
+                      <Badge variant="success" className="rounded-full font-black text-[10px]">{t("productBundles.discount", { discount: discountPreview })}</Badge>
                     )}
-                    {isPriceInvalid && <Badge variant="danger" className="rounded-full text-[10px]">يتجاوز الإجمالي</Badge>}
+                    {isPriceInvalid && <Badge variant="danger" className="rounded-full text-[10px]">{t("productBundles.priceExceeds")}</Badge>}
                   </div>
                   <div className="relative">
                     <Input
@@ -639,9 +641,9 @@ export default function ProductBundles() {
                     />
                     <div className={cn("absolute left-4 top-1/2 -translate-y-1/2 font-black text-sm", isPriceInvalid ? "text-danger" : "text-muted")}>{currencyLabel()}</div>
                   </div>
-                  {isPriceInvalid && <p className="text-[11px] font-bold text-danger">لا يمكن أن يتجاوز {formatCurrency(totalPrice)}</p>}
+                  {isPriceInvalid && <p className="text-[11px] font-bold text-danger">{t("productBundles.priceExceedsMsg", { total: formatCurrency(totalPrice) })}</p>}
                   {!isPriceInvalid && !isPriceEmpty && totalPrice === 0 && (
-                    <p className="text-[11px] font-bold text-muted">أضف منتجات أولاً لحساب الخصم بدقة</p>
+                    <p className="text-[11px] font-bold text-muted">{t("productBundles.noProductsHint")}</p>
                   )}
                 </label>
               </div>
@@ -653,7 +655,7 @@ export default function ProductBundles() {
                     <Package size={14} />
                   </div>
                   <div>
-                    <div className="text-[10px] font-black text-muted uppercase">منتجات</div>
+                    <div className="text-[10px] font-black text-muted uppercase">{t("productBundles.products")}</div>
                     <div className="text-sm font-black text-main tabular-nums">{formatNumber(formData.products.length)}</div>
                   </div>
                 </div>
@@ -662,7 +664,7 @@ export default function ProductBundles() {
                     <Tag size={14} />
                   </div>
                   <div>
-                    <div className="text-[10px] font-black text-muted uppercase">القيمة</div>
+                    <div className="text-[10px] font-black text-muted uppercase">{t("productBundles.value")}</div>
                     <div className="text-sm font-black text-main tabular-nums">{formatCurrency(totalPrice)}</div>
                   </div>
                 </div>
@@ -677,18 +679,18 @@ export default function ProductBundles() {
                     <div className="h-8 w-8 rounded-xl bg-primary-soft text-primary flex items-center justify-center font-black text-xs border border-primary/10">
                       {formData.products.length}
                     </div>
-                    <span className="font-black text-main text-sm">المنتجات المختارة</span>
+                    <span className="font-black text-main text-sm">{t("productBundles.selectedProducts")}</span>
                   </div>
                   {totalPrice > 0 && (
                     <span className="hidden sm:inline text-[10px] font-black text-muted bg-soft px-3 py-1.5 rounded-full border border-border tabular-nums">
-                      الفعلية: {formatCurrency(totalPrice)}
+                      {t("productBundles.actualPrice", { price: formatCurrency(totalPrice) })}
                     </span>
                   )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar min-h-[160px] max-h-[320px]">
                   {formData.products.length > 0 ? (
-                    <AnimatePresence mode="popLayout">
+                    <AnimatePresence>
                       {formData.products.map((p: any) => (
                         <motion.div
                           layout
@@ -704,7 +706,7 @@ export default function ProductBundles() {
                             </div>
                             <div className="min-w-0">
                               <div className="text-sm font-black text-main truncate">{p.name}</div>
-                              <div className="text-[10px] font-bold text-muted tabular-nums">{formatCurrency(p.price)} / وحدة</div>
+                              <div className="text-[10px] font-bold text-muted tabular-nums">{t("productBundles.unitPrice", { price: formatCurrency(p.price) })}</div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
@@ -768,7 +770,7 @@ export default function ProductBundles() {
                       <div className="p-5 rounded-full bg-card border border-border">
                         <Archive size={32} strokeWidth={1.4} />
                       </div>
-                      <span className="text-xs font-black uppercase tracking-widest text-center max-w-[22ch]">أضف منتجات من القائمة بالأسفل لبناء الحزمة</span>
+                      <span className="text-xs font-black uppercase tracking-widest text-center max-w-[22ch]">{t("productBundles.selectProduct")}</span>
                     </div>
                   )}
                 </div>
@@ -776,8 +778,8 @@ export default function ProductBundles() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-muted uppercase tracking-widest">المنتجات المتاحة</span>
-                  <span className="text-[10px] font-bold text-muted tabular-nums">{formatNumber(availableProducts.length)} متاح</span>
+                  <span className="text-xs font-black text-muted uppercase tracking-widest">{t("productBundles.availableProducts")}</span>
+                  <span className="text-[10px] font-bold text-muted tabular-nums">{t("productBundles.availableCount", { count: availableProducts.length })}</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 max-h-56 overflow-y-auto custom-scrollbar p-1">
                   {availableProducts.length > 0 ? (
@@ -803,7 +805,7 @@ export default function ProductBundles() {
                   ) : (
                     <div className="col-span-full py-8 flex flex-col items-center gap-2 text-muted">
                       <CheckCircle2 size={20} />
-                      <span className="text-xs font-bold">جميع المنتجات مضافة</span>
+                      <span className="text-xs font-bold">{t("productBundles.allAdded")}</span>
                     </div>
                   )}
                 </div>
@@ -816,9 +818,9 @@ export default function ProductBundles() {
               */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-muted uppercase tracking-widest">الخدمات المشمولة</span>
+                  <span className="text-xs font-black text-muted uppercase tracking-widest">{t("productBundles.serviceIncluded")}</span>
                   <span className="text-[10px] font-bold text-muted tabular-nums">
-                    {formData.serviceIds.length} مختارة
+                    {t("productBundles.selectedCount", { count: formData.serviceIds.length })}
                   </span>
                 </div>
                 {services.length > 0 ? (
@@ -838,7 +840,7 @@ export default function ProductBundles() {
                           <span className="min-w-0">
                             <span className="block text-xs font-black truncate">{s.name_ar || s.name}</span>
                             {s.duration_minutes ? (
-                              <span className="block text-[10px] font-bold opacity-70">{s.duration_minutes} دقيقة</span>
+                              <span className="block text-[10px] font-bold opacity-70">{t("productBundles.duration", { duration: s.duration_minutes })}</span>
                             ) : null}
                           </span>
                           <input
@@ -852,10 +854,10 @@ export default function ProductBundles() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs font-bold text-muted">لا توجد خدمات في الكتالوج بعد.</p>
+                  <p className="text-xs font-bold text-muted">{t("productBundles.noServices")}</p>
                 )}
                 <p className="text-[10px] font-bold leading-relaxed text-muted">
-                  العرض يحتاج منتجاً أو خدمة واحدة على الأقل.
+                  {t("productBundles.validationError")}
                 </p>
               </div>
             </div>
@@ -879,7 +881,7 @@ export default function ProductBundles() {
                   onChange={(e) => setFormData((p: any) => ({ ...p, is_public: e.target.checked }))}
                 />
                 <span className="text-xs font-black text-main group-hover:text-primary transition-colors flex items-center gap-1">
-                  <Globe size={12} /> نشر في الموقع
+                  <Globe size={12} /> {t("productBundles.publishInWebsite")}
                 </span>
               </label>
               <label className="flex items-center gap-2.5 cursor-pointer group">
@@ -898,7 +900,7 @@ export default function ProductBundles() {
                   onChange={(e) => setFormData((p: any) => ({ ...p, is_active: e.target.checked }))}
                 />
                 <span className="text-xs font-black text-main group-hover:text-success transition-colors flex items-center gap-1">
-                  {formData.is_active ? <Eye size={12} /> : <Archive size={12} />} {formData.is_active ? "نشط" : "معطل"}
+                  {formData.is_active ? <Eye size={12} /> : <Archive size={12} />} {formData.is_active ? t("productBundles.active") : t("productBundles.inactive")}
                 </span>
               </label>
             </div>
@@ -909,7 +911,7 @@ export default function ProductBundles() {
                 onClick={() => setIsModalOpen(false)}
                 className="flex-1 sm:flex-none h-11 px-6 rounded-xl font-black border border-transparent hover:border-border bg-card"
               >
-                إلغاء
+                {t("productBundles.cancel")}
               </Button>
               <Button
                 loading={saving}
@@ -917,7 +919,7 @@ export default function ProductBundles() {
                 disabled={isPriceInvalid || isPriceEmpty}
                 className="flex-1 sm:flex-none h-11 px-8 rounded-xl font-black disabled:opacity-50"
               >
-                {editingId ? "تحديث الحزمة" : "حفظ الحزمة"}
+                {editingId ? t("productBundles.updateBundle") : t("productBundles.saveBundle")}
               </Button>
             </div>
           </DialogFooter>

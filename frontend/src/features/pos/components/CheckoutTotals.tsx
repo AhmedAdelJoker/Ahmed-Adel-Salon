@@ -1,52 +1,97 @@
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn, formatCurrency } from "@/lib/core/utils";
+import { currencyLabel } from "@/lib/core/currency";
 import type { Dispatch, SetStateAction } from "react";
+import type { DiscountAllowance } from "@/features/pos/utils";
+import type { SplitLine, SplitMethod } from "@/features/pos/types";
+import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  Banknote,
   CreditCard,
-  DollarSign,
+  Landmark,
+  Plus,
   RefreshCw,
   Star,
+  Wallet,
+  X,
   Zap,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+/** One entry per instrument the invoice endpoint accepts in a split —
+ * the id doubles as the payload's `payment_method` value. Labels live in the
+ * `pos` namespace (`payments.*`), keyed by this id. */
+const SPLIT_METHODS: Array<{
+  id: SplitMethod;
+  icon: LucideIcon;
+}> = [
+  { id: "cash", icon: Banknote },
+  { id: "card", icon: CreditCard },
+  { id: "wallet", icon: Wallet },
+  { id: "bank_transfer", icon: Landmark },
+];
 
 export interface CheckoutTotalsProps {
   subtotal: number;
   discount: number;
   setDiscount: Dispatch<SetStateAction<number>>;
+  /** The discount a cashier may apply without a manager's approval. */
+  discountAllowance?: DiscountAllowance;
   loyaltyDiscount: number;
+  taxRate: number;
+  taxAmount: number;
   finalTotal: number;
   paymentMethod: string;
   setPaymentMethod: Dispatch<SetStateAction<string>>;
   isSplitPayment: boolean;
   setIsSplitPayment: Dispatch<SetStateAction<boolean>>;
-  splitCashAmount: number | string;
-  splitCardAmount: number | string;
-  setSplitCashAmount: Dispatch<SetStateAction<number>>;
-  setSplitCardAmount: Dispatch<SetStateAction<number>>;
+  splitLines: SplitLine[];
+  setSplitLines: Dispatch<SetStateAction<SplitLine[]>>;
   isReady: boolean;
   isSubmitting: boolean;
   onCheckout: () => void;
 }
 
+/**
+ * The money block: totals, payment instrument, split rows and the one primary
+ * action on the whole screen.
+ *
+ * Colour is used as meaning, not decoration: the total and the checkout action
+ * share the accent, the loyalty line is the only green, and the payment
+ * instruments stay neutral until one is selected. The five differently
+ * coloured payment buttons the till used to show competed with the total for
+ * attention and made the CTA look like one option among many.
+ */
 export const CheckoutTotals = ({
   subtotal,
   discount,
   setDiscount,
+  discountAllowance,
   loyaltyDiscount,
+  taxRate,
+  taxAmount,
   finalTotal,
   paymentMethod,
   setPaymentMethod,
   isSplitPayment,
   setIsSplitPayment,
-  splitCashAmount,
-  splitCardAmount,
-  setSplitCashAmount,
-  setSplitCardAmount,
+  splitLines,
+  setSplitLines,
   isReady,
   isSubmitting,
   onCheckout,
 }: CheckoutTotalsProps) => {
+  const { t } = useTranslation("pos");
+  const [cashReceived, setCashReceived] = useState<string>("");
   // Keep the manual discount inside sane bounds: never negative and never
   // larger than the subtotal (the server rejects both).
   const handleDiscountChange = (raw: string) => {
@@ -58,86 +103,169 @@ export const CheckoutTotals = ({
     );
   };
 
-  const handleCashChange = (val: string) => {
-    const cash = Number(val || 0);
-    setSplitCashAmount(val as unknown as number);
-    const remaining = Math.max(0, finalTotal - cash);
-    setSplitCardAmount(remaining.toFixed(2) as unknown as number);
+  // Split math (computed during render so every row edit reflects instantly):
+  // paid = Σ row amounts, remaining = what's still uncovered.
+  const splitPaid = splitLines.reduce(
+    (sum, line) => sum + Number(line.amount || 0),
+    0,
+  );
+  const splitRemaining = finalTotal - splitPaid;
+  const usedSplitMethods = splitLines.map((line) => line.method);
+  const availableSplitMethods = SPLIT_METHODS.filter(
+    (method) => !usedSplitMethods.includes(method.id),
+  );
+  const updateSplitLine = (index: number, patch: Partial<SplitLine>) => {
+    setSplitLines((lines) =>
+      lines.map((line, i) => (i === index ? { ...line, ...patch } : line)),
+    );
+  };
+  /** Push (or pull back) the uncovered remainder onto the last row so the
+   * sum lands exactly on the invoice total with one tap. */
+  const settleSplitRemaining = () => {
+    if (Math.abs(splitRemaining) < 0.01 || splitLines.length === 0) return;
+    setSplitLines((lines) =>
+      lines.map((line, i) =>
+        i === lines.length - 1
+          ? {
+              ...line,
+              amount: Math.max(
+                0,
+                Number(line.amount || 0) + splitRemaining,
+              ).toFixed(2),
+            }
+          : line,
+      ),
+    );
   };
 
-  const handleCardChange = (val: string) => {
-    const card = Number(val || 0);
-    setSplitCardAmount(val as unknown as number);
-    const remaining = Math.max(0, finalTotal - card);
-    setSplitCashAmount(remaining.toFixed(2) as unknown as number);
-  };
+  /** Payment-method display label, keyed by the lowercase method id. */
+  const methodLabel = (id: string) => t(`payments.${id}`);
 
   return (
-    <div className="p-4 sm:p-5 border-t border-border/50 bg-white dark:bg-white/5 space-y-4 shrink-0">
-      <div className="space-y-2 relative z-10">
-        <div className="flex justify-between items-center text-[10px] font-bold text-muted uppercase tracking-wider">
-          <span>المجموع</span>
-          <span className="font-black text-main">{formatCurrency(subtotal)}</span>
+    <div className="sticky bottom-0 z-20 shrink-0 space-y-3 border-t border-border/60 bg-card p-3 sm:p-4">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[10px] font-bold text-muted">
+          <span>{t("totals.subtotal")}</span>
+          <span className="font-black tabular-nums text-main">
+            {formatCurrency(subtotal)}
+          </span>
         </div>
 
-        <div className="flex justify-between items-center">
-          <span className="text-[10px] font-black text-red-500 uppercase">الخصم</span>
-          <div className="flex items-center gap-2 bg-red-50 dark:bg-red-500/10 px-2 py-1 rounded-lg border border-red-100 dark:border-red-900/20">
+        <div className="flex items-center justify-between gap-2">
+          <label
+            htmlFor="pos-discount"
+            className="text-[10px] font-bold text-muted"
+          >
+            {t("totals.discount")}
+          </label>
+          <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-soft/50 px-2 py-0.5 focus-within:border-primary/50">
             <input
+              id="pos-discount"
               type="number"
               min="0"
+              inputMode="decimal"
               value={discount}
-              onChange={(e) => handleDiscountChange(e.target.value)}
-              className="w-14 h-10 bg-transparent text-left focus:outline-none font-black text-red-600 text-xs touch-target"
-              aria-label="مبلغ الخصم"
+              onChange={(event) => handleDiscountChange(event.target.value)}
+              aria-label={t("totals.discount_amount")}
+              className="h-8 w-14 bg-transparent text-end text-xs font-black tabular-nums text-main outline-none touch-target"
             />
-            <DollarSign size={10} className="text-red-500" />
+            <span className="text-[9px] font-black text-muted">
+              {currencyLabel()}
+            </span>
           </div>
         </div>
 
+        {discountAllowance && Number(discount) > discountAllowance.allowed && (
+          <p className="text-[10px] font-bold leading-relaxed text-warning">
+            {t("totals.over_limit", { label: discountAllowance.label })}
+          </p>
+        )}
+
         {Number(loyaltyDiscount) > 0 && (
-          <div className="flex justify-between items-center text-success">
-            <span className="text-[10px] font-black uppercase flex items-center gap-1">
-              <Star size={10} className="fill-success" /> خصم الولاء
+          <div className="flex items-center justify-between text-success">
+            <span className="flex items-center gap-1 text-[10px] font-black">
+              <Star size={10} className="fill-success" aria-hidden="true" />
+              {t("totals.loyalty")}
             </span>
-            <span className="text-xs font-black">-{formatCurrency(loyaltyDiscount)}</span>
+            <span className="text-xs font-black tabular-nums">
+              -{formatCurrency(loyaltyDiscount)}
+            </span>
           </div>
         )}
 
-        <div className="flex justify-between items-baseline pt-2 border-t border-border/30">
-          <span className="text-[10px] font-black text-muted uppercase tracking-widest">
-            الإجمالي
+        {taxRate > 0 && (
+          <div className="flex items-center justify-between text-muted">
+            <span className="text-[10px] font-black">
+              {t("totals.tax", {
+                rate: taxRate > 1 ? taxRate : (taxRate * 100).toFixed(0),
+              })}
+            </span>
+            <span className="text-xs font-black tabular-nums">
+              +{formatCurrency(taxAmount)}
+            </span>
+          </div>
+        )}
+
+        <div className="flex items-baseline justify-between border-t border-border/50 pt-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-muted">
+            {t("totals.total")}
           </span>
-          <span className="text-2xl font-black text-primary tracking-tighter tabular-nums">
+          <span className="text-2xl font-black tabular-nums tracking-tight text-primary">
             {formatCurrency(finalTotal)}
           </span>
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 relative z-10">
-        <div className="grid grid-cols-3 gap-2">
+      {/* Cash received + change (cash only) */}
+      {!isSplitPayment && paymentMethod === "CASH" && (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <label
+              htmlFor="pos-cash-received"
+              className="text-[10px] font-bold text-muted"
+            >
+              {t("totals.cash_received")}
+            </label>
+            <input
+              id="pos-cash-received"
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              value={cashReceived}
+              onChange={(event) => setCashReceived(event.target.value)}
+              aria-label={t("totals.cash_received")}
+              className="h-10 w-full rounded-lg border border-border/60 bg-background px-2 text-xs font-black tabular-nums text-main outline-none focus:border-primary/50 touch-target"
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-muted">
+              {t("totals.change")}
+            </span>
+            <div
+              className={cn(
+                "flex h-10 w-full items-center rounded-lg border px-2 text-xs font-black tabular-nums",
+                cashReceived && Number(cashReceived) >= finalTotal
+                  ? "border-success/30 bg-success/10 text-success"
+                  : "border-border/60 bg-soft/40 text-muted",
+              )}
+            >
+              {cashReceived
+                ? formatCurrency(Math.max(0, Number(cashReceived) - finalTotal))
+                : "—"}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <div className="grid grid-cols-5 gap-1">
           {[
-            {
-              id: "CASH",
-              label: "نقدي",
-              icon: DollarSign,
-              activeClass:
-                "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20",
-            },
-            {
-              id: "CARD",
-              label: "شبكة",
-              icon: CreditCard,
-              activeClass:
-                "bg-blue-500 border-blue-500 text-white shadow-md shadow-blue-500/20",
-            },
-            {
-              id: "SPLIT",
-              label: "مقسم",
-              icon: Activity,
-              activeClass:
-                "bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-500/20",
-            },
+            { id: "CASH", icon: Banknote },
+            { id: "CARD", icon: CreditCard },
+            { id: "WALLET", icon: Wallet },
+            { id: "BANK_TRANSFER", icon: Landmark },
+            { id: "SPLIT", icon: Activity },
           ].map((method) => {
             const isActive =
               method.id === "SPLIT"
@@ -146,12 +274,18 @@ export const CheckoutTotals = ({
             return (
               <button
                 key={method.id}
+                type="button"
+                aria-pressed={isActive}
+                aria-label={methodLabel(method.id.toLowerCase())}
                 onClick={() => {
                   if (method.id === "SPLIT") {
                     setIsSplitPayment(!isSplitPayment);
                     if (!isSplitPayment) {
-                      setSplitCashAmount(finalTotal.toFixed(2) as unknown as number);
-                      setSplitCardAmount("0.00" as unknown as number);
+                      // Seed one row: the whole total sits on cash until the
+                      // cashier splits it further.
+                      setSplitLines([
+                        { method: "cash", amount: finalTotal.toFixed(2) },
+                      ]);
                     }
                   } else {
                     setIsSplitPayment(false);
@@ -159,18 +293,15 @@ export const CheckoutTotals = ({
                   }
                 }}
                 className={cn(
-                  "h-12 flex flex-col items-center justify-center rounded-xl border-2 transition-all group touch-target",
+                  "flex h-11 flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors touch-target",
                   isActive
-                    ? method.activeClass
-                    : "bg-white dark:bg-white/5 border-slate-100 dark:border-white/10 text-muted hover:border-primary/30 hover:text-primary",
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border/60 bg-soft/30 text-muted hover:border-primary/40 hover:text-primary",
                 )}
               >
-                <method.icon
-                  size={16}
-                  className="group-hover:scale-110 transition-transform"
-                />
-                <span className="text-[10px] font-black uppercase tracking-tight">
-                  {method.label}
+                <method.icon size={14} aria-hidden="true" />
+                <span className="text-[11px] font-black">
+                  {methodLabel(method.id.toLowerCase())}
                 </span>
               </button>
             );
@@ -178,81 +309,125 @@ export const CheckoutTotals = ({
         </div>
 
         {isSplitPayment && (
-          <div className="p-3 bg-slate-50 dark:bg-white/5 border border-border/50 rounded-2xl animate-in fade-in zoom-in-95 duration-300 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label
-                  htmlFor="split-cash"
-                  className="text-[10px] font-black text-muted uppercase me-1"
-                >
-                  نقدي
-                </label>
-                <div className="relative">
-                  <input
-                    id="split-cash"
-                    type="number"
-                    className="w-full bg-white dark:bg-slate-950 border border-border/50 rounded-lg h-10 px-2 ps-6 text-xs font-black outline-none focus:border-emerald-500/40 touch-target"
-                    value={splitCashAmount}
-                    onChange={(e) => handleCashChange(e.target.value)}
-                    step="0.01"
-                  />
-                  <DollarSign
-                    size={10}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500"
-                  />
+          <div className="space-y-2 rounded-xl border border-border/60 bg-soft/25 p-2.5">
+            {splitLines.map((line, index) => {
+              const meta = SPLIT_METHODS.find(
+                (method) => method.id === line.method,
+              );
+              // The dropdown lists the row's own method plus whatever isn't
+              // claimed by another row — two rows can't fight over one
+              // instrument, which would read like a double charge.
+              const options = SPLIT_METHODS.filter(
+                (method) =>
+                  method.id === line.method ||
+                  !usedSplitMethods.includes(method.id),
+              );
+              return (
+                <div key={index} className="flex items-center gap-1.5">
+                  <Select
+                    value={line.method}
+                    onValueChange={(value) =>
+                      updateSplitLine(index, {
+                        method: value as SplitMethod,
+                      })
+                    }
+                  >
+                    <SelectTrigger
+                      aria-label={t("split.method", { n: index + 1 })}
+                      className="h-9 w-[6.5rem] shrink-0 rounded-lg border-border/60 bg-card px-2 text-[11px] font-black"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {options.map((method) => (
+                        <SelectItem key={method.id} value={method.id}>
+                          {methodLabel(method.id)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="relative min-w-0 flex-1">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      className="h-9 w-full rounded-lg border border-border/60 bg-card pe-2 ps-7 text-xs font-black tabular-nums text-main outline-none focus:border-primary/50 touch-target"
+                      value={line.amount}
+                      onChange={(event) =>
+                        updateSplitLine(index, {
+                          amount: event.target.value,
+                        })
+                      }
+                      aria-label={t("split.amount", {
+                        label: meta ? methodLabel(meta.id) : "",
+                      })}
+                    />
+                    <span className="absolute start-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-muted">
+                      {currencyLabel()}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={t("split.remove", {
+                      label: meta ? methodLabel(meta.id) : "",
+                    })}
+                    onClick={() =>
+                      setSplitLines((lines) =>
+                        lines.filter((_, i) => i !== index),
+                      )
+                    }
+                    disabled={splitLines.length === 1}
+                    className="flex h-9 w-7 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-30 touch-target"
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
                 </div>
-              </div>
-              <div className="space-y-1">
-                <label
-                  htmlFor="split-card"
-                  className="text-[10px] font-black text-muted uppercase me-1"
-                >
-                  شبكة
-                </label>
-                <div className="relative">
-                  <input
-                    id="split-card"
-                    type="number"
-                    className="w-full bg-white dark:bg-slate-950 border border-border/50 rounded-lg h-10 px-2 ps-6 text-xs font-black outline-none focus:border-blue-500/40 touch-target"
-                    value={splitCardAmount}
-                    onChange={(e) => handleCardChange(e.target.value)}
-                    step="0.01"
-                  />
-                  <CreditCard
-                    size={10}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 text-blue-500"
-                  />
-                </div>
-              </div>
-            </div>
+              );
+            })}
 
-            <div className="flex justify-between items-center pt-1 border-t border-border/20">
+            {availableSplitMethods.length > 0 && (
+              <button
+                type="button"
+                aria-label={t("split.add_method")}
+                onClick={() =>
+                  setSplitLines((lines) => [
+                    ...lines,
+                    { method: availableSplitMethods[0].id, amount: "0.00" },
+                  ])
+                }
+                className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border/70 text-[11px] font-black text-muted transition-colors hover:border-primary/40 hover:text-primary touch-target"
+              >
+                <Plus size={12} aria-hidden="true" /> {t("split.add_method")}
+              </button>
+            )}
+
+            <div className="flex items-center justify-between border-t border-border/40 pt-1.5">
               <div className="text-[10px] font-bold text-muted">
-                المجموع:{" "}
+                {t("split.remaining")}:{" "}
                 <span
                   className={cn(
-                    "font-black",
-                    Math.abs(
-                      Number(splitCashAmount) + Number(splitCardAmount) - finalTotal,
-                    ) < 0.01
-                      ? "text-emerald-500"
-                      : "text-rose-500",
+                    "font-black tabular-nums",
+                    Math.abs(splitRemaining) < 0.01
+                      ? "text-success"
+                      : splitRemaining > 0
+                        ? "text-danger"
+                        : "text-warning",
                   )}
                 >
-                  {formatCurrency(Number(splitCashAmount) + Number(splitCardAmount))}
+                  {Math.abs(splitRemaining) < 0.01
+                    ? t("split.balanced")
+                    : formatCurrency(Math.abs(splitRemaining))}
                 </span>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-10 px-3 text-[10px] font-black text-primary bg-primary/5 hover:bg-primary/10 touch-target"
-                onClick={() => {
-                  setSplitCardAmount(
-                    (finalTotal - Number(splitCashAmount)).toFixed(2) as unknown as number,
-                  );
-                }}
+                className="h-8 px-2 text-[10px] font-black text-primary hover:bg-primary/10 touch-target"
+                onClick={settleSplitRemaining}
+                disabled={Math.abs(splitRemaining) < 0.01}
               >
-                تغطية المتبقي بالشبكة
+                {splitRemaining > 0 ? t("split.cover") : t("split.deduct")}
               </Button>
             </div>
           </div>
@@ -263,24 +438,24 @@ export const CheckoutTotals = ({
         size="lg"
         data-pos-checkout="true"
         className={cn(
-          "w-full h-14 rounded-2xl font-black text-base transition-all duration-300 shadow-xl group",
+          "group h-14 w-full rounded-xl text-base font-black shadow-lg transition-all",
           isReady
-            ? "bg-primary text-white shadow-primary/20"
-            : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed",
+            ? "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary-strong"
+            : "cursor-not-allowed bg-soft text-muted shadow-none",
         )}
         disabled={!isReady || isSubmitting}
         onClick={onCheckout}
       >
-        <div className="flex items-center justify-center gap-3">
+        <span className="flex items-center justify-center gap-2">
           {isSubmitting ? (
-            <RefreshCw className="animate-spin" size={20} />
+            <RefreshCw className="animate-spin" size={19} aria-hidden="true" />
           ) : (
             <>
-              <Zap size={18} fill="currentColor" />
-              <span>تأكيد وإصدار (Ctrl+Enter)</span>
+              <Zap size={18} fill="currentColor" aria-hidden="true" />
+              <span>{t("checkout.confirm")}</span>
             </>
           )}
-        </div>
+        </span>
       </Button>
     </div>
   );

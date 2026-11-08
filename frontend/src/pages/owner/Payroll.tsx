@@ -1,4 +1,4 @@
-import { usePayroll, MONTHS, toNumber, formatSignedPct, PeriodChartPanel, StaffSnapshot, PayrollTable, PayrollModals } from "@/features/payroll";
+import { usePayroll, toNumber, formatSignedPct, PeriodChartPanel, StaffSnapshot, PayrollTable, PayrollModals } from "@/features/payroll";
 import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import exportService from "@/services/exportService";
 import {
@@ -23,8 +23,13 @@ import { cn, formatCurrency } from "@/lib/core/utils";
 import { PageHeader, PremiumCard, SkeletonCard } from "@/components/shared/PremiumUI";
 import { CurrencyStatCard, StatCard as DisplayStatCard } from "@/components/shared/DisplayComponents";
 import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "@/lib/format/locale";
 
 export default function Payroll() {
+  const { t, i18n } = useTranslation("owner");
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
+  const lang: "ar" | "en" = (i18n.resolvedLanguage || i18n.language || "ar").startsWith("en") ? "en" : "ar";
   const {
     navigate,
     employeeIdFilter,
@@ -111,7 +116,7 @@ export default function Payroll() {
       <div className="erp-page-container space-y-6 pb-10">
         <div className="flex flex-col items-center gap-3 py-10">
           <Sparkles className="h-10 w-10 animate-pulse text-primary" />
-          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-muted">جاري تدقيق الرواتب...</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-muted">{t("payroll.auditing")}</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <SkeletonCard variant="stats" />
@@ -126,26 +131,26 @@ export default function Payroll() {
 
   return (
     <div className="erp-page-container space-y-6 pb-10">
-      <ConfirmDialog open={!!cancelId} onOpenChange={(o) => !o && setCancelId(null)} title="إلغاء السجل؟" description="سيتم إلغاء هذا القيد من كشف الرواتب." onConfirm={handleCancel} />
+      <ConfirmDialog open={!!cancelId} onOpenChange={(o) => !o && setCancelId(null)} title={t("payroll.cancelTitle")} description={t("payroll.cancelDesc")} onConfirm={handleCancel} />
 
       <PageHeader
-        title="مسيرات الرواتب"
-        subtitle="إدارة التعويضات والعمولات والكشوف الشهرية — احترافية عالمية"
-        badge="الموارد المالية"
+        title={t("payroll.title")}
+        subtitle={t("payroll.subtitle")}
+        badge={t("payroll.badge")}
         icon={Banknote}
         actions={
           <div className="flex flex-col gap-2 w-full xl:w-auto print:hidden">
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant={isCurrentPreset ? "primary" : "outline"} size="sm" onClick={() => applyPreset("current")} className="h-9 rounded-xl text-[11px] font-black">الشهر الحالي</Button>
-              <Button variant={!isCurrentPreset ? "primary" : "outline"} size="sm" onClick={() => applyPreset("prev")} className="h-9 rounded-xl text-[11px] font-black">الشهر السابق</Button>
+              <Button variant={isCurrentPreset ? "primary" : "outline"} size="sm" onClick={() => applyPreset("current")} className="h-9 rounded-xl text-[11px] font-black">{t("payroll.currentMonth")}</Button>
+              <Button variant={!isCurrentPreset ? "primary" : "outline"} size="sm" onClick={() => applyPreset("prev")} className="h-9 rounded-xl text-[11px] font-black">{t("payroll.prevMonth")}</Button>
               <span className="hidden sm:inline h-6 w-px bg-border" />
               <Button variant="outline" onClick={() => exportService.downloadExcel("/exports/payroll/excel", "payroll_report", period as unknown as Record<string, unknown>)} className="h-9 rounded-xl px-3 text-[11px] font-black"><FileSpreadsheet size={14} className="ms-1.5 text-success" />Excel</Button>
-              <Button variant="outline" onClick={handlePrint} className="h-9 rounded-xl px-3 text-[11px] font-black"><Printer size={14} className="ms-1.5" /> طباعة / PDF</Button>
+              <Button variant="outline" onClick={handlePrint} className="h-9 rounded-xl px-3 text-[11px] font-black"><Printer size={14} className="ms-1.5" /> {t("payroll.print")}</Button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => setIsAdvanceModalOpen(true)} className="h-9 rounded-xl px-3 text-[11px] font-black text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-600 hover:text-white"><MinusCircle size={14} className="ms-1.5" /> سلفة</Button>
-              <Button variant="outline" onClick={() => navigate("/owner/payroll/archive")} className="h-9 rounded-xl px-3 text-[11px] font-black"><Archive size={14} className="ms-1.5" /> الأرشيف</Button>
-              <Button onClick={handleCalculate} disabled={loading || refreshing} className="h-9 rounded-xl px-5 bg-primary hover:bg-primary-strong text-white font-black shadow-lg"><RefreshCw size={14} className={cn("ms-1.5", refreshing && "animate-spin")} /> تحديث الحسابات</Button>
+              <Button variant="outline" onClick={() => setIsAdvanceModalOpen(true)} className="h-9 rounded-xl px-3 text-[11px] font-black text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-600 hover:text-white"><MinusCircle size={14} className="ms-1.5" /> {t("payroll.advance")}</Button>
+              <Button variant="outline" onClick={() => navigate("/owner/payroll/archive")} className="h-9 rounded-xl px-3 text-[11px] font-black"><Archive size={14} className="ms-1.5" /> {t("payroll.archive")}</Button>
+              <Button onClick={handleCalculate} disabled={loading || refreshing} className="h-9 rounded-xl px-5 bg-primary hover:bg-primary-strong text-white font-black shadow-lg"><RefreshCw size={14} className={cn("ms-1.5", refreshing && "animate-spin")} /> {t("payroll.recalculate")}</Button>
             </div>
           </div>
         }
@@ -156,8 +161,8 @@ export default function Payroll() {
         <div className="p-4 sm:p-5 space-y-4">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center"><Building2 size={16} /></div>
-            <div><h3 className="text-sm font-black text-main">ترابط الرواتب بالنظام</h3><p className="text-[11px] font-bold text-muted">كل راتب هو حلقة وصل بين الحضور والعمولات والخزنة — الأرقام حية من نفس الفترة</p></div>
-            <Badge className="me-auto hidden rounded-full border-primary/20 bg-primary-soft text-primary text-[10px] font-black sm:flex">تكامل تلقائي • {MONTHS.find((m) => m.value === period.month)?.label} {period.year}</Badge>
+            <div><h3 className="text-sm font-black text-main">{t("payroll.linkTitle")}</h3><p className="text-[11px] font-bold text-muted">{t("payroll.linkDesc")}</p></div>
+            <Badge className="me-auto hidden rounded-full border-primary/20 bg-primary-soft text-primary text-[10px] font-black sm:flex">{t("payroll.autoSync")} • {t(`payroll.months.m${period.month}`)} {period.year}</Badge>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {systemLinks.map((l) => (
@@ -173,38 +178,38 @@ export default function Payroll() {
       {/* KPIs with growth */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <CurrencyStatCard
-          label="كتلة الرواتب"
+          label={t("payroll.totalBlock")}
           value={toNumber(summary?.total_net_salary)}
           icon={Wallet}
           variant="primary"
           trend={growth === null ? undefined : growth >= 0 ? "positive" : "negative"}
           trendValue={growth === null ? undefined : formatSignedPct(growth)}
-          hint={`${toNumber(summary?.employees_count) || employees.length} موظف • عن ${prevLabel}`}
+          hint={t("payroll.employeesAbout", { count: toNumber(summary?.employees_count) || employees.length, period: prevLabel })}
         />
         <CurrencyStatCard
-          label="تم صرفه"
+          label={t("payroll.paid")}
           value={toNumber(summary?.paid_total)}
           icon={CheckSquare}
           variant="success"
           trend={paidGrowth === null ? undefined : paidGrowth >= 0 ? "positive" : "negative"}
           trendValue={paidGrowth === null ? undefined : formatSignedPct(paidGrowth)}
-          hint={`${paidPct}% من الإجمالي`}
+          hint={t("payroll.pctOfTotal", { pct: paidPct })}
         />
         <CurrencyStatCard
-          label="متبقي للصرف"
+          label={t("payroll.remaining")}
           value={toNumber(summary?.unpaid_total)}
           icon={Clock}
           variant={unpaidGrowth === null ? "warning" : unpaidGrowth > 0 ? "danger" : "warning"}
           trend={unpaidGrowth === null ? undefined : unpaidGrowth > 0 ? "negative" : "positive"}
           trendValue={unpaidGrowth === null ? undefined : formatSignedPct(unpaidGrowth)}
-          hint={toNumber(summary?.unpaid_total) === 0 ? "مكتمل ✅" : "بانتظار الصرف"}
+          hint={toNumber(summary?.unpaid_total) === 0 ? t("payroll.completed") : t("payroll.awaitingPay")}
         />
         <DisplayStatCard
-          label="متوسط الراتب"
+          label={t("payroll.avgSalary")}
           value={formatCurrency(avgSalary)}
           icon={Target}
           variant="info"
-          hint={`عن ${MONTHS.find((m) => m.value === period.month)?.label} ${period.year}`}
+          hint={t("payroll.forPeriod", { period: `${t(`payroll.months.m${period.month}`)} ${period.year}` })}
         />
       </div>
 
@@ -221,10 +226,10 @@ export default function Payroll() {
 
       {employeeIdFilter && (
         <PremiumCard className="flex flex-col gap-3 border-primary/20 bg-primary-soft/40 p-4 sm:flex-row sm:items-center justify-between" animate={false}>
-          <div><div className="text-[10px] font-black uppercase text-primary">فلترة موظف</div><div className="font-black text-main">{employeeNameFilter || `موظف #${employeeIdFilter}`}</div></div>
+          <div><div className="text-[10px] font-black uppercase text-primary">{t("payroll.filterEmployeeTitle")}</div><div className="font-black text-main">{employeeNameFilter || t("payroll.employeeWithId", { id: employeeIdFilter })}</div></div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/owner/hr?employeeId=${employeeIdFilter}`)} className="rounded-xl font-black">ملف الموظف</Button>
-            <Button variant="outline" size="sm" onClick={() => navigate("/owner/payroll")} className="rounded-xl font-black">إلغاء الفلترة</Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/manager/hr?employeeId=${employeeIdFilter}`)} className="rounded-xl font-black">{t("payroll.viewEmployee")}</Button>
+            <Button variant="outline" size="sm" onClick={() => navigate("/owner/payroll")} className="rounded-xl font-black">{t("payroll.clearFilter")}</Button>
           </div>
         </PremiumCard>
       )}
@@ -269,18 +274,18 @@ export default function Payroll() {
       <div id="advances">
         <PremiumCard noPadding className="overflow-hidden" animate={false}>
           <div className="p-5 border-b border-border bg-soft/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div><h3 className="font-black flex items-center gap-2"><Banknote size={16} className="text-rose-600" /> السلف المعلقة <Badge className="bg-rose-500 text-white rounded-full">{advances.length}</Badge></h3><p className="text-xs font-bold text-muted">لم تخصم بعد من الرواتب • تُخصم تلقائياً عند صرف الراتب</p></div>
-          <Button variant="outline" size="sm" onClick={() => setIsAdvanceModalOpen(true)} className="rounded-xl font-black text-rose-600 border-rose-200">سلفة جديدة</Button>
+          <div><h3 className="font-black flex items-center gap-2"><Banknote size={16} className="text-rose-600" /> {t("payroll.advancesTitle")} <Badge className="bg-rose-500 text-white rounded-full">{advances.length}</Badge></h3><p className="text-xs font-bold text-muted">{t("payroll.advancesDesc")}</p></div>
+          <Button variant="outline" size="sm" onClick={() => setIsAdvanceModalOpen(true)} className="rounded-xl font-black text-rose-600 border-rose-200">{t("payroll.advanceNew")}</Button>
         </div>
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-right min-w-[640px]">
-            <thead><tr className="bg-soft/50 border-b border-border"><th className="px-6 py-3 text-[10px] font-black uppercase text-muted">الموظف</th><th className="px-6 py-3 text-[10px] font-black uppercase text-muted">المبلغ</th><th className="px-6 py-3 text-[10px] font-black uppercase text-muted">التاريخ</th><th className="px-6 py-3 text-[10px] font-black uppercase text-muted">البيان</th><th className="px-6 py-3 text-center text-[10px] font-black uppercase text-muted">حذف</th></tr></thead>
+          <table className="w-full text-start min-w-[640px]">
+            <thead><tr className="bg-soft/50 border-b border-border"><th className="px-6 py-3 text-[10px] font-black uppercase text-muted">{t("payroll.tblEmployee")}</th><th className="px-6 py-3 text-[10px] font-black uppercase text-muted">{t("payroll.tblAmount")}</th><th className="px-6 py-3 text-[10px] font-black uppercase text-muted">{t("payroll.tblDate")}</th><th className="px-6 py-3 text-[10px] font-black uppercase text-muted">{t("payroll.tblNote")}</th><th className="px-6 py-3 text-center text-[10px] font-black uppercase text-muted">{t("payroll.tblDelete")}</th></tr></thead>
             <tbody className="divide-y divide-border/30">
-              {advances.length === 0 ? <tr><td colSpan={5} className="py-12 text-center font-bold text-muted">لا توجد سلف معلقة • السجل نظيف ✅</td></tr> : advances.map((adv) => (
+              {advances.length === 0 ? <tr><td colSpan={5} className="py-12 text-center font-bold text-muted">{t("payroll.noAdvances")}</td></tr> : advances.map((adv) => (
                 <tr key={String(adv.id)} className="hover:bg-soft/20">
-                  <td className="px-6 py-4 font-black text-sm">{String((adv as unknown as { employee_name?: string }).employee_name || `موظف #${String(adv.employee_id)}`)}</td>
+                  <td className="px-6 py-4 font-black text-sm">{String((adv as unknown as { employee_name?: string }).employee_name || t("payroll.employeeWithId", { id: String(adv.employee_id) }))}</td>
                   <td className="px-6 py-4 font-black text-rose-600 tabular-nums">{formatCurrency(adv.amount)}</td>
-                  <td className="px-6 py-4 text-xs font-bold text-muted">{adv.advance_date ? new Date(String(adv.advance_date)).toLocaleDateString("ar-EG") : "—"}</td>
+                  <td className="px-6 py-4 text-xs font-bold text-muted">{adv.advance_date ? new Date(String(adv.advance_date)).toLocaleDateString(locale) : "—"}</td>
                   <td className="px-6 py-4 text-xs font-bold text-muted truncate max-w-[220px]">{String(adv.description || "—")}</td>
                   <td className="px-6 py-4 text-center"><Button variant="ghost" size="icon" onClick={() => handleDeleteAdvance(adv.id as number | string)} className="h-8 w-8 text-rose-400 hover:text-rose-600"><Trash2 size={14} /></Button></td>
                 </tr>
@@ -304,10 +309,10 @@ export default function Payroll() {
               paginator={paginator}
               onPageChange={setPage}
               showSizeChanger={false}
-              locale="ar"
+              locale={lang}
             />
             <p className="mt-1 text-center text-[10px] font-bold text-muted">
-              صفحة {page} • {totalCount} سجل إجمالي
+              {t("payroll.pageTotal", { page, total: totalCount })}
             </p>
           </PremiumCard>
         );

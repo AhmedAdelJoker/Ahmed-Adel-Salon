@@ -18,6 +18,21 @@ const ROLE_ALIASES: Record<string, string> = {
   BARBER_USER: "BARBER",
 };
 
+/**
+ * Translation key for a role label.
+ *
+ * Kept next to `normalizeRole` so the layout chrome and any future screen
+ * translate roles the same way instead of each carrying its own Arabic map.
+ */
+export function roleTranslationKey(role: unknown): string {
+  const normalized = normalizeRole(role);
+  return ["OWNER", "ADMIN", "MANAGER", "CASHIER", "BARBER", "ACCOUNTANT"].includes(
+    normalized,
+  )
+    ? `role.${normalized.toLowerCase()}`
+    : "role.user";
+}
+
 export function normalizeRole(role: unknown): string {
   const normalized = String(role || "")
     .trim()

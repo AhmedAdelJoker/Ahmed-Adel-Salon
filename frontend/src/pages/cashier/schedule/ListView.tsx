@@ -1,4 +1,5 @@
 import { memo, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Clock3 } from "lucide-react";
 import { cn, formatTime12h } from "@/lib/core/utils";
 import { getStatusConfig, getAppointmentDuration } from "@/pages/cashier/schedule/scheduleUtils";
@@ -10,6 +11,7 @@ const ListView = memo(function ListView({
   selectedDate,
   onOpenDetails,
 }: any) {
+  const { t } = useTranslation("schedule");
   const sorted = useMemo(
     () =>
       [...appointments]
@@ -46,10 +48,10 @@ const ListView = memo(function ListView({
           <CalendarDays size={56} className="text-muted/30" />
         </div>
         <p className="text-xl font-black text-main">
-          لا توجد مواعيد في هذا اليوم
+          {t("empty.title")}
         </p>
         <p className="text-muted font-bold text-sm">
-          استخدم زر "حجز جديد" لإضافة أول موعد اليوم.
+          {t("empty.message")}
         </p>
       </div>
     );
@@ -72,7 +74,7 @@ const ListView = memo(function ListView({
                 )}
               >
                 <span className={cn("w-1.5 h-1.5 rounded-full", cfg.dot)} />
-                {cfg.label}: {n}
+                {t(cfg.label)}: {n}
               </Badge>
             );
           })}
@@ -80,12 +82,12 @@ const ListView = memo(function ListView({
 
       <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden">
         <div className="grid grid-cols-12 gap-3 px-5 py-3.5 bg-soft/70 border-b border-border/60 text-[9px] font-black text-muted uppercase tracking-widest">
-          <div className="col-span-3">الوقت</div>
-          <div className="col-span-3">العميل</div>
-          <div className="col-span-2 hidden md:block">الموظف</div>
-          <div className="col-span-2 hidden lg:block">الخدمة</div>
-          <div className="col-span-2 hidden sm:block">الهاتف</div>
-          <div className="col-span-2">الحالة</div>
+          <div className="col-span-3">{t("listView.time")}</div>
+          <div className="col-span-3">{t("listView.customer")}</div>
+          <div className="col-span-2 hidden md:block">{t("listView.barber")}</div>
+          <div className="col-span-2 hidden lg:block">{t("listView.service")}</div>
+          <div className="col-span-2 hidden sm:block">{t("listView.phone")}</div>
+          <div className="col-span-2">{t("listView.status")}</div>
         </div>
         <div className="divide-y divide-border/40">
           {sorted.map((appt, i) => {
@@ -122,18 +124,18 @@ const ListView = memo(function ListView({
                     </p>
                     {dur != null && (
                       <p className="text-[8px] font-bold text-muted">
-                        {dur} دقيقة
+                        {dur} {t("listView.minuteShort")}
                       </p>
                     )}
                   </div>
                 </div>
                 <div className="col-span-3 min-w-0">
                   <p className="text-xs font-black text-main truncate group-hover:text-accent transition-colors">
-                    {appt.customer_name || "عميل مجهول"}
+                    {appt.customer_name || t("appointmentCard.unknownCustomer")}
                   </p>
                   {appt.booking_source === "online" && (
                     <p className="text-[8px] font-bold text-sky-500">
-                      حجز أونلاين
+                      {t("scheduleModal.bookingSourceOnline")}
                     </p>
                   )}
                 </div>

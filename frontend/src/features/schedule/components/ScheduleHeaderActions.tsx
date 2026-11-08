@@ -1,4 +1,5 @@
 import { Plus, Keyboard } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,22 +19,26 @@ export function ScheduleHeaderActions({
   onBackToBookings,
   onNewBooking,
 }: ScheduleHeaderActionsProps) {
+  const { t } = useTranslation("schedule");
   return (
     <div className="flex flex-wrap items-center gap-3">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="h-11 rounded-xl px-4">
-            <Keyboard size={16} /> اختصارات
+            <Keyboard size={16} /> {t("headerActions.shortcuts")}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-[240px]">
-          <DropdownMenuLabel>اختصارات لوحة المفاتيح</DropdownMenuLabel>
+          <DropdownMenuLabel>{t("headerActions.shortcutsLabel")}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {[
-            ["← / →", "تنقل بين الأيام"],
-            ["T", "العودة لليوم الحالي"],
-            ["D / W / V", "الجدول / الأسبوع / القائمة"],
-            ["L", "إظهار/إخفاء الشريط الجانبي"],
+            ["← / →", t("headerActions.navDays")],
+            ["T", t("headerActions.today")],
+            [
+              "D / W / V",
+              `${t("headerActions.viewDay")} / ${t("headerActions.viewWeek")} / ${t("headerActions.viewList")}`,
+            ],
+            ["L", t("headerActions.toggleSidebar")],
           ].map(([k, desc]) => (
             <DropdownMenuItem
               key={k}
@@ -53,13 +58,13 @@ export function ScheduleHeaderActions({
         onClick={onBackToBookings}
         className="h-11 rounded-xl"
       >
-        العودة للحجوزات
+        {t("headerActions.backToBookings")}
       </Button>
       <Button
         onClick={onNewBooking}
         className="h-11 px-8 rounded-xl shadow-accent"
       >
-        <Plus size={18} className="ms-2" /> حجز جديد
+        <Plus size={18} className="ms-2" /> {t("headerActions.newBooking")}
       </Button>
     </div>
   );

@@ -1,4 +1,5 @@
 import { memo, useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { User, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
@@ -13,6 +14,7 @@ import { BarberColumn } from "@/features/schedule";
 import {
   BARBER_COL_MIN,
   TIME_COL_WIDTH,
+  dirIsRtl,
 } from "@/features/schedule";
 import { slotTo24 } from "@/features/schedule";
 
@@ -44,6 +46,7 @@ const DayBoard = memo(function DayBoard({
   onOpenDetails,
   isDraggingAny,
 }: DayBoardProps) {
+  const { t } = useTranslation("schedule");
   const [now, setNow] = useState(() => new Date());
 
   const headerRef = useRef<HTMLDivElement>(null);
@@ -64,11 +67,8 @@ const DayBoard = memo(function DayBoard({
           <User size={80} className="text-muted/30" />
         </div>
         <div className="space-y-2">
-          <p className="text-2xl font-black text-main">لا توجد بيانات موظفين</p>
-          <p className="text-muted font-bold max-w-md mx-auto">
-            يرجى اختيار فلتر مختلف أو التأكد من إضافة الموظفين وجداول عملهم في
-            النظام.
-          </p>
+          <p className="text-2xl font-black text-main">{t("dayBoard.noStaffTitle")}</p>
+          <p className="text-muted font-bold max-w-md mx-auto">{t("dayBoard.noStaffMessage")}</p>
         </div>
       </div>
     );
@@ -88,7 +88,7 @@ const DayBoard = memo(function DayBoard({
         >
           <div className="sticky right-0 z-50 bg-card backdrop-blur-xl rounded-2xl border border-border shadow-sm flex items-center justify-center gap-2 text-[10px] font-black text-muted uppercase tracking-widest">
             <CalendarClock size={14} className="text-accent" />
-            <span className="hidden 2xl:inline">الجدول الزمني</span>
+            <span className="hidden 2xl:inline">{t("dayBoard.headerLabel")}</span>
           </div>
 
           {barbers.map((barber) => {
@@ -104,6 +104,16 @@ const DayBoard = memo(function DayBoard({
                 : loadPercent >= 70
                   ? "bg-amber-500"
                   : "bg-emerald-500";
+            const count = barber.appointments.length;
+            const countLabel = count === 0
+              ? t("dayBoard.zeroCount")
+              : count === 1
+                ? t("dayBoard.oneCount")
+                : count === 2
+                  ? t("dayBoard.twoCount")
+                  : count <= 10
+                    ? t("dayBoard.manyCount", { count })
+                    : t("dayBoard.manyAboveTen", { count });
             return (
               <div
                 key={barber.id}
@@ -136,7 +146,7 @@ const DayBoard = memo(function DayBoard({
                       variant="secondary"
                       className="bg-accent/10 text-accent border-none font-black text-[9px] px-2 py-0.5 rounded-lg shrink-0"
                     >
-                      {barber.appointments.length} موعد
+                      {countLabel}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2 mt-1.5">
@@ -165,7 +175,10 @@ const DayBoard = memo(function DayBoard({
         >
           <div
             ref={gutterRef}
-            className="relative rounded-2xl sticky right-0 z-30 bg-card backdrop-blur-xl"
+            className={cn(
+              "relative rounded-2xl sticky z-30 bg-card backdrop-blur-xl",
+              dirIsRtl ? "right-0" : "left-0",
+            )}
             style={{ height: bodyHeight }}
           >
             {slots.map((slot, i) => (

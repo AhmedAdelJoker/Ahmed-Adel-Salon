@@ -5,7 +5,7 @@ import { render, screen } from "@testing-library/react";
  * The quick-action grid listed eight destinations as a hand-written array:
  *
  *     const items = [
- *       { label: "الموظفين", icon: Users, to: "/owner/hr", ... },
+ *       { label: "الموظفين", icon: Users, to: "/manager/hr", ... },
  *       { label: "الخدمات", to: "/owner/settings?tab=services", ... },
  *       ...
  *     ];
@@ -78,7 +78,7 @@ describe("quick actions come from the route registry", () => {
     const paths = new Set(getQuickNavItems().map((i) => i.to));
 
     for (const path of [
-      "/owner/hr",
+      "/manager/hr",
       "/owner/reports",
       "/inventory",
       "/bookings",

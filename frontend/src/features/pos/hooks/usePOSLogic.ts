@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import api from "@/services/api";
 import { posShiftService } from "@/services/posShiftService";
 import { adaptList } from "@/services/apiAdapter";
@@ -6,11 +7,37 @@ import { toast } from "react-hot-toast";
 import { useSocket } from "@/context/SocketContext";
 import { useSalon } from "@/context/SalonContext";
 import { loadErrorMessage } from "@/lib/core/asyncError";
-import { resolveCustomerTier } from "@/features/pos/utils";
+import { digitsOnly } from "@/features/hr/utils/digits";
+import {
+  appointmentToCartItems,
+  cashierDiscountAllowance,
+  isProductOnlyOffer,
+  offerAvailableUnits,
+  resolveCustomerTier,
+} from "@/features/pos/utils";
 import type { ID } from "@/types/common";
-import type { POSRecord, CartItem, POSContextValue } from "@/features/pos/types";
+import type {
+  POSRecord,
+  CartItem,
+  CustomerValidation,
+  POSContextValue,
+  SaleMode,
+  SplitLine,
+} from "@/features/pos/types";
+
+/** Digits only: the phone matcher must not care about spaces or dashes, and
+ * Arabic-Indic numerals typed on an Arabic keyboard are the same number. */
+const digitsOf = (value: unknown): string => digitsOnly(String(value ?? ""));
+
+const fullNameOf = (record: POSRecord | null): string => {
+  if (!record) return "";
+  return `${String(record.first_name ?? record.firstName ?? "").trim()} ${String(
+    record.last_name ?? record.lastName ?? "",
+  ).trim()}`.trim();
+};
 
 export function usePOSLogic(): POSContextValue {
+  const { t } = useTranslation("pos");
   const socketContext = useSocket?.();
   const socket = socketContext?.socket || null;
   const { refreshBalance } = useSalon();
@@ -43,72 +70,172 @@ export function usePOSLogic(): POSContextValue {
 
   // Search & Filtering State
   const [itemSearchQuery, setItemSearchQuery] = useState("");
-  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState("الكل");
+  // Canonical ids, not display strings: "all"/"offers"/"products" are the
+  // three fixed tabs, anything else is a category id from the catalogue.
+  // Rendering translates the fixed ones; comparisons below match ids, so the
+  // filter survives a language switch (it used to break mid-session when the
+  // Arabic literals changed under it).
+  const [activeCategory, setActiveCategory] = useState("all");
 
-  // Customer lookup is a server-side typeahead, not a client-side filter over
-  // a preloaded roster. The POS used to pull /customers?limit=1000 on every
-  // page open — the whole customer table, with every column, into the till's
-  // memory — and then filtered it locally, for a list no UI ever displayed.
-  // The till now asks the server for exactly what it shows.
-  const [customerSearchResults, setCustomerSearchResults] = useState<
-    POSRecord[]
-  >([]);
-  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
-  const [customerSearchError, setCustomerSearchError] = useState<string | null>(
+  // Sale mode decides what the till can sell. Starting or loading a sale
+  // always resets the catalogue filter, so the cashier never lands on a tab
+  // that does not exist in the new mode (e.g. a product category while a
+  // session's services are being sold).
+  const [saleMode, setSaleMode] = useState<SaleMode>("idle");
+
+  // Customer block: a mandatory name plus an optional mobile. There is no
+  // customer typeahead any more — the phone number is the identity key, and
+  // the server resolves it the same way the till previews it here.
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerMatch, setCustomerMatch] = useState<POSRecord | null>(null);
+  const [customerLookupLoading, setCustomerLookupLoading] = useState(false);
+  const [customerLookupError, setCustomerLookupError] = useState<string | null>(
     null,
   );
-  // The one customer this sale is for. Holding the picked record (instead of
-  // a whole roster) is what lets the till drop the 1000-row preload while
-  // still knowing the customer's loyalty tier and name at checkout time.
   const [selectedCustomer, setSelectedCustomer] = useState<POSRecord | null>(
     null,
   );
+  const [selectedCustomerId, setSelectedCustomerId] = useState("walk_in");
+
+  // Guards the async session-customer fetch: switching sessions quickly must
+  // not leave the older response in `selectedCustomer`.
+  const sessionCustomerRequest = useRef(0);
 
   // Cart/Checkout State
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedBarberId, setSelectedBarberId] = useState("");
-  const [selectedCustomerId, setSelectedCustomerId] = useState("walk_in");
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [activeAppointmentId, setActiveAppointmentId] =
     useState<ID | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // New Customer State
-  const [isNewCustomer, setIsNewCustomer] = useState(false);
-  const [newCustomerFirstName, setNewCustomerFirstName] = useState("");
-  const [newCustomerPhone, setNewCustomerPhone] = useState("");
-
-  // Split Payment State
+  // Split Payment State — rows across any combination of the four accepted
+  // instruments (cash / card / wallet / bank_transfer), not just cash+card.
   const [isSplitPayment, setIsSplitPayment] = useState(false);
-  const [splitCashAmount, setSplitCashAmount] = useState(0);
-  const [splitCardAmount, setSplitCardAmount] = useState(0);
+  const [splitLines, setSplitLines] = useState<SplitLine[]>([]);
+
+  const isCustomerLocked = saleMode === "session";
+
+  const nameParts = useMemo(
+    () => customerName.trim().split(/\s+/).filter(Boolean).length,
+    [customerName],
+  );
+
+  const isRegisteredBuyer = isCustomerLocked || Boolean(customerMatch);
+
+  const customerValidation = useMemo<CustomerValidation>(() => {
+    const name = customerName.trim();
+    const phone = customerPhone.trim();
+
+    if (!name) {
+      return {
+        valid: false,
+        message: t("customer.errors.name_required"),
+        isRegistered: isRegisteredBuyer,
+        nameParts,
+      };
+    }
+
+    if (phone && digitsOf(phone).length < 7) {
+      return {
+        valid: false,
+        message: t("customer.errors.phone_invalid"),
+        isRegistered: isRegisteredBuyer,
+        nameParts,
+      };
+    }
+
+    // A guest/new buyer is identified by name alone, so the name has to carry
+    // first / father / family. A loaded session or a matched phone already has
+    // an authoritative customer row; the typed name only has to be non-empty.
+    if (!isRegisteredBuyer && nameParts < 3) {
+      return {
+        valid: false,
+        message: t("customer.errors.name_three_parts"),
+        isRegistered: false,
+        nameParts,
+      };
+    }
+
+    return {
+      valid: true,
+      message: null,
+      isRegistered: isRegisteredBuyer,
+      nameParts,
+    };
+  }, [customerName, customerPhone, isRegisteredBuyer, nameParts, t]);
+
+  const validateCustomer = useCallback(
+    () => customerValidation.message,
+    [customerValidation.message],
+  );
 
   // Derived Values
-  const categoryTabs = useMemo(
-    () => [
-      "الكل",
-      "العروض",
-      "المنتجات",
+  const categoryTabs = useMemo(() => {
+    // The manual sale is one catalogue: retail products and product-only
+    // offers. Service categories have no meaning here and must not be offered.
+    if (saleMode === "products") return ["all", "products", "offers"];
+    return [
+      "all",
+      "offers",
+      "products",
       ...categories.map((c) => c.name_ar || c.name).filter(Boolean),
-    ],
-    [categories],
+    ];
+  }, [categories, saleMode]);
+
+  // Product-only offers are retail stock in everything but name: they bundle
+  // products, carry no service and no expert, and the invoice still records
+  // them as an offer line with the offer price.
+  const productOffers = useMemo(
+    () =>
+      offers
+        .filter((offer) => isProductOnlyOffer(offer))
+        .map((offer) => ({
+          ...offer,
+          isProductOffer: true,
+          stock: offerAvailableUnits(offer, products),
+        })),
+    [offers, products],
   );
 
   const filteredItems = useMemo(() => {
     const query = itemSearchQuery.trim().toLowerCase();
+    const matches = (item: POSRecord) =>
+      String(item.name_ar || item.nameAr || item.name || "")
+        .toLowerCase()
+        .includes(query);
 
-    if (activeCategory === "العروض") {
-      return offers.filter((o) =>
-        (o.name || o.name_ar || "").toLowerCase().includes(query),
-      );
+    // Manual sale: products and product-only offers, never a service.
+    if (saleMode === "products") {
+      const collection =
+        activeCategory === "offers"
+          ? productOffers
+          : activeCategory === "products"
+            ? products
+            : [...products, ...productOffers];
+      return collection.filter(matches);
     }
 
-    if (activeCategory === "المنتجات") {
-      return products.filter((p) =>
-        (p.name || "").toLowerCase().includes(query),
-      );
+    if (activeCategory === "offers") {
+      // Session sales may still add an offer. Product-only offers keep their
+      // derived shelf count so the cashier cannot oversell the components.
+      return offers
+        .map((offer) =>
+          isProductOnlyOffer(offer)
+            ? {
+                ...offer,
+                isProductOffer: true,
+                stock: offerAvailableUnits(offer, products),
+              }
+            : offer,
+        )
+        .filter(matches);
+    }
+
+    if (activeCategory === "products") {
+      return products.filter(matches);
     }
 
     // Default to services
@@ -131,7 +258,7 @@ export function usePOSLogic(): POSContextValue {
         .toLowerCase()
         .includes(query);
       if (!nameMatch) return false;
-      if (activeCategory === "الكل") return true;
+      if (activeCategory === "all") return true;
 
       const cat = categories.find(
         (c) =>
@@ -142,73 +269,141 @@ export function usePOSLogic(): POSContextValue {
       return String(s.category_id || s.categoryId) === String(cat?.id);
     });
   }, [
+    saleMode,
     activeCategory,
     itemSearchQuery,
     services,
     products,
     offers,
+    productOffers,
     categories,
     selectedBarberId,
     barbers,
   ]);
 
-  // Server-side customer typeahead. Debounced so a fast typist does not fire
-  // one request per keystroke, and sequence-guarded so a slow response for an
-  // older query cannot overwrite the results of a newer one (the classic
-  // out-of-order race that leaves the list showing the wrong customer).
+  /**
+   * Resolve the phone number against the customer table.
+   *
+   * A matched number attaches the existing row (and its loyalty tier) to the
+   * sale; an unmatched number simply stays in the form and the invoice
+   * endpoint creates the customer. Session sales are excluded: the appointment
+   * already owns the customer, and the field is read-only there.
+   */
   useEffect(() => {
-    const query = customerSearchQuery.trim();
+    if (isCustomerLocked) {
+      setCustomerLookupLoading(false);
+      setCustomerLookupError(null);
+      setCustomerMatch(null);
+      return;
+    }
 
-    if (query.length < 2) {
-      setCustomerSearchResults([]);
-      setCustomerSearchError(null);
-      setCustomerSearchLoading(false);
+    const digits = digitsOf(customerPhone);
+    if (digits.length < 7) {
+      setCustomerMatch(null);
+      setCustomerLookupLoading(false);
+      setCustomerLookupError(null);
+      setSelectedCustomer(null);
+      setSelectedCustomerId("walk_in");
       return;
     }
 
     let cancelled = false;
-    setCustomerSearchLoading(true);
+    // The typed number changed, so any previously matched customer is stale
+    // until this lookup answers. Clearing here keeps the loyalty line and the
+    // total from briefly reflecting the wrong buyer.
+    setCustomerMatch(null);
+    setSelectedCustomer(null);
+    setSelectedCustomerId("walk_in");
+    setCustomerLookupLoading(true);
 
     const timer = setTimeout(async () => {
       try {
-        const response = await api.get("/customers", {
-          params: { q: query, limit: 20 },
+        const response = await api.get("/customers/search", {
+          params: { phone: digits },
         });
         if (cancelled) return;
-        setCustomerSearchResults(adaptList(response));
-        setCustomerSearchError(null);
+        const rows = adaptList(response);
+        const match =
+          rows.find((row: POSRecord) =>
+            digitsOf(row.phone) === digits ||
+            digitsOf(row.second_phone ?? row.secondPhone) === digits,
+          ) ?? null;
+        setCustomerMatch(match);
+        setCustomerLookupError(null);
+        if (match) {
+          setSelectedCustomer(match);
+          setSelectedCustomerId(
+            String(match.customer_id ?? match.id ?? "walk_in"),
+          );
+          // Keep a name the cashier already typed; only fill a blank one.
+          setCustomerName((prev) => prev.trim() || fullNameOf(match));
+        }
       } catch (error) {
         if (cancelled) return;
-        console.error("POS customer search failed:", error);
-        setCustomerSearchResults([]);
-        setCustomerSearchError(
-          loadErrorMessage(error, "البحث عن العميل"),
+        console.error("POS phone lookup failed:", error);
+        setCustomerMatch(null);
+        setCustomerLookupError(
+          loadErrorMessage(error, t("customer.lookup_error")),
         );
       } finally {
-        if (!cancelled) setCustomerSearchLoading(false);
+        if (!cancelled) setCustomerLookupLoading(false);
       }
-    }, 300);
+    }, 350);
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [customerSearchQuery]);
+  }, [customerPhone, isCustomerLocked, t]);
+
+  /** Load the loyalty/contact record for a session's customer. */
+  const hydrateSessionCustomer = useCallback(
+    async (customerId: ID, requestId: number) => {
+      try {
+        const response = await api.get(`/customers/${customerId}`);
+        if (requestId !== sessionCustomerRequest.current) return;
+        const record = (response.data?.data ?? response.data) as POSRecord;
+        if (!record || typeof record !== "object") return;
+        setSelectedCustomer(record);
+        setSelectedCustomerId(
+          String(record.customer_id ?? record.id ?? customerId),
+        );
+        setCustomerName((prev) => prev.trim() || fullNameOf(record));
+        setCustomerPhone((prev) => prev.trim() || String(record.phone ?? ""));
+        setCustomerLookupError(null);
+      } catch (error) {
+        if (requestId !== sessionCustomerRequest.current) return;
+        console.error("POS session customer load failed:", error);
+        // Non-fatal: the session's snapshot name on the appointment is still
+        // usable. Surface it so the cashier knows loyalty may not be shown.
+        setCustomerLookupError(
+          loadErrorMessage(error, t("customer.lookup_error")),
+        );
+      }
+    },
+    [t],
+  );
 
   // Actions
   const addToCart = useCallback(
-    (item: POSRecord, type: string) => {
-      if ((type === "service" || type === "offer") && !selectedBarberId) {
-        toast.error("يرجى تحديد الخبير المسؤول أولاً");
-        return;
-      }
+    (item: POSRecord, type: string, quantity: number = 1) => {
+      // The manual sale sells retail: products and product-only offers. A
+      // product offer is still an `offer` line on the invoice, but it behaves
+      // like stock — quantity, shelf limit, no expert.
+      const isProductOffer = type === "offer" && isProductOnlyOffer(item);
+      const itemType =
+        saleMode === "products"
+          ? isProductOffer
+            ? "offer"
+            : "product"
+          : type;
+      const isStocked = itemType === "product" || isProductOffer;
 
-      // Shelf guard: a stocked-out product can still be picked from the grid,
-      // so refuse it here before it hides inside the cart and only surfaces as
-      // a 400 when the customer is already standing at the till.
-      if (type === "product" && Number(item.quantity ?? 0) <= 0) {
-        toast.error("المنتج غير متوفر في المخزون");
-        return;
+      if ((itemType === "service" || itemType === "offer") && !isProductOffer) {
+        if (!selectedBarberId) {
+          toast.error(t("logic.pick_expert_first"));
+          return;
+        }
       }
 
       const id =
@@ -217,48 +412,118 @@ export function usePOSLogic(): POSContextValue {
         item.productId ||
         item.product_id ||
         item.offer_id;
-      if (cart.some((c) => String(c.id) === String(id) && c.type === type)) {
-        toast.error("هذا البند موجود بالفعل في السلة");
-        return;
+
+      const stock = isProductOffer
+        ? offerAvailableUnits(item, products)
+        : Number(item.quantity ?? item.stock ?? 0);
+      const reqQty = Math.max(1, Math.floor(Number(quantity) || 1));
+
+      // Shelf guard: a stocked-out product can still be picked from the grid,
+      // so refuse it here before it hides inside the cart. A product offer
+      // needs every component in stock for each bundle it sells.
+      if (isStocked) {
+        if (stock <= 0) {
+          toast.error(t("logic.out_of_stock"));
+          return;
+        }
+        if (reqQty > stock) {
+          toast.error(t("logic.max_stock", { count: Math.floor(stock) }));
+          return;
+        }
       }
 
       const barber = barbers.find(
         (b) => String(b.id) === String(selectedBarberId),
       );
 
+      const unitPrice = Number(
+        item.price ||
+          item.sell_price ||
+          item.sellPrice ||
+          item.offer_price ||
+          item.offerPrice ||
+          0,
+      );
+
+      const name =
+        item.name_ar ||
+        item.nameAr ||
+        item.name ||
+        item.display_name ||
+        item.displayName ||
+        t("logic.item_fallback");
+
+      // Dedup policy (Option A):
+      // - products and product offers: collapse into one line, increment qty.
+      // - services: duplicate only if barber differs; same service+barber blocked.
+      // - service offers: collapse (block duplicate).
+      if (isStocked) {
+        const existing = cart.find(
+          (c) => String(c.id) === String(id) && c.type === itemType,
+        );
+        if (existing) {
+          const newQty = (existing.quantity || 1) + reqQty;
+          if (newQty > stock) {
+            toast.error(t("logic.max_stock", { count: Math.floor(stock) }));
+            return;
+          }
+          setCart((prev) =>
+            prev.map((c) =>
+              c.uid === existing.uid ? { ...c, quantity: newQty } : c,
+            ),
+          );
+          toast.success(t("logic.qty_updated"));
+          return;
+        }
+      } else if (itemType === "service") {
+        const dup = cart.find(
+          (c) =>
+            String(c.id) === String(id) &&
+            c.type === itemType &&
+            String(c.barberId) === String(barber?.id ?? ""),
+        );
+        if (dup) {
+          toast.error(t("logic.already_in_cart"));
+          return;
+        }
+      } else {
+        if (cart.some((c) => String(c.id) === String(id) && c.type === itemType)) {
+          toast.error(t("logic.already_in_cart"));
+          return;
+        }
+      }
+
       setCart((prev) => [
         ...prev,
         {
           id,
-          uid: `${type}-${id}-${Date.now()}`,
-          name:
-            item.name_ar ||
-            item.nameAr ||
-            item.name ||
-            item.display_name ||
-            item.displayName ||
-            "عنصر",
-          price: Number(
-            item.price ||
-              item.sell_price ||
-              item.sellPrice ||
-              item.offer_price ||
-              item.offerPrice ||
-              0,
-          ),
-          type,
-          barberId: barber?.id || null,
-          barberName:
-            barber?.display_name ||
-            barber?.displayName ||
-            barber?.full_name ||
-            barber?.fullName ||
-            "المتجر",
+          uid: `${itemType}-${id}-${Date.now()}`,
+          name,
+          price: unitPrice,
+          quantity: reqQty,
+          type: itemType,
+          isProductOffer: isProductOffer || undefined,
+          barberId: isStocked ? null : barber?.id || null,
+          barberName: isStocked
+            ? t("cart.store")
+            : barber?.display_name ||
+              barber?.displayName ||
+              barber?.full_name ||
+              barber?.fullName ||
+              t("cart.store"),
+          stock: isStocked ? stock : undefined,
+          durationMinutes:
+            item.duration_minutes || item.durationMinutes || item.duration || undefined,
+          sku: item.sku || undefined,
+          originalPrice:
+            item.original_price || item.originalPrice || item.offer_price_original || undefined,
+          includedItems: item.included_items || item.includedItems || undefined,
+          categoryName: item.category || item.category_name || item.categoryName || undefined,
         },
       ]);
-      toast.success("تمت الإضافة للسلة");
+      toast.success(t("logic.added"));
     },
-    [selectedBarberId, barbers, cart],
+    [saleMode, selectedBarberId, barbers, cart, products, t],
   );
 
   const updateCartItemBarber = useCallback(
@@ -275,14 +540,32 @@ export function usePOSLogic(): POSContextValue {
                   barber?.displayName ||
                   barber?.full_name ||
                   barber?.fullName ||
-                  "الخبير",
+                  t("cart.expert_fallback"),
               }
             : item,
         ),
       );
     },
-    [barbers],
+    [barbers, t],
   );
+
+  const updateCartItemQuantity = useCallback((uid: string, delta: number) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.uid !== uid) return item;
+        const stock = Number(item.stock ?? 0);
+        const current = Number(item.quantity || 1);
+        let next = current + delta;
+        if (next < 1) next = 1;
+        const isStocked = item.type === "product" || item.isProductOffer;
+        if (isStocked && stock > 0 && next > stock) {
+          toast.error(t("logic.max_stock", { count: Math.floor(stock) }));
+          next = stock;
+        }
+        return { ...item, quantity: next };
+      }),
+    );
+  }, [t]);
 
   const assignBarberToAll = useCallback(
     (barberId: ID) => {
@@ -293,53 +576,170 @@ export function usePOSLogic(): POSContextValue {
       setCart((prev) =>
         prev.map((item) => ({
           ...item,
-          barberId: barberId,
+          // Products and product-only offers never carry an expert;
+          // assigning one must not make a retail line look like a service.
+          barberId:
+            item.type === "product" || item.isProductOffer ? null : barberId,
           barberName:
-            barber.display_name ||
-            barber.displayName ||
-            barber.full_name ||
-            barber.fullName ||
-            "الخبير",
+            item.type === "product" || item.isProductOffer
+              ? t("cart.store")
+              : barber.display_name ||
+                barber.displayName ||
+                barber.full_name ||
+                barber.fullName ||
+                t("cart.expert_fallback"),
         })),
       );
-      toast.success(`تم تعيين ${barber.display_name || "الخبير"} لجميع البنود`);
+      toast.success(
+        t("logic.assigned_all", {
+          name: barber.display_name || t("cart.expert_fallback"),
+        }),
+      );
     },
-    [barbers],
+    [barbers, t],
   );
 
   const removeFromCart = useCallback((uid: string) => {
     setCart((prev) => prev.filter((item) => item.uid !== uid));
   }, []);
 
-  const resetPOS = useCallback(() => {
+  /** Wipe every sale-scoped field. Mode returns to the session queue. */
+  const resetPOS = useCallback(
+    (options?: { silent?: boolean }) => {
+      setCart([]);
+      setDiscount(0);
+      setSelectedBarberId("");
+      setSelectedCustomerId("walk_in");
+      setSelectedCustomer(null);
+      setCustomerName("");
+      setCustomerPhone("");
+      setCustomerMatch(null);
+      setCustomerLookupError(null);
+      setPaymentMethod("CASH");
+      setIsSplitPayment(false);
+      setSplitLines([]);
+      setActiveAppointmentId(null);
+      setItemSearchQuery("");
+      setActiveCategory("all");
+      setSaleMode("idle");
+      sessionCustomerRequest.current += 1;
+      if (!options?.silent) toast.success(t("logic.pos_reset"));
+    },
+    [t],
+  );
+
+  const startSaleMode = useCallback(
+    (mode: "products") => {
+      setCart([]);
+      setDiscount(0);
+      setSelectedBarberId("");
+      setSelectedCustomerId("walk_in");
+      setSelectedCustomer(null);
+      setCustomerName("");
+      setCustomerPhone("");
+      setCustomerMatch(null);
+      setCustomerLookupError(null);
+      setPaymentMethod("CASH");
+      setIsSplitPayment(false);
+      setSplitLines([]);
+      setActiveAppointmentId(null);
+      setItemSearchQuery("");
+      setActiveCategory("all");
+      setSaleMode(mode);
+      sessionCustomerRequest.current += 1;
+      toast.success(t("products_sale.started"));
+    },
+    [t],
+  );
+
+  /**
+   * Start a walk-in (no appointment) service sale.
+   *
+   * Opens the service catalogue with a walk-in customer so the cashier can
+   * ring up services for a customer who has no pre-booked appointment.
+   */
+  const startQuickSale = useCallback(() => {
     setCart([]);
     setDiscount(0);
     setSelectedBarberId("");
     setSelectedCustomerId("walk_in");
     setSelectedCustomer(null);
-    setCustomerSearchQuery("");
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerMatch(null);
+    setCustomerLookupError(null);
     setPaymentMethod("CASH");
+    setIsSplitPayment(false);
+    setSplitLines([]);
     setActiveAppointmentId(null);
-    toast.success("تمت إعادة تعيين محطة الـ POS");
-  }, []);
+    setItemSearchQuery("");
+    setActiveCategory("all");
+    setSaleMode("session");
+    sessionCustomerRequest.current += 1;
+    toast.success(t("logic.quick_sale_started"));
+  }, [t]);
 
   /**
-   * Attach a customer to this sale. The id and the record are set together:
-   * the id is what the invoice carries, the record is what the till needs for
-   * the loyalty tier and the printed name. Setting one without the other was
-   * the bug that made a walked-in customer silently lose their loyalty
-   * discount.
+   * Load a reception session into the till.
+   *
+   * The appointment owns the buyer: the name and phone are prefilled from it
+   * and shown read-only. The loyalty record is fetched separately because the
+   * appointment payload only carries the id and the snapshot name.
    */
-  const selectCustomer = useCallback((customer: POSRecord | null) => {
-    if (!customer) {
+  const loadSession = useCallback(
+    (appointment: POSRecord, options?: { notify?: boolean }) => {
+      if (!appointment) return;
+      const appointmentId =
+        appointment.appointment_id ||
+        appointment.appointmentId ||
+        appointment.id;
+      const appointmentBarberId =
+        appointment.employee_id ||
+        appointment.employeeId ||
+        appointment.barber_id ||
+        appointment.barberId ||
+        "";
+      const customerId =
+        appointment.customer_id ?? appointment.customerId ?? null;
+      const snapshotName = String(
+        appointment.customer_name ?? appointment.customerName ?? "",
+      ).trim();
+      const unknownName = t("sessions.unknown_customer");
+      const phone = String(
+        appointment.customer_phone ?? appointment.customerPhone ?? "",
+      ).trim();
+
+      sessionCustomerRequest.current += 1;
+      const requestId = sessionCustomerRequest.current;
+
+      setCart(appointmentToCartItems(appointment, barbers, appointmentBarberId));
+      setActiveAppointmentId(appointmentId);
+      setSelectedBarberId(appointmentBarberId ? String(appointmentBarberId) : "");
+      setSelectedCustomerId(customerId ? String(customerId) : "walk_in");
       setSelectedCustomer(null);
-      setSelectedCustomerId("walk_in");
-      return;
-    }
-    setSelectedCustomer(customer);
-    setSelectedCustomerId(String(customer.customer_id ?? customer.id ?? ""));
-    setCustomerSearchQuery("");
-  }, []);
+      setCustomerMatch(null);
+      setCustomerName(
+        snapshotName && snapshotName !== unknownName ? snapshotName : "",
+      );
+      setCustomerPhone(phone);
+      setCustomerLookupError(null);
+      setDiscount(0);
+      setPaymentMethod("CASH");
+      setIsSplitPayment(false);
+      setSplitLines([]);
+      setItemSearchQuery("");
+      setActiveCategory("all");
+      setSaleMode("session");
+
+      if (customerId) {
+        void hydrateSessionCustomer(customerId, requestId);
+      }
+      if (options?.notify !== false) {
+        toast.success(t("sessions.loaded"));
+      }
+    },
+    [barbers, hydrateSessionCustomer, t],
+  );
 
   const fetchReadyAppointments = useCallback(async () => {
     try {
@@ -350,11 +750,11 @@ export function usePOSLogic(): POSContextValue {
       // Was console-only, so a failed fetch left the queue simply empty and the
       // cashier could not tell "nobody waiting" from "the request failed".
       console.error("Fetch ready appointments error:", error);
-      setReadyAppointmentsError(loadErrorMessage(error, "قائمة الانتظار"));
+      setReadyAppointmentsError(loadErrorMessage(error, t("logic.queue_error")));
     } finally {
       setReadyAppointmentsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const fetchShift = useCallback(async () => {
     try {
@@ -368,12 +768,12 @@ export function usePOSLogic(): POSContextValue {
       console.error("Shift check failed:", error);
       setCurrentShift(null);
       setShiftError(
-        `${loadErrorMessage(error, "حالة الوردية")} لم يتم تأكيد أن الوردية مفتوحة.`,
+        `${loadErrorMessage(error, t("logic.shift_error"))} ${t("logic.shift_not_confirmed")}`,
       );
     } finally {
       setShiftLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -410,9 +810,9 @@ export function usePOSLogic(): POSContextValue {
       // turned a slow network into a dead register. Each fetch settles on its
       // own; the cashier keeps selling whatever did load.
       //
-      // Customers are deliberately NOT preloaded: the till searches them
-      // server-side on demand (see the typeahead effect above), so opening
-      // the POS no longer pulls the entire customer table into memory.
+      // Customers are deliberately NOT preloaded: the till resolves them from
+      // the optional phone number on demand (see the lookup effect above), so
+      // opening the POS no longer pulls the entire customer table into memory.
       const [productsOut, offersOut] = await Promise.allSettled([
         api.get("/products", { params: { limit: 1000 } }),
         api.get("/offers/active", { params: { limit: 1000 } }),
@@ -427,23 +827,23 @@ export function usePOSLogic(): POSContextValue {
         );
       } else {
         console.error("POS products fetch failed:", productsOut.reason);
-        toast.error("تعذر تحميل قائمة المنتجات — أعد التحديث لاحقاً");
+        toast.error(t("logic.products_error"));
       }
 
       if (offersOut.status === "fulfilled") {
         setOffers(adaptList(offersOut.value));
       } else {
         console.error("POS offers fetch failed:", offersOut.reason);
-        toast.error("تعذر تحميل قائمة العروض — أعد التحديث لاحقاً");
+        toast.error(t("logic.offers_error"));
       }
     } catch (error) {
       console.error("POS data error:", error);
-      setCatalogError(loadErrorMessage(error, "بيانات نقطة البيع"));
-      toast.error("فشل مزامنة محطة العمل");
+      setCatalogError(loadErrorMessage(error, t("logic.pos_data")));
+      toast.error(t("logic.sync_failed"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -462,7 +862,7 @@ export function usePOSLogic(): POSContextValue {
         ) {
           fetchReadyAppointments();
           if (msg.event === "appointment_ready_for_payment") {
-            toast.success("جلسة جديدة جاهزة للدفع");
+            toast.success(t("logic.new_session"));
           }
         }
       } catch (err) {
@@ -472,7 +872,7 @@ export function usePOSLogic(): POSContextValue {
 
     socket?.addEventListener("message", handleMessage);
     return () => socket?.removeEventListener("message", handleMessage);
-  }, [socket, fetchReadyAppointments]);
+  }, [socket, fetchReadyAppointments, t]);
 
   const [lastInvoice, setLastInvoice] = useState<POSRecord | null>(null);
   const [completedCustomerName, setCompletedCustomerName] = useState("");
@@ -480,13 +880,30 @@ export function usePOSLogic(): POSContextValue {
 
   // Derived
   const subtotal = useMemo(
-    () => cart.reduce((sum, item) => sum + Number(item.price || 0), 0),
+    () =>
+      cart.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
+        0,
+      ),
     [cart],
   );
 
+  const taxRate = useMemo(() => {
+    const raw = Number(
+      businessSettings?.tax_rate ??
+        businessSettings?.taxRate ??
+        businessSettings?.vat_rate ??
+        businessSettings?.vatRate ??
+        0,
+    );
+    return Number.isFinite(raw) ? raw : 0;
+  }, [businessSettings]);
+
   const loyaltyDiscount = useMemo(() => {
     if (!businessSettings?.loyalty_settings?.enabled) return 0;
-    if (selectedCustomerId === "walk_in" || isNewCustomer) return 0;
+    // A guest sale has no customer record, so there is no tier to apply. The
+    // server computes the same discount from the resolved customer id.
+    if (!selectedCustomer) return 0;
 
     // The tier comes from the visit count, so the badge and the price always
     // agree — and a customer whose stored tier name is stale still gets the
@@ -498,17 +915,25 @@ export function usePOSLogic(): POSContextValue {
     if (!tier?.discount_percent) return 0;
 
     return (subtotal * Number(tier.discount_percent)) / 100;
-  }, [
-    businessSettings,
-    selectedCustomer,
-    selectedCustomerId,
-    isNewCustomer,
-    subtotal,
-  ]);
+  }, [businessSettings, selectedCustomer, subtotal]);
+
+  const taxAmount = useMemo(() => {
+    const base = Math.max(0, subtotal - Number(discount || 0) - loyaltyDiscount);
+    const rate = taxRate > 1 ? taxRate / 100 : taxRate;
+    return base * rate;
+  }, [subtotal, discount, loyaltyDiscount, taxRate]);
 
   const finalTotal = useMemo(
-    () => Math.max(0, subtotal - Number(discount || 0) - loyaltyDiscount),
-    [subtotal, discount, loyaltyDiscount],
+    () =>
+      Math.max(0, subtotal - Number(discount || 0) - loyaltyDiscount + taxAmount),
+    [subtotal, discount, loyaltyDiscount, taxAmount],
+  );
+
+  // The discount a cashier may apply without a manager's approval, read from
+  // the owner's setting rather than a constant baked into the till.
+  const discountAllowance = useMemo(
+    () => cashierDiscountAllowance(businessSettings, subtotal),
+    [businessSettings, subtotal],
   );
 
   const isShopOpen = useMemo(() => {
@@ -564,6 +989,7 @@ export function usePOSLogic(): POSContextValue {
     services,
     products,
     offers,
+    productOffers,
     barbers,
     readyAppointments,
     businessSettings,
@@ -590,13 +1016,20 @@ export function usePOSLogic(): POSContextValue {
     setCompletedBarberName,
     itemSearchQuery,
     setItemSearchQuery,
-    customerSearchQuery,
-    setCustomerSearchQuery,
-    customerSearchResults,
-    customerSearchLoading,
-    customerSearchError,
-    selectedCustomer,
-    selectCustomer,
+    saleMode,
+    startSaleMode,
+    startQuickSale,
+    loadSession,
+    customerName,
+    setCustomerName,
+    customerPhone,
+    setCustomerPhone,
+    customerLookupLoading,
+    customerLookupError,
+    customerMatch,
+    isCustomerLocked,
+    customerValidation,
+    validateCustomer,
     activeCategory,
     setActiveCategory,
     categoryTabs,
@@ -608,6 +1041,7 @@ export function usePOSLogic(): POSContextValue {
     setSelectedBarberId,
     selectedCustomerId,
     setSelectedCustomerId,
+    selectedCustomer,
     discount,
     setDiscount,
     loyaltyDiscount,
@@ -615,21 +1049,16 @@ export function usePOSLogic(): POSContextValue {
     setPaymentMethod,
     activeAppointmentId,
     setActiveAppointmentId,
-    isNewCustomer,
-    setIsNewCustomer,
-    newCustomerFirstName,
-    setNewCustomerFirstName,
-    newCustomerPhone,
-    setNewCustomerPhone,
     isSplitPayment,
     setIsSplitPayment,
-    splitCashAmount,
-    setSplitCashAmount,
-    splitCardAmount,
-    setSplitCardAmount,
+    splitLines,
+    setSplitLines,
     // Derived
     subtotal,
     finalTotal,
+    taxRate,
+    taxAmount,
+    discountAllowance,
     // Actions
     fetchReadyAppointments,
     fetchShift,
@@ -638,6 +1067,7 @@ export function usePOSLogic(): POSContextValue {
     removeFromCart,
     resetPOS,
     updateCartItemBarber,
+    updateCartItemQuantity,
     assignBarberToAll,
   };
 

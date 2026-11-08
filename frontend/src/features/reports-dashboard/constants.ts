@@ -64,11 +64,11 @@ export const KPI_CONFIG: KpiConfigEntry[] = [
 ];
 
 export const PERIODS: PeriodOption[] = [
-  { value: "today", label: "اليوم" },
-  { value: "yesterday", label: "أمس" },
-  { value: "week", label: "هذا الأسبوع" },
-  { value: "month", label: "هذا الشهر" },
-  { value: "year", label: "هذا العام" },
+  { value: "today", label: "periodToday" },
+  { value: "yesterday", label: "periodYesterday" },
+  { value: "week", label: "periodWeek" },
+  { value: "month", label: "periodMonth" },
+  { value: "year", label: "periodYear" },
 ];
 
 /**

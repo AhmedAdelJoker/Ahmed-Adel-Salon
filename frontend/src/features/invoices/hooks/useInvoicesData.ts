@@ -7,10 +7,12 @@
  * overwrite the result of a newer one.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { adaptList } from "@/services/apiAdapter";
 import { getApiErrorMessage } from "@/lib/core/utils";
+import i18n from "@/i18n";
 import {
   formatDate,
   invoiceBarber,
@@ -23,9 +25,12 @@ import {
   isInvoiceEditable,
   invoiceSubtotal,
   invoiceDiscount,
+  invoiceTaxAmount,
   invoiceIsClosed,
   rowsFromInvoice,
+  type InvoiceRecord,
 } from "@/features/invoices/utils/invoice";
+import type { AdjustmentDialogState } from "@/features/invoices/components/InvoicesDialogs";
 
 export type TimePreset = "today" | "week" | "month" | "last_month" | "custom";
 
@@ -80,20 +85,13 @@ export function detectPreset(range: DateRange): TimePreset {
   return "custom";
 }
 
-function initialRange(): DateRange {
-  if (typeof window !== "undefined") {
-    const urlMonth = new URLSearchParams(window.location.search).get("month");
-    if (urlMonth) {
-      const [y, m] = urlMonth.split("-").map(Number);
-      if (y && m && m >= 1 && m <= 12) {
-        return {
-          from: fmtLocal(new Date(y, m - 1, 1)),
-          to: fmtLocal(new Date(y, m, 0)),
-        };
-      }
-    }
-  }
-  return presetRange("month");
+export function monthRange(yearMonth: string): DateRange | null {
+  const [y, m] = yearMonth.split("-").map(Number);
+  if (!y || !m || m < 1 || m > 12) return null;
+  return {
+    from: fmtLocal(new Date(y, m - 1, 1)),
+    to: fmtLocal(new Date(y, m, 0)),
+  };
 }
 
 const SORT_PARAM: Record<string, string> = {
@@ -111,11 +109,14 @@ function escapeCsv(value: unknown): string {
 }
 
 export function useInvoicesData() {
-  const [initial] = useState<DateRange>(initialRange);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [adjustments, setAdjustments] = useState<any[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [initial] = useState<DateRange>(() => {
+    const month = searchParams.get("month");
+    const range = month ? monthRange(month) : null;
+    return range && range.from !== range.to ? range : presetRange("month");
+  });
+  const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(true);
-  const [adjustmentsLoading, setAdjustmentsLoading] = useState(true);
   const [adjustmentsError, setAdjustmentsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -133,6 +134,7 @@ export function useInvoicesData() {
   const pageSize = 20;
   const [totalCount, setTotalCount] = useState(0);
   const [summary, setSummary] = useState(DEFAULT_SUMMARY);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     invoiceNo: true,
     customer: true,
@@ -143,7 +145,7 @@ export function useInvoicesData() {
     actions: true,
   });
 
-  const [adjustmentDialog, setAdjustmentDialog] = useState<any>({
+  const [adjustmentDialog, setAdjustmentDialog] = useState<AdjustmentDialogState>({
     open: false,
     invoice: null,
     type: "discount",
@@ -152,8 +154,11 @@ export function useInvoicesData() {
     notes: "",
   });
   const [adjustmentSubmitting, setAdjustmentSubmitting] = useState(false);
+  const [pendingAdjustments, setPendingAdjustments] = useState(0);
   const [busyPdfId, setBusyPdfId] = useState<number | string | null>(null);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [busyWhatsappId, setBusyWhatsappId] = useState<number | string | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRecord | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const requestSeq = useRef(0);
 
@@ -162,38 +167,38 @@ export function useInvoicesData() {
     [fromDate, toDate],
   );
 
-  const applyPreset = useCallback((preset: Exclude<TimePreset, "custom">) => {
-    const range = presetRange(preset);
-    setFromDate(range.from);
-    setToDate(range.to);
-    setCurrentPage(1);
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("month")) {
-      params.delete("month");
-      const qs = params.toString();
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${qs ? `?${qs}` : ""}`,
-      );
-    }
-  }, []);
+  const clearMonthParam = useCallback(() => {
+    if (!searchParams.has("month")) return;
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete("month");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
 
-  const applyRange = useCallback((range: DateRange) => {
-    setFromDate(range.from);
-    setToDate(range.to);
-    setCurrentPage(1);
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("month")) {
-      params.delete("month");
-      const qs = params.toString();
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${qs ? `?${qs}` : ""}`,
-      );
-    }
-  }, []);
+  const applyPreset = useCallback(
+    (preset: Exclude<TimePreset, "custom">) => {
+      const range = presetRange(preset);
+      setFromDate(range.from);
+      setToDate(range.to);
+      setCurrentPage(1);
+      clearMonthParam();
+    },
+    [clearMonthParam],
+  );
+
+  const applyRange = useCallback(
+    (range: DateRange) => {
+      setFromDate(range.from);
+      setToDate(range.to);
+      setCurrentPage(1);
+      clearMonthParam();
+    },
+    [clearMonthParam],
+  );
 
   const shiftMonth = useCallback(
     (delta: number) => {
@@ -268,12 +273,16 @@ export function useInvoicesData() {
         typeof raw.total === "number" ? raw.total : items.length,
       );
       setSummary(raw.summary || { ...DEFAULT_SUMMARY, count: items.length });
+      setLastUpdated(new Date());
       setError(null);
     } catch (err) {
       if (seq !== requestSeq.current) return;
       const apiErr = err as { response?: { data?: unknown } };
       console.error("Invoices load error:", apiErr?.response?.data || err);
-      const message = getApiErrorMessage(apiErr, "فشل تحميل سجل الفواتير");
+      const message = getApiErrorMessage(
+        apiErr,
+        i18n.t("invoices:toasts.loadFailed"),
+      );
       setError(message);
       toast.error(message);
     } finally {
@@ -283,18 +292,30 @@ export function useInvoicesData() {
 
   const fetchAdjustments = useCallback(async () => {
     try {
-      setAdjustmentsLoading(true);
       setAdjustmentsError(null);
-      const res = await api.get("/invoice-adjustment-requests");
-      setAdjustments(adaptList(res));
+      // The list endpoint already filters by role (cashiers get their own
+      // only), so ask for exactly one row and read the total from the header
+      // instead of downloading rows just to count them.
+      const res = await api.get("/invoice-adjustment-requests", {
+        params: { status: "pending", limit: 1 },
+      });
+      const fromHeader = Number(res?.headers?.["x-total-count"]);
+      setPendingAdjustments(
+        Number.isFinite(fromHeader)
+          ? fromHeader
+          : Array.isArray(res.data)
+            ? res.data.length
+            : 0,
+      );
     } catch (err) {
       console.error("Adjustments load error:", err);
-      setAdjustments([]);
+      setPendingAdjustments(0);
       setAdjustmentsError(
-        getApiErrorMessage(err, "تعذر تحميل طلبات تعديل الفواتير"),
+        getApiErrorMessage(
+          err,
+          i18n.t("invoices:toasts.loadAdjustmentsFailed"),
+        ),
       );
-    } finally {
-      setAdjustmentsLoading(false);
     }
   }, []);
 
@@ -315,33 +336,49 @@ export function useInvoicesData() {
   const searchPending = query.trim() !== debouncedQuery;
 
   const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize));
-  const pendingAdjustments = adjustments.filter(
-    (request) =>
-      String(request.status || request.request_status || "").toLowerCase() ===
-      "pending",
-  ).length;
 
   const exportToCSV = useCallback(async () => {
     try {
-      const res = await api.get("/invoices", {
-        params: buildParams({ skip: 0, limit: 1000 }),
-      });
-      const raw = res.data || {};
-      const items = Array.isArray(raw) ? raw : raw.items || [];
+      setExporting(true);
+      // The server caps a page at 1000 rows, so a period with more invoices
+      // than that used to export only the first thousand — silently, with a
+      // toast that said "exported N invoices". The export now walks the
+      // whole result set page by page and reports what it really wrote.
+      const PAGE_SIZE = 500;
+      const collected: InvoiceRecord[] = [];
+      let skip = 0;
+      let total = Number.POSITIVE_INFINITY;
+
+      while (collected.length < total) {
+        const res = await api.get("/invoices", {
+          params: buildParams({ skip, limit: PAGE_SIZE }),
+        });
+        const raw = res.data || {};
+        const page = Array.isArray(raw) ? raw : raw.items || [];
+        if (!page.length) break;
+        collected.push(...page);
+        total = typeof raw.total === "number" ? raw.total : collected.length;
+        skip += page.length;
+        if (page.length < PAGE_SIZE) break;
+      }
+
+      const items = collected;
       if (!items.length) {
-        toast.error("لا توجد فواتير مطابقة للتصدير");
+        toast.error(i18n.t("invoices:csv.noMatching"));
         return;
       }
       const headers = [
-        "رقم الفاتورة",
-        "العميل",
-        "الخبير",
-        "التاريخ",
-        "طريقة الدفع",
-        "الحالة",
-        "الإجمالي",
+        i18n.t("invoices:csv.invoiceNo"),
+        i18n.t("invoices:csv.customer"),
+        i18n.t("invoices:csv.barber"),
+        i18n.t("invoices:csv.date"),
+        i18n.t("invoices:csv.payment"),
+        i18n.t("invoices:csv.status"),
+        i18n.t("invoices:csv.total"),
+        i18n.t("invoices:csv.discount"),
+        i18n.t("invoices:csv.tax"),
       ];
-      const rows = items.map((invoice: any) => [
+      const rows = items.map((invoice) => [
         invoiceNo(invoice),
         invoiceCustomer(invoice),
         invoiceBarber(invoice),
@@ -349,6 +386,8 @@ export function useInvoicesData() {
         invoicePaymentLabel(invoice),
         invoiceStatusLabel(invoice),
         invoiceTotal(invoice).toFixed(2),
+        invoiceDiscount(invoice).toFixed(2),
+        invoiceTaxAmount(invoice).toFixed(2),
       ]);
       const csv =
         "\uFEFF" +
@@ -362,15 +401,19 @@ export function useInvoicesData() {
       link.download = `invoices_${fromDate}_${toDate}.csv`;
       link.click();
       URL.revokeObjectURL(url);
-      toast.success(`تم تصدير ${items.length} فاتورة`);
+      toast.success(i18n.t("invoices:csv.exported", { count: items.length }));
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "تعذر تصدير الفواتير"));
+      toast.error(
+        getApiErrorMessage(err, i18n.t("invoices:csv.exportFailed")),
+      );
+    } finally {
+      setExporting(false);
     }
   }, [buildParams, fromDate, toDate]);
 
-  const openInvoicePdf = useCallback(async (invoice: any) => {
+  const openInvoicePdf = useCallback(async (invoice: InvoiceRecord) => {
     const id = invoiceId(invoice);
-    if (!id) return toast.error("لا يمكن تحديد رقم الفاتورة");
+    if (!id) return toast.error(i18n.t("invoices:toasts.notDetermined"));
     try {
       setBusyPdfId(id);
       const response = await api.get(`/invoices/${id}/pdf`, {
@@ -391,13 +434,29 @@ export function useInvoicesData() {
       if (viewer) viewer.opener = null;
       setTimeout(() => URL.revokeObjectURL(fileUrl), 60000);
     } catch {
-      toast.error("تعذر فتح ملف PDF");
+      toast.error(i18n.t("invoices:toasts.pdfFailed"));
     } finally {
       setBusyPdfId(null);
     }
   }, []);
 
-  const openAdjustmentDialog = useCallback((invoice: any) => {
+  const sendInvoicePdfWhatsapp = useCallback(async (invoice: InvoiceRecord) => {
+    const id = invoiceId(invoice);
+    if (!id) return toast.error(i18n.t("invoices:toasts.notDetermined"));
+    try {
+      setBusyWhatsappId(id);
+      await api.post(`/invoices/${id}/send-whatsapp-pdf`);
+      toast.success(i18n.t("invoices:toasts.whatsappSent"));
+    } catch (err) {
+      toast.error(
+        getApiErrorMessage(err, i18n.t("invoices:toasts.whatsappFailed")),
+      );
+    } finally {
+      setBusyWhatsappId(null);
+    }
+  }, []);
+
+  const openAdjustmentDialog = useCallback((invoice: InvoiceRecord) => {
     setAdjustmentDialog({
       open: true,
       invoice,
@@ -410,7 +469,7 @@ export function useInvoicesData() {
 
   const submitAdjustmentRequest = useCallback(async () => {
     const reason = String(adjustmentDialog.reason || "").trim();
-    if (!reason) return toast.error("يرجى ذكر سبب التعديل");
+    if (!reason) return toast.error(i18n.t("invoices:toasts.reasonRequired"));
 
     const type = adjustmentDialog.type;
     const newValue = String(adjustmentDialog.new_value || "").trim();
@@ -418,15 +477,15 @@ export function useInvoicesData() {
     if (type === "discount") {
       const parsed = Number(newValue);
       if (!newValue || !Number.isFinite(parsed) || parsed < 0) {
-        return toast.error("أدخل قيمة خصم صحيحة أكبر من أو تساوي صفر");
+        return toast.error(i18n.t("invoices:toasts.invalidDiscount"));
       }
       if (parsed > invoiceSubtotal(adjustmentDialog.invoice)) {
-        return toast.error("الخصم لا يمكن أن يتجاوز إجمالي الفاتورة قبل الخصم");
+        return toast.error(i18n.t("invoices:toasts.discountTooLarge"));
       }
     }
 
     if (type === "payment_method" && !ALLOWED_ADJUSTMENT_PAYMENTS.includes(newValue)) {
-      return toast.error("اختر طريقة دفع صحيحة");
+      return toast.error(i18n.t("invoices:toasts.invalidPaymentMethod"));
     }
 
     if (
@@ -434,8 +493,8 @@ export function useInvoicesData() {
       invoiceIsClosed(adjustmentDialog.invoice) ||
       !isInvoiceEditable(adjustmentDialog.invoice)
     ) {
-      toast.error("انتهت فترة تعديل هذه الفاتورة (ساعة واحدة)");
-      setAdjustmentDialog((prev: any) => ({ ...prev, open: false }));
+      toast.error(i18n.t("invoices:toasts.expiredEditSave"));
+      setAdjustmentDialog((prev) => ({ ...prev, open: false }));
       return;
     }
 
@@ -457,7 +516,7 @@ export function useInvoicesData() {
           type === "void" ? { status: "cancelled" } : { new_value: newValue },
       };
       await api.post(`/invoices/${id}/adjustment-requests`, payload);
-      toast.success("تم إرسال طلب التعديل بنجاح");
+      toast.success(i18n.t("invoices:toasts.sentSuccess"));
       setAdjustmentDialog({
         open: false,
         invoice: null,
@@ -468,7 +527,9 @@ export function useInvoicesData() {
       });
       refreshAll();
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "فشل إرسال الطلب"));
+      toast.error(
+        getApiErrorMessage(err, i18n.t("invoices:toasts.submitFailed")),
+      );
     } finally {
       setAdjustmentSubmitting(false);
     }
@@ -476,9 +537,7 @@ export function useInvoicesData() {
 
   return {
     invoices,
-    adjustments,
     invoicesLoading,
-    adjustmentsLoading,
     adjustmentsError,
     error,
     loading: invoicesLoading,
@@ -512,15 +571,19 @@ export function useInvoicesData() {
     filteredInvoices,
     summary,
     exportToCSV,
+    exporting,
     adjustmentDialog,
     setAdjustmentDialog,
     adjustmentSubmitting,
     busyPdfId,
+    busyWhatsappId,
     selectedInvoice,
     setSelectedInvoice,
     totalPages,
     pendingAdjustments,
+    lastUpdated,
     openInvoicePdf,
+    sendInvoicePdfWhatsapp,
     openAdjustmentDialog,
     submitAdjustmentRequest,
   };

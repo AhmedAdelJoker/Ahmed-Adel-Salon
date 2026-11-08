@@ -9,6 +9,7 @@ export {
   ASSISTANT_TASKS,
   FORM_TABS,
   defaultForm,
+  ARCHIVE_REASON_VALUES,
   FIELD_LABEL_CLASS,
   FIELD_INPUT_CLASS,
   FIELD_TEXTAREA_CLASS,
@@ -16,18 +17,36 @@ export {
 } from "@/features/hr/utils/constants";
 export {
   getJobTitleLabel,
+  jobTitleLabel,
+  employmentTypeLabel,
+  formatEmployeeDate,
+  formatEmployeeMoney,
+  currencyLabelForLanguage,
+  tenureLabel,
   isCustomJobTitleValue,
   isServiceProviderJobTitle,
   SERVICE_PROVIDER_JOB_TITLES,
   deriveDateOnly,
   normalizeEmployeeRecord,
 } from "@/features/hr/utils/helpers";
-export type { HrStats, HrViewMode } from "@/features/hr/types";
+export type {
+  HrStats,
+  HrStatusFilter,
+  HrViewMode,
+  ArchiveForm,
+  EmployeeArchiveImpact,
+} from "@/features/hr/types";
 export { useHrData } from "@/features/hr/hooks/useHrData";
 export { useEmployeeForm } from "@/features/hr/hooks/useEmployeeForm";
 export { useEmployeeDocuments } from "@/features/hr/hooks/useEmployeeDocuments";
+export { default as HrStatStrip } from "@/features/hr/components/HrStatStrip";
+export type {
+  HrStatCell,
+  HrStatTone,
+} from "@/features/hr/components/HrStatStrip";
 export { default as HrStatsGrid } from "@/features/hr/components/HrStatsGrid";
 export { default as HrToolbar } from "@/features/hr/components/HrToolbar";
+export { default as ArchiveEmployeeDialog } from "@/features/hr/components/ArchiveEmployeeDialog";
 export { default as ExpiringDocsAlert } from "@/features/hr/components/ExpiringDocsAlert";
 export { default as EmployeeCardGrid } from "@/features/hr/components/EmployeeCardGrid";
 export { default as EmployeeTable } from "@/features/hr/components/EmployeeTable";

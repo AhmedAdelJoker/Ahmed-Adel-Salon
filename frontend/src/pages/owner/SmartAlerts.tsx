@@ -24,18 +24,20 @@ import { adaptObject } from "@/services/apiAdapter";
 import { loadErrorMessage } from "@/lib/core/asyncError";
 import type { OwnerAlert, OwnerAlertsPayload } from "@/features/owner-alerts/types";
 import type { AlertPriority as Priority } from "@/features/owner-alerts/types";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "@/lib/format/locale";
 
-const PRIORITY_STYLES: Record<Priority, { label: string; className: string }> = {
+const PRIORITY_STYLES: Record<Priority, { key: string; className: string }> = {
   high: {
-    label: "حرجة",
+    key: "smartAlerts.priorityHigh",
     className: "bg-danger-soft text-danger border-danger/20",
   },
   medium: {
-    label: "قيد المراجعة",
+    key: "smartAlerts.priorityMedium",
     className: "bg-warning-soft text-warning border-warning/20",
   },
   low: {
-    label: "معلومة",
+    key: "smartAlerts.priorityLow",
     className: "bg-info-soft text-info border-info/20",
   },
 };
@@ -52,24 +54,26 @@ const SOURCE_ICONS: Record<string, typeof FileText> = {
   pos_shifts: AlertOctagon,
 };
 
-function formatWhen(iso: string | null): string {
-  if (!iso) return "بلا تاريخ";
+function formatWhen(iso: string | null, t: (path: string, opts?: Record<string, unknown>) => string, locale: string): string {
+  if (!iso) return t("smartAlerts.noDate");
   const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return "بلا تاريخ";
+  if (Number.isNaN(parsed.getTime())) return t("smartAlerts.noDate");
 
   const diffMs = Date.now() - parsed.getTime();
   const minutes = Math.round(diffMs / 60000);
-  if (minutes < 1) return "الآن";
-  if (minutes < 60) return `منذ ${minutes} دقيقة`;
+  if (minutes < 1) return t("smartAlerts.now");
+  if (minutes < 60) return t("smartAlerts.minutesAgo", { minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `منذ ${hours} ساعة`;
+  if (hours < 24) return t("smartAlerts.hoursAgo", { hours });
   const days = Math.round(hours / 24);
-  if (days === 1) return "أمس";
-  if (days < 30) return `منذ ${days} يوم`;
-  return parsed.toLocaleDateString("ar-EG");
+  if (days === 1) return t("smartAlerts.yesterday");
+  if (days < 30) return t("smartAlerts.daysAgo", { days });
+  return parsed.toLocaleDateString(locale);
 }
 
 const SmartAlerts = () => {
+  const { t, i18n } = useTranslation("owner");
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -92,7 +96,7 @@ const SmartAlerts = () => {
     } catch (error) {
       // Kept distinct from "loaded successfully, nothing pending". Showing an
       // empty alerts page after a failed request would read as "you are safe".
-      setLoadError(loadErrorMessage(error, "تعذّر تحميل التنبيهات"));
+      setLoadError(loadErrorMessage(error, t("smartAlerts.loadError")));
     } finally {
       setLoading(false);
     }
@@ -117,7 +121,7 @@ const SmartAlerts = () => {
   );
 
   // Only notifications can actually be dismissed, because only they have a
-  // read flag. The previous "تجاهل" button on every row set local state and was
+  // read flag. The previous "dismiss" button on every row set local state and was
   // gone on refresh, so it looked like acknowledging an alert and recorded
   // nothing. A pending request or a stock level is not dismissible -- it is
   // resolved by doing the thing, so it gets a link and no dismiss button.
@@ -128,7 +132,7 @@ const SmartAlerts = () => {
       await api.patch(`/notifications/${id}/read`);
       setAlerts((current) => current.filter((a) => a.key !== alert.key));
     } catch (error) {
-      setLoadError(loadErrorMessage(error, "تعذّر تعليم الإشعار كمقروء"));
+      setLoadError(loadErrorMessage(error, t("smartAlerts.markReadError")));
     } finally {
       setBusyKey(null);
     }
@@ -143,10 +147,10 @@ const SmartAlerts = () => {
           </div>
           <div>
             <h1 className="text-2xl font-black tracking-tight text-main sm:text-3xl">
-              مركز التنبيهات
+              {t("smartAlerts.title")}
             </h1>
             <p className="text-xs text-muted sm:text-sm">
-              ما ينتظر قرارك فعلياً: طلبات، مستندات، مخزون، وإشعارات غير مقروءة
+              {t("smartAlerts.subtitle")}
             </p>
           </div>
         </div>
@@ -158,7 +162,7 @@ const SmartAlerts = () => {
             className="h-11 flex-1 rounded-xl border-border px-6 text-[10px] font-black uppercase tracking-widest md:flex-none"
           >
             <Filter className="me-2" size={14} />
-            {showCriticalOnly ? "كل التنبيهات" : "الحرجة فقط"}
+            {showCriticalOnly ? t("smartAlerts.allAlerts") : t("smartAlerts.criticalOnly")}
           </Button>
           <Button
             variant="outline"
@@ -171,7 +175,7 @@ const SmartAlerts = () => {
             ) : (
               <RefreshCw className="me-2" size={14} />
             )}
-            تحديث
+            {t("smartAlerts.refresh")}
           </Button>
         </div>
       </div>
@@ -184,12 +188,12 @@ const SmartAlerts = () => {
               <div>
                 <p className="text-sm font-black text-danger">{loadError}</p>
                 <p className="mt-1 text-xs text-muted">
-                  لم يتم جلب أي بيانات. هذه ليست حالة «لا يوجد تنبيهات».
+                  {t("smartAlerts.fetchFailed")}
                 </p>
               </div>
             </div>
             <Button variant="outline" onClick={loadAlerts} className="shrink-0 rounded-xl">
-              إعادة المحاولة
+              {t("smartAlerts.retry")}
             </Button>
           </div>
         </Card>
@@ -199,19 +203,19 @@ const SmartAlerts = () => {
         <StatusCard
           icon={ShieldCheck}
           tone="success"
-          label="إجمالي ما ينتظرك"
+          label={t("smartAlerts.totalWaiting")}
           value={loadError ? "—" : loading ? "…" : `${alerts.length}`}
         />
         <StatusCard
           icon={AlertOctagon}
           tone="danger"
-          label="حرجة"
+          label={t("smartAlerts.criticalLabel")}
           value={loadError ? "—" : loading ? "…" : `${counts.high}`}
         />
         <StatusCard
           icon={FileText}
           tone="warning"
-          label="قيد المراجعة"
+          label={t("smartAlerts.reviewLabel")}
           value={loadError ? "—" : loading ? "…" : `${counts.medium}`}
         />
       </div>
@@ -249,7 +253,7 @@ const SmartAlerts = () => {
                       <Badge
                         className={`rounded-lg border px-3 py-0.5 text-[9px] font-black uppercase tracking-widest ${config.className}`}
                       >
-                        {config.label}
+                        {t(config.key)}
                       </Badge>
                     </div>
                     {alert.message && (
@@ -259,7 +263,7 @@ const SmartAlerts = () => {
                     )}
                     <div className="flex items-center gap-2 pt-2 text-[9px] font-black uppercase tracking-widest text-muted">
                       <Clock className="h-3.5 w-3.5 text-accent" />
-                      {formatWhen(alert.occurred_at)}
+                      {formatWhen(alert.occurred_at, t, locale)}
                     </div>
                   </div>
                 </div>
@@ -272,7 +276,7 @@ const SmartAlerts = () => {
                       onClick={() => dismissNotification(alert)}
                       className="h-11 flex-1 rounded-xl px-6 text-[10px] font-black uppercase tracking-widest text-muted hover:bg-soft lg:flex-none"
                     >
-                      {busyKey === alert.key ? "…" : "تعليم كمقروء"}
+                      {busyKey === alert.key ? "…" : t("smartAlerts.markRead")}
                     </Button>
                   )}
                   <Button
@@ -280,7 +284,7 @@ const SmartAlerts = () => {
                     onClick={() => navigate(alert.destination)}
                     className="h-11 flex-[2] rounded-xl px-8 text-[10px] font-black uppercase tracking-widest shadow-soft transition-all hover:-translate-y-0.5 lg:flex-none"
                   >
-                    اتخاذ إجراء
+                    {t("smartAlerts.takeAction")}
                     <ChevronRight className="me-2 rotate-180" size={14} />
                   </Button>
                 </div>
@@ -294,11 +298,11 @@ const SmartAlerts = () => {
             <EmptyState
               variant="table"
               icon={ShieldCheck}
-              title={showCriticalOnly ? "لا توجد تنبيهات حرجة" : "لا يوجد ما ينتظرك"}
+              title={showCriticalOnly ? t("smartAlerts.noCritical") : t("smartAlerts.nothingWaiting")}
               message={
                 showCriticalOnly
-                  ? "لا توجد طلبات أو مستندات أو نقص مخزون مسجّل حالياً."
-                  : "كل الطلبات تمت مراجعتها، ولا توجد مستندات قاربت الانتهاء أو إشعارات غير مقروءة."
+                  ? t("smartAlerts.noCriticalMsg")
+                  : t("smartAlerts.nothingMsg")
               }
             />
           </Card>
@@ -314,12 +318,10 @@ const SmartAlerts = () => {
             </div>
             <div>
               <h4 className="mb-2 text-xl font-black tracking-tight text-inverse sm:text-2xl">
-                مصدر هذه التنبيهات
+                {t("smartAlerts.sourceTitle")}
               </h4>
               <p className="max-w-3xl text-xs font-medium leading-relaxed text-white/70 sm:text-sm">
-                تُبنى من بيانات النظام مباشرة: طلبات تعديل الفواتير، طلبات الخصم،
-                إشعاراتك غير المقروءة، مستندات الموظفين المنتهية أو القاربة على
-                الانتهاء، المنتجات تحت حد التنبيه، والورديات المفتوحة.
+                {t("smartAlerts.sourceDesc")}
               </p>
             </div>
           </div>
@@ -327,7 +329,7 @@ const SmartAlerts = () => {
             onClick={() => navigate(settingsDestination)}
             className="h-14 w-full shrink-0 rounded-xl bg-inverse px-10 text-[11px] font-black uppercase tracking-widest text-primary shadow-premium hover:bg-inverse/90 xl:w-auto"
           >
-            {canManageRules ? "إعدادات الرقابة" : "سجل الرقابة"}
+            {canManageRules ? t("smartAlerts.rulesSettings") : t("smartAlerts.rulesLog")}
           </Button>
         </div>
       </Card>

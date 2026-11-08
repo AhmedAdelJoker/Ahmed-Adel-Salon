@@ -7,7 +7,6 @@ import {
 } from "@/lib/core/utils";
 import {
   invoiceId,
-  paymentLabels,
 } from "@/features/invoices";
 import type {
   ArchiveComparison,
@@ -577,7 +576,6 @@ export function useInvoiceArchive() {
     filteredMonths,
     handleExportPDF,
     daysInMonth,
-    paymentLabels,
     selectedInvoice,
     setSelectedInvoice,
     busyPdfId,

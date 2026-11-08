@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useTranslation } from "react-i18next";
 
 export default function CustomerEditDialog({
   open,
@@ -26,19 +27,20 @@ export default function CustomerEditDialog({
   isSaving: boolean;
   onSave: () => void;
 }) {
+  const { t } = useTranslation("customers");
   return (
         <Dialog open={open} onOpenChange={onOpenChange}>
           <DialogContent className="max-w-lg rounded-2xl">
             <DialogHeader className="p-5 pb-3 border-b border-border/40">
               <DialogTitle className="text-base font-black flex items-center gap-2">
-                <Edit3 size={16} className="text-primary" /> تعديل بيانات العميل
+                <Edit3 size={16} className="text-primary" aria-hidden="true" /> {t("form.editTitle")}
               </DialogTitle>
             </DialogHeader>
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                    الاسم الأول *
+                    {t("form.firstNameLabel")} {t("form.nameRequired")}
                   </label>
                   <Input
                     value={form.first_name}
@@ -46,11 +48,12 @@ export default function CustomerEditDialog({
                       setForm({ ...form, first_name: e.target.value })
                     }
                     className="h-10 rounded-xl"
+                    aria-label={t("form.firstNameLabel")}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                    اسم العائلة
+                    {t("form.lastNameLabel")}
                   </label>
                   <Input
                     value={form.last_name}
@@ -58,12 +61,13 @@ export default function CustomerEditDialog({
                       setForm({ ...form, last_name: e.target.value })
                     }
                     className="h-10 rounded-xl"
+                    aria-label={t("form.lastNameLabel")}
                   />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                  الهاتف *
+                  {t("form.phoneLabel")} {t("form.nameRequired")}
                 </label>
                 <Input
                   value={form.phone}
@@ -72,11 +76,12 @@ export default function CustomerEditDialog({
                   }
                   className="h-10 rounded-xl"
                   dir="ltr"
+                  aria-label={t("form.phoneLabel")}
                 />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                  هاتف بديل
+                  {t("form.secondPhoneLabel")}
                 </label>
                 <Input
                   value={form.phone2}
@@ -85,11 +90,12 @@ export default function CustomerEditDialog({
                   }
                   className="h-10 rounded-xl"
                   dir="ltr"
+                  aria-label={t("form.secondPhoneLabel")}
                 />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                  البريد الإلكتروني
+                  {t("form.emailLabel")}
                 </label>
                 <Input
                   value={form.email}
@@ -99,11 +105,12 @@ export default function CustomerEditDialog({
                   className="h-10 rounded-xl"
                   dir="ltr"
                   type="email"
+                  aria-label={t("form.emailLabel")}
                 />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                  ملاحظات
+                  {t("form.notesLabel")}
                 </label>
                 <textarea
                   value={form.notes}
@@ -111,6 +118,7 @@ export default function CustomerEditDialog({
                     setForm({ ...form, notes: e.target.value })
                   }
                   className="w-full h-20 rounded-xl border border-border bg-soft p-3 text-sm font-bold resize-none focus:border-primary focus:ring-0"
+                  aria-label={t("form.notesLabel")}
                 />
               </div>
             </div>
@@ -119,16 +127,18 @@ export default function CustomerEditDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 className="h-10 flex-1 rounded-xl text-xs"
+                aria-label={t("form.cancel")}
               >
-                إلغاء
+                {t("form.cancel")}
               </Button>
               <Button
                 variant="primary"
                 onClick={onSave}
                 loading={isSaving}
                 className="h-10 flex-1 rounded-xl text-xs"
+                aria-label={t("form.saveEdit")}
               >
-                <Save size={14} className="ms-1.5" /> حفظ
+                <Save size={14} className="ms-1.5" aria-hidden="true" /> {t("form.saveEdit")}
               </Button>
             </DialogFooter>
           </DialogContent>

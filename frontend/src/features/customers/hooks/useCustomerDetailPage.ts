@@ -13,10 +13,12 @@ import {
   useCustomerInvoices,
 } from "@/hooks/useCustomer";
 import { getTierInfo } from "@/features/customers/utils/customer";
+import { useTranslation } from "react-i18next";
 
 export function useCustomerDetailPage(customerId: number) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation("customers");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
@@ -61,6 +63,21 @@ export function useCustomerDetailPage(customerId: number) {
         String(a.status || "").toLowerCase(),
       ),
     );
+    // Last visit = most recent completed/done appointment date
+    const completedAppts = appointments.filter((a) =>
+      ["completed", "done", "checked_out", "paid"].includes(
+        String(a.status || "").toLowerCase(),
+      ),
+    );
+    const sortedCompleted = [...completedAppts].sort(
+      (a, b) =>
+        new Date(b.appointment_date || b.created_at || 0).getTime() -
+        new Date(a.appointment_date || a.created_at || 0).getTime(),
+    );
+    const lastVisit = sortedCompleted[0]
+      ? sortedCompleted[0].appointment_date ||
+        sortedCompleted[0].created_at
+      : null;
     return {
       totalSpend,
       visits,
@@ -69,6 +86,7 @@ export function useCustomerDetailPage(customerId: number) {
       noShowRate,
       totalPaid,
       upcomingCount: upcomingAppts.length,
+      lastVisit,
     };
   }, [customer, appointments, invoices]);
 
@@ -86,7 +104,7 @@ export function useCustomerDetailPage(customerId: number) {
 
   async function handleSaveEdit() {
     if (!editForm.first_name.trim() || !editForm.phone.trim()) {
-      toast.error("الاسم والهاتف مطلوبان");
+      toast.error(t("toasts.namePhoneRequired"));
       return;
     }
     try {
@@ -99,13 +117,13 @@ export function useCustomerDetailPage(customerId: number) {
         email: editForm.email?.trim() || null,
         notes: editForm.notes || null,
       });
-      toast.success("تم تحديث بيانات العميل بنجاح");
+      toast.success(t("toasts.updateSuccess"));
       setIsEditOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["customers"] });
     } catch (err) {
 
       const apiErr = err as { response?: { data?: { detail?: unknown } } };
-      toast.error((apiErr.response?.data?.detail as string) || "فشل تحديث البيانات");
+      toast.error((apiErr.response?.data?.detail as string) || t("toasts.saveFailed"));
     } finally {
       setIsSaving(false);
     }
@@ -115,15 +133,15 @@ export function useCustomerDetailPage(customerId: number) {
     try {
       const name =
         `${customer?.first_name || ""} ${customer?.last_name || ""}`.trim() ||
-        "العميل";
+        t("customer.unknown");
       await api.delete(`/customers/${customerId}`, {
-        data: { archive_reason: "أرشفة من صفحة العميل" },
+        data: { archive_reason: t("customerDetail.archive") },
       });
-      toast.success("تم نقل العميل إلى الأرشيف");
+      toast.success(t("toasts.deleteSuccess"));
       await queryClient.invalidateQueries({ queryKey: ["customers"] });
       navigate("/customers");
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || "فشل حذف العميل");
+      toast.error(err?.response?.data?.detail || t("toasts.deleteFailed"));
     }
   }
 

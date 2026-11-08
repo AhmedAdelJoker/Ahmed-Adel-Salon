@@ -1,5 +1,6 @@
 /** Customer helpers (moved from Customers page, no logic changes). */
 import { Award, BadgeDollarSign, CheckCircle2, Clock, Crown, Loader2, Star, XCircle } from "lucide-react";
+import i18n from "@/i18n";
 export function customerId(customer) {
     return customer?.customer_id || customer?.id || customer?.invoiceId;
   }
@@ -17,7 +18,7 @@ export function customerName(customer) {
     return (
       `${customer?.first_name || ""} ${customer?.last_name || ""}`.trim() ||
       customer?.name ||
-      "عميل"
+      (i18n.t("customers:customer.unknown") as string)
     );
   }
 
@@ -27,21 +28,21 @@ export function secondPhone(customer) {
 
 export const TIER_CONFIG = {
   gold: {
-    label: "ذهبي",
+    label: "tier.gold",
     color: "text-amber-500",
     bg: "bg-amber-500/10",
     border: "border-amber-400",
     icon: Crown,
   },
   silver: {
-    label: "فضي",
+    label: "tier.silver",
     color: "text-slate-400",
     bg: "bg-slate-400/10",
     border: "border-slate-400",
     icon: Award,
   },
   bronze: {
-    label: "برونزي",
+    label: "tier.bronze",
     color: "text-orange-600",
     bg: "bg-orange-600/10",
     border: "border-orange-500",
@@ -64,55 +65,55 @@ const normalizeStatus = (status?: string | null) =>
 export function getStatusConfig(status) {
   const map: Record<string, { label: string; color: string; bg: string; icon: any }> = {
     PENDING: {
-      label: "قيد الانتظار",
+      label: "status.PENDING",
       color: "text-blue-500",
       bg: "bg-blue-500/10",
       icon: Clock,
     },
     CONFIRMED: {
-      label: "مؤكد",
+      label: "status.CONFIRMED",
       color: "text-amber-500",
       bg: "bg-amber-500/10",
       icon: CheckCircle2,
     },
     WAITING: {
-      label: "في الانتظار",
+      label: "status.WAITING",
       color: "text-cyan-500",
       bg: "bg-cyan-500/10",
       icon: Clock,
     },
     IN_PROGRESS: {
-      label: "قيد التنفيذ",
+      label: "status.IN_PROGRESS",
       color: "text-indigo-500",
       bg: "bg-indigo-500/10",
       icon: Loader2,
     },
     READY_FOR_PAYMENT: {
-      label: "جاهز للدفع",
+      label: "status.READY_FOR_PAYMENT",
       color: "text-violet-500",
       bg: "bg-violet-500/10",
       icon: BadgeDollarSign,
     },
     COMPLETED: {
-      label: "مكتمل",
+      label: "status.COMPLETED",
       color: "text-emerald-500",
       bg: "bg-emerald-500/10",
       icon: CheckCircle2,
     },
     CANCELLED: {
-      label: "ملغي",
+      label: "status.CANCELLED",
       color: "text-rose-500",
       bg: "bg-rose-500/10",
       icon: XCircle,
     },
     AUTO_CANCELLED: {
-      label: "أُلغي تلقائياً",
+      label: "status.AUTO_CANCELLED",
       color: "text-rose-700",
       bg: "bg-rose-700/10",
       icon: XCircle,
     },
     NO_SHOW: {
-      label: "لم يحضر",
+      label: "status.NO_SHOW",
       color: "text-rose-700",
       bg: "bg-rose-700/10",
       icon: XCircle,
@@ -141,17 +142,17 @@ export function getInvoiceStatusConfig(invoice) {
   const key = invoice?.is_closed ? "CLOSED" : invoice?.is_draft ? "DRAFT" : "OPEN";
   const map: Record<string, { label: string; color: string; bg: string }> = {
     CLOSED: {
-      label: "ملغاة",
+      label: "invoices.statusClosed",
       color: "text-red-500",
       bg: "bg-red-500/10",
     },
     OPEN: {
-      label: "صادرة",
+      label: "invoices.statusOpen",
       color: "text-blue-500",
       bg: "bg-blue-500/10",
     },
     DRAFT: {
-      label: "مسودة",
+      label: "invoices.statusDraft",
       color: "text-slate-400",
       bg: "bg-slate-400/10",
     },

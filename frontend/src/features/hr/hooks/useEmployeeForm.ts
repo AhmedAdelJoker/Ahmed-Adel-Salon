@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { CheckCircle2 } from "lucide-react";
 import api, { staticURL } from "@/services/api";
 import { validateImageSize } from "@/lib/media/upload";
@@ -42,6 +43,10 @@ import {
   type EmployeeDraft,
 } from "@/features/hr/utils/draft";
 import type { EmployeeRecord } from "@/types/employee";
+import type { ArchiveForm, EmployeeArchiveImpact } from "@/features/hr/types";
+
+/** An untouched dialog: no reason, and "as of now" for the leaving date. */
+const EMPTY_ARCHIVE_FORM: ArchiveForm = { reason: "", effectiveDate: "" };
 
 /**
  * The system roles the backend accepts, and which job title maps to each.
@@ -86,6 +91,7 @@ const VALID_USER_ROLES = new Set([
  * status toggle. Extracted from pages/owner/HRManagement (Phase 3).
  */
 export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
+  const { t } = useTranslation("owner");
   const [activeTab, setActiveTab] = useState("personal");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState<EmployeeRecord | null>(null);
@@ -93,6 +99,10 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
   // Moving someone to the archive (they left the salon) is a separate,
   // heavier decision than "on vacation": distinct target and confirmation.
   const [archiveTarget, setArchiveTarget] = useState<EmployeeRecord | null>(null);
+  // Read before the dialog opens, so the warning about stranded bookings lands
+  // in front of the decision rather than after it.
+  const [archiveImpact, setArchiveImpact] = useState<EmployeeArchiveImpact | null>(null);
+  const [archiveForm, setArchiveForm] = useState<ArchiveForm>(EMPTY_ARCHIVE_FORM);
   const [formData, setFormData] = useState<EmployeeRecord>(
     defaultForm as EmployeeRecord,
   );
@@ -611,25 +621,51 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
   };
 
   /**
+   * Open the archive dialog and read what it would touch, in the same action.
+   * The count of bookings still in that person's name is the one fact that
+   * changes the decision, and asking for it after the owner pressed archive is
+   * too late to be anything but a surprise.
+   */
+  const openArchive = useCallback((emp: EmployeeRecord) => {
+    setArchiveTarget(emp);
+    setArchiveForm(EMPTY_ARCHIVE_FORM);
+    setArchiveImpact(null);
+    api
+      .get(`/employees/${emp.id}/archive-impact`)
+      .then((res) => setArchiveImpact(res.data))
+      .catch(() => setArchiveImpact(null));
+  }, []);
+
+  /**
    * Move an employee to the archive: they left the salon (resigned). The row
-   * keeps its history but leaves every operational surface — the switches are
-   * switched off too, so a return later starts from a clean, deliberate state.
+   * keeps its history, and the archive keeps the date, the reason and the name
+   * of whoever decided.
+   *
+   * The `showInPos` / `showInBooking` switches are deliberately not touched.
+   * Archiving used to flip both off "so a return starts clean", but every
+   * operational surface already filters on `status` and `is_active`, so the
+   * wipe hid nothing extra -- and restore never flipped them back, so an
+   * employee who came back was invisible at the till and on the booking site
+   * until someone found the two switches again.
    */
   const handleArchiveEmployee = async () => {
     if (!archiveTarget) return;
     try {
       setIsActionLoading(true);
-      await api.put(`/employees/${archiveTarget.id}`, {
-        status: "resigned",
-        isActive: false,
-        showInBooking: false,
-        showInPos: false,
+      await api.post(`/employees/${archiveTarget.id}/archive`, {
+        reason: archiveForm.reason || null,
+        effectiveDate: archiveForm.effectiveDate || null,
       });
-      toast.success("تم نقل الموظف إلى الأرشيف");
+      toast.success(t("hr.archivedToast"));
       setArchiveTarget(null);
+      setArchiveImpact(null);
       fetchEmployees();
     } catch (_error) {
-      toast.error("فشل نقل الموظف إلى الأرشيف");
+      const detail = (_error as { response?: { data?: { detail?: unknown } } })
+        ?.response?.data?.detail;
+      toast.error(
+        typeof detail === "string" ? detail : t("hr.archiveFailedToast"),
+      );
     } finally {
       setIsActionLoading(false);
     }
@@ -649,6 +685,10 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
     setDeleteTarget,
     archiveTarget,
     setArchiveTarget,
+    archiveImpact,
+    archiveForm,
+    setArchiveForm,
+    openArchive,
     formData,
     setFormData,
     imagePreview,

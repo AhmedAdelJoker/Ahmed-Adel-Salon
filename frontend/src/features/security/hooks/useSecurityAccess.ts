@@ -116,7 +116,7 @@ export function useSecurityAccess() {
     const fetchUsers = async () => {
       try {
         setUsersLoading(true);
-        const res = await captureRequest(api.get("/users", { params: { limit: 1000 } }));
+        const res = await captureRequest(api.get("/users", { params: { limit: 500 } }));
         setUsers(res.ok ? asArray(res.response) : []);
         return res;
       } finally {

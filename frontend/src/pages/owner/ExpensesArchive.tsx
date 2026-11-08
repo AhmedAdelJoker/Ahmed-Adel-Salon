@@ -30,50 +30,17 @@ import { Input } from "@/components/ui/input";
 import { PageHeader, PremiumCard, SkeletonCard } from "@/components/shared/PremiumUI";
 import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import { formatCurrency } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "@/lib/format/locale";
+import { expenseCatLabelFor } from "@/features/financial-reports/utils";
 
-const CATEGORIES = [
-  { value: "all", label: "الكل" },
-  { value: "رواتب", label: "رواتب" },
-  { value: "إيجار", label: "إيجار" },
-  { value: "مشتريات", label: "مشتريات" },
-  { value: "كهرباء", label: "كهرباء" },
-  { value: "مياه", label: "مياه" },
-  { value: "إنترنت", label: "إنترنت" },
-  { value: "صيانة", label: "صيانة" },
-  { value: "تسويق", label: "تسويق" },
-  { value: "ضيافة", label: "ضيافة" },
-  { value: "أخرى", label: "أخرى" },
-];
+// Expense category values are stored in the database as Arabic labels — they are
+// data, not UI text. Display labels are resolved via finFeat.cat.* / expensesArch.* keys.
+const CATEGORY_VALUES = ["all", "رواتب", "إيجار", "مشتريات", "كهرباء", "مياه", "إنترنت", "صيانة", "تسويق", "ضيافة", "أخرى"] as const;
 
-const PAYMENT_METHODS = [
-  { value: "all", label: "الكل" },
-  { value: "cash", label: "نقدي" },
-  { value: "card", label: "بطاقة" },
-  { value: "bank_transfer", label: "تحويل بنكي" },
-  { value: "wallet", label: "محفظة" },
-];
+const PAYMENT_METHOD_VALUES = ["all", "cash", "card", "bank_transfer", "wallet"] as const;
 
 const LIMITS = [20, 50, 100];
-
-const PAYMENT_LABELS: Record<string, string> = {
-  cash: "نقدي",
-  card: "بطاقة",
-  bank_transfer: "تحويل بنكي",
-  wallet: "محفظة",
-};
-
-function paymentLabel(v: unknown): string {
-  const k = String(v || "").trim().toLowerCase();
-  return PAYMENT_LABELS[k] || (k ? k : "—");
-}
-
-function getStatusLabel(status: unknown): string {
-  const s = String(status || "").toLowerCase();
-  if (s === "approved") return "معتمد";
-  if (s === "recorded") return "مسجل";
-  if (s === "cancelled" || s === "canceled") return "ملغي";
-  return s ? s : "غير محدد";
-}
 
 function getStatusVariant(status: unknown): "success" | "danger" | "secondary" | "warning" {
   const s = String(status || "").toLowerCase();
@@ -124,6 +91,9 @@ function buildCleanParams(filters: ArchiveFilters): Record<string, unknown> {
 }
 
 export default function ExpensesArchive() {
+  const { t, i18n } = useTranslation("owner");
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
+  const lang: "ar" | "en" = (i18n.resolvedLanguage || i18n.language || "ar").startsWith("en") ? "en" : "ar";
   const navigate = useNavigate();
   const [items, setItems] = useState<unknown[]>([]);
   const [total, setTotal] = useState(0);
@@ -133,6 +103,28 @@ export default function ExpensesArchive() {
   const [qDraft, setQDraft] = useState("");
   const [detailItem, setDetailItem] = useState<Record<string, unknown> | null>(null);
   const [openDetail, setOpenDetail] = useState(false);
+
+  const methodLabel = (v: unknown): string => {
+    const k = String(v || "").trim().toLowerCase();
+    if (k === "cash") return t("expensesArch.methodCash");
+    if (k === "card") return t("expensesArch.methodCard");
+    if (k === "bank_transfer") return t("expensesArch.methodBankTransfer");
+    if (k === "wallet") return t("expensesArch.methodWallet");
+    return k ? k : "—";
+  };
+
+  const statusLabel = (v: unknown): string => {
+    const s = String(v || "").toLowerCase();
+    if (s === "approved") return t("expensesArch.statusApproved");
+    if (s === "recorded") return t("expensesArch.statusRecorded");
+    if (s === "cancelled" || s === "canceled") return t("expensesArch.statusCancelled");
+    return s ? s : t("expensesArch.statusUnspecified");
+  };
+
+  const categoryLabel = (v: unknown): string => {
+    const raw = String(v ?? "").trim();
+    return raw ? expenseCatLabelFor(raw, t) : t("expensesArch.categoryFallback");
+  };
 
   // debounce search
   useEffect(() => {
@@ -166,7 +158,7 @@ export default function ExpensesArchive() {
       // if backend returned total_amount reliably, use it; otherwise compute from all items if we have them
       if (Number((response as Record<string, unknown>)?.total_amount) > 0) setTotalAmount(Number((response as Record<string, unknown>).total_amount));
     } catch {
-      toast.error("فشل تحميل أرشيف المصروفات");
+      toast.error(t("expensesArch.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -219,9 +211,9 @@ export default function ExpensesArchive() {
   return (
     <div className="erp-page-container space-y-6 pb-10">
       <PageHeader
-        title="أرشيف المصروفات"
-        subtitle="السجل التاريخي للمصروفات — فلترة زمنية، بحث فوري، وتصدير"
-        badge="الأرشيف المالي"
+        title={t("expensesArch.title")}
+        subtitle={t("expensesArch.subtitle")}
+        badge={t("expensesArch.badge")}
         icon={Archive}
         actions={
           <div className="flex flex-wrap items-center gap-2 print:hidden">
@@ -229,11 +221,11 @@ export default function ExpensesArchive() {
               <FileSpreadsheet size={16} className="ms-1.5" /> Excel
             </Button>
             <Button variant="outline" onClick={handlePrint} className="h-11 rounded-xl px-4 font-black text-xs">
-              <Printer size={16} className="ms-1.5" /> طباعة / PDF
+              <Printer size={16} className="ms-1.5" /> {t("expensesArch.print")}
             </Button>
             <Link to="/expenses">
               <Button variant="ghost" className="h-11 rounded-xl border border-border bg-card px-4 font-black text-xs">
-                <ArrowRight size={16} className="ms-1.5" /> العودة للمصروفات
+                <ArrowRight size={16} className="ms-1.5" /> {t("expensesArch.backToExpenses")}
               </Button>
             </Link>
           </div>
@@ -243,19 +235,19 @@ export default function ExpensesArchive() {
       {/* KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <PremiumCard className="p-5" animate={false}>
-          <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center gap-2"><Wallet size={12} className="text-primary" /> إجمالي إنفاق الفترة</div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center gap-2"><Wallet size={12} className="text-primary" /> {t("expensesArch.statTotal")}</div>
           <div className="mt-2 text-2xl font-black tabular-nums">{formatCurrency(kpis.displayTotal)}</div>
-          <div className="text-[11px] font-bold text-muted">{kpis.count} عملية • الفترة المفلترة</div>
+          <div className="text-[11px] font-bold text-muted">{t("expensesArch.statTotalHint", { count: kpis.count })}</div>
         </PremiumCard>
         <PremiumCard className="p-5" animate={false}>
-          <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center gap-2"><History size={12} className="text-sky-600" /> عدد العمليات</div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center gap-2"><History size={12} className="text-sky-600" /> {t("expensesArch.statPage")}</div>
           <div className="mt-2 text-2xl font-black tabular-nums">{kpis.count}</div>
-          <div className="text-[11px] font-bold text-muted">{kpis.pageCount} في الصفحة الحالية</div>
+          <div className="text-[11px] font-bold text-muted">{t("expensesArch.statPageHint", { count: kpis.pageCount })}</div>
         </PremiumCard>
         <PremiumCard className="p-5" animate={false}>
-          <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center gap-2"><TrendingUp size={12} className="text-emerald-600" /> متوسط المصروف</div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center gap-2"><TrendingUp size={12} className="text-emerald-600" /> {t("expensesArch.statAvg")}</div>
           <div className="mt-2 text-2xl font-black tabular-nums">{formatCurrency(kpis.avg)}</div>
-          <div className="text-[11px] font-bold text-muted">للفترة المفلترة</div>
+          <div className="text-[11px] font-bold text-muted">{t("expensesArch.statAvgHint")}</div>
         </PremiumCard>
       </div>
 
@@ -265,59 +257,59 @@ export default function ExpensesArchive() {
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center"><Filter size={14} /></div>
             <div>
-              <h3 className="text-sm font-black">فلاتر البحث المتقدم</h3>
-              <p className="text-[11px] font-bold text-muted">نطاق زمني + تصنيف + طريقة دفع — البحث يحدّث تلقائياً</p>
+              <h3 className="text-sm font-black">{t("expensesArch.filterTitle")}</h3>
+              <p className="text-[11px] font-bold text-muted">{t("expensesArch.filterSubtitle")}</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleReset} className="me-auto h-8 rounded-xl text-xs font-black gap-1"><X size={12} /> إعادة ضبط</Button>
+            <Button variant="ghost" size="sm" onClick={handleReset} className="me-auto h-8 rounded-xl text-xs font-black gap-1"><X size={12} /> {t("expensesArch.resetFilters")}</Button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Field label="من تاريخ">
+            <Field label={t("expensesArch.fieldFrom")}>
               <Input type="date" value={filters.start_date} max={filters.end_date || undefined} onChange={(e) => setFilters((p) => ({ ...p, start_date: e.target.value, page: 1 }))} className="h-11 rounded-xl bg-soft border-border font-bold" />
             </Field>
-            <Field label="إلى تاريخ">
+            <Field label={t("expensesArch.fieldTo")}>
               <Input type="date" value={filters.end_date} min={filters.start_date || undefined} onChange={(e) => setFilters((p) => ({ ...p, end_date: e.target.value, page: 1 }))} className="h-11 rounded-xl bg-soft border-border font-bold" />
             </Field>
-            <Field label="التصنيف">
+            <Field label={t("expensesArch.fieldCategory")}>
               <Select value={filters.category} onValueChange={(v) => setFilters((p) => ({ ...p, category: v, page: 1 }))}>
                 <SelectTrigger className="h-11 rounded-xl bg-soft border-border font-bold"><SelectValue /></SelectTrigger>
-                <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                <SelectContent>{CATEGORY_VALUES.map((v) => <SelectItem key={v} value={v}>{v === "all" ? t("expensesArch.all") : expenseCatLabelFor(v, t)}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
-            <Field label="طريقة الدفع">
+            <Field label={t("expensesArch.fieldPayment")}>
               <Select value={filters.payment_method} onValueChange={(v) => setFilters((p) => ({ ...p, payment_method: v, page: 1 }))}>
                 <SelectTrigger className="h-11 rounded-xl bg-soft border-border font-bold"><SelectValue /></SelectTrigger>
-                <SelectContent>{PAYMENT_METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                <SelectContent>{PAYMENT_METHOD_VALUES.map((v) => <SelectItem key={v} value={v}>{v === "all" ? t("expensesArch.all") : methodLabel(v)}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2">
-              <Field label="بحث في العنوان أو الوصف">
+              <Field label={t("expensesArch.fieldSearch")}>
                 <div className="relative">
                   <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted" />
-                  <Input value={qDraft} onChange={(e) => setQDraft(e.target.value)} placeholder="مثال: إيجار، كهرباء، صيانة..." className="h-11 pe-9 rounded-xl bg-soft border-border font-bold" />
+                  <Input value={qDraft} onChange={(e) => setQDraft(e.target.value)} placeholder={t("expensesArch.searchPlaceholder")} className="h-11 pe-9 rounded-xl bg-soft border-border font-bold" />
                   {qDraft && <button onClick={() => setQDraft("")} className="absolute left-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg bg-card border flex items-center justify-center text-muted"><X size={12} /></button>}
                 </div>
               </Field>
             </div>
-            <Field label="عدد الصفوف">
+            <Field label={t("expensesArch.fieldLimit")}>
               <Select value={String(filters.limit)} onValueChange={(v) => setFilters((p) => ({ ...p, limit: Number(v), page: 1 }))}>
                 <SelectTrigger className="h-11 rounded-xl bg-soft border-border font-black"><SelectValue /></SelectTrigger>
-                <SelectContent>{LIMITS.map((n) => <SelectItem key={n} value={String(n)}>{n} / صفحة</SelectItem>)}</SelectContent>
+                <SelectContent>{LIMITS.map((n) => <SelectItem key={n} value={String(n)}>{t("expensesArch.perPage", { n })}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
           </div>
 
           {filters.start_date && filters.end_date && filters.start_date > filters.end_date && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">تاريخ البداية أكبر من النهاية — سيتم تجاهل النطاق حتى تصححه</div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">{t("expensesArch.invalidDateRange")}</div>
           )}
 
           <div className="flex items-center gap-2 text-[11px] font-bold text-muted">
-            <span className="hidden sm:inline">النتائج تحدّث تلقائياً • </span>
-            <span>{total} عملية • صفحة {filters.page} من {totalPages}</span>
-            <span className="me-auto hidden sm:inline-flex items-center gap-1">ترتيب حسب {filters.sortBy === "amount" ? "المبلغ" : "التاريخ"} {filters.sortDir === "asc" ? "↑" : "↓"}</span>
+            <span className="hidden sm:inline">{t("expensesArch.autoUpdate")}</span>
+            <span>{t("expensesArch.pageOf", { page: filters.page, total: totalPages, count: total })}</span>
+            <span className="me-auto hidden sm:inline-flex items-center gap-1">{t("expensesArch.sortHint", { sortBy: filters.sortBy === "amount" ? t("expensesArch.sortAmount") : t("expensesArch.sortDate"), dir: filters.sortDir === "asc" ? "↑" : "↓" })}</span>
           </div>
         </div>
       </PremiumCard>
@@ -334,20 +326,20 @@ export default function ExpensesArchive() {
           <>
             {/* Desktop */}
             <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full text-right">
+              <table className="w-full text-start">
                 <thead className="sticky top-0 z-10 bg-soft/70 backdrop-blur border-b border-border">
                   <tr>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted">
-                      <button onClick={() => toggleSort("date")} className="flex items-center gap-1">التاريخ {filters.sortBy === "date" ? (filters.sortDir === "asc" ? "↑" : "↓") : ""}</button>
+                      <button onClick={() => toggleSort("date")} className="flex items-center gap-1">{t("expensesArch.sortDate")} {filters.sortBy === "date" ? (filters.sortDir === "asc" ? "↑" : "↓") : ""}</button>
                     </th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted">المصروف</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted">التصنيف</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted">{t("expensesArch.thExpense")}</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted">{t("expensesArch.thCategory")}</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted">
-                      <button onClick={() => toggleSort("amount")} className="flex items-center gap-1">المبلغ {filters.sortBy === "amount" ? (filters.sortDir === "asc" ? "↑" : "↓") : ""}</button>
+                      <button onClick={() => toggleSort("amount")} className="flex items-center gap-1">{t("expensesArch.sortAmount")} {filters.sortBy === "amount" ? (filters.sortDir === "asc" ? "↑" : "↓") : ""}</button>
                     </th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted">طريقة الدفع</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted">الحالة</th>
-                    <th className="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted print:hidden">عرض</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted">{t("expensesArch.thPayment")}</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted">{t("expensesArch.thStatus")}</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted print:hidden">{t("expensesArch.thView")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
@@ -355,12 +347,12 @@ export default function ExpensesArchive() {
                     const r = item as Record<string, unknown>;
                     return (
                       <tr key={String(r.id)} className="hover:bg-soft/20 transition-colors">
-                        <td className="px-6 py-4 text-xs font-bold tabular-nums">{r.expense_date ? new Date(String(r.expense_date)).toLocaleDateString("ar-EG") : r.created_at ? new Date(String(r.created_at)).toLocaleDateString("ar-EG") : "—"}</td>
-                        <td className="px-6 py-4"><div className="text-sm font-black truncate max-w-[260px]">{String(r.title || r.name || "مصروف")}</div><div className="text-[11px] font-bold text-muted truncate max-w-[260px]">{String(r.description || "—")}</div></td>
-                        <td className="px-6 py-4"><Badge variant="outline" className="rounded-full font-black text-[11px]">{String(r.category || "غير محدد")}</Badge></td>
+                        <td className="px-6 py-4 text-xs font-bold tabular-nums">{r.expense_date ? new Date(String(r.expense_date)).toLocaleDateString(locale) : r.created_at ? new Date(String(r.created_at)).toLocaleDateString(locale) : "—"}</td>
+                        <td className="px-6 py-4"><div className="text-sm font-black truncate max-w-[260px]">{String(r.title || r.name || t("expensesArch.expenseFallback"))}</div><div className="text-[11px] font-bold text-muted truncate max-w-[260px]">{String(r.description || "—")}</div></td>
+                        <td className="px-6 py-4"><Badge variant="outline" className="rounded-full font-black text-[11px]">{categoryLabel(r.category)}</Badge></td>
                         <td className="px-6 py-4 text-sm font-black tabular-nums">{formatCurrency(r.amount)}</td>
-                        <td className="px-6 py-4 text-xs font-bold flex items-center gap-1"><CreditCard size={12} className="text-muted" />{paymentLabel(r.payment_method)}</td>
-                        <td className="px-6 py-4"><Badge variant={getStatusVariant(r.status) as never} className="rounded-full text-[10px] font-black">{getStatusLabel(r.status)}</Badge></td>
+                        <td className="px-6 py-4 text-xs font-bold flex items-center gap-1"><CreditCard size={12} className="text-muted" />{methodLabel(r.payment_method)}</td>
+                        <td className="px-6 py-4"><Badge variant={getStatusVariant(r.status) as never} className="rounded-full text-[10px] font-black">{statusLabel(r.status)}</Badge></td>
                         <td className="px-6 py-4 text-center print:hidden">
                           <Button variant="ghost" size="icon" onClick={() => { setDetailItem(r); setOpenDetail(true); }} className="h-8 w-8 rounded-xl border bg-card hover:bg-soft">
                             <Eye size={14} />
@@ -370,7 +362,7 @@ export default function ExpensesArchive() {
                     );
                   })}
                   {sortedItems.length === 0 && (
-                    <tr><td colSpan={7} className="py-20 text-center"><History size={40} className="mx-auto text-muted/20 mb-3" /><p className="text-sm font-black">لا توجد نتائج مطابقة</p><p className="text-[11px] font-bold text-muted">جرّب توسيع النطاق أو مسح البحث</p></td></tr>
+                    <tr><td colSpan={7} className="py-20 text-center"><History size={40} className="mx-auto text-muted/20 mb-3" /><p className="text-sm font-black">{t("expensesArch.noResults")}</p><p className="text-[11px] font-bold text-muted">{t("expensesArch.noResultsSub")}</p></td></tr>
                   )}
                 </tbody>
               </table>
@@ -385,19 +377,19 @@ export default function ExpensesArchive() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="h-10 w-10 rounded-xl bg-soft border flex items-center justify-center text-muted shrink-0"><Package size={16} /></div>
-                        <div className="min-w-0"><div className="text-sm font-black truncate">{String(r.title || "مصروف")}</div><div className="text-[11px] font-bold text-muted truncate">{String(r.category || "—")} • {r.expense_date ? new Date(String(r.expense_date)).toLocaleDateString("ar-EG") : "—"}</div></div>
+                        <div className="min-w-0"><div className="text-sm font-black truncate">{String(r.title || t("expensesArch.expenseFallback"))}</div><div className="text-[11px] font-bold text-muted truncate">{r.category ? expenseCatLabelFor(r.category, t) : "—"} • {r.expense_date ? new Date(String(r.expense_date)).toLocaleDateString(locale) : "—"}</div></div>
                       </div>
-                      <Badge variant={getStatusVariant(r.status) as never} className="shrink-0 rounded-full text-[10px]">{getStatusLabel(r.status)}</Badge>
+                      <Badge variant={getStatusVariant(r.status) as never} className="shrink-0 rounded-full text-[10px]">{statusLabel(r.status)}</Badge>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-xl bg-soft border p-3"><div className="text-[9px] font-black text-muted uppercase">المبلغ</div><div className="font-black tabular-nums">{formatCurrency(r.amount)}</div></div>
-                      <div className="rounded-xl bg-soft border p-3"><div className="text-[9px] font-black text-muted uppercase">الدفع</div><div className="font-black text-xs">{paymentLabel(r.payment_method)}</div></div>
+                      <div className="rounded-xl bg-soft border p-3"><div className="text-[9px] font-black text-muted uppercase">{t("expensesArch.detailAmount")}</div><div className="font-black tabular-nums">{formatCurrency(r.amount)}</div></div>
+                      <div className="rounded-xl bg-soft border p-3"><div className="text-[9px] font-black text-muted uppercase">{t("expensesArch.payShort")}</div><div className="font-black text-xs">{methodLabel(r.payment_method)}</div></div>
                     </div>
-                    <Button variant="outline" onClick={() => { setDetailItem(r); setOpenDetail(true); }} className="w-full h-9 rounded-xl text-xs font-black">عرض التفاصيل</Button>
+                    <Button variant="outline" onClick={() => { setDetailItem(r); setOpenDetail(true); }} className="w-full h-9 rounded-xl text-xs font-black">{t("expensesArch.viewDetails")}</Button>
                   </PremiumCard>
                 );
               })}
-              {sortedItems.length === 0 && <div className="py-10 text-center font-bold text-muted">لا توجد نتائج</div>}
+              {sortedItems.length === 0 && <div className="py-10 text-center font-bold text-muted">{t("expensesArch.noResultsHint")}</div>}
             </div>
 
             {/* Phase 2: unified pagination — reads X-Total-Count header */}
@@ -413,12 +405,12 @@ export default function ExpensesArchive() {
                     paginator={paginator}
                     onPageChange={(p) => setFilters((prev) => ({ ...prev, page: p }))}
                     onSizeChange={(s) => setFilters((prev) => ({ ...prev, limit: s, page: 1 }))}
-                    locale="ar"
+                    locale={lang}
                   />
                   <div className="flex items-center justify-center gap-2 px-3 pb-1 text-[10px] font-bold text-muted">
-                    <span>صفحة {filters.page} من {totalPages}</span>
+                    <span>{t("expensesArch.pageOnly", { page: filters.page, total: totalPages })}</span>
                     <span>•</span>
-                    <span>{total} عملية</span>
+                    <span>{t("expensesArch.opsCount", { count: total })}</span>
                   </div>
                 </div>
               );
@@ -435,10 +427,10 @@ export default function ExpensesArchive() {
             <div className="relative flex items-center gap-3">
               <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center border border-white/10"><Package size={20} /></div>
               <div>
-                <DialogTitle className="text-lg font-black text-white">تفاصيل المصروف</DialogTitle>
-                <DialogDescription className="text-xs font-bold text-slate-300">قراءة فقط • الأرشيف</DialogDescription>
+                <DialogTitle className="text-lg font-black text-white">{t("expensesArch.detailTitle")}</DialogTitle>
+                <DialogDescription className="text-xs font-bold text-slate-300">{t("expensesArch.detailSubtitle")}</DialogDescription>
               </div>
-              <div className="me-auto"><Badge variant={detailItem ? getStatusVariant(detailItem.status) as never : "secondary"} className="rounded-full bg-white/10 text-white border-white/10">{detailItem ? getStatusLabel(detailItem.status) : ""}</Badge></div>
+              <div className="me-auto"><Badge variant={detailItem ? getStatusVariant(detailItem.status) as never : "secondary"} className="rounded-full bg-white/10 text-white border-white/10">{detailItem ? statusLabel(detailItem.status) : ""}</Badge></div>
             </div>
           </div>
           {detailItem ? (
@@ -446,34 +438,34 @@ export default function ExpensesArchive() {
               {/* Creator */}
               <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xs shrink-0">
-                  {String(((detailItem.created_by as Record<string, unknown>)?.full_name as string) || ((detailItem.created_by_user as Record<string, unknown>)?.full_name as string) || (detailItem.recipient_name as string) || "؟")[0]}
+                  {String(((detailItem.created_by as Record<string, unknown>)?.full_name as string) || ((detailItem.created_by_user as Record<string, unknown>)?.full_name as string) || (detailItem.recipient_name as string) || "?")[0]}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-black truncate">{String(((detailItem.created_by as Record<string, unknown>)?.full_name as string) || ((detailItem.created_by_user as Record<string, unknown>)?.full_name as string) || ((detailItem.created_by as Record<string, unknown>)?.username as string) || "غير معروف")}</div>
+                  <div className="text-xs font-black truncate">{String(((detailItem.created_by as Record<string, unknown>)?.full_name as string) || ((detailItem.created_by_user as Record<string, unknown>)?.full_name as string) || ((detailItem.created_by as Record<string, unknown>)?.username as string) || t("expensesArch.unknownPerson"))}</div>
                   <div className="flex items-center gap-2 mt-1">
-                    <Badge className="h-5 rounded-full px-2 text-[9px] font-black border-0 bg-slate-900 text-white">{String(((detailItem.created_by as Record<string, unknown>)?.role || (detailItem.created_by_user as Record<string, unknown>)?.role || "موظف"))}</Badge>
-                    <span className="text-[11px] font-bold text-muted flex items-center gap-1"><Clock size={10} />{detailItem.created_at ? new Date(String(detailItem.created_at)).toLocaleDateString("ar-EG") : "—"}</span>
+                    <Badge className="h-5 rounded-full px-2 text-[9px] font-black border-0 bg-slate-900 text-white">{String(((detailItem.created_by as Record<string, unknown>)?.role || (detailItem.created_by_user as Record<string, unknown>)?.role || t("expensesArch.employeeFallback")))}</Badge>
+                    <span className="text-[11px] font-bold text-muted flex items-center gap-1"><Clock size={10} />{detailItem.created_at ? new Date(String(detailItem.created_at)).toLocaleDateString(locale) : "—"}</span>
                   </div>
                 </div>
-                <span className="text-[10px] font-black text-muted">المنشئ</span>
+                <span className="text-[10px] font-black text-muted">{t("expensesArch.detailCreator")}</span>
               </div>
 
               <div className="rounded-2xl bg-soft border p-4 space-y-2">
-                <div className="text-sm font-black">{String(detailItem.title || detailItem.name || "مصروف")}</div>
-                <div className="text-xs font-bold text-muted whitespace-pre-wrap leading-relaxed">{String(detailItem.description || "لا يوجد وصف")}</div>
-                {detailItem.recipient_name ? <div className="text-xs font-black text-main mt-2">المستفيد: <span className="font-bold text-muted">{String(detailItem.recipient_name)}</span></div> : null}
+                <div className="text-sm font-black">{String(detailItem.title || detailItem.name || t("expensesArch.expenseFallback"))}</div>
+                <div className="text-xs font-bold text-muted whitespace-pre-wrap leading-relaxed">{String(detailItem.description || t("expensesArch.detailDescription"))}</div>
+                {detailItem.recipient_name ? <div className="text-xs font-black text-main mt-2">{t("expensesArch.detailRecipientLabel")} <span className="font-bold text-muted">{String(detailItem.recipient_name)}</span></div> : null}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-soft border p-4"><div className="text-[9px] font-black text-muted uppercase">التاريخ</div><div className="text-sm font-black">{detailItem.expense_date ? new Date(String(detailItem.expense_date)).toLocaleDateString("ar-EG") : detailItem.created_at ? new Date(String(detailItem.created_at)).toLocaleDateString("ar-EG") : "—"}</div></div>
-                <div className="rounded-2xl bg-soft border p-4"><div className="text-[9px] font-black text-muted uppercase">المبلغ</div><div className="text-sm font-black tabular-nums">{formatCurrency(detailItem.amount)}</div></div>
-                <div className="rounded-2xl bg-soft border p-4"><div className="text-[9px] font-black text-muted uppercase">التصنيف</div><div className="text-sm font-black">{String(detailItem.category || "—")}</div></div>
-                <div className="rounded-2xl bg-soft border p-4"><div className="text-[9px] font-black text-muted uppercase">طريقة الدفع</div><div className="text-sm font-black flex items-center gap-1"><CreditCard size={12} />{paymentLabel(detailItem.payment_method)}</div></div>
+                <div className="rounded-2xl bg-soft border p-4"><div className="text-[9px] font-black text-muted uppercase">{t("expensesArch.detailDate")}</div><div className="text-sm font-black">{detailItem.expense_date ? new Date(String(detailItem.expense_date)).toLocaleDateString(locale) : detailItem.created_at ? new Date(String(detailItem.created_at)).toLocaleDateString(locale) : "—"}</div></div>
+                <div className="rounded-2xl bg-soft border p-4"><div className="text-[9px] font-black text-muted uppercase">{t("expensesArch.detailAmount")}</div><div className="text-sm font-black tabular-nums">{formatCurrency(detailItem.amount)}</div></div>
+                <div className="rounded-2xl bg-soft border p-4"><div className="text-[9px] font-black text-muted uppercase">{t("expensesArch.detailCategory")}</div><div className="text-sm font-black">{detailItem.category ? expenseCatLabelFor(detailItem.category, t) : "—"}</div></div>
+                <div className="rounded-2xl bg-soft border p-4"><div className="text-[9px] font-black text-muted uppercase">{t("expensesArch.detailPayment")}</div><div className="text-sm font-black flex items-center gap-1"><CreditCard size={12} />{methodLabel(detailItem.payment_method)}</div></div>
               </div>
 
               {(detailItem.reference_type || detailItem.reference_id) ? (
                 <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-2">
-                  <div className="text-[10px] font-black text-indigo-700 uppercase flex items-center gap-2"><ArrowUpRight size={12} /> مرتبط بـ</div>
+                  <div className="text-[10px] font-black text-indigo-700 uppercase flex items-center gap-2"><ArrowUpRight size={12} /> {t("expensesArch.detailLinked")}</div>
                   <div className="flex items-center gap-2">
                     <Badge className="bg-indigo-600 text-white rounded-full text-[10px] font-black">{String(detailItem.reference_type)}</Badge>
                     <span className="font-black text-sm">#{String(detailItem.reference_id)}</span>
@@ -483,32 +475,32 @@ export default function ExpensesArchive() {
                       else if (t === "invoice") navigate("/invoices");
                       else if (t === "product") navigate("/inventory");
                       else if (t === "booking") navigate("/bookings");
-                    }} className="me-auto text-xs font-black text-indigo-600 hover:underline">فتح المرجع</button>
+                    }} className="me-auto text-xs font-black text-indigo-600 hover:underline">{t("expensesArch.detailOpenReference")}</button>
                   </div>
                 </div>
               ) : null}
 
               <div className="rounded-xl border bg-soft/30 p-3 flex items-center gap-2">
                 <Wallet size={14} className="text-muted" />
-                <span className="text-xs font-bold text-muted">حركة الخزنة:</span>
+                <span className="text-xs font-bold text-muted">{t("expensesArch.detailLinkedTx")}</span>
                 <span className="font-black text-xs">EXP-{String(detailItem.id)}</span>
-                <button onClick={() => navigate("/owner/cashbox")} className="me-auto text-xs font-black text-primary hover:underline">عرض في الخزنة</button>
+                <button onClick={() => navigate("/owner/cashbox")} className="me-auto text-xs font-black text-primary hover:underline">{t("expensesArch.detailViewInCashbox")}</button>
               </div>
 
               {detailItem.internal_notes && String(detailItem.internal_notes).trim() ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                  <div className="text-[10px] font-black text-amber-700 uppercase flex items-center gap-1"><ShieldCheck size={12} /> ملاحظات داخلية</div>
+                  <div className="text-[10px] font-black text-amber-700 uppercase flex items-center gap-1"><ShieldCheck size={12} /> {t("expensesArch.detailInternalNotes")}</div>
                   <p className="text-sm font-bold leading-relaxed text-amber-900 whitespace-pre-wrap mt-1">{String(detailItem.internal_notes)}</p>
                 </div>
               ) : null}
 
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setOpenDetail(false)} className="flex-1 h-11 rounded-xl font-black">إغلاق</Button>
-                <Link to="/expenses" className="flex-1"><Button className="w-full h-11 rounded-xl bg-slate-900 text-white font-black">الذهاب للمصروفات</Button></Link>
+                <Button variant="outline" onClick={() => setOpenDetail(false)} className="flex-1 h-11 rounded-xl font-black">{t("expensesArch.detailClose")}</Button>
+                <Link to="/expenses" className="flex-1"><Button className="w-full h-11 rounded-xl bg-slate-900 text-white font-black">{t("expensesArch.detailGoToExpenses")}</Button></Link>
               </div>
             </div>
           ) : (
-            <div className="p-10 text-center font-bold text-muted">جاري التحميل...</div>
+            <div className="p-10 text-center font-bold text-muted">{t("expensesArch.loading")}</div>
           )}
         </DialogContent>
       </Dialog>

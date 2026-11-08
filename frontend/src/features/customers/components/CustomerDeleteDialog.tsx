@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useTranslation } from "react-i18next";
 import { customerName } from "@/features/customers/utils/customer";
 
 export default function CustomerDeleteDialog({
@@ -25,6 +26,7 @@ export default function CustomerDeleteDialog({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("customers");
   return (
       <Dialog
         open={!!customer}
@@ -32,11 +34,11 @@ export default function CustomerDeleteDialog({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>نقل العميل إلى الأرشيف؟</DialogTitle>
+            <DialogTitle>{t("delete.title")}</DialogTitle>
             <DialogDescription>
-              سيتم نقل بيانات{" "}
-              {customer ? customerName(customer) : "العميل"} إلى أرشيف
-              العملاء، ويمكن استعادته في أي وقت من صفحة الأرشيف.
+              {t("delete.description", {
+                name: customer ? customerName(customer) : "",
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -44,11 +46,17 @@ export default function CustomerDeleteDialog({
               variant="secondary"
               disabled={loading}
               onClick={() => onClose()}
+              aria-label={t("delete.cancel")}
             >
-              إلغاء
+              {t("delete.cancel")}
             </Button>
-            <Button variant="danger" disabled={loading} onClick={onConfirm}>
-              نقل للأرشيف
+            <Button
+              variant="danger"
+              disabled={loading}
+              onClick={onConfirm}
+              aria-label={t("delete.confirm")}
+            >
+              {t("delete.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

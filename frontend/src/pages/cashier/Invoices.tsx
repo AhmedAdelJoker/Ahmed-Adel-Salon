@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import {
   Archive,
   CalendarDays,
@@ -15,6 +16,8 @@ import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useSalon } from "@/context/SalonContext";
 import { printThermalReceipt } from "@/lib/print/receipt";
+import { getIntlLocale } from "@/lib/format/locale";
+import i18n from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/core/utils";
@@ -32,28 +35,8 @@ import {
   AdjustmentRequestDialog,
 } from "@/features/invoices";
 
-function rangeLabel(from: string, to: string): string {
-  if (!from || !to) return "كل الفترات";
-  const start = new Date(`${from}T00:00:00`);
-  const end = new Date(`${to}T00:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return `${from} — ${to}`;
-  }
-  const month = (date: Date) =>
-    date.toLocaleDateString("ar-EG-u-nu-latn", { month: "long" });
-  if (
-    start.getFullYear() === end.getFullYear() &&
-    start.getMonth() === end.getMonth()
-  ) {
-    return `${month(start)} ${start.getFullYear()}`;
-  }
-  if (start.getFullYear() === end.getFullYear()) {
-    return `${start.toLocaleDateString("ar-EG-u-nu-latn", { day: "2-digit", month: "short" })} — ${end.toLocaleDateString("ar-EG-u-nu-latn", { day: "2-digit", month: "short" })} ${end.getFullYear()}`;
-  }
-  return `${start.toLocaleDateString("ar-EG-u-nu-latn", { day: "2-digit", month: "short", year: "numeric" })} — ${end.toLocaleDateString("ar-EG-u-nu-latn", { day: "2-digit", month: "short", year: "numeric" })}`;
-}
-
 export default function Invoices() {
+  const { t } = useTranslation("invoices");
   const { settings } = useSalon();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -88,14 +71,18 @@ export default function Invoices() {
     filteredInvoices,
     summary,
     exportToCSV,
+    exporting,
     adjustmentDialog,
     setAdjustmentDialog,
     adjustmentSubmitting,
     busyPdfId,
+    busyWhatsappId,
     selectedInvoice,
     setSelectedInvoice,
     pendingAdjustments,
+    lastUpdated,
     openInvoicePdf,
+    sendInvoicePdfWhatsapp,
     openAdjustmentDialog,
     submitAdjustmentRequest,
   } = useInvoicesData();
@@ -106,14 +93,37 @@ export default function Invoices() {
   const hasFilters =
     Boolean(query.trim()) ||
     paymentFilter !== "all" ||
-    statusFilter !== "all";
+    statusFilter !== "all" ||
+    timePreset !== "month";
+
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
+  const rangeLabel = (from: string, to: string): string => {
+    if (!from || !to) return t("hero.allRanges");
+    const start = new Date(`${from}T00:00:00`);
+    const end = new Date(`${to}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return `${from} — ${to}`;
+    }
+    const month = (date: Date) =>
+      date.toLocaleDateString(locale, { month: "long" });
+    if (
+      start.getFullYear() === end.getFullYear() &&
+      start.getMonth() === end.getMonth()
+    ) {
+      return `${month(start)} ${start.getFullYear()}`;
+    }
+    if (start.getFullYear() === end.getFullYear()) {
+      return `${start.toLocaleDateString(locale, { day: "2-digit", month: "short" })} — ${end.toLocaleDateString(locale, { day: "2-digit", month: "short" })} ${end.getFullYear()}`;
+    }
+    return `${start.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" })} — ${end.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" })}`;
+  };
 
   return (
     <PageShell contained>
       <PageHeader
-        title="الفواتير"
-        subtitle="دفتر المبيعات والمدفوعات — كل فاتورة في مكانها"
-        badge="العمليات المالية"
+        title={t("page.title")}
+        subtitle={t("page.subtitle")}
+        badge={t("page.badge")}
         icon={Receipt}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -121,11 +131,11 @@ export default function Invoices() {
               <Button
                 variant="outline"
                 className="h-10 rounded-xl px-3"
-                onClick={() => navigate("/owner/adjustment-requests")}
-                aria-label="طلبات التعديل"
+                onClick={() => navigate("/approvals")}
+                aria-label={t("actions.adjustmentRequests")}
               >
                 <ShieldCheck size={14} className="ms-1.5" />
-                <span className="hidden sm:inline">طلبات التعديل</span>
+                <span className="hidden sm:inline">{t("actions.adjustmentRequests")}</span>
                 {pendingAdjustments > 0 && (
                   <span className="ms-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-warning px-1 text-[10px] font-black text-white">
                     {pendingAdjustments}
@@ -137,17 +147,17 @@ export default function Invoices() {
               variant="outline"
               className="h-10 rounded-xl px-3"
               onClick={() => navigate("/invoices/archive")}
-              aria-label="أرشيف الفواتير"
+              aria-label={t("actions.archive")}
             >
               <Archive size={14} className="ms-1.5" />
-              <span className="hidden sm:inline">الأرشيف</span>
+              <span className="hidden sm:inline">{t("actions.archive")}</span>
             </Button>
             <Button
               className="h-10 rounded-xl px-4"
               onClick={() => navigate("/pos")}
             >
               <Plus size={15} className="ms-1.5" />
-              فاتورة جديدة
+              {t("actions.newInvoice")}
             </Button>
           </div>
         }
@@ -162,11 +172,16 @@ export default function Invoices() {
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10">
                 <Wallet size={14} />
               </span>
-              <span>صافي مبيعات الفترة</span>
+              <span>{t("hero.netSales")}</span>
               <span className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-[10px] font-black text-white/90">
                 <CalendarDays size={11} />
                 {rangeLabel(fromDate, toDate)}
               </span>
+              {timePreset === "custom" && (
+                <span className="inline-flex items-center gap-1 rounded-lg bg-white/15 px-2 py-1 text-[10px] font-black text-white/90">
+                  {t("hero.customRange")}
+                </span>
+              )}
             </div>
             <p
               className={cn(
@@ -180,20 +195,23 @@ export default function Invoices() {
             </p>
             <p className="mt-1 text-[11px] font-bold text-white/60">
               {loading && summary.count === 0
-                ? "جارٍ تحميل ملخص الفترة…"
-                : `${summary.count} فاتورة بعد الخصومات • ${summary.closed} ملغاة`}
+                ? t("hero.loadingSummary")
+                : t("hero.summaryLine", {
+                    count: summary.count,
+                    closed: summary.closed,
+                  })}
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[540px]">
             <HeroStat
               icon={Receipt}
-              label="عدد الفواتير"
+              label={t("hero.invoiceCount")}
               value={loading && summary.count === 0 ? "—" : summary.count}
             />
             <HeroStat
               icon={TrendingUp}
-              label="متوسط الفاتورة"
+              label={t("hero.average")}
               value={
                 loading && summary.count === 0
                   ? "—"
@@ -202,12 +220,12 @@ export default function Invoices() {
             />
             <HeroStat
               icon={CircleSlash}
-              label="ملغاة"
+              label={t("hero.cancelled")}
               value={loading && summary.count === 0 ? "—" : summary.closed}
             />
             <HeroStat
               icon={ShieldCheck}
-              label="طلبات تعديل"
+              label={t("hero.adjustmentRequests")}
               value={pendingAdjustments}
             />
           </div>
@@ -235,6 +253,7 @@ export default function Invoices() {
           visibleColumns={visibleColumns}
           toggleColumn={toggleColumn}
           exportToCSV={exportToCSV}
+          exporting={exporting}
         />
       </div>
 
@@ -247,13 +266,23 @@ export default function Invoices() {
       <div className="mt-4 overflow-hidden rounded-3xl border border-border/70 bg-card shadow-soft">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-black text-main">سجل الفواتير</h2>
+            <h2 className="text-sm font-black text-main">{t("table.ledger")}</h2>
             <Badge variant="secondary" size="sm">
               {totalCount}
             </Badge>
             {searchPending && (
               <span className="text-[10px] font-bold text-muted">
-                جارٍ البحث…
+                {t("table.searching")}
+              </span>
+            )}
+            {lastUpdated && !loading && (
+              <span className="hidden text-[10px] font-bold text-muted sm:inline">
+                {t("toasts.lastUpdated", {
+                  time: lastUpdated.toLocaleTimeString(locale, {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }),
+                })}
               </span>
             )}
           </div>
@@ -263,8 +292,8 @@ export default function Invoices() {
             className="h-8 w-8 rounded-lg"
             onClick={refreshAll}
             disabled={loading}
-            aria-label="تحديث الفواتير"
-            title="تحديث"
+            aria-label={t("actions.refreshInvoices")}
+            title={t("actions.refresh")}
           >
             <RefreshCw size={15} className={cn(loading && "animate-spin")} />
           </Button>
@@ -284,13 +313,15 @@ export default function Invoices() {
           sortConfig={sortConfig}
           handleSort={handleSort}
           busyPdfId={busyPdfId}
+          busyWhatsappId={busyWhatsappId}
           hasFilters={hasFilters}
           onSelectInvoice={(invoice) => setSelectedInvoice(invoice)}
           onPrintInvoice={(invoice) => printThermalReceipt(invoice, settings)}
           onOpenPdf={(invoice) => openInvoicePdf(invoice)}
+          onSendWhatsapp={(invoice) => sendInvoicePdfWhatsapp(invoice)}
           onRequestAdjustment={(invoice) => {
             if (!isInvoiceEditable(invoice)) {
-              toast.error("انتهت فترة التعديل (ساعة) أو أن الفاتورة ملغاة");
+              toast.error(t("toasts.expiredEdit"));
               return;
             }
             openAdjustmentDialog(invoice);
@@ -302,6 +333,7 @@ export default function Invoices() {
             applyPreset("month");
           }}
           onRetry={refreshAll}
+          onCreateFromPos={() => navigate("/pos")}
         />
 
         {!loading && filteredInvoices.length > 0 && (

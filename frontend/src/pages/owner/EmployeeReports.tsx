@@ -32,6 +32,7 @@ import { cn, formatCurrency, formatNumber } from "@/lib/core/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PremiumCard, StatCard } from "@/components/shared/PremiumUI";
+import { useTranslation } from "react-i18next";
 import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import { useEmployeePerformance } from "@/hooks/useApi";
 import {
@@ -51,6 +52,8 @@ const EXPORT_PAGE_SIZE = 200;
 const SEARCH_DEBOUNCE_MS = 500;
 
 export default function EmployeeReports() {
+  const { t, i18n } = useTranslation("owner");
+  const lang: "ar" | "en" = (i18n.resolvedLanguage || i18n.language || "ar").startsWith("en") ? "en" : "ar";
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -132,8 +135,8 @@ export default function EmployeeReports() {
         });
         all = all.concat(res.data?.items || []);
       }
-      if (!all.length) return toast.error("لا توجد بيانات للتصدير");
-      const headers = ["الموظف", "المبيعات", "العمولة", "نسبة العمولة", "الخدمات", "الفواتير", "متوسط الفاتورة", "أكثر خدمة"];
+      if (!all.length) return toast.error(t("empReports.exportEmpty"));
+      const headers = [t("empReports.csvEmployee"), t("empReports.csvSales"), t("empReports.csvCommission"), t("empReports.csvRate"), t("empReports.csvServices"), t("empReports.csvInvoices"), t("empReports.csvAvgInvoice"), t("empReports.csvTopService")];
       const rowsCsv = all.map((r) => [r.employee_name, r.sales, r.commission, r.commission_rate ? `${(r.commission_rate * 100).toFixed(0)}%` : "—", r.service_count, r.invoice_count, r.avg_ticket, r.top_service_name]);
       const csv = [headers.join(","), ...rowsCsv.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
       const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -142,13 +145,13 @@ export default function EmployeeReports() {
       link.download = `employee_reports_${fromDate}_${toDate}.csv`;
       link.click();
       URL.revokeObjectURL(link.href);
-      toast.success(`تم تصدير ${all.length} موظف بنجاح`);
+      toast.success(t("empReports.exportSuccess", { count: all.length }));
     } catch (_err) {
-      toast.error("فشل التصدير — حاول مجدداً");
+      toast.error(t("empReports.exportFailed"));
     } finally {
       setExporting(false);
     }
-  }, [fromDate, toDate, debouncedQuery]);
+  }, [fromDate, toDate, debouncedQuery, t]);
 
   return (
     <div className="erp-page space-y-4 sm:space-y-6 pb-10">
@@ -167,14 +170,14 @@ export default function EmployeeReports() {
               </div>
               <div className="min-w-0">
                 <span className="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-3 py-1 text-[10px] font-black tracking-widest">
-                  التقارير التشغيلية
+                  {t("empReports.operationalReports")}
                 </span>
                 <h1 className="mt-2 text-xl sm:text-2xl font-black leading-tight">
-                  تقارير الموظفين والعمولات
+                  {t("empReports.employeeReportsTitle")}
                 </h1>
                 <p className="mt-1 text-xs font-bold text-white/70">
-                  من {fromDate} إلى {toDate} • {formatNumber(data?.total || 0)} موظف
-                  {isFetching && !isLoading && " • جاري التحديث..."}
+                  {t("empReports.rangeLabel", { from: fromDate, to: toDate, total: formatNumber(data?.total || 0) })}
+                  {isFetching && !isLoading && t("empReports.updating")}
                 </p>
               </div>
             </div>
@@ -189,7 +192,7 @@ export default function EmployeeReports() {
                 ) : (
                   <Download size={16} className="ms-1.5" />
                 )}
-                تصدير CSV
+                {t("empReports.exportCsv")}
               </Button>
               <Button
                 onClick={() => refetch()}
@@ -203,7 +206,7 @@ export default function EmployeeReports() {
           <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-8">
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 text-[10px] font-black text-white/70 uppercase tracking-widest">
-                <TrendingUp size={12} /> إجمالي مبيعات الفترة
+                <TrendingUp size={12} /> {t("empReports.totalSales")}
               </div>
               <div className="mt-1 text-3xl sm:text-4xl font-black tabular-nums truncate">
                 {formatCurrency(Number(summary?.total_sales || 0))}
@@ -212,7 +215,7 @@ export default function EmployeeReports() {
             <div className="hidden sm:block w-px self-stretch bg-white/20 shrink-0" />
             <div className="min-w-0">
               <div className="text-[10px] font-black text-white/70 uppercase tracking-widest">
-                إجمالي العمولات
+                {t("empReports.totalCommissions")}
               </div>
               <div className="mt-1 text-xl sm:text-2xl font-black tabular-nums truncate">
                 {formatCurrency(Number(summary?.total_commission || 0))}
@@ -228,9 +231,9 @@ export default function EmployeeReports() {
           <div className="flex items-center gap-3">
             <AlertTriangle size={18} className="text-danger shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-black text-danger">حدث خطأ في تحميل البيانات</p>
+              <p className="text-sm font-black text-danger">{t("empReports.loadError")}</p>
               <p className="text-xs font-bold text-muted mt-0.5">
-                تعذّر الاتصال بالخادم — تحقق من الاتصال ثم أعد المحاولة
+                {t("empReports.loadErrorSub")}
               </p>
             </div>
             <Button
@@ -239,7 +242,7 @@ export default function EmployeeReports() {
               size="sm"
               className="shrink-0 rounded-xl"
             >
-              <RefreshCw size={14} className="ms-1" /> إعادة المحاولة
+              <RefreshCw size={14} className="ms-1" /> {t("empReports.retry")}
             </Button>
           </div>
         </PremiumCard>
@@ -248,11 +251,11 @@ export default function EmployeeReports() {
       {/* Filters — presets + dates + search */}
       <PremiumCard className="p-4 sm:p-5">
         <div className="flex items-center gap-2 text-xs font-black text-muted uppercase tracking-widest mb-3">
-          <CalendarDays size={14} className="text-primary" /> نطاق التقرير والبحث
+          <CalendarDays size={14} className="text-primary" /> {t("empReports.rangeSection")}
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-muted uppercase">الفترة</label>
+            <label className="text-[10px] font-black text-muted uppercase">{t("empReports.period")}</label>
             <div className="flex h-11 items-center rounded-xl bg-soft border border-border p-1 gap-1">
               {PRESET_OPTIONS.filter((o) => o.value !== "custom").map((o) => (
                 <button
@@ -265,18 +268,18 @@ export default function EmployeeReports() {
                       : "text-muted hover:text-main",
                   )}
                 >
-                  {o.label}
+                  {t(o.key)}
                 </button>
               ))}
               {preset === "custom" && (
                 <span className="h-full flex items-center whitespace-nowrap rounded-lg px-3 text-xs font-black bg-card text-primary shadow-sm">
-                  مخصص
+                  {t("empReports.custom")}
                 </span>
               )}
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-muted uppercase">من تاريخ</label>
+            <label className="text-[10px] font-black text-muted uppercase">{t("empReports.fromDate")}</label>
             <Input
               type="date"
               value={fromDate}
@@ -285,7 +288,7 @@ export default function EmployeeReports() {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-muted uppercase">إلى تاريخ</label>
+            <label className="text-[10px] font-black text-muted uppercase">{t("empReports.toDate")}</label>
             <Input
               type="date"
               value={toDate}
@@ -294,13 +297,13 @@ export default function EmployeeReports() {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-muted uppercase">بحث موظف / خدمة</label>
+            <label className="text-[10px] font-black text-muted uppercase">{t("empReports.searchLabel")}</label>
             <div className="relative">
               <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="مثال: أحمد - قص شعر..."
+                placeholder={t("empReports.searchPlaceholder")}
                 className="h-11 pe-10 rounded-xl bg-soft border-border font-bold"
               />
             </div>
@@ -311,28 +314,28 @@ export default function EmployeeReports() {
       {/* KPIs — no overlap with hero totals */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <StatCard
-          label="عدد الموظفين"
+          label={t("empReports.employeesCount")}
           value={formatNumber(data?.total || 0)}
           icon={Users}
           variant="primary"
           delay={0}
         />
         <StatCard
-          label="عدد الخدمات"
+          label={t("empReports.servicesCount")}
           value={formatNumber(summary?.total_services || 0)}
           icon={Briefcase}
           variant="info"
           delay={0.05}
         />
         <StatCard
-          label="عدد الفواتير"
+          label={t("empReports.invoicesCount")}
           value={formatNumber(summary?.total_invoices || 0)}
           icon={Receipt}
           variant="secondary"
           delay={0.1}
         />
         <StatCard
-          label="متوسط مبيعات الموظف"
+          label={t("empReports.avgSales")}
           value={formatCurrency(Number(avgPerEmployee) || 0)}
           icon={Wallet}
           variant="warning"
@@ -345,10 +348,10 @@ export default function EmployeeReports() {
         <PremiumCard wrapperClassName="xl:col-span-7 min-w-0" className="p-5 sm:p-6 min-w-0">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-black flex items-center gap-2">
-              <BarChart3 size={16} className="text-primary" /> مقارنة المبيعات
+              <BarChart3 size={16} className="text-primary" /> {t("empReports.salesCompare")}
             </h2>
             <Badge variant="outline" className="rounded-full text-[10px] font-black bg-soft">
-              الأعلى 8
+              {t("empReports.top8")}
             </Badge>
           </div>
           {topLoading ? (
@@ -362,7 +365,7 @@ export default function EmployeeReports() {
         <PremiumCard wrapperClassName="xl:col-span-5 min-w-0" className="p-5 sm:p-6 min-w-0">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-black flex items-center gap-2">
-              <Trophy size={16} className="text-warning" /> منصة الأوائل
+              <Trophy size={16} className="text-warning" /> {t("empReports.podium")}
             </h2>
             <Badge variant="outline" className="rounded-full text-[10px] font-black bg-soft">
               Top 3
@@ -382,27 +385,27 @@ export default function EmployeeReports() {
       <PremiumCard noPadding className="overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-border bg-soft/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <h2 className="text-sm font-black flex items-center gap-2">
-            <UserCheck size={16} className="text-primary" /> تفاصيل الموظفين والعمولات
+            <UserCheck size={16} className="text-primary" /> {t("empReports.detailsTitle")}
           </h2>
           <div className="flex items-center gap-2 text-[11px] font-bold">
-            <span className="hidden sm:inline text-muted">يعرض</span>
+            <span className="hidden sm:inline text-muted">{t("empReports.showing")}</span>
             <Badge variant="primary" className="rounded-full">
-              {rows.length} من {data?.total || 0}
+              {t("empReports.ofTotal", { shown: rows.length, total: data?.total || 0 })}
             </Badge>
           </div>
         </div>
 
         {isLoading ? (
           <div className="flex min-h-[200px] items-center justify-center gap-2 text-muted">
-            <RefreshCw className="h-5 w-5 animate-spin" /> جاري تحميل التقرير...
+            <RefreshCw className="h-5 w-5 animate-spin" /> {t("empReports.loadingReport")}
           </div>
         ) : rows.length === 0 ? (
           <div className="flex min-h-[200px] flex-col items-center justify-center text-center p-8">
             <div className="h-14 w-14 rounded-2xl bg-soft border border-border flex items-center justify-center">
               <UserCheck size={20} className="text-muted/40" />
             </div>
-            <p className="mt-3 font-black text-main">لا توجد بيانات موظفين مطابقة</p>
-            <p className="text-xs font-bold text-muted">جرب توسيع نطاق التاريخ أو مسح البحث</p>
+            <p className="mt-3 font-black text-main">{t("empReports.noDataTitle")}</p>
+            <p className="text-xs font-bold text-muted">{t("empReports.noDataSub")}</p>
           </div>
         ) : (
           <>
@@ -411,13 +414,13 @@ export default function EmployeeReports() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-soft/50 text-[10px] font-black uppercase tracking-widest text-muted">
-                    <TableHead className="px-4 py-4 sm:px-5">الموظف</TableHead>
-                    <TableHead className="px-4 py-4 sm:px-5">المبيعات</TableHead>
-                    <TableHead className="px-4 py-4 sm:px-5">العمولة</TableHead>
-                    <TableHead className="px-4 py-4 sm:px-5 text-center">الخدمات</TableHead>
-                    <TableHead className="px-4 py-4 sm:px-5 text-center">الفواتير</TableHead>
-                    <TableHead className="px-4 py-4 sm:px-5">متوسط الفاتورة</TableHead>
-                    <TableHead className="px-4 py-4 sm:px-5">أكثر خدمة</TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5">{t("empReports.thEmployee")}</TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5">{t("empReports.thSales")}</TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5">{t("empReports.thCommission")}</TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5 text-center">{t("empReports.thServices")}</TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5 text-center">{t("empReports.thInvoices")}</TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5">{t("empReports.thAvgInvoice")}</TableHead>
+                    <TableHead className="px-4 py-4 sm:px-5">{t("empReports.thTopService")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-border/40">
@@ -445,7 +448,7 @@ export default function EmployeeReports() {
                         <div className="font-black text-warning">{formatCurrency(row.commission)}</div>
                         {row.commission_rate ? (
                           <div className="text-[10px] font-bold text-muted mt-0.5">
-                            النسبة {(row.commission_rate * 100).toFixed(0)}%
+                            {t("empReports.rateLabel")} {(row.commission_rate * 100).toFixed(0)}%
                           </div>
                         ) : null}
                       </TableCell>
@@ -504,13 +507,13 @@ export default function EmployeeReports() {
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <div className="rounded-xl bg-success-soft border border-success/20 p-3">
-                          <div className="text-[9px] font-black text-muted uppercase">المبيعات</div>
+                          <div className="text-[9px] font-black text-muted uppercase">{t("empReports.thSales")}</div>
                           <div className="text-sm font-black text-success">
                             {formatCurrency(row.sales)}
                           </div>
                         </div>
                         <div className="rounded-xl bg-warning-soft border border-warning/20 p-3">
-                          <div className="text-[9px] font-black text-muted uppercase">العمولة</div>
+                          <div className="text-[9px] font-black text-muted uppercase">{t("empReports.thCommission")}</div>
                           <div className="text-sm font-black text-warning">
                             {formatCurrency(row.commission)}
                           </div>
@@ -521,21 +524,21 @@ export default function EmployeeReports() {
                           )}
                         </div>
                         <div className="rounded-xl bg-soft border border-border p-3 text-center">
-                          <div className="text-[9px] font-black text-muted uppercase">الخدمات</div>
+                          <div className="text-[9px] font-black text-muted uppercase">{t("empReports.thServices")}</div>
                           <div className="font-black">{formatNumber(row.service_count)}</div>
                         </div>
                         <div className="rounded-xl bg-soft border border-border p-3 text-center">
-                          <div className="text-[9px] font-black text-muted uppercase">الفواتير</div>
+                          <div className="text-[9px] font-black text-muted uppercase">{t("empReports.thInvoices")}</div>
                           <div className="font-black">{formatNumber(row.invoice_count)}</div>
                         </div>
                       </div>
                       <div className="mt-2 flex items-center justify-between rounded-xl bg-soft border border-border p-3">
-                        <span className="text-[11px] font-bold text-muted">متوسط الفاتورة</span>
+                        <span className="text-[11px] font-bold text-muted">{t("empReports.avgInvoice")}</span>
                         <span className="text-sm font-black">{formatCurrency(row.avg_ticket)}</span>
                       </div>
                       {row.top_service_name && (
                         <div className="mt-2 flex items-center justify-between rounded-xl bg-soft border border-border p-3">
-                          <span className="text-[11px] font-bold text-muted">أكثر خدمة</span>
+                          <span className="text-[11px] font-bold text-muted">{t("empReports.topService")}</span>
                           <Badge
                             variant="outline"
                             className="rounded-full font-bold text-[10px] max-w-[140px] truncate"
@@ -562,10 +565,10 @@ export default function EmployeeReports() {
                     paginator={paginator}
                     onPageChange={(p) => setPage(p)}
                     showSizeChanger={false}
-                    locale="ar"
+                    locale={lang}
                   />
                   <p className="text-center text-[10px] font-bold text-muted">
-                    صفحة {page} من {totalPages} — إجمالي {data?.total || 0} موظف
+                    {t("empReports.pageOf", { page, totalPages, count: data?.total || 0 })}
                   </p>
                 </div>
               );
@@ -578,11 +581,11 @@ export default function EmployeeReports() {
       <PremiumCard className="p-3 sm:p-4 print:hidden">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] font-black text-muted uppercase tracking-widest shrink-0">
-            روابط سريعة:
+            {t("empReports.quickLinks")}
           </span>
           {SYSTEM_LINKS.map((l) => (
             <button
-              key={l.label}
+              key={l.labelKey}
               onClick={() => navigate(l.href)}
               className="group flex items-center gap-2 rounded-full border border-border bg-card py-1.5 pe-1.5 ps-4 hover:border-primary/40 hover:shadow-sm transition-all"
             >
@@ -595,7 +598,7 @@ export default function EmployeeReports() {
                 <l.icon size={14} />
               </span>
               <span className="text-xs font-black text-main group-hover:text-primary">
-                {l.label}
+                {t(l.labelKey)}
               </span>
             </button>
           ))}

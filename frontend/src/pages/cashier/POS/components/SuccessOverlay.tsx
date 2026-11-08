@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { usePOS } from "@/pages/cashier/POS/POSContext";
 import { useSalon } from "@/context/SalonContext";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/core/utils";
+import { useIntlLocale } from "@/hooks/useAppLocale";
 import { printThermalReceipt } from "@/lib/print/receipt";
 import { printReceiptNative } from "@/lib/print/thermal";
 import {
@@ -21,6 +23,8 @@ import { toast } from "react-hot-toast";
 import { AnimatePresence } from "framer-motion";
 
 const SuccessOverlay = () => {
+  const { t } = useTranslation("pos");
+  const locale = useIntlLocale();
   const {
     lastInvoice,
     setLastInvoice,
@@ -49,11 +53,11 @@ const SuccessOverlay = () => {
 
   const buildReceiptData = () => {
     const invoice = lastInvoice;
-    const shopName = settings?.salon_name || settings?.salonName || "صالون برو";
+    const shopName = settings?.salon_name || settings?.salonName || t("receipt.default_shop");
     const shopPhone = settings?.shop_phone || settings?.shopPhone || "";
     const shopAddress = settings?.address || settings?.shopAddress || "";
     const footer =
-      settings?.receipt_footer || settings?.receiptFooter || "شكراً لزيارتكم";
+      settings?.receipt_footer || settings?.receiptFooter || t("receipt.thank_you_default");
     const publicSlug = settings?.public_slug || "default-salon";
 
     const invoiceNo =
@@ -67,10 +71,10 @@ const SuccessOverlay = () => {
       invoice.customer_name ||
       invoice.customerName ||
       completedCustomerName ||
-      "عميل نقدي";
+      t("receipt.walk_in_customer");
     const createdAt = new Date(
       invoice.created_at || invoice.createdAt || new Date(),
-    ).toLocaleString("ar-EG", {
+    ).toLocaleString(locale, {
       dateStyle: "short",
       timeStyle: "short",
     });
@@ -93,7 +97,7 @@ const SuccessOverlay = () => {
         item.product_name ||
         item.productName ||
         item.name ||
-        "بند",
+        t("receipt.item_fallback"),
       qty: Number(item.quantity || item.qty || 1),
       price: Number(
         item.total_price ||
@@ -110,16 +114,20 @@ const SuccessOverlay = () => {
         "",
     }));
 
-    const subtotal = Number(
-      invoice.subtotal_amount ||
-        invoice.subtotalAmount ||
-        invoice.total_amount ||
-        0,
-    );
+    const taxAmount = Number(invoice.tax_amount || invoice.taxAmount || 0);
+    const taxRate = Number(invoice.tax_rate || invoice.taxRate || 0);
     const discount = Number(
       invoice.discount_amount || invoice.discountAmount || 0,
     );
     const total = Number(invoice.total_amount || invoice.totalAmount || 0);
+    // Mirrors receipt.ts: derive the pre-tax subtotal for legacy invoices
+    // that never snapshotted one (total_amount is tax-inclusive now).
+    const subtotal = Number(
+      invoice.subtotal_amount ||
+        invoice.subtotalAmount ||
+        Math.max(0, total - discount - taxAmount) ||
+        0,
+    );
 
     // Generate QR code data URL for native printing
     const qrDataUrl = `https://salon-pro.com/${publicSlug}?invoice=${invoiceNo}`;
@@ -133,6 +141,8 @@ const SuccessOverlay = () => {
       items,
       subtotal,
       discount,
+      taxRate,
+      taxAmount,
       total,
       shopName,
       shopPhone,
@@ -151,26 +161,25 @@ const SuccessOverlay = () => {
       const receiptData = buildReceiptData();
 
       if (printMethod === "native") {
-         
         await printReceiptNative(receiptData as any);
-        toast.success("تم الإرسال للطابعة الحرارية");
+        toast.success(t("print_toasts.sent_native"));
       } else {
         await printThermalReceipt(lastInvoice, settings);
-        toast.success("تم فتح نافذة الطباعة");
+        toast.success(t("print_toasts.opened_window"));
       }
     } catch (error) {
       console.error("Print error:", error);
-       
+
       const apiErr = error as { message?: string };
       setNativePrinterError(apiErr.message as string);
-      toast.error(`فشل الطباعة: ${apiErr.message}`);
+      toast.error(t("print_toasts.failed", { msg: apiErr.message }));
       // Fallback to browser print
       if (printMethod === "native") {
         try {
           await printThermalReceipt(lastInvoice, settings);
-          toast.success("تم فتح نافذة الطباعة كبديل");
+          toast.success(t("print_toasts.fallback_window"));
         } catch (_fallbackError) {
-          toast.error("فشل الطباعة تماماً");
+          toast.error(t("print_toasts.failed_completely"));
         }
       }
     } finally {
@@ -208,11 +217,13 @@ const SuccessOverlay = () => {
 
             <div className="space-y-2">
               <h2 className="text-3xl font-black text-main tracking-tight">
-                تم الدفع بنجاح!
+                {t("success.title")}
               </h2>
               <p className="text-sm font-bold text-muted flex items-center justify-center gap-2 uppercase tracking-widest">
                 <ShoppingBag size={14} />
-                فاتورة رقم: #{lastInvoice.invoice_no || lastInvoice.id}
+                {t("success.invoice_no", {
+                  no: lastInvoice.invoice_no || lastInvoice.id,
+                })}
               </p>
             </div>
 
@@ -224,26 +235,26 @@ const SuccessOverlay = () => {
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-muted uppercase">
-                      العميل
+                      {t("success.customer")}
                     </p>
                     <p className="text-sm font-black text-main">
-                      {completedCustomerName || "عميل مجهول"}
+                      {completedCustomerName || t("success.unknown_customer")}
                     </p>
                   </div>
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-black text-muted uppercase">
-                    الخبير
+                    {t("success.expert")}
                   </p>
                   <p className="text-sm font-black text-primary">
-                    {completedBarberName || "الخبير"}
+                    {completedBarberName || t("success.expert")}
                   </p>
                 </div>
               </div>
 
               <div className="pt-4 border-t border-slate-200 dark:border-white/10">
                 <p className="text-[10px] font-black text-muted uppercase tracking-[0.2em] mb-1">
-                  المبلغ المحصل
+                  {t("success.collected")}
                 </p>
                 <p className="text-5xl font-black text-success tabular-nums tracking-tighter">
                   {formatCurrency(lastInvoice.total_amount)}
@@ -254,7 +265,7 @@ const SuccessOverlay = () => {
             {/* Print Method Selector */}
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 space-y-3">
               <p className="text-[10px] font-black text-muted uppercase tracking-widest text-right">
-                طريقة الطباعة
+                {t("success.print_method")}
               </p>
               <div className="flex gap-2">
                 <button
@@ -267,7 +278,7 @@ const SuccessOverlay = () => {
                 >
                   <span className="flex items-center justify-center gap-2">
                     <Printer size={18} />
-                    متصفح (افتراضي)
+                    {t("success.browser")}
                   </span>
                 </button>
                 <button
@@ -280,7 +291,7 @@ const SuccessOverlay = () => {
                 >
                   <span className="flex items-center justify-center gap-2">
                     <Zap size={18} fill="currentColor" />
-                    أصلية (WebUSB/Electron)
+                    {t("success.native")}
                   </span>
                 </button>
               </div>
@@ -292,8 +303,8 @@ const SuccessOverlay = () => {
               )}
               <p className="text-[10px] font-bold text-slate-400 text-center">
                 {printMethod === "browser"
-                  ? "يفتح نافذة طباعة في المتصفح — يعمل على أي جهاز"
-                  : "يتطلب توصيل طابعة عبر USB أو تطبيق سطح مكتب (Electron/TAURI)"}
+                  ? t("success.browser_hint")
+                  : t("success.native_hint")}
               </p>
             </div>
 
@@ -307,7 +318,7 @@ const SuccessOverlay = () => {
                 {printing ? (
                   <>
                     <Loader2 size={22} className="animate-spin" />
-                    جاري الطباعة...
+                    {t("success.printing")}
                   </>
                 ) : (
                   <>
@@ -315,7 +326,7 @@ const SuccessOverlay = () => {
                       size={22}
                       className="group-hover:rotate-12 transition-transform"
                     />
-                    طباعة الفاتورة الحرارية
+                    {t("success.print")}
                   </>
                 )}
               </Button>
@@ -325,7 +336,7 @@ const SuccessOverlay = () => {
                 disabled={printing}
                 className="h-14 rounded-[1.5rem] font-black text-muted hover:text-main hover:bg-slate-100 group disabled:opacity-50"
               >
-                العميل التالي
+                {t("success.next_customer")}
                 <ArrowRight
                   size={18}
                   className="me-2 group-hover:-translate-x-1 transition-transform rotate-180"

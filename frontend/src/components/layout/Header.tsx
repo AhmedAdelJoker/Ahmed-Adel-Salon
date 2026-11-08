@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
   ChevronDown,
@@ -27,18 +28,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getHomePath, normalizeRole } from "@/lib/access/roles";
+import { getHomePath, normalizeRole, roleTranslationKey } from "@/lib/access/roles";
+import { useIntlLocale } from "@/hooks/useAppLocale";
 import LanguageSwitcher from "@/components/shared/LanguageSwitcher";
-
-const roleLabel = (role) =>
-  ({
-    OWNER: "المالك",
-    ADMIN: "مدير النظام",
-    MANAGER: "المدير",
-    CASHIER: "الكاشير",
-    BARBER: "الخبير",
-    ACCOUNTANT: "المحاسب",
-  })[normalizeRole(role)] || "المستخدم";
 
 /**
  * Isolated minute clock. Ticking here re-renders only this span, not the whole
@@ -46,6 +38,7 @@ const roleLabel = (role) =>
  */
 function LiveClock() {
   const [now, setNow] = useState(() => new Date());
+  const locale = useIntlLocale();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -54,24 +47,26 @@ function LiveClock() {
 
   return (
     <span className="text-[13px] font-black text-main tabular-nums tracking-tight">
-      {now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}
+      {now.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
     </span>
   );
 }
 
 export default function Header({
-  title = "Barber Luxe",
+  title = "Salon Pro",
   subtitle = "Premium Management Suite",
   onOpenSidebar = () => {},
 }) {
   const navigate = useNavigate();
+  const { t } = useTranslation("common");
   const { user, logout, loading } = useAuth();
   const { preferences, toggleTheme } = usePreferences();
   const { valutBalance, vaultCashBalance } = useSalon();
 
   const isDark = preferences?.theme !== "light";
   const role = normalizeRole(user?.role);
-  const displayName = user?.full_name || user?.username || "المستخدم";
+  const roleLabel = t(roleTranslationKey(user?.role));
+  const displayName = user?.full_name || user?.username || t("role.user");
 
   const [avatarFailed, setAvatarFailed] = useState(false);
 
@@ -106,7 +101,7 @@ export default function Header({
       <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-6">
         <button
           onClick={onOpenSidebar}
-          aria-label="فتح القائمة الجانبية"
+          aria-label={t("open_sidebar")}
           className="focus-ring flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 border border-border/50 text-muted hover:text-accent hover:border-accent/40 lg:hidden transition-all"
         >
           <Menu size={20} />
@@ -135,14 +130,14 @@ export default function Header({
         {/* Search Command Button (full on desktop, icon-only on smaller screens) */}
         <button
           onClick={openCommandPalette}
-          aria-label="فتح البحث الذكي"
+          aria-label={t("open_search")}
           className="focus-ring flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 border border-border/40 text-muted hover:text-accent hover:border-accent/30 hover:bg-accent/5 transition-all lg:hidden"
         >
           <Search size={18} />
         </button>
         <button
           onClick={openCommandPalette}
-          aria-label="فتح البحث الذكي"
+          aria-label={t("open_search")}
           className="focus-ring hidden lg:flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/5 border border-border/40 text-muted/60 hover:text-main hover:border-accent/50 hover:bg-accent/5 transition-all group shadow-sm"
         >
           <Search
@@ -150,7 +145,7 @@ export default function Header({
             className="group-hover:text-accent group-hover:scale-110 transition-all"
           />
           <span className="text-[11px] font-black uppercase tracking-widest">
-            البحث الذكي
+            {t("smart_search")}
           </span>
           <div className="flex items-center gap-1 rounded-lg border border-border/50 bg-bg-main/50 px-2 py-0.5 text-[9px] font-black text-muted/80 group-hover:text-accent transition-colors">
             <Command size={9} /> K
@@ -174,7 +169,7 @@ export default function Header({
             <button
               type="button"
               onClick={() => navigate("/owner/cashbox")}
-              title="الخزنة المركزية — مرتبط بالخزنة (نقدي + رقمي)"
+              title={t("vault_hint")}
               className="flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-accent/5 border border-accent/20 shadow-sm group hover:bg-accent/10 transition-all cursor-pointer"
             >
               <div className="h-8 w-8 flex items-center justify-center rounded-xl bg-accent/10 text-accent border border-accent/20">
@@ -182,13 +177,13 @@ export default function Header({
               </div>
               <div className="flex min-w-[72px] flex-col gap-0.5">
                 <span className="text-[9px] font-black text-accent/60 uppercase tracking-widest">
-                  الخزنة • Vault
+                  {t("vault")}
                 </span>
                 <span className="text-[14px] font-black text-main tabular-nums drop-shadow-sm">
                   {formatCurrency(valutBalance)}
                 </span>
                 <span className="text-[9px] font-bold text-muted hidden xl:block">
-                  نقدي {formatCurrency(vaultCashBalance)}
+                  {t("cash")} {formatCurrency(vaultCashBalance)}
                 </span>
               </div>
             </button>
@@ -203,7 +198,7 @@ export default function Header({
           </div>
           <button
             onClick={toggleTheme}
-            aria-label={isDark ? "التبديل إلى الوضع الفاتح" : "التبديل إلى الوضع الداكن"}
+            aria-label={t(isDark ? "switch_light" : "switch_dark")}
             className="focus-ring flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 border border-border/40 text-muted hover:text-accent hover:border-accent/30 hover:bg-accent/5 transition-all"
           >
             {isDark ? (
@@ -216,7 +211,7 @@ export default function Header({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                aria-label="قائمة المستخدم"
+                aria-label={t("user_menu")}
                 aria-haspopup="menu"
                 className="flex min-w-0 items-center gap-2 rounded-2xl border border-transparent p-1.5 transition-all hover:border-border/40 hover:bg-white/5 sm:gap-4 sm:ps-4 group">
                 <div className="relative">
@@ -249,7 +244,7 @@ export default function Header({
                     {displayName}
                   </span>
                   <span className="max-w-full text-[10px] font-bold text-accent/60 uppercase tracking-normal mt-0.5">
-                    {roleLabel(user?.role)}
+                    {roleLabel}
                   </span>
                 </div>
                 <ChevronDown
@@ -270,7 +265,7 @@ export default function Header({
                   <div className="inline-flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/10 border border-accent/20">
                     <div className="h-1 w-1 rounded-full bg-accent" />
                     <span className="text-[9px] font-black text-accent uppercase tracking-widest">
-                      {user?.email || roleLabel(user?.role)}
+                      {user?.email || roleLabel}
                     </span>
                   </div>
                 </div>
@@ -285,7 +280,7 @@ export default function Header({
                     size={16}
                     className="ms-3 text-muted/60 group-hover:text-accent transition-colors"
                   />
-                  <span className="text-[13px]">لوحة التحكم</span>
+                  <span className="text-[13px]">{t("dashboard")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => navigate("/settings")}
@@ -295,7 +290,7 @@ export default function Header({
                     size={16}
                     className="ms-3 text-muted/60 group-hover:text-accent transition-colors"
                   />
-                  <span className="text-[13px]">إعدادات الحساب</span>
+                  <span className="text-[13px]">{t("account_settings")}</span>
                 </DropdownMenuItem>
               </div>
               <DropdownMenuSeparator className="bg-border/20 my-2" />
@@ -307,7 +302,7 @@ export default function Header({
                   size={16}
                   className="ms-3 group-hover:-translate-x-1 transition-transform"
                 />
-                <span className="text-[13px]">تسجيل الخروج</span>
+                <span className="text-[13px]">{t("logout")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

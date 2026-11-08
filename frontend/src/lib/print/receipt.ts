@@ -1,21 +1,28 @@
 import QRCode from "qrcode";
+import i18n from "@/i18n";
+import { getIntlLocale } from "@/lib/format/locale";
+import { getCurrency } from "@/lib/core/currency";
 
 /**
  * Professional Thermal Receipt Printer Utility
  * Supports 80mm and 58mm layouts, Cairo font, and real QR codes.
  */
 
+/** Intl locale follows the live UI language (Arabic pinned to Latin digits). */
+const intlLocale = (): string =>
+  getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
+
 const formatCurrency = (value: unknown): string => {
-  return new Intl.NumberFormat("ar-EG", {
+  return new Intl.NumberFormat(intlLocale(), {
     style: "currency",
-    currency: "EGP",
+    currency: getCurrency(),
     maximumFractionDigits: 2,
   }).format((value as number) || 0);
 };
 
 const formatDate = (date: unknown): string => {
   if (!date) return "-";
-  return new Date(date as string | number | Date).toLocaleString("ar-EG", {
+  return new Date(date as string | number | Date).toLocaleString(intlLocale(), {
     dateStyle: "short",
     timeStyle: "short",
   });
@@ -34,13 +41,13 @@ const escapeHtml = (str: unknown): string => {
 export const printThermalReceipt = async (invoice: Record<string, any> | null | undefined, settings: Record<string, any> = {}): Promise<void> => {
   if (!invoice) return;
 
-  const shopName = settings.salon_name || settings.salonName || "صالون برو";
+  const shopName = settings.salon_name || settings.salonName || i18n.t("pos:receipt.default_shop");
   const shopPhone = settings.shop_phone || settings.shopPhone || "";
   const shopWhatsApp = settings.shop_whatsapp || settings.shopWhatsApp || "";
   const address = settings.address || settings.shopAddress || "";
   const logoUrl = settings.logo_url || settings.logoUrl || "";
   const footer =
-    settings.receipt_footer || settings.receiptFooter || "شكراً لزيارتكم";
+    settings.receipt_footer || settings.receiptFooter || i18n.t("pos:receipt.thank_you_default");
   const publicSlug = settings.public_slug || "default-salon";
 
   const invoiceId = invoice.invoice_id || invoice.invoiceId || invoice.id || "";
@@ -51,7 +58,7 @@ export const printThermalReceipt = async (invoice: Record<string, any> | null | 
     invoiceId ||
     "-";
   const customerName =
-    invoice.customer_name || invoice.customerName || "عميل نقدي";
+    invoice.customer_name || invoice.customerName || i18n.t("pos:receipt.walk_in_customer");
   const createdAt = formatDate(
     invoice.created_at || invoice.createdAt || new Date(),
   );
@@ -61,13 +68,22 @@ export const printThermalReceipt = async (invoice: Record<string, any> | null | 
     "cash"
   ).toLowerCase();
 
-  const paymentLabels: Record<string, string> = {
-    cash: "نقدي",
-    card: "شبكة",
-    visa: "فيزا",
-    mada: "مدى",
-    wallet: "محفظة كاش",
-    instapay: "انستا باي",
+  /** Payment label from the shared `pos:payments.*` vocabulary, keyed by the
+   * lowercase method id; an unknown method prints as-is. */
+  const methodLabel = (method: string): string => {
+    const known = [
+      "cash",
+      "card",
+      "visa",
+      "mada",
+      "wallet",
+      "instapay",
+      "bank_transfer",
+      "split",
+    ];
+    return known.includes(method)
+      ? i18n.t(`pos:payments.${method}`)
+      : method;
   };
 
   const rows = Array.isArray(invoice.items)
@@ -84,7 +100,7 @@ export const printThermalReceipt = async (invoice: Record<string, any> | null | 
         item.product_name ||
         item.productName ||
         item.name ||
-        "بند";
+        i18n.t("pos:receipt.item_fallback");
       const qty = Number(item.quantity || item.qty || 1);
       const price = Number(
         item.total_price ||
@@ -104,7 +120,7 @@ export const printThermalReceipt = async (invoice: Record<string, any> | null | 
       <tr>
         <td class="item-info">
           <div class="item-name">${escapeHtml(name)}</div>
-          ${barber ? `<div class="item-barber">خبير: ${escapeHtml(barber)}</div>` : ""}
+          ${barber ? `<div class="item-barber">${i18n.t("pos:receipt.expert_prefix")}: ${escapeHtml(barber)}</div>` : ""}
         </td>
         <td class="item-qty">${qty}</td>
         <td class="item-total">${formatCurrency(price)}</td>
@@ -113,16 +129,21 @@ export const printThermalReceipt = async (invoice: Record<string, any> | null | 
     })
     .join("");
 
-  const subtotal = Number(
-    invoice.subtotal_amount ||
-      invoice.subtotalAmount ||
-      invoice.total_amount ||
-      0,
-  );
+  const taxAmount = Number(invoice.tax_amount || invoice.taxAmount || 0);
+  const taxRate = Number(invoice.tax_rate || invoice.taxRate || 0);
   const discount = Number(
     invoice.discount_amount || invoice.discountAmount || 0,
   );
   const total = Number(invoice.total_amount || invoice.totalAmount || 0);
+  // Older invoices never snapshotted a subtotal — derive it so the printed
+  // "المجموع الفرعي" stays the pre-tax figure even when only total_amount
+  // (now tax-inclusive) is on the record.
+  const subtotal = Number(
+    invoice.subtotal_amount ||
+      invoice.subtotalAmount ||
+      Math.max(0, total - discount - taxAmount) ||
+      0,
+  );
 
   // Generate real QR Code
   const qrDataUrl = await QRCode.toDataURL(
@@ -139,7 +160,7 @@ export const printThermalReceipt = async (invoice: Record<string, any> | null | 
 
   const html = `
     <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
+    <html lang="${i18n.resolvedLanguage || "ar"}" dir="${(i18n.resolvedLanguage || "ar") === "ar" ? "rtl" : "ltr"}">
     <head>
       <meta charset="UTF-8">
       <title>Receipt ${invoiceNo}</title>
@@ -240,7 +261,7 @@ export const printThermalReceipt = async (invoice: Record<string, any> | null | 
           border-bottom: 2px solid #000;
           padding: 2mm 0;
           font-weight: 900;
-          text-align: right;
+          text-align: start;
           font-size: 12px;
         }
 
@@ -254,7 +275,7 @@ export const printThermalReceipt = async (invoice: Record<string, any> | null | 
         .item-name { font-weight: 800; font-size: 11.5px; color: #000; }
         .item-barber { font-size: 9px; color: #6b7280; font-weight: 700; margin-top: 0.5mm; }
         .item-qty { width: 10%; text-align: center; font-weight: 700; }
-        .item-total { width: 35%; text-align: left; font-weight: 800; font-size: 11px; }
+        .item-total { width: 35%; text-align: end; font-weight: 800; font-size: 11px; }
 
         .total-section {
           margin-top: 3mm;
@@ -328,28 +349,28 @@ export const printThermalReceipt = async (invoice: Record<string, any> | null | 
           }
           <div class="shop-name">${escapeHtml(shopName)}</div>
           <div class="shop-info">
-            ${shopPhone ? `<div>ت: ${escapeHtml(shopPhone)}</div>` : ""}
-            ${shopWhatsApp ? `<div>واتساب: ${escapeHtml(shopWhatsApp)}</div>` : ""}
+            ${shopPhone ? `<div>${i18n.t("pos:receipt.phone_prefix")} ${escapeHtml(shopPhone)}</div>` : ""}
+            ${shopWhatsApp ? `<div>${i18n.t("pos:receipt.whatsapp_prefix")} ${escapeHtml(shopWhatsApp)}</div>` : ""}
             ${address ? `<div>${escapeHtml(address)}</div>` : ""}
           </div>
         </div>
 
         <div class="divider"></div>
-        <div class="receipt-title">إيصال مبيعات احترافي</div>
+        <div class="receipt-title">${i18n.t("pos:receipt.title")}</div>
         
         <div class="meta-section">
-          <div class="meta-row"><span class="meta-label">رقم الفاتورة:</span> <span class="meta-value">#${escapeHtml(invoiceNo)}</span></div>
-          <div class="meta-row"><span class="meta-label">التاريخ:</span> <span class="meta-value">${escapeHtml(createdAt)}</span></div>
-          <div class="meta-row"><span class="meta-label">العميل:</span> <span class="meta-value">${escapeHtml(customerName)}</span></div>
-          <div class="meta-row"><span class="meta-label">طريقة الدفع:</span> <span class="meta-value">${escapeHtml(paymentLabels[paymentMethod] || paymentMethod)}</span></div>
+          <div class="meta-row"><span class="meta-label">${i18n.t("pos:receipt.invoice_no")}:</span> <span class="meta-value">#${escapeHtml(invoiceNo)}</span></div>
+          <div class="meta-row"><span class="meta-label">${i18n.t("pos:receipt.date")}:</span> <span class="meta-value">${escapeHtml(createdAt)}</span></div>
+          <div class="meta-row"><span class="meta-label">${i18n.t("pos:receipt.customer")}:</span> <span class="meta-value">${escapeHtml(customerName)}</span></div>
+          <div class="meta-row"><span class="meta-label">${i18n.t("pos:receipt.pay")}:</span> <span class="meta-value">${escapeHtml(methodLabel(paymentMethod))}</span></div>
         </div>
 
         <table>
           <thead>
             <tr>
-              <th>الوصف / الخبير</th>
-              <th style="text-align: center">ك</th>
-              <th style="text-align: left">الإجمالي</th>
+              <th>${i18n.t("pos:receipt.col_desc_expert")}</th>
+              <th style="text-align: center">${i18n.t("pos:receipt.qty")}</th>
+              <th style="text-align: end">${i18n.t("pos:receipt.line_total")}</th>
             </tr>
           </thead>
           <tbody>
@@ -359,35 +380,44 @@ export const printThermalReceipt = async (invoice: Record<string, any> | null | 
 
         <div class="total-section">
           <div class="total-row">
-            <span>المجموع الفرعي</span>
+            <span>${i18n.t("pos:receipt.subtotal")}</span>
             <span>${formatCurrency(subtotal)}</span>
           </div>
           ${
             discount > 0
               ? `
           <div class="total-row" style="color: #dc2626">
-            <span>الخصم المطبق</span>
+            <span>${i18n.t("pos:receipt.discount_applied")}</span>
             <span>-${formatCurrency(discount)}</span>
           </div>`
               : ""
           }
+          ${
+            taxAmount > 0
+              ? `
+          <div class="total-row">
+            <span>${i18n.t("pos:receipt.tax")}${taxRate > 0 ? ` (${Number(taxRate)}%)` : ""}</span>
+            <span>+${formatCurrency(taxAmount)}</span>
+          </div>`
+              : ""
+          }
           <div class="total-row grand-total">
-            <span>الإجمالي الصافي</span>
+            <span>${i18n.t("pos:receipt.total")}</span>
             <span>${formatCurrency(total)}</span>
           </div>
         </div>
 
         <div class="qr-container">
           <img src="${qrDataUrl}" class="qr-code" />
-          <div style="font-size: 9px; margin-top: 2mm; font-weight: 800; color: #374151">امسح للتقييم أو حجز موعد جديد</div>
+          <div style="font-size: 9px; margin-top: 2mm; font-weight: 800; color: #374151">${i18n.t("pos:receipt.scan_hint")}</div>
         </div>
 
         <div class="footer">
           ${escapeHtml(footer)}
           <div style="margin-top: 3mm; font-size: 9px; color: #9ca3af; font-weight: 400">
-            شكرًا لثقتكم بنا. ننتظر زيارتكم القادمة!
+            ${i18n.t("pos:receipt.thanks")}
             <br/>
-            تم الإصدار عبر <b>Salon Pro ERP</b>
+            ${i18n.t("pos:receipt.powered")} <b>Salon Pro ERP</b>
           </div>
         </div>
       </div>
@@ -407,7 +437,7 @@ export const printThermalReceipt = async (invoice: Record<string, any> | null | 
 
   const printWindow = window.open("", "_blank", "width=420,height=720");
   if (!printWindow) {
-    alert("يرجى السماح بالنوافذ المنبثقة للطباعة");
+    alert(i18n.t("pos:receipt.allow_popup"));
     return;
   }
 

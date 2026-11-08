@@ -78,7 +78,7 @@ export function StockSupplyModal({
           </div>
         </DialogHeader>
         <div className="max-h-[65vh] space-y-4 overflow-y-auto p-4 sm:space-y-5 sm:p-5">
-          <AnimatePresence mode="wait">
+          <AnimatePresence>
             {!showPriceAlert ? (
               <motion.div
                 key="supply-form"

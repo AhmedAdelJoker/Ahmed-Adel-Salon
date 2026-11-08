@@ -1,0 +1,352 @@
+{
+  "customer": {
+    "unknown": "Customer"
+  },
+  "page": {
+    "title": "Customer Records",
+    "subtitle": "Manage customer database and build lasting loyalty relationships",
+    "loading": "Loading customers..."
+  },
+  "header": {
+    "import": "Import",
+    "export": "Export",
+    "archive": "Archive",
+    "create": "Add Customer",
+    "importError": "Failed to import customers"
+  },
+  "import": {
+    "loading": "Importing customers...",
+    "loadingProducts": "Importing products...",
+    "success": "Imported successfully",
+    "errorsWarn": "Imported with some errors, check console.",
+    "failed": "Failed to import file"
+  },
+  "stats": {
+    "total": "Total customers",
+    "vip": "VIP elite",
+    "regular": "Regular customers",
+    "new": "New customers",
+    "avgSpend": "Average spend",
+    "totalSpend": "Total spend",
+    "visits": "Visits",
+    "loyaltyPoints": "Loyalty points",
+    "totalPaid": "Total paid"
+  },
+  "filterTabs": {
+    "all": "All",
+    "vip": "VIP",
+    "regular": "Regular",
+    "new": "New"
+  },
+  "toolbar": {
+    "search": "Search by name or phone...",
+    "cardsView": "Cards view",
+    "tableView": "Table view",
+    "clearFilters": "Clear search and filter"
+  },
+  "table": {
+    "customerProfile": "Customer profile",
+    "contact": "Contact",
+    "visits": "Visits",
+    "spend": "Spend",
+    "actions": "Actions",
+    "viewProfile": "View profile",
+    "quickOpen": "Quick open",
+    "archive": "Archive",
+    "visitBadge": "{{count}} visits",
+    "emptyTitle": "No matching customers",
+    "emptyHint": "Try a different search term or change the filter",
+    "emptyNoCustomers": "No customers",
+    "emptyNoCustomersHint": "Add your first customer from the Add Customer button",
+    "idFallback": "---"
+  },
+  "cards": {
+    "phoneLabel": "Phone",
+    "spendLabel": "Spend",
+    "record": "Record",
+    "archive": "Archive",
+    "emptyTitle": "No matching customers",
+    "emptyHint": "Try a different search term or change the filter"
+  },
+  "empty": {
+    "noCustomers": "No customers",
+    "noCustomersHint": "Add your first customer from the Add Customer button",
+    "noResults": "No matching results",
+    "noResultsHint": "Try a different search term or change the filter"
+  },
+  "pagination": {
+    "pageOf": "Page {{page}} of {{total}}",
+    "showing": "Showing {{count}} of {{total}}"
+  },
+  "form": {
+    "editTitle": "Edit customer details",
+    "createTitle": "Add new customer",
+    "description": "Enter customer name and phone number. Additional phone is optional.",
+    "nameLabel": "Full name",
+    "nameRequired": "*",
+    "namePlaceholder": "Example: Ahmed Mohammed",
+    "phoneLabel": "Phone number",
+    "phonePlaceholder": "010...",
+    "secondPhoneLabel": "Additional phone (optional)",
+    "secondPhonePlaceholder": "010...",
+    "cancel": "Cancel",
+    "saveEdit": "Save changes",
+    "create": "Add customer",
+    "firstNameLabel": "First name",
+    "lastNameLabel": "Last name",
+    "emailLabel": "Email",
+    "notesLabel": "Notes"
+  },
+  "details": {
+    "title": "Customer details",
+    "phone": "Phone",
+    "secondPhone": "Additional phone",
+    "email": "Email",
+    "createdSince": "Since",
+    "totalSpend": "Total spend",
+    "visits": "Visits",
+    "loyaltyPoints": "Loyalty points",
+    "totalPaid": "Total paid",
+    "balance": "Balance",
+    "edit": "Edit",
+    "delete": "Delete",
+    "newBooking": "New booking",
+    "back": "Back",
+    "ok": "OK",
+    "notFound": "Customer not found",
+    "backToCustomers": "Back to customers",
+    "profileSubtitle": "Full customer profile • #{{id}}",
+    "since": "Since",
+    "description": "Customer details",
+    "archivedDescription": "Archived customer details",
+    "lastVisit": "Last visit",
+    "archivedAt": "Archived at",
+    "tier": "Tier",
+    "restore": "Restore"
+  },
+  "tabs": {
+    "overview": "Overview",
+    "appointments": "Appointments",
+    "invoices": "Invoices"
+  },
+  "delete": {
+    "title": "Archive customer",
+    "description": "Are you sure you want to archive {{name}}? They will be moved to the archive and can be restored later by the owner from the archive page.",
+    "confirm": "Yes, archive",
+    "cancel": "Cancel"
+  },
+  "toasts": {
+    "loadFailed": "Failed to load customer data",
+    "statsFailed": "Customer statistics",
+    "saveSuccess": "Customer added successfully",
+    "updateSuccess": "Customer details updated",
+    "saveFailed": "Failed to save customer data",
+    "deleteSuccess": "Customer moved to archive",
+    "deleteFailed": "Failed to delete customer",
+    "importSuccess": "Customers imported successfully",
+    "importFailed": "Failed to import customers",
+    "viewArchive": "View archive",
+    "namePhoneRequired": "Name and phone number are required"
+  },
+  "search": {
+    "shortcut": "Search",
+    "createShortcut": "n"
+  },
+  "shortcuts": {
+    "search": "Search (/)",
+    "create": "New Customer (n)",
+    "close": "Close (Esc)"
+  },
+  "tier": {
+    "gold": "Gold",
+    "silver": "Silver",
+    "bronze": "Bronze"
+  },
+  "tierHistory": {
+    "title": "Tier Change History",
+    "noHistory": "No tier change history",
+    "changedTo": "Changed to",
+    "changedBy": "Changed by",
+    "date": "Date"
+  },
+  "status": {
+    "PENDING": "Pending",
+    "CONFIRMED": "Confirmed",
+    "WAITING": "Waiting",
+    "IN_PROGRESS": "In progress",
+    "READY_FOR_PAYMENT": "Ready for payment",
+    "COMPLETED": "Completed",
+    "CANCELLED": "Cancelled",
+    "AUTO_CANCELLED": "Auto-cancelled",
+    "NO_SHOW": "No show"
+  },
+  "overview": {
+    "totalSpend": "Total spend",
+    "visits": "Visits",
+    "points": "Loyalty points",
+    "paid": "Total paid",
+    "avgSpend": "Avg spend per visit",
+    "noShowRate": "No-show rate",
+    "upcomingAppointments": "Upcoming appointments",
+    "recentAppointments": "Recent appointments",
+    "recentInvoices": "Recent invoices",
+    "activityLog": "Activity log",
+    "activityFilters": {
+      "all": "All",
+      "appointment": "Appointments",
+      "invoice": "Invoices",
+      "edit": "Edits",
+      "payment": "Payments"
+    },
+    "noAppointments": "No appointments",
+    "noInvoices": "No invoices",
+    "noActivity": "No recorded activity"
+  },
+  "invoices": {
+    "viewInvoice": "View invoice",
+    "noInvoices": "No invoices",
+    "emptyMessage": "No invoices have been issued for this customer",
+    "details": "Invoice details",
+    "tableInvoice": "Invoice",
+    "tableDate": "Date",
+    "tableAmount": "Amount",
+    "tableStatus": "Status",
+    "actions": "Actions",
+    "statusClosed": "Voided",
+    "statusOpen": "Issued",
+    "statusDraft": "Draft"
+  },
+  "appointments": {
+    "noAppointments": "No appointments",
+    "emptyMessage": "No appointments have been recorded for this customer",
+    "viewAll": "View all appointments",
+    "showLess": "Show less",
+    "showRemaining": "Show remaining ({{count}})",
+    "viewDetails": "View details",
+    "allAppointmentsTitle": "Appointment history for {{name}}",
+    "payNow": "Pay now",
+    "cancelAll": "Cancel all upcoming appointments",
+    "cancelAllConfirm": "Are you sure you want to cancel all upcoming appointments? This cannot be undone.",
+    "cancelAllSuccess": "All upcoming appointments cancelled successfully",
+    "cancelAllFailed": "Failed to cancel upcoming appointments"
+  },
+  "activity": {
+    "noActivity": "No activity records",
+    "noActivityRecords": "No recorded activity"
+  },
+  "merge": {
+    "title": "Merge customers",
+    "description": "Merge duplicate customers"
+  },
+  "duplicates": {
+    "alert": "Duplicate customers found",
+    "mergeButton": "Merge"
+  },
+  "filter": {
+    "all": "All",
+    "vip": "VIP",
+    "regular": "Regular",
+    "new": "New"
+  },
+  "bulk": {
+    "selected": "{{count}} customers selected",
+    "selectAll": "Select all",
+    "selectNone": "Select none",
+    "delete": "Delete selected",
+    "deleteSelected": "Delete selected customers",
+    "deleteConfirm": "Are you sure you want to delete {{count}} customers? This cannot be undone."
+  },
+  "heatmap": {
+    "title": "Peak Visit Hours Heatmap",
+    "noData": "Not enough data for heatmap",
+    "visits": "Visits",
+    "hour": "Hour"
+  },
+  "coupons": {
+    "title": "Applied discounts",
+    "noCoupons": "No discounts applied to this customer's invoices",
+    "invoice": "Invoice",
+    "date": "Date",
+    "type": "Type",
+    "amount": "Amount",
+    "discountType": {
+      "percentage": "Percentage",
+      "fixed": "Fixed amount",
+      "amount": "Fixed amount",
+      "coupon": "Coupon",
+      "manual": "Manual",
+      "loyalty": "Loyalty points",
+      "promo": "Promotion"
+    }
+  },
+  "duplicatesAlert": {
+    "title": "Found {{groupCount}} duplicate customer groups",
+    "hint": "Customers sharing the same phone number — merging keeps records in one place",
+    "count": "{{customerCount}} customers",
+    "merge": "Start merge"
+  },
+  "mergeDialog": {
+    "title": "Merge duplicate customers",
+    "subtitle": "Customer groups sharing the same phone number — choose which row to keep from each group",
+    "mergeWith": "Merge rest into selected",
+    "refresh": "Refresh",
+    "close": "Close",
+    "noDuplicates": "No duplicate groups currently",
+    "loading": "Loading…",
+    "confirm": "Will merge {{count}} customers into «{{name}}».\nAll appointments, invoices, and sessions will be moved to the kept customer, and the rest archived with a merge reason recorded.\nProceed?",
+    "success": "Group merged successfully",
+    "failed": "Failed to merge group",
+    "keep": "Keep"
+  },
+  "bookingModal": {
+    "title": "New booking for customer",
+    "customer": "{{firstName}} {{lastName}}",
+    "selectServices": "Select services *",
+    "date": "Date *",
+    "time": "Time *",
+    "barber": "Barber",
+    "autoAssign": "Auto-assign",
+    "notes": "Notes",
+    "notesPlaceholder": "Any notes...",
+    "summary": "Total ({{count}} services • {{duration}} minutes)",
+    "confirm": "Confirm booking",
+    "cancel": "Cancel",
+    "errorSelectService": "Select at least one service",
+    "errorSelectTime": "Please select a time",
+    "errorPastTime": "Cannot book in the past",
+    "errorConflict": "There is a booking conflict",
+    "errorSameDay": "This customer already has a booking today. Please choose another day.",
+    "success": "Booking created successfully",
+    "failed": "Failed to create booking",
+    "conflict": "There is a booking conflict",
+    "sameDay": "This customer already has a booking today",
+    "minutesAbbr": "min"
+  },
+  "customerDetail": {
+    "notFound": "Customer not found",
+    "backToCustomers": "Back to customers",
+    "back": "Back",
+    "newBooking": "New booking",
+    "edit": "Edit",
+    "delete": "Delete",
+    "archive": "Archive customer",
+    "archiveConfirm": "Are you sure you want to archive {{name}}? They will be moved to the archive and can be restored later by the owner from the archive page.",
+    "archiveConfirmText": "Yes, archive",
+    "archiveCancel": "Cancel"
+  },
+  "quickActions": {
+    "whatsapp": "Send WhatsApp message",
+    "reminder": "Send appointment reminder",
+    "printCard": "Print customer card",
+    "transferPOS": "Transfer to POS",
+    "bookAppointment": "Book new appointment",
+    "createCustomer": "Create new customer"
+  },
+  "export": {
+    "title": "Export customer data",
+    "button": "Export PDF",
+    "success": "Customer data exported successfully",
+    "failed": "Failed to export customer data",
+    "filename": "customer_data_{{name}}_{{date}}.pdf"
+  }
+}

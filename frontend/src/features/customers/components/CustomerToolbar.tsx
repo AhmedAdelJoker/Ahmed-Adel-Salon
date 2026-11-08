@@ -4,6 +4,7 @@ import { Input } from "@/components/ui";
 import { Card } from "@/components/ui";
 import { cn } from "@/lib/core/utils";
 import { CUSTOMER_FILTER_TABS } from "@/features/customers/constants";
+import { useTranslation } from "react-i18next";
 
 const COUNT_KEY_BY_TAB: Record<string, string> = {
   "الكل": "total",
@@ -31,6 +32,15 @@ export default function CustomerToolbar({
   loading: boolean;
   counts?: Record<string, number>;
 }) {
+  const { t } = useTranslation("customers");
+  const tabKey = (tab: string) =>
+    tab === "الكل"
+      ? "all"
+      : tab === "VIP"
+        ? "vip"
+        : tab === "منتظم"
+          ? "regular"
+          : "new";
   return (
       <Card className="border-border p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
@@ -42,6 +52,7 @@ export default function CustomerToolbar({
                 <button
                   type="button"
                   key={tab}
+                  aria-pressed={activeFilter === tab}
                   onClick={() => onFilter(tab)}
                   className={cn(
                     "flex items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all",
@@ -50,7 +61,7 @@ export default function CustomerToolbar({
                       : "bg-soft text-muted hover:text-main",
                   )}
                 >
-                  {tab}
+                  {t(`filterTabs.${tabKey(tab)}`)}
                   <span
                     className={cn(
                       "rounded-md px-1.5 py-0.5 text-[8px] font-black leading-none",
@@ -68,7 +79,7 @@ export default function CustomerToolbar({
           <div className="relative flex-1">
             <Search className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <Input
-              placeholder="البحث بالاسم أو رقم الجوال..."
+              placeholder={t("toolbar.search")}
               className="pe-11 h-12 rounded-xl bg-soft border-border/60 font-bold"
               value={searchTerm || ""}
               onChange={(event) => onSearch(event.target.value)}
@@ -84,7 +95,7 @@ export default function CustomerToolbar({
                   ? "bg-primary text-white shadow-sm"
                   : "text-muted hover:text-main",
               )}
-              title="عرض بطاقات"
+              title={t("toolbar.cardsView")}
             >
               <svg
                 width="14"
@@ -109,7 +120,7 @@ export default function CustomerToolbar({
                   ? "bg-primary text-white shadow-sm"
                   : "text-muted hover:text-main",
               )}
-              title="عرض جدول"
+              title={t("toolbar.tableView")}
             >
               <svg
                 width="14"

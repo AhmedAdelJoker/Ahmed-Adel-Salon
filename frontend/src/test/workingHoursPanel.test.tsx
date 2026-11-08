@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import WorkingHoursPanel from "@/pages/owner/WorkingHoursPanel";
+import "@/i18n";
 import { businessSettingsService } from "@/services/businessSettingsService";
 
 vi.mock("@/services/businessSettingsService", () => ({

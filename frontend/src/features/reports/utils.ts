@@ -21,9 +21,9 @@ export function presetRange(preset: Exclude<ReportPreset, "custom">): { from: st
   return { from: firstDayOfMonth(), to };
 }
 
-export const PRESET_OPTIONS: { value: ReportPreset; label: string }[] = [
-  { value: "today", label: "اليوم" },
-  { value: "week", label: "آخر 7 أيام" },
-  { value: "month", label: "هذا الشهر" },
-  { value: "custom", label: "مخصص" },
+export const PRESET_OPTIONS: { value: ReportPreset; key: string }[] = [
+  { value: "today", key: "empReports.presetToday" },
+  { value: "week", key: "empReports.presetWeek" },
+  { value: "month", key: "empReports.presetMonth" },
+  { value: "custom", key: "empReports.custom" },
 ];

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import "@/i18n";
 import {
   render,
   screen,
@@ -9,6 +10,10 @@ import {
 import { MemoryRouter } from "react-router-dom";
 import api from "@/services/api";
 import { EmployeeTable, useHrData } from "@/features/hr";
+
+vi.mock("@/context/UIContext", () => ({
+  useUI: () => ({ openEmployeeQuickView: vi.fn() }),
+}));
 
 /**
  * "On vacation" is not "suspended" and not "archived".
@@ -60,7 +65,7 @@ describe("the vacation state in the team list", () => {
   it("offers a separate archive action for someone who left", () => {
     const onArchive = vi.fn();
     renderTable({ onArchive });
-    fireEvent.click(screen.getAllByTitle("أرشفة (ترك العمل)")[0]);
+    fireEvent.click(screen.getAllByTitle(/أرشفة الموظف \(ترك العمل\)/) [0]);
     expect(onArchive).toHaveBeenCalledWith(suspendedEmployee);
   });
 });

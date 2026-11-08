@@ -84,10 +84,10 @@ describe("default role permissions", () => {
   });
 
   it("still covers sub-pages by prefix", () => {
-    // The prefix matching is load-bearing, not incidental: `/owner/hr` is what
-    // grants `/owner/hr/archive`.
-    expect(DEFAULT_ROLE_PERMISSIONS.MANAGER("/owner/hr")).toBe(true);
-    expect(DEFAULT_ROLE_PERMISSIONS.MANAGER("/owner/hr/archive")).toBe(true);
+    // The prefix matching is load-bearing, not incidental: `/manager/hr` is what
+    // grants `/manager/hr/archive`.
+    expect(DEFAULT_ROLE_PERMISSIONS.MANAGER("/manager/hr")).toBe(true);
+    expect(DEFAULT_ROLE_PERMISSIONS.MANAGER("/manager/hr/archive")).toBe(true);
     expect(DEFAULT_ROLE_PERMISSIONS.CASHIER("/inventory/bundles")).toBe(true);
   });
 
@@ -96,7 +96,7 @@ describe("default role permissions", () => {
     // default grant rather than granting it deliberately.
     expect(DEFAULT_ROLE_PERMISSIONS.MANAGER("/owner/payroll")).toBe(true);
     expect(DEFAULT_ROLE_PERMISSIONS.CASHIER("/owner/payroll")).toBe(false);
-    expect(DEFAULT_ROLE_PERMISSIONS.BARBER("/owner/hr")).toBe(false);
+    expect(DEFAULT_ROLE_PERMISSIONS.BARBER("/manager/hr")).toBe(false);
     expect(DEFAULT_ROLE_PERMISSIONS.ACCOUNTANT("/pos")).toBe(false);
   });
 

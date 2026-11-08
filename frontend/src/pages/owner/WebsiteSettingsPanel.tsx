@@ -29,6 +29,7 @@ import { staticURL } from "@/services/api";
 import type { LucideIcon } from "lucide-react";
 import { useWebsiteSettings } from "@/features/website-settings";
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   content: Layout,
@@ -55,13 +56,13 @@ const TAB_ICONS: Record<string, LucideIcon> = {
 const SITE_PALETTES = [
   {
     brand: "ember",
-    brandLabel: "جمر",
-    brandNote: "دافئ، جريء، واضح",
+    brandLabel: "website.palette.ember",
+    brandNote: "website.palette.emberNote",
     options: [
       {
         id: "midnight",
-        label: "حبر داكن",
-        note: "أسود مزرقّ مع مرجاني",
+        label: "website.palette.midnight",
+        note: "website.palette.midnightNote",
         isDark: true,
         bg: "#080B11",
         card: "#131A24",
@@ -69,8 +70,8 @@ const SITE_PALETTES = [
       },
       {
         id: "gold",
-        label: "عاجي فاتح",
-        note: "ورقي دافئ مع قرمزي",
+        label: "website.palette.gold",
+        note: "website.palette.goldNote",
         isDark: false,
         bg: "#F3EFE6",
         card: "#FFFDF8",
@@ -80,13 +81,13 @@ const SITE_PALETTES = [
   },
   {
     brand: "verdant",
-    brandLabel: "أخضر",
-    brandNote: "طبيعي، حيوي، مميز",
+    brandLabel: "website.palette.verdant",
+    brandNote: "website.palette.verdantNote",
     options: [
       {
         id: "moss",
-        label: "غابة داكنة",
-        note: "أخضر داكن مع ليموني",
+        label: "website.palette.moss",
+        note: "website.palette.mossNote",
         isDark: true,
         bg: "#0A100C",
         card: "#131D16",
@@ -94,8 +95,8 @@ const SITE_PALETTES = [
       },
       {
         id: "clay",
-        label: "طين فاتح",
-        note: "طين دافئ مع فيروزي",
+        label: "website.palette.clay",
+        note: "website.palette.clayNote",
         isDark: false,
         bg: "#F6EBE1",
         card: "#FFFBF6",
@@ -105,13 +106,13 @@ const SITE_PALETTES = [
   },
   {
     brand: "azure",
-    brandLabel: "أزرق",
-    brandNote: "هادئ، نظيف، احترافي",
+    brandLabel: "website.palette.azure",
+    brandNote: "website.palette.azureNote",
     options: [
       {
         id: "graphite",
-        label: "جرافيت داكن",
-        note: "رمادي مزرقّ مع سماوي",
+        label: "website.palette.graphite",
+        note: "website.palette.graphiteNote",
         isDark: true,
         bg: "#0A1017",
         card: "#151F2C",
@@ -119,8 +120,8 @@ const SITE_PALETTES = [
       },
       {
         id: "silver",
-        label: "فضي فاتح",
-        note: "رمادي بارد dengan أزرق",
+        label: "website.palette.silver",
+        note: "website.palette.silverNote",
         isDark: false,
         bg: "#EDF1F6",
         card: "#FFFFFF",
@@ -131,6 +132,7 @@ const SITE_PALETTES = [
 ] as const;
 
 const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { onSaved?: () => void; onChangeDraft?: (s: any) => void; embedded?: boolean }) => {
+  const { t } = useTranslation("owner");
   const {
     loading,
     saving,
@@ -201,7 +203,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
   const ActiveTabIcon = TAB_ICONS[activeTabMeta.id] || Layout;
 
   const stats = {
-    cover: settings.landingCoverImageUrl ? "غلاف جاهز" : "بدون غلاف",
+    cover: settings.landingCoverImageUrl ? t("website.coverReady") : t("website.coverNone"),
     portfolioCount: settings.landingPortfolio.length,
     socialCount: [settings.socialFacebook, settings.socialInstagram, settings.socialTiktok, settings.socialYoutube].filter(Boolean).length,
     badges: settings.landingTrustBadges.filter((item: any) => item.label).length,
@@ -227,35 +229,35 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
       {/* Overview Stats — unified with StatCard */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
         <StatCard
-          label="العرض الرئيسي"
+          label={t("website.statCover")}
           value={stats.cover}
           icon={ImageIcon}
           variant={settings.landingCoverImageUrl ? "success" : "secondary"}
           delay={0}
         />
         <StatCard
-          label="المعرض"
+          label={t("website.statGallery")}
           value={`${stats.portfolioCount}`}
           icon={Layout}
           variant={stats.portfolioCount > 0 ? "primary" : "secondary"}
           delay={0.05}
         />
         <StatCard
-          label="روابط التواصل"
+          label={t("website.statSocial")}
           value={`${stats.socialCount}/4`}
           icon={Link2}
           variant={stats.socialCount > 0 ? "info" : "secondary"}
           delay={0.1}
         />
         <StatCard
-          label="شارات الثقة"
+          label={t("website.statBadges")}
           value={`${stats.badges}/3`}
           icon={ShieldCheck}
           variant={stats.badges > 0 ? "warning" : "secondary"}
           delay={0.15}
         />
         <StatCard
-          label="التقييمات"
+          label={t("website.statTestimonials")}
           value={`${stats.testimonials}/3`}
           icon={Star}
           variant={stats.testimonials > 0 ? "success" : "secondary"}
@@ -270,8 +272,8 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
             <ActiveTabIcon size={18} />
           </div>
           <div>
-            <h3 className="text-sm font-black text-main">{activeTabMeta.label}</h3>
-            <p className="text-[11px] font-bold text-muted">{activeTabMeta.description}</p>
+            <h3 className="text-sm font-black text-main">{t(activeTabMeta.key)}</h3>
+            <p className="text-[11px] font-bold text-muted">{t(activeTabMeta.descKey)}</p>
           </div>
         </div>
         <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="w-full sm:w-auto">
@@ -285,8 +287,8 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                   className="gap-1.5 rounded-xl text-[11px] font-black data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border px-3 py-2.5 flex-1 sm:flex-none justify-center"
                 >
                   <TabIcon size={14} />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                  <span className="sm:hidden text-[10px]">{tab.label}</span>
+                  <span className="hidden sm:inline">{t(tab.key)}</span>
+                  <span className="sm:hidden text-[10px]">{t(tab.key)}</span>
                 </TabsTrigger>
               );
             })}
@@ -294,7 +296,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
         </Tabs>
       </div>
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {activeSubTab === "content" && (
           <motion.div
             key="content"
@@ -305,72 +307,72 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <PremiumCard className="space-y-6">
-                <SectionGroup title="القسم الرئيسي (Hero)" />
+                <SectionGroup title={t("website.heroSection")} />
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label htmlFor="hero-badge" className="text-[10px] font-black text-muted uppercase tracking-widest">
-                      شارة أعلى الصفحة
+                      {t("website.heroBadgeLabel")}
                     </label>
                     <Input
                       id="hero-badge"
                       value={settings.landingHeroBadge || ""}
                       onChange={(e) => updateField("landingHeroBadge", e.target.value)}
                       className="h-11 bg-soft border-border font-bold rounded-xl"
-                      placeholder="مثلاً: أهلاً بك في صالون..."
+                      placeholder={t("website.heroBadgePlaceholder")}
                     />
                   </div>
                   <div className="space-y-2">
                     <label htmlFor="hero-title" className="text-[10px] font-black text-muted uppercase tracking-widest">
-                      العنوان الرئيسي
+                      {t("website.heroTitleLabel")}
                     </label>
                     <Input
                       id="hero-title"
                       value={settings.landingHeroTitle || ""}
                       onChange={(e) => updateField("landingHeroTitle", e.target.value)}
                       className="h-11 bg-soft border-border font-black rounded-xl"
-                      placeholder="عنوان جذاب"
+                      placeholder={t("website.heroTitlePlaceholder")}
                     />
                   </div>
                   <div className="space-y-2">
                     <label htmlFor="hero-subtitle" className="text-[10px] font-black text-muted uppercase tracking-widest">
-                      الوصف الفرعي
+                      {t("website.heroSubtitleLabel")}
                     </label>
                     <textarea
                       id="hero-subtitle"
                       value={settings.landingHeroSubtitle || ""}
                       onChange={(e) => updateField("landingHeroSubtitle", e.target.value)}
                       className="w-full min-h-[100px] rounded-xl bg-soft border border-border p-4 text-xs font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
-                      placeholder="وصف مختصر يظهر تحت العنوان"
+                      placeholder={t("website.heroSubtitlePlaceholder")}
                     />
                   </div>
                 </div>
               </PremiumCard>
 
               <PremiumCard className="space-y-6">
-                <SectionGroup title="قسم من نحن (About)" />
+                <SectionGroup title={t("website.aboutSection")} />
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label htmlFor="about-title" className="text-[10px] font-black text-muted uppercase tracking-widest">
-                      عنوان القسم
+                      {t("website.aboutTitleLabel")}
                     </label>
                     <Input
                       id="about-title"
                       value={settings.landingAboutTitle || ""}
                       onChange={(e) => updateField("landingAboutTitle", e.target.value)}
                       className="h-11 bg-soft border-border font-bold rounded-xl"
-                      placeholder="من نحن"
+                      placeholder={t("website.aboutTitlePlaceholder")}
                     />
                   </div>
                   <div className="space-y-2">
                     <label htmlFor="about-content" className="text-[10px] font-black text-muted uppercase tracking-widest">
-                      المحتوى
+                      {t("website.aboutContentLabel")}
                     </label>
                     <textarea
                       id="about-content"
                       value={settings.landingAboutContent || ""}
                       onChange={(e) => updateField("landingAboutContent", e.target.value)}
                       className="w-full min-h-[150px] rounded-xl bg-soft border border-border p-4 text-xs font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
-                      placeholder="نص تعريفي عن الصالون"
+                      placeholder={t("website.aboutContentPlaceholder")}
                     />
                   </div>
                 </div>
@@ -387,7 +389,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
             className="space-y-6"
           >
             <PremiumCard className="space-y-10">
-              <SectionGroup title="الإحصاءات الرئيسية">
+              <SectionGroup title={t("website.statsSection")}>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   {(settings.landingStats as { value?: string; label?: string }[]).map((item, index) => (
                     <div key={index} className="space-y-3 rounded-2xl border border-border bg-soft/40 p-4">
@@ -395,22 +397,22 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                         value={item.value || ""}
                         onChange={(e) => updateArrayItem("landingStats", index, "value", e.target.value)}
                         className="h-10 bg-card border-border font-black text-sm rounded-xl"
-                        placeholder="القيمة (مثال: 15k+)"
-                        aria-label={`قيمة إحصاء ${index + 1}`}
+                        placeholder={t("website.statValuePlaceholder")}
+                        aria-label={t("website.statValueAria", { n: index + 1 })}
                       />
                       <Input
                         value={item.label || ""}
                         onChange={(e) => updateArrayItem("landingStats", index, "label", e.target.value)}
                         className="h-10 bg-card border-border font-bold text-xs rounded-xl"
-                        placeholder="العنوان"
-                        aria-label={`عنوان إحصاء ${index + 1}`}
+                        placeholder={t("website.statLabelPlaceholder")}
+                        aria-label={t("website.statLabelAria", { n: index + 1 })}
                       />
                     </div>
                   ))}
                 </div>
               </SectionGroup>
 
-              <SectionGroup title="مميزات المنشأة">
+              <SectionGroup title={t("website.featuresSection")}>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   {(settings.landingFeatures as { title?: string; description?: string }[]).map((item, index) => (
                     <div key={index} className="space-y-3 rounded-2xl border border-border bg-soft/40 p-4">
@@ -418,35 +420,35 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                         value={item.title || ""}
                         onChange={(e) => updateArrayItem("landingFeatures", index, "title", e.target.value)}
                         className="h-10 bg-card border-border font-black text-sm rounded-xl"
-                        placeholder="عنوان الميزة"
-                        aria-label={`عنوان ميزة ${index + 1}`}
+                        placeholder={t("website.featureTitlePlaceholder")}
+                        aria-label={t("website.featureTitleAria", { n: index + 1 })}
                       />
                       <textarea
                         value={item.description || ""}
                         onChange={(e) => updateArrayItem("landingFeatures", index, "description", e.target.value)}
                         className="min-h-[80px] w-full rounded-xl border border-border bg-card p-3 text-[11px] font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
-                        placeholder="وصف مختصر"
+                        placeholder={t("website.featureDescPlaceholder")}
                       />
                     </div>
                   ))}
                 </div>
               </SectionGroup>
 
-              <SectionGroup title="عناوين ونصوص الأقسام">
+              <SectionGroup title={t("website.sectionTexts")}>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   {(
                     [
-                      ["landingServicesTitle", "عنوان الخدمات", false],
-                      ["landingServicesSubtitle", "وصف الخدمات", true],
-                      ["landingPortfolioTitle", "عنوان المعرض", false],
-                      ["landingBookingTitle", "عنوان الحجز", false],
-                      ["landingBookingSubtitle", "وصف الحجز", true],
-                      ["landingLocationTitle", "عنوان الموقع", false],
-                      ["landingContactTitle", "عنوان التواصل", false],
+                      ["landingServicesTitle", "website.fldServicesTitle", false],
+                      ["landingServicesSubtitle", "website.fldServicesSubtitle", true],
+                      ["landingPortfolioTitle", "website.fldPortfolioTitle", false],
+                      ["landingBookingTitle", "website.fldBookingTitle", false],
+                      ["landingBookingSubtitle", "website.fldBookingSubtitle", true],
+                      ["landingLocationTitle", "website.fldLocationTitle", false],
+                      ["landingContactTitle", "website.fldContactTitle", false],
                     ] as [string, string, boolean][]
                   ).map(([key, label, multiline]) => (
                     <div key={key} className="space-y-2">
-                      <label className="text-[10px] font-black text-muted uppercase tracking-widest">{label}</label>
+                      <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t(label)}</label>
                       {multiline ? (
                         <textarea
                           value={String(settings[key] ?? "")}
@@ -478,11 +480,11 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
             <PremiumCard className="space-y-8">
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="space-y-4 rounded-2xl border border-border bg-soft/40 p-5">
-                  <SectionGroup title="صورة الغلاف" />
-                  <p className="text-xs font-bold leading-relaxed text-muted">صورة Hero تظهر كواجهة أولى في موقع المحل. يُفضل نسبة 16:9 بدقة عالية.</p>
+                  <SectionGroup title={t("website.coverSection")} />
+                  <p className="text-xs font-bold leading-relaxed text-muted">{t("website.coverHint")}</p>
                   <div className="flex flex-wrap gap-2 pt-2">
                     <label className="h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-6 text-[11px] font-black text-white shadow-md hover:bg-primary/90 transition-colors flex">
-                      <Plus size={14} /> {settings.landingCoverImageUrl ? "استبدال الغلاف" : "رفع الغلاف"}
+                      <Plus size={14} /> {settings.landingCoverImageUrl ? t("website.coverReplace") : t("website.coverUpload")}
                       <input type="file" className="hidden" accept="image/*" onChange={handleCoverImageUpload} />
                     </label>
                     {settings.landingCoverImageUrl && (
@@ -492,13 +494,13 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                         onClick={removeCoverImage}
                         className="text-danger border-danger/20 bg-card hover:bg-danger-soft hover:text-danger text-[11px] rounded-xl h-10"
                       >
-                        <Trash2 size={14} className="ms-1" /> حذف
+                        <Trash2 size={14} className="ms-1" /> {t("website.delete")}
                       </Button>
                     )}
                   </div>
                   {settings.landingCoverImageUrl && (
                     <Badge variant="secondary" className="rounded-full text-[10px] font-black">
-                      <ImageIcon size={10} /> صورة مرفوعة
+                      <ImageIcon size={10} /> {t("website.uploadedImage")}
                     </Badge>
                   )}
                 </div>
@@ -508,7 +510,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                     <img
                       src={settings.landingCoverImageUrl.startsWith("http") ? settings.landingCoverImageUrl : `${staticURL}${settings.landingCoverImageUrl}`}
                       className="h-full w-full object-cover"
-                      alt="غلاف الموقع"
+                      alt={t("website.coverAlt")}
                       onError={() => setCoverFailed(true)}
                     />
                   ) : (
@@ -516,8 +518,8 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                       <div className="h-14 w-14 rounded-2xl bg-card border border-border flex items-center justify-center mx-auto mb-3 shadow-sm">
                         <ImageIcon size={22} className="opacity-60" />
                       </div>
-                      <p className="text-[11px] font-black uppercase tracking-widest opacity-60">لا يوجد غلاف حالياً</p>
-                      <p className="text-[10px] font-bold text-muted mt-1">ارفع صورة لمعاينتها هنا</p>
+                      <p className="text-[11px] font-black uppercase tracking-widest opacity-60">{t("website.noCover")}</p>
+                      <p className="text-[10px] font-bold text-muted mt-1">{t("website.uploadToPreview")}</p>
                     </div>
                   )}
                 </div>
@@ -528,17 +530,17 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                   on the page: the poster is what shows before the clip loads,
                   and if the owner clears the video the poster is what remains. */}
               <div className="space-y-4 rounded-2xl border border-border bg-soft/40 p-5">
-                <SectionGroup title="فيديو الغلاف (اختياري)" />
+                <SectionGroup title={t("website.videoSection")} />
                 <p className="text-xs font-bold leading-relaxed text-muted">
-                  فيديو قصير (10–15 ثانية) يظهر خلف عنوان الصفحة. الصيغ المدعومة MP4 و WebM، والحد الأقصى 25 م.ب.
+                  {t("website.videoHint")}
                   <span className="block mt-1 text-danger/80">
-                    مهم: صورة الغلاف مطلوبة — تُستخدم كصورة بديلة قبل تحميل الفيديو.
+                    {t("website.videoPosterNote")}
                   </span>
                 </p>
 
                 <div className="flex flex-wrap gap-2 pt-1">
                   <label className="h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-6 text-[11px] font-black text-white shadow-md hover:bg-primary/90 transition-colors flex">
-                    <Video size={14} /> {settings.landingHeroVideoUrl ? "استبدال الفيديو" : "رفع فيديو"}
+                    <Video size={14} /> {settings.landingHeroVideoUrl ? t("website.videoReplace") : t("website.videoUpload")}
                     <input
                       type="file"
                       className="hidden"
@@ -553,7 +555,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                       onClick={removeHeroVideo}
                       className="text-danger border-danger/20 bg-card hover:bg-danger-soft hover:text-danger text-[11px] rounded-xl h-10"
                     >
-                      <Trash2 size={14} className="ms-1" /> حذف
+                      <Trash2 size={14} className="ms-1" /> {t("website.delete")}
                     </Button>
                   )}
                 </div>
@@ -562,11 +564,11 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                   <>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className="rounded-full text-[10px] font-black">
-                        <Video size={10} /> فيديو مرفوع
+                        <Video size={10} /> {t("website.uploadedVideo")}
                       </Badge>
                       {!settings.landingVideoPosterUrl && (
                         <Badge variant="warning" className="rounded-full text-[10px] font-black">
-                          بدون صورة بديلة
+                          {t("website.noPoster")}
                         </Badge>
                       )}
                     </div>
@@ -597,7 +599,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                     </div>
 
                     <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 cursor-pointer">
-                      <span className="text-[11px] font-black text-main">تشغيل الفيديو تلقائياً</span>
+                      <span className="text-[11px] font-black text-main">{t("website.autoplay")}</span>
                       <input
                         type="checkbox"
                         checked={settings.landingVideoAutoplay}
@@ -616,12 +618,12 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                   expects animation everywhere, and it still will not be — the
                   OS preference wins, always. */}
               <div className="space-y-4 rounded-2xl border border-border bg-soft/40 p-5">
-                <SectionGroup title="الحركة والانتقالات" />
+                <SectionGroup title={t("website.motionSection")} />
                 <p className="text-xs font-bold leading-relaxed text-muted">
-                  ظهور تدريجي للأقسام عند التمرير. هذا الخيار لا يتجاوز تفضيل جهاز الزائر: إذا كان نظامه يطلب تقليل الحركة، فلن تُعرض أي حركة.
+                  {t("website.motionHint")}
                 </p>
                 <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 cursor-pointer">
-                  <span className="text-[11px] font-black text-main">تفعيل أنميشن التمرير</span>
+                  <span className="text-[11px] font-black text-main">{t("website.motionEnable")}</span>
                   <input
                     type="checkbox"
                     checked={settings.landingMotionEnabled}
@@ -635,13 +637,13 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
 
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <SectionGroup title="معرض الأعمال" />
+                  <SectionGroup title={t("website.gallerySection")} />
                   <div className="flex items-center gap-2">
                     <Badge variant="primary" className="rounded-full tabular-nums">
                       {settings.landingPortfolio.length}/20
                     </Badge>
                     <label className={`h-10 cursor-pointer items-center justify-center gap-2 rounded-xl px-6 text-[11px] font-black shadow-md flex transition-colors ${settings.landingPortfolio.length >= 20 ? "bg-soft text-muted border border-border cursor-not-allowed" : "bg-primary text-white hover:bg-primary/90"}`}>
-                      <Plus size={14} /> إضافة صورة
+                      <Plus size={14} /> {t("website.addImage")}
                       <input type="file" className="hidden" accept="image/*" onChange={handleAddPortfolioImage} disabled={settings.landingPortfolio.length >= 20} />
                     </label>
                   </div>
@@ -655,20 +657,20 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                           <img
                             src={url.startsWith("http") ? url : `${staticURL}${url}`}
                             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            alt={`معرض ${idx + 1}`}
+                            alt={t("website.galleryAlt", { n: idx + 1 })}
                             onError={() => setFailedPortfolio((p) => ({ ...p, [idx]: true }))}
                           />
                         ) : (
                           <div className="h-full w-full flex flex-col items-center justify-center gap-2 text-muted p-4">
                             <ImageIcon size={20} className="opacity-40" />
-                            <span className="text-[10px] font-bold">فشل التحميل</span>
+                            <span className="text-[10px] font-bold">{t("website.loadFailedSmall")}</span>
                           </div>
                         )}
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <button
                             onClick={() => removePortfolioImage(idx)}
                             className="h-9 w-9 rounded-xl bg-danger text-white flex items-center justify-center hover:scale-105 transition-transform shadow-lg"
-                            aria-label={`حذف صورة ${idx + 1}`}
+                            aria-label={t("website.deleteImageAria", { n: idx + 1 })}
                           >
                             <Trash2 size={16} />
                           </button>
@@ -679,12 +681,12 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                   </div>
                 ) : (
                   <EmptyState
-                    title="المعرض فارغ"
-                    message="أضف صور أعمالك — ستظهر كشبكة جذابة في صفحة العميل."
+                    title={t("website.galleryEmpty")}
+                    message={t("website.galleryEmptyMsg")}
                     icon={ImageIcon}
                     action={
                       <label className="h-11 cursor-pointer inline-flex items-center gap-2 rounded-xl bg-primary px-6 text-xs font-black text-white shadow-md hover:bg-primary/90 transition-colors">
-                        <Plus size={16} /> رفع أول صورة
+                        <Plus size={16} /> {t("website.uploadFirst")}
                         <input type="file" className="hidden" accept="image/*" onChange={handleAddPortfolioImage} />
                       </label>
                     }
@@ -703,8 +705,8 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
             className="space-y-6"
           >
             <PremiumCard>
-              <SectionGroup title="روابط التواصل" />
-              <p className="text-xs font-bold text-muted -mt-3 mb-6">تظهر كأيقونات في تذييل الموقع العام. اترك الحقل فارغاً لإخفاء القناة.</p>
+              <SectionGroup title={t("website.socialSection")} />
+              <p className="text-xs font-bold text-muted -mt-3 mb-6">{t("website.socialHint")}</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {(
                   [
@@ -722,7 +724,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                       <label htmlFor={social.id} className="text-[10px] font-black text-muted uppercase tracking-widest">
                         {social.label}
                       </label>
-                      {String(settings[social.id] || "").trim() && <Badge variant="success" size="sm" className="me-auto rounded-full text-[9px]">مفعل</Badge>}
+                      {String(settings[social.id] || "").trim() && <Badge variant="success" size="sm" className="me-auto rounded-full text-[9px]">{t("website.enabled")}</Badge>}
                     </div>
                     <Input
                       id={social.id}
@@ -747,28 +749,28 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
             className="space-y-6"
           >
             <PremiumCard className="space-y-6">
-              <SectionGroup title="الشارات والعناوين العلوية (Eyebrow)" />
+              <SectionGroup title={t("website.eyebrowsSection")} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {(
                   [
-                    ["landingPublicHeaderBadge", "شارة الهيدر العلوي"],
-                    ["landingHeroHighlightBadge", "شارة تمييز الهيرو"],
-                    ["landingServicesEyebrow", "تمهيد الخدمات"],
-                    ["landingPortfolioEyebrow", "تمهيد المعرض"],
-                    ["landingBookingEyebrow", "تمهيد الحجز"],
-                    ["landingLocationEyebrow", "تمهيد الموقع"],
-                    ["landingContactEyebrow", "تمهيد التواصل"],
-                    ["landingTestimonialsEyebrow", "تمهيد الشهادات"],
-                    ["landingQuickActionsEyebrow", "تمهيد الإجراءات السريعة"],
+                    ["landingPublicHeaderBadge", "website.eyebrowHeaderBadge"],
+                    ["landingHeroHighlightBadge", "website.eyebrowHeroHighlight"],
+                    ["landingServicesEyebrow", "website.eyebrowServices"],
+                    ["landingPortfolioEyebrow", "website.eyebrowPortfolio"],
+                    ["landingBookingEyebrow", "website.eyebrowBooking"],
+                    ["landingLocationEyebrow", "website.eyebrowLocation"],
+                    ["landingContactEyebrow", "website.eyebrowContact"],
+                    ["landingTestimonialsEyebrow", "website.eyebrowTestimonials"],
+                    ["landingQuickActionsEyebrow", "website.eyebrowQuickActions"],
                   ] as [string, string][]
                 ).map(([key, label]) => (
                   <div key={key} className="space-y-1.5">
-                    <label className="text-[10px] font-black text-muted uppercase tracking-widest">{label}</label>
+                    <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t(label)}</label>
                     <Input
                       value={String(settings[key] ?? "")}
                       onChange={(e) => updateField(key, e.target.value)}
                       className="h-11 bg-soft border-border font-bold rounded-xl"
-                      placeholder={label}
+                      placeholder={t(label)}
                     />
                   </div>
                 ))}
@@ -777,23 +779,23 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <PremiumCard className="space-y-5">
-                <SectionGroup title="تمييز الهيرو والدعوة" />
+                <SectionGroup title={t("website.heroHighlightSection")} />
                 <div className="space-y-3">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-muted uppercase tracking-widest">عنوان تمييز الهيرو</label>
+                    <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.heroHighlightTitle")}</label>
                     <Input value={String(settings.landingHeroHighlightTitle ?? "")} onChange={(e) => updateField("landingHeroHighlightTitle", e.target.value)} className="h-11 bg-soft border-border font-black rounded-xl" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-muted uppercase tracking-widest">وصف تمييز الهيرو</label>
+                    <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.heroHighlightSubtitle")}</label>
                     <textarea value={String(settings.landingHeroHighlightSubtitle ?? "")} onChange={(e) => updateField("landingHeroHighlightSubtitle", e.target.value)} className="w-full min-h-[80px] rounded-xl bg-soft border border-border p-3 text-xs font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/10" />
                   </div>
                   <div className="grid grid-cols-1 gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-muted uppercase tracking-widest">عنوان الشهادات</label>
+                      <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.testimonialsTitle")}</label>
                       <Input value={String(settings.landingTestimonialsTitle ?? "")} onChange={(e) => updateField("landingTestimonialsTitle", e.target.value)} className="h-11 bg-soft border-border font-bold rounded-xl" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-muted uppercase tracking-widest">وصف الشهادات</label>
+                      <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.testimonialsSubtitle")}</label>
                       <textarea value={String(settings.landingTestimonialsSubtitle ?? "")} onChange={(e) => updateField("landingTestimonialsSubtitle", e.target.value)} className="w-full min-h-[70px] rounded-xl bg-soft border border-border p-3 text-xs font-bold outline-none focus:border-primary" />
                     </div>
                   </div>
@@ -801,24 +803,24 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
               </PremiumCard>
 
               <PremiumCard className="space-y-5">
-                <SectionGroup title="الموقع الجغرافي التفصيلي" />
+                <SectionGroup title={t("website.locationSection")} />
                 <div className="space-y-3">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-muted uppercase tracking-widest">وصف الموقع</label>
+                    <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.locationDesc")}</label>
                     <textarea value={String(settings.landingLocationDescription ?? "")} onChange={(e) => updateField("landingLocationDescription", e.target.value)} className="w-full min-h-[80px] rounded-xl bg-soft border border-border p-3 text-xs font-bold outline-none focus:border-primary" />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-muted uppercase tracking-widest">نص «مفتوح»</label>
+                      <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.openText")}</label>
                       <Input value={String(settings.landingLocationOpenLabel ?? "")} onChange={(e) => updateField("landingLocationOpenLabel", e.target.value)} className="h-11 bg-soft border-border font-bold rounded-xl" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-muted uppercase tracking-widest">نص «مغلق»</label>
+                      <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.closedText")}</label>
                       <Input value={String(settings.landingLocationClosedLabel ?? "")} onChange={(e) => updateField("landingLocationClosedLabel", e.target.value)} className="h-11 bg-soft border-border font-bold rounded-xl" />
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-muted uppercase tracking-widest">نص حالة الموقع</label>
+                    <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.statusText")}</label>
                     <Input value={String(settings.landingLocationStatusText ?? "")} onChange={(e) => updateField("landingLocationStatusText", e.target.value)} className="h-11 bg-soft border-border font-bold rounded-xl" />
                   </div>
                 </div>
@@ -826,30 +828,30 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
             </div>
 
             <PremiumCard className="space-y-5">
-              <SectionGroup title="التواصل والإجراءات والختام" />
+              <SectionGroup title={t("website.contactSection")} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">وصف التواصل</label>
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.contactSubtitle")}</label>
                   <textarea value={String(settings.landingContactSubtitle ?? "")} onChange={(e) => updateField("landingContactSubtitle", e.target.value)} className="w-full min-h-[70px] rounded-xl bg-soft border border-border p-3 text-xs font-bold outline-none focus:border-primary" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">وصف الإجراءات السريعة</label>
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.quickActionsSubtitle")}</label>
                   <textarea value={String(settings.landingQuickActionsSubtitle ?? "")} onChange={(e) => updateField("landingQuickActionsSubtitle", e.target.value)} className="w-full min-h-[70px] rounded-xl bg-soft border border-border p-3 text-xs font-bold outline-none focus:border-primary" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">عنوان الإجراءات السريعة</label>
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.quickActionsTitle")}</label>
                   <Input value={String(settings.landingQuickActionsTitle ?? "")} onChange={(e) => updateField("landingQuickActionsTitle", e.target.value)} className="h-11 bg-soft border-border font-bold rounded-xl" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">زر الختام</label>
-                  <Input value={String(settings.landingFinalButtonLabel ?? "")} onChange={(e) => updateField("landingFinalButtonLabel", e.target.value)} className="h-11 bg-soft border-border font-black rounded-xl" placeholder="مثلاً: احجز الآن" />
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.finalButton")}</label>
+                  <Input value={String(settings.landingFinalButtonLabel ?? "")} onChange={(e) => updateField("landingFinalButtonLabel", e.target.value)} className="h-11 bg-soft border-border font-black rounded-xl" placeholder={t("website.finalButtonPlaceholder")} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">عنوان الختام</label>
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.finalTitle")}</label>
                   <Input value={String(settings.landingFinalTitle ?? "")} onChange={(e) => updateField("landingFinalTitle", e.target.value)} className="h-11 bg-soft border-border font-bold rounded-xl" />
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">وصف الختام</label>
+                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">{t("website.finalSubtitle")}</label>
                   <textarea value={String(settings.landingFinalSubtitle ?? "")} onChange={(e) => updateField("landingFinalSubtitle", e.target.value)} className="w-full min-h-[80px] rounded-xl bg-soft border border-border p-3 text-xs font-bold outline-none focus:border-primary" />
                 </div>
               </div>
@@ -865,11 +867,9 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
             className="space-y-6"
           >
             <PremiumCard className="space-y-8">
-              <SectionGroup title="هوية الموقع" />
+              <SectionGroup title={t("website.identitySection")} />
               <p className="-mt-2 text-xs font-bold leading-relaxed text-muted">
-                اللون النشط يبقى ثابتاً كما هو. الخلفية فقط هي التي تتغيّر عندما
-                يختار الزائر الوضع الفاتح أو الداكن — ولهذا يأتي الخياران في كل
-                لون متشابهين.
+                {t("website.identityHint")}
               </p>
 
               <div className="space-y-7">
@@ -877,10 +877,10 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                   <div key={brand.brand} className="space-y-3">
                     <div className="flex items-baseline gap-3">
                       <h5 className="text-xs font-black text-main">
-                        {brand.brandLabel}
+                        {t(brand.brandLabel)}
                       </h5>
                       <span className="text-[11px] font-bold text-muted">
-                        {brand.brandNote}
+                        {t(brand.brandNote)}
                       </span>
                     </div>
 
@@ -944,10 +944,10 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                             <span className="flex items-center justify-between gap-2 border-t border-border bg-card px-4 py-3">
                               <span className="min-w-0">
                                 <span className="block truncate text-xs font-black text-main">
-                                  {option.label}
+                                  {t(option.label)}
                                 </span>
                                 <span className="block truncate text-[10px] font-bold text-muted">
-                                  {option.note}
+                                  {t(option.note)}
                                 </span>
                               </span>
                               {active ? (
@@ -967,19 +967,19 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <PremiumCard className="space-y-5">
-                <SectionGroup title="أقسام اختيارية" />
+                <SectionGroup title={t("website.optionalSections")} />
                 <div className="space-y-4">
                   {(
                     [
                       [
                         "landingShowStaff",
-                        "إظهار قسم الفريق",
-                        "يظهر اسم الحلاقين وصورهم إن كان لديك فريق.",
+                        "website.showStaff",
+                        "website.showStaffHint",
                       ],
                       [
                         "landingShowStaffBio",
-                        "إظهار نبذة الحلاق",
-                        "يعرض الوصف إلى جانب الاسم والمسمّى.",
+                        "website.showStaffBio",
+                        "website.showStaffBioHint",
                       ],
                     ] as [string, string, string][]
                   ).map(([key, label, hint]) => (
@@ -997,10 +997,10 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                       />
                       <span className="min-w-0">
                         <span className="block text-xs font-black text-main">
-                          {label}
+                          {t(label)}
                         </span>
                         <span className="block text-[11px] font-bold text-muted">
-                          {hint}
+                          {t(hint)}
                         </span>
                       </span>
                     </label>
@@ -1009,13 +1009,13 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
               </PremiumCard>
 
               <PremiumCard className="space-y-5">
-                <SectionGroup title="شارة الهيدر العلوي" />
+                <SectionGroup title={t("website.headerBadgeSection")} />
                 <div className="space-y-2">
                   <label
                     htmlFor="public-header-badge"
                     className="text-[10px] font-black text-muted uppercase tracking-widest"
                   >
-                    نص الشارة
+                    {t("website.badgeText")}
                   </label>
                   <Input
                     id="public-header-badge"
@@ -1026,10 +1026,10 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
                       updateField("landingPublicHeaderBadge", e.target.value)
                     }
                     className="h-11 rounded-xl border-border bg-soft font-bold"
-                    placeholder="اتركه فارغاً لإخفائه"
+                    placeholder={t("website.badgePlaceholder")}
                   />
                   <p className="text-[11px] font-bold text-muted">
-                    يظهر أعلى ترويسة الموقع. اتركه فارغاً لإخفاء الشارة بالكامل.
+                    {t("website.badgeHint")}
                   </p>
                 </div>
               </PremiumCard>
@@ -1040,9 +1040,9 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-border/60">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[11px] font-bold text-muted">التغييرات تُحفظ كمسودة حتى الضغط على الحفظ.</p>
-          {hasUnsaved && !saving && <Badge variant="warning" className="rounded-full text-[10px] font-black">تعديلات غير محفوظة</Badge>}
-          {!hasUnsaved && !loading && <Badge variant="secondary" className="rounded-full text-[10px]">محفوظ</Badge>}
+          <p className="text-[11px] font-bold text-muted">{t("website.draftSaved")}</p>
+          {hasUnsaved && !saving && <Badge variant="warning" className="rounded-full text-[10px] font-black">{t("website.unsaved")}</Badge>}
+          {!hasUnsaved && !loading && <Badge variant="secondary" className="rounded-full text-[10px]">{t("website.saved")}</Badge>}
         </div>
         <Button
           onClick={handleSaveSettings}
@@ -1050,7 +1050,7 @@ const WebsiteSettingsPanel = ({ onSaved, onChangeDraft, embedded = false }: { on
           loading={saving}
           className="h-12 rounded-xl px-8 font-black text-xs shadow-md disabled:opacity-60"
         >
-          <Save size={16} className="ms-2" /> {saving ? "جاري الحفظ..." : "حفظ إعدادات الموقع"}
+          <Save size={16} className="ms-2" /> {saving ? t("website.saving") : t("website.saveWebsite")}
         </Button>
       </div>
     </div>

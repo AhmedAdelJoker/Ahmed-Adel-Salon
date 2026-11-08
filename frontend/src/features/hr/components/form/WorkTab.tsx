@@ -16,6 +16,7 @@ import {
   EMPLOYMENT_TYPES,
 } from "@/features/hr";
 import { isCustomJobTitleValue, isServiceProviderJobTitle } from "@/features/hr";
+import { useTranslation } from "react-i18next";
 import {
   FIELD_LABEL_CLASS,
   FIELD_INPUT_CLASS,
@@ -40,13 +41,14 @@ export default function WorkTab({
   /** Steps this job title does not ask for, each with the reason why. */
   hiddenSteps: Array<{ id: string; label: string; reason: string }>;
 }) {
+  const { t } = useTranslation("owner");
   // Shown only for fixed-term hires, so an end date before the hire date can
   // only be a typo. Both are `yyyy-mm-dd`, so a string compare is a date compare.
   const contractEnd = String(formData.contractEndDate ?? "").trim();
   const hireDate = String(formData.hireDate ?? "").trim();
   const contractEndError =
     contractEnd && hireDate && contractEnd < hireDate
-      ? "تاريخ انتهاء العقد لا يمكن أن يسبق تاريخ التعيين"
+      ? t("hr.contractEndBeforeHire")
       : null;
 
   return (
@@ -54,7 +56,7 @@ export default function WorkTab({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <Briefcase size={14} /> المسمى الوظيفي
+                  <Briefcase size={14} /> {t("hr.jobTitle")}
                 </label>
                 <Select
                   value={
@@ -88,7 +90,7 @@ export default function WorkTab({
                       </SelectItem>
                     ))}
                     <SelectItem value="__custom__" className="font-black text-accent">
-                      ✍️ تسجيل يدوي (مسمى مخصص)
+                      ✍️ {t("hr.jobTitleManual")}
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -107,7 +109,7 @@ export default function WorkTab({
                       })
                     }
                     className={`${FIELD_INPUT_CLASS} mt-2`}
-                    placeholder="أدخل المسمى الوظيفي يدوياً (مثال: منسق ورديات)..."
+                    placeholder={t("hr.jobTitleManualPlaceholder")}
                   />
                 )}
                 {/*
@@ -119,16 +121,16 @@ export default function WorkTab({
                   <p className="mt-2 flex items-start gap-1.5 text-[10px] font-bold leading-relaxed text-muted">
                     <Info size={12} className="mt-0.5 shrink-0" />
                     <span>
-                      لهذا المسار تُخفى:{" "}
-                      {hiddenSteps.map((s) => s.label).join("، ")}. أي بيانات
-                      تكتبها في غيرها لن تُحفظ.
+                      {t("hr.hiddenStepsNote")}{" "}
+                      {hiddenSteps.map((s) => s.label).join(', ')}.
+                      {t("hr.hiddenStepsDataLost")}
                     </span>
                   </p>
                 )}
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <Clock size={14} /> نظام التعاقد
+                  <Clock size={14} /> {t("hr.contractType")}
                 </label>
                 <Select
                   value={formData.employmentType}
@@ -156,7 +158,7 @@ export default function WorkTab({
               {formData.employmentType !== "full_time" && (
                 <div className="space-y-2">
                   <label className={FIELD_LABEL_CLASS}>
-                    <CalendarOff size={14} /> انتهاء العقد
+                    <CalendarOff size={14} /> {t("hr.contractEnd")}
                   </label>
                   <Input
                     type="date"
@@ -188,7 +190,7 @@ export default function WorkTab({
               )}
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <Calendar size={14} /> تاريخ الالتحاق
+                  <Calendar size={14} /> {t("hr.hireDate")}
                 </label>
                 <Input
                   type="date"
@@ -201,7 +203,7 @@ export default function WorkTab({
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <Activity size={14} /> الحالة الوظيفية
+                  <Activity size={14} /> {t("hr.status")}
                 </label>
                 <Select
                   value={formData.status}
@@ -215,13 +217,13 @@ export default function WorkTab({
                       value="active"
                       className="text-success font-bold"
                     >
-                      نشط
+                      {t("hr.statusActive")}
                     </SelectItem>
                     <SelectItem
                       value="suspended"
                       className="text-warning font-bold"
                     >
-                      في إجازة
+                      {t("hr.statusSuspended")}
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -229,10 +231,10 @@ export default function WorkTab({
               <div className="flex items-center justify-between p-4 rounded-2xl bg-soft border border-border">
                 <div>
                   <div className="text-xs font-black text-main">
-                    الظهور في نقطة البيع
+                    {t("hr.showInPos")}
                   </div>
                   <div className="text-xs font-bold text-muted">
-                    يظهر في شاشة الدفع (الكاشير)
+                    {t("hr.showInPosDesc")}
                   </div>
                 </div>
                 <Switch
@@ -252,10 +254,10 @@ export default function WorkTab({
                 <div className="flex items-center justify-between p-4 rounded-2xl bg-soft border border-border">
                   <div>
                     <div className="text-xs font-black text-main">
-                      الظهور في الحجز الأونلاين
+                      {t("hr.showInBooking")}
                     </div>
                     <div className="text-xs font-bold text-muted">
-                      يتاح للعملاء على الموقع حجز المواعيد معه
+                      {t("hr.showInBookingDesc")}
                     </div>
                   </div>
                   <Switch
@@ -270,12 +272,10 @@ export default function WorkTab({
                   <Info size={14} className="mt-0.5 shrink-0 text-muted" />
                   <div>
                     <div className="text-xs font-black text-muted">
-                      الحجز الأونلاين
+                      {t("hr.bookingOnline")}
                     </div>
                     <div className="text-xs font-bold text-muted leading-relaxed">
-                      العملاء يحجزون أونلاين مع مقدّمي الخدمة فقط (حلاق، مصفف
-                      شعر، صبغة، بشرة، أظافر) — هذا المسمى إداري ولا يظهر في
-                      الحجز.
+                      {t("hr.bookingOnlineDesc")}
                     </div>
                   </div>
                 </div>

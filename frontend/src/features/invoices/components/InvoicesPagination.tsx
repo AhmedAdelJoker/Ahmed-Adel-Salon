@@ -5,6 +5,7 @@
  * them in a second Arabic line ("عرض 1 - 20 من 23 (الصفحة الحالية 20)").
  */
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Pagination,
   createPaginationState,
@@ -23,6 +24,9 @@ export function InvoicesPagination({
   totalCount,
   onPageChange,
 }: InvoicesPaginationProps) {
+  const { i18n } = useTranslation();
+  const locale = i18n.language?.startsWith("ar") ? "ar" : "en";
+
   const paginator = useMemo(
     () =>
       createPaginationState({
@@ -30,6 +34,9 @@ export function InvoicesPagination({
         size: pageSize,
         total: totalCount,
       }),
+    // The shared component mutates nothing; its props keep React the single
+    // owner of page numbers, so recreating on change is cheap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
   paginator.total = totalCount;
@@ -44,7 +51,7 @@ export function InvoicesPagination({
         paginator={paginator}
         onPageChange={onPageChange}
         showSizeChanger={false}
-        locale="ar"
+        locale={locale}
       />
     </div>
   );

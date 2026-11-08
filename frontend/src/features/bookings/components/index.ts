@@ -6,3 +6,4 @@ export { default as BookingsBoardContent } from "@/features/bookings/components/
 export { default as BookingCardFull } from "@/features/bookings/components/BookingCardFull";
 export { default as BookingFormDialog } from "@/features/bookings/components/BookingFormDialog";
 export { default as CancelBookingDialog } from "@/features/bookings/components/CancelBookingDialog";
+export { default as RescheduleBookingDialog } from "@/features/bookings/components/RescheduleBookingDialog";

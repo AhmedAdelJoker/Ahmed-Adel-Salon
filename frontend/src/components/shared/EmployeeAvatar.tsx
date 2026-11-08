@@ -11,6 +11,8 @@ interface EmployeeAvatarProps {
   showInfo?: boolean;
   className?: string;
   status?: string | null;
+  /** Circle for profile-style cards; rounded-panel (default) for list/table rows. */
+  shape?: "circle" | "rounded";
 }
 
 export function EmployeeAvatar({
@@ -21,20 +23,24 @@ export function EmployeeAvatar({
   showInfo = false,
   className,
   status = null,
+  shape = "rounded",
 }: EmployeeAvatarProps) {
   const [imgError, setImgError] = useState(false);
   useEffect(() => setImgError(false), [imageUrl]);
 
   const getAvatarUrl = () => {
     if (!imageUrl) return null;
-    // Support blob:, data:, http(s), and relative /uploads paths
+    // Support blob:, data:, and absolute http(s) URLs as-is
     if (
       imageUrl.startsWith("http") ||
       imageUrl.startsWith("blob:") ||
       imageUrl.startsWith("data:")
     )
       return imageUrl;
-    return `${staticURL}${imageUrl}`;
+    // In dev (Vite), staticURL is "" and /uploads is proxied to localhost:8000.
+    // In Electron / VITE_API_URL, staticURL is the absolute backend origin.
+    const base = staticURL.replace(/\/$/, "");
+    return base ? `${base}/uploads${imageUrl}` : `/uploads${imageUrl}`;
   };
 
   const getInitials = () => employeeInitials(name);
@@ -51,12 +57,15 @@ export function EmployeeAvatar({
   const avatarUrl = getAvatarUrl();
   const showImage = avatarUrl && !imgError;
 
+  const shapeClass = shape === "circle" ? "rounded-full" : "rounded-xl";
+
   return (
     <div className={cn("flex items-center gap-3", className)}>
       <div className="relative shrink-0">
         <div
           className={cn(
-            "rounded-xl bg-accent/10 flex items-center justify-center text-accent font-black overflow-hidden border border-border shadow-sm",
+            "flex items-center justify-center overflow-hidden border border-line bg-accent/10 font-black text-accent shadow-sm",
+            shapeClass,
             sizeClasses[size] || sizeClasses.md,
           )}
         >
@@ -78,21 +87,24 @@ export function EmployeeAvatar({
         {status && (
           <div
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-slate-950",
+              "absolute rounded-full border-2 border-card",
+              shape === "circle" ? "bottom-0 end-0" : "-bottom-0.5 -end-0.5",
               size === "xs" || size === "sm" ? "h-2 w-2" : "h-3 w-3",
               status === "active" || status === "present"
                 ? "bg-emerald-500"
-                : "bg-slate-500",
+                : status === "suspended"
+                  ? "bg-amber-500"
+                  : "bg-slate-400",
             )}
           />
         )}
       </div>
 
       {showInfo && (
-        <div className="flex flex-col min-w-0 text-right">
+        <div className="flex min-w-0 flex-col text-start">
           <p
             className={cn(
-              "font-black text-white truncate",
+              "truncate font-black text-content",
               size === "sm" ? "text-xs" : "text-sm",
             )}
           >
@@ -101,7 +113,7 @@ export function EmployeeAvatar({
           {role && (
             <p
               className={cn(
-                "font-bold text-slate-500 uppercase tracking-widest leading-none mt-0.5",
+                "mt-0.5 font-bold uppercase leading-none tracking-widest text-content-tertiary",
                 size === "sm" ? "text-[8px]" : "text-[10px]",
               )}
             >

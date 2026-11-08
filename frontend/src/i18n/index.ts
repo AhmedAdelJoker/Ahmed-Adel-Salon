@@ -5,6 +5,22 @@ import arCommon from "@/i18n/locales/ar/common.json";
 import enCommon from "@/i18n/locales/en/common.json";
 import arAppearance from "@/i18n/locales/ar/appearance.json";
 import enAppearance from "@/i18n/locales/en/appearance.json";
+import arPOS from "@/i18n/locales/ar/pos.json";
+import enPOS from "@/i18n/locales/en/pos.json";
+import arReception from "@/i18n/locales/ar/reception.json";
+import enReception from "@/i18n/locales/en/reception.json";
+import arBookings from "@/i18n/locales/ar/bookings.json";
+import enBookings from "@/i18n/locales/en/bookings.json";
+import arSchedule from "@/i18n/locales/ar/schedule.json";
+import enSchedule from "@/i18n/locales/en/schedule.json";
+import arOwner from "@/i18n/locales/ar/owner.json";
+import enOwner from "@/i18n/locales/en/owner.json";
+import arCustomers from "@/i18n/locales/ar/customers.json";
+import enCustomers from "@/i18n/locales/en/customers.json";
+import arRoutes from "@/i18n/locales/ar/routes.json";
+import enRoutes from "@/i18n/locales/en/routes.json";
+import arInvoices from "@/i18n/locales/ar/invoices.json";
+import enInvoices from "@/i18n/locales/en/invoices.json";
 
 /**
  * Translation namespaces.
@@ -15,7 +31,7 @@ import enAppearance from "@/i18n/locales/en/appearance.json";
  * each domain owns its own file, and the parity test in
  * `src/test/i18n.test.ts` fails the build if a locale drifts out of sync.
  */
-export const NAMESPACES = ["common", "appearance"] as const;
+export const NAMESPACES = ["common", "appearance", "pos", "reception", "bookings", "schedule", "owner", "customers", "routes", "invoices"] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 
 /**
@@ -59,8 +75,8 @@ i18n
   .use(initReactI18next)
   .init({
     resources: {
-      ar: { common: arCommon, appearance: arAppearance },
-      en: { common: enCommon, appearance: enAppearance },
+      ar: { common: arCommon, appearance: arAppearance, pos: arPOS, reception: arReception, bookings: arBookings, schedule: arSchedule, owner: arOwner, customers: arCustomers, routes: arRoutes, invoices: arInvoices },
+      en: { common: enCommon, appearance: enAppearance, pos: enPOS, reception: enReception, bookings: enBookings, schedule: enSchedule, owner: enOwner, customers: enCustomers, routes: enRoutes, invoices: enInvoices },
     },
     ns: [...NAMESPACES],
     defaultNS: "common",

@@ -9,5 +9,8 @@ export {
   triggerSuccessEffect,
   isOpenShiftStatus,
   appointmentToCartItems,
+  isProductOnlyOffer,
+  offerAvailableUnits,
+  cartLineNeedsExpert,
 } from "@/features/pos/utils";
 export * from "@/features/pos/components";

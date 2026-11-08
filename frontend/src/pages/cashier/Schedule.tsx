@@ -5,6 +5,7 @@ import {
 } from "@dnd-kit/core";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { PageShell } from "@/components/shared/PageShell";
@@ -30,6 +31,7 @@ import {
 
 function SchedulePage() {
   const navigate = useNavigate();
+  const { t } = useTranslation("schedule");
   const {
     selectedDate,
     setSelectedDate,
@@ -71,14 +73,21 @@ function SchedulePage() {
   return (
     <PageShell className="relative">
       <PageHeader className={undefined}
-        title="مخطط المواعيد الذكي"
-        subtitle="إدارة المواعيد اليومية بدقة واحترافية"
-        badge="جدولة العمليات"
+        title={t("page.title")}
+        subtitle={t("page.subtitle")}
+        badge={t("page.badge")}
         icon={CalendarDays}
         actions={
           <ScheduleHeaderActions
             onBackToBookings={() => navigate("/bookings")}
-            onNewBooking={() => navigate("/bookings")}
+            onNewBooking={() =>
+              navigate("/bookings", {
+                state: {
+                  date: selectedDate,
+                  barberId: barberFilter === "all" ? undefined : barberFilter,
+                },
+              })
+            }
           />
         }
       />
@@ -122,17 +131,17 @@ function SchedulePage() {
       >
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
           <ContentPanel
-            title="الخريطة التشغيلية للمواعيد"
+            title={t("contentPanel.title")}
             subtitle={
               viewMode === "day"
-                ? "خط زمني دقيق يعكس مدة كل خدمة. اسحب المواعيد لإعادة توزيعها بين الموظفين."
+                ? t("contentPanel.subtitleDay")
                 : viewMode === "week"
-                  ? "نظرة أسبوعية شاملة على توزيع المواعيد."
-                  : "قائمة مفصلة بمواعيد اليوم مع كل التفاصيل."
+                  ? t("contentPanel.subtitleWeek")
+                  : t("contentPanel.subtitleList")
             }
             className={cn("min-w-0")}
            actions={undefined}>
-            <AnimatePresence mode="wait">
+            <AnimatePresence>
               {loading ? (
                 <ScheduleLoadingSkeleton />
               ) : (
@@ -205,6 +214,22 @@ function SchedulePage() {
       <ScheduleModal
         appointment={selectedAppointment}
         onClose={() => setSelectedAppointment(null)}
+        onEdit={() => {
+          setSelectedAppointment(null);
+          loadData();
+        }}
+        onCancel={() => {
+          setSelectedAppointment(null);
+          loadData();
+        }}
+        onTransferPOS={() => {
+          setSelectedAppointment(null);
+          loadData();
+        }}
+        onStatusChange={() => {
+          setSelectedAppointment(null);
+          loadData();
+        }}
       />
     </PageShell>
   );

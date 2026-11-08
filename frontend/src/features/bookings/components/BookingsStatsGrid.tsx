@@ -1,4 +1,5 @@
 import { Activity, Clock, Globe, Sparkles, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { StatCard } from "@/components/shared/PremiumUI";
 
 interface StatsShape {
@@ -18,6 +19,7 @@ export default function BookingsStatsGrid({
   setActiveTab: (v: string) => void;
   setQuickFilter: (v: string) => void;
 }) {
+  const { t } = useTranslation("bookings");
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
       <div
@@ -37,7 +39,7 @@ export default function BookingsStatsGrid({
         className="cursor-pointer transition-transform hover:scale-[1.02]"
       >
         <StatCard
-          label="إجمالي المواعيد"
+          label={t("stats.total")}
           value={stats.total}
           icon={Activity}
           variant="primary"
@@ -63,7 +65,7 @@ export default function BookingsStatsGrid({
         className="cursor-pointer transition-transform hover:scale-[1.02]"
       >
         <StatCard
-          label="حجوزات أونلاين"
+          label={t("stats.online")}
           value={stats.online}
           icon={Globe}
           variant="info"
@@ -89,7 +91,7 @@ export default function BookingsStatsGrid({
         className="cursor-pointer transition-transform hover:scale-[1.02]"
       >
         <StatCard
-          label="بانتظار الخدمة"
+          label={t("stats.waiting")}
           value={stats.waiting}
           icon={Clock}
           variant="warning"
@@ -115,7 +117,7 @@ export default function BookingsStatsGrid({
         className="cursor-pointer transition-transform hover:scale-[1.02]"
       >
         <StatCard
-          label="عند الاستقبال"
+          label={t("stats.reception")}
           value={stats.reception}
           icon={Sparkles}
           variant="success"
@@ -141,7 +143,7 @@ export default function BookingsStatsGrid({
         className="cursor-pointer transition-transform hover:scale-[1.02]"
       >
         <StatCard
-          label="حجوزات ملغاة"
+          label={t("stats.cancelled")}
           value={stats.cancelled}
           icon={X}
           variant="danger"

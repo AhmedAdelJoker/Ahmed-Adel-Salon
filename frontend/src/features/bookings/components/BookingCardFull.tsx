@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -51,6 +52,7 @@ export default function BookingCardFull({
   canEdit,
   loading,
 }: any) {
+  const { t } = useTranslation("bookings");
   const [showAllServices, setShowAllServices] = useState(false);
   const config = statusConfig(booking.status);
   const status = normalizeStatus(booking.status);
@@ -100,7 +102,7 @@ export default function BookingCardFull({
       {/* Late Warning Banner */}
       {isLateHour && (
         <div className="absolute top-0 left-0 right-0 bg-rose-600 text-white text-[10px] font-black text-center py-1 rounded-t-3xl">
-          ⚠ متأخر أكثر من ساعة - يحتاج تفعيل أو إعادة جدولة
+          {t("card.lateBanner")}
         </div>
       )}
       {/* Background Glow */}
@@ -127,7 +129,10 @@ export default function BookingCardFull({
                }}
                className="text-sm sm:text-base font-black text-main group-hover:text-primary transition-colors cursor-pointer flex items-center gap-1"
 
-              title="عرض سجل العميل الكامل"
+              aria-label={t("card.viewCustomerAria", {
+                name: getBookingCustomerName(booking),
+              })}
+              title={t("card.viewCustomerTitle")}
             >
               <span className="break-words leading-snug">
                 {getBookingCustomerName(booking)}
@@ -141,7 +146,7 @@ export default function BookingCardFull({
               <AlertTriangle
                 size={14}
                 className="text-amber-500 shrink-0"
-                {...({ title: "عميل غير ملتزم" } as any)}
+                {...({ title: t("card.unCommitted") } as any)}
               />
             )}
             {booking.visit_count > 10 && (
@@ -154,7 +159,7 @@ export default function BookingCardFull({
           {/* Phone & WhatsApp Quick Menu */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-bold text-muted dir-ltr text-right">
-              {booking.customer_phone || "غير متوفر"}
+              {booking.customer_phone || t("card.phoneUnavailable")}
             </span>
 
             {booking.customer_phone && (
@@ -162,10 +167,11 @@ export default function BookingCardFull({
                 <DropdownMenuTrigger asChild>
                   <button
                     className="h-6 px-2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-1 text-[11px] font-black shadow-sm"
-                    title="خيارات الرسائل الفورية عبر واتساب"
+                    title={t("card.whatsappAria")}
+                    aria-label={t("card.whatsappAria")}
                   >
                     <MessageCircle size={12} />
-                    <span>واتساب</span>
+                    <span>{t("card.whatsapp")}</span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -177,21 +183,21 @@ export default function BookingCardFull({
                     className="text-xs font-bold cursor-pointer py-2 flex items-center gap-2"
                   >
                     <Clock size={14} className="text-amber-500" />
-                    <span>إرسال تذكير بالموعد</span>
+                    <span>{t("card.reminder")}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => sendWhatsAppMessage(booking, "confirm")}
                     className="text-xs font-bold cursor-pointer py-2 flex items-center gap-2"
                   >
                     <CheckCircle2 size={14} className="text-emerald-500" />
-                    <span>إرسال تأكيد الحجز</span>
+                    <span>{t("card.confirm")}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => sendWhatsAppMessage(booking, "thank_you")}
                     className="text-xs font-bold cursor-pointer py-2 flex items-center gap-2"
                   >
                     <Sparkles size={14} className="text-primary" />
-                    <span>إرسال رسالة شكر بعد الزيارة</span>
+                    <span>{t("card.thankYou")}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -211,7 +217,7 @@ export default function BookingCardFull({
           )}
           {isLate && (
             <Badge className="text-[10px] font-black bg-rose-600 text-white border-none px-1.5 h-4 animate-pulse">
-              متأخر {Math.abs(diffMinutes)} دقيقة
+              {t("card.lateMinutes", { minutes: Math.abs(diffMinutes) })}
             </Badge>
           )}
         </div>
@@ -239,7 +245,7 @@ export default function BookingCardFull({
             <span className="whitespace-nowrap">{expectedEnd}</span>
           </div>
           <span className="text-[11px] opacity-70 dir-rtl shrink-0">
-            ({duration} د)
+            ({duration} {t("card.minutesShort")})
           </span>
         </div>
         <div className="flex justify-between items-center text-[11px] font-bold text-muted px-1 gap-2">
@@ -270,7 +276,7 @@ export default function BookingCardFull({
               variant="secondary"
               className="rounded-lg py-0.5 px-2 bg-soft border border-border/40 text-[11px] font-bold text-muted h-6 flex items-center"
             >
-              {s.service_name_snapshot || "خدمة"}
+              {s.service_name_snapshot || t("card.service")}
             </Badge>
           ))}
         </div>
@@ -282,11 +288,11 @@ export default function BookingCardFull({
           >
             {showAllServices ? (
               <>
-                <span>عرض أقل</span> <ChevronUp size={10} />
+                <span>{t("card.showLess")}</span> <ChevronUp size={10} />
               </>
             ) : (
               <>
-                <span>عرض كافة الخدمات ({servicesList.length})</span>{" "}
+                <span>{t("card.showAll", { count: servicesList.length })}</span>{" "}
                 <ChevronDown size={10} />
               </>
             )}
@@ -306,10 +312,10 @@ export default function BookingCardFull({
           />
           <div className="min-w-0">
             <p className="text-[10px] font-bold text-muted leading-none mb-0.5">
-              الخبير المسؤول
+              {t("card.barberLabel")}
             </p>
             <p className="text-xs font-black text-main break-words leading-tight">
-              {booking.barber_name || "غير محدد"}
+              {booking.barber_name || t("card.barberUnassigned")}
             </p>
           </div>
         </div>
@@ -321,7 +327,7 @@ export default function BookingCardFull({
             config.color,
           )}
         >
-          {config.label}
+          {t(config.label)}
         </Badge>
       </div>
 
@@ -335,9 +341,10 @@ export default function BookingCardFull({
                   onClick={() => onActivate(booking)}
                   loading={loading === `${booking.id}-activate`}
                   className="flex-1 h-10 rounded-xl bg-primary hover:bg-primary/90 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 min-w-0"
+                  aria-label={t("card.activateAria")}
                 >
                   <span className="whitespace-nowrap">
-                    تفعيل ونقل للاستقبال
+                    {t("card.activate")}
                   </span>
                   <ArrowUpRight size={14} className="shrink-0" />
                 </Button>
@@ -345,9 +352,12 @@ export default function BookingCardFull({
                 <Button
                   onClick={() => onTransferToPOS(booking)}
                   className="flex-1 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 min-w-0"
+                  aria-label={t("card.transferPOSAria")}
                 >
                   <CreditCard size={14} className="shrink-0" />
-                  <span className="whitespace-nowrap">تحويل لـ POS والدفع</span>
+                  <span className="whitespace-nowrap">
+                    {t("card.transferPOS")}
+                  </span>
                 </Button>
               )}
 
@@ -357,7 +367,8 @@ export default function BookingCardFull({
                     variant="ghost"
                     onClick={onEdit}
                     className="h-10 w-10 p-0 rounded-xl bg-soft text-muted hover:bg-card hover:text-primary border border-border/50"
-                    title="تعديل الحجز"
+                    title={t("card.edit")}
+                    aria-label={t("card.edit")}
                   >
                     <Edit3 size={15} />
                   </Button>
@@ -367,7 +378,8 @@ export default function BookingCardFull({
                     variant="ghost"
                     onClick={() => onReschedule(booking)}
                     className="h-10 w-10 p-0 rounded-xl bg-amber-500/10 text-amber-600 hover:bg-amber-600 hover:text-white border border-amber-500/20"
-                    title="إعادة جدولة"
+                    title={t("card.reschedule")}
+                    aria-label={t("card.rescheduleAria")}
                   >
                     <Calendar size={15} />
                   </Button>
@@ -376,7 +388,8 @@ export default function BookingCardFull({
                   variant="ghost"
                   onClick={() => onStatus(booking, "CANCELLED")}
                   className="h-10 w-10 p-0 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/20"
-                  title="إلغاء الحجز"
+                  title={t("card.cancel")}
+                  aria-label={t("card.cancel")}
                 >
                   <Trash2 size={15} />
                 </Button>
@@ -384,13 +397,15 @@ export default function BookingCardFull({
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center h-10 rounded-xl bg-soft/40 border border-dashed border-border text-xs font-black text-muted">
-              {status === "DONE" ? "حجز مكتمل ومغلق" : "حجز ملغي"}
+              {status === "DONE"
+                ? t("card.done")
+                : t("card.cancelledByUs")}
             </div>
           )}
         </div>
         {!canEdit && status !== "DONE" && status !== "CANCELLED" && (
           <p className="text-[9px] font-bold text-rose-500 text-center">
-            لا يمكن تعديل حجز يوم سابق - أنشئ حجز جديد
+            {t("card.pastEdit")}
           </p>
         )}
       </div>

@@ -16,6 +16,7 @@ import {
 } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Scissors } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 
 import { getHomePath, getProfilePath, hasRoleAccess } from "@/lib/access/roles";
@@ -79,7 +80,7 @@ function RouteLoader() {
           <Scissors className="h-8 w-8 animate-pulse" />
         </div>
         <div className="space-y-1 text-center">
-          <p className="text-sm font-black text-main">Barber Luxe Pro</p>
+          <p className="text-sm font-black text-main">Salon Pro Pro</p>
           <p className="text-xs font-bold tracking-widest text-muted uppercase">
             جاري تأمين الجلسة...
           </p>
@@ -195,10 +196,13 @@ function RegistryRoute({ route }: { route: AppRoute }) {
 
 function TitleUpdater() {
   const location = useLocation();
+  const { t } = useTranslation("routes");
+  const meta = resolvePageMeta(location.pathname);
 
   useEffect(() => {
-    document.title = `${resolvePageMeta(location.pathname).title} | Barber Luxe Pro`;
-  }, [location.pathname]);
+    const title = t(`page.${meta.key}`, { defaultValue: meta.title });
+    document.title = `${title} | Salon Pro Pro`;
+  }, [meta.key, meta.title, t]);
 
   return null;
 }
@@ -226,7 +230,12 @@ function MainLayout() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const { t } = useTranslation("routes");
   const meta = resolvePageMeta(location.pathname);
+  const pageTitle = t(`page.${meta.key}`, { defaultValue: meta.title });
+  const pageSubtitle = meta.subtitle
+    ? t(`subtitle.${meta.key}`, { defaultValue: meta.subtitle })
+    : t("subtitle.default");
   // POS owns its own bottom bar (POSBottomNav); the global pill nav would
   // stack underneath it and clutter the till screen.
   const hideMobileNav = location.pathname.startsWith("/pos");
@@ -256,8 +265,8 @@ function MainLayout() {
       <div className="app-shell__body relative z-20 flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         <header className="z-30 shrink-0 border-b border-border/40 bg-white/90 dark:bg-slate-900/90">
           <Header
-            title={meta.title}
-            subtitle={meta.subtitle ?? "إدارة ذكية ومتكاملة."}
+            title={pageTitle}
+            subtitle={pageSubtitle}
             onOpenSidebar={toggleSidebar}
           />
         </header>

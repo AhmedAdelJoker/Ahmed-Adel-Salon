@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import { ArrowUpRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { ContentPanel } from "@/components/shared/PremiumUI";
 import { cn } from "@/lib/core/utils";
 import { useAuth } from "@/context/AuthContext";
 import { hasRoleAccess } from "@/lib/access/roles";
-import { getQuickNavItems } from "@/app/route-registry";
+import { getQuickNavItems, routeKey } from "@/app/route-registry";
 
 export interface QuickActionsProps {
   onNavigate: (to: string) => void;
@@ -30,13 +31,21 @@ const TONES = [
 
 export function QuickActions({ onNavigate }: QuickActionsProps) {
   const { user } = useAuth();
+  const { t } = useTranslation("routes");
 
   const items = useMemo(
     () =>
-      getQuickNavItems().filter((item) =>
-        hasRoleAccess(user, item.roles as string[], item.to),
-      ),
-    [user],
+      getQuickNavItems()
+        .filter((item) =>
+          hasRoleAccess(user, item.roles as string[], item.to),
+        )
+        .map((item) => ({
+          ...item,
+          label: t(`nav.${routeKey(item.to)}`, {
+            defaultValue: item.label,
+          }),
+        })),
+    [user, t],
   );
 
   // A grid with nothing in it is worse than no grid. Renders nothing rather than
@@ -51,8 +60,12 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
             <ArrowUpRight size={20} />
           </div>
           <div className="min-w-0">
-            <h3 className="text-lg font-black tracking-tight text-main truncate">وصول سريع</h3>
-            <p className="text-xs font-bold text-muted">اختصارات لأهم العمليات اليومية</p>
+            <h3 className="text-lg font-black tracking-tight text-main truncate">
+              {t("ui.quickAccess")}
+            </h3>
+            <p className="text-xs font-bold text-muted">
+              {t("ui.quickAccessSubtitle")}
+            </p>
           </div>
         </div>
       </div>

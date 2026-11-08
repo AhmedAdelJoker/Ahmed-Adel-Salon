@@ -6,6 +6,7 @@ import { cn, formatCurrency } from "@/lib/core/utils";
 import { getInvoiceStatusConfig } from "@/features/customers/utils/customer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TabsContent } from "@/components/ui/tabs";
+import { useTranslation } from "react-i18next";
 
 export default function CustomerInvoicesTab({
   invoices,
@@ -19,6 +20,9 @@ export default function CustomerInvoicesTab({
    * public API, and pages may import cross-feature barrels. */
   onViewInvoice?: (invoice: (typeof invoices)[number]) => void;
 }) {
+  const { t, i18n } = useTranslation("customers");
+  const dateLocale = i18n.language.startsWith("ar") ? "ar-EG" : "en-GB";
+
   return (
           <TabsContent value="invoices" className="mt-4">
             {loading ? (
@@ -30,29 +34,29 @@ export default function CustomerInvoicesTab({
             ) : invoices.length === 0 ? (
               <EmptyState variant="inline"
                 icon={Receipt}
-                title="لا توجد فواتير"
-                message="لم يتم إصدار أي فواتير لهذا العميل"
+                title={t("invoices.noInvoices")}
+                message={t("invoices.emptyMessage")}
               />
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="w-full min-w-[500px] text-right">
+                <table className="w-full min-w-[500px] text-end">
                   <thead>
                     <tr className="border-b border-border bg-soft/50">
                       <th className="px-3 py-2 text-[10px] font-black uppercase text-muted">
-                        الفاتورة
+                        {t("invoices.tableInvoice")}
                       </th>
                       <th className="px-3 py-2 text-[10px] font-black uppercase text-muted">
-                        التاريخ
+                        {t("invoices.tableDate")}
                       </th>
                       <th className="px-3 py-2 text-[10px] font-black uppercase text-muted">
-                        المبلغ
+                        {t("invoices.tableAmount")}
                       </th>
                       <th className="px-3 py-2 text-[10px] font-black uppercase text-muted">
-                        الحالة
+                        {t("invoices.tableStatus")}
                       </th>
                       {onViewInvoice && (
                         <th className="px-3 py-2 text-[10px] font-black uppercase text-muted">
-                          <span className="sr-only">إجراءات</span>
+                          <span className="sr-only">{t("invoices.actions")}</span>
                         </th>
                       )}
                     </tr>
@@ -67,7 +71,7 @@ export default function CustomerInvoicesTab({
                           </td>
                           <td className="px-3 py-2 text-xs font-bold text-muted">
                             {new Date(inv.created_at).toLocaleDateString(
-                              "ar-EG",
+                              dateLocale,
                             )}
                           </td>
                           <td className="px-3 py-2 text-xs font-black text-emerald-600">
@@ -81,7 +85,7 @@ export default function CustomerInvoicesTab({
                                 conf.color,
                               )}
                             >
-                              {conf.label}
+                              {t(conf.label)}
                             </span>
                           </td>
                           {onViewInvoice && (
@@ -90,8 +94,8 @@ export default function CustomerInvoicesTab({
                                 variant="secondary"
                                 size="icon"
                                 className="h-8 w-8 rounded-lg"
-                                title="تفاصيل الفاتورة"
-                                aria-label="تفاصيل الفاتورة"
+                                title={t("invoices.details")}
+                                aria-label={t("invoices.details")}
                                 onClick={() => onViewInvoice(inv)}
                               >
                                 <Eye size={15} />

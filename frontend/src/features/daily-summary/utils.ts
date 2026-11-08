@@ -14,8 +14,8 @@ export function calcNetProfit(data: DailySummaryData | undefined): number {
   return Number(data.summary?.total_sales || 0) - Number(data.summary?.total_expenses || 0);
 }
 
-export function getShiftDisplayName(shift: DailySummaryShift): string {
-  return shift.user?.full_name || shift.user?.username || `وردية #${shift.id}`;
+export function getShiftDisplayName(shift: DailySummaryShift, fallback?: string): string {
+  return shift.user?.full_name || shift.user?.username || fallback || `وردية #${shift.id}`;
 }
 
 export function getShiftInitial(shift: DailySummaryShift): string {
@@ -23,26 +23,59 @@ export function getShiftInitial(shift: DailySummaryShift): string {
   return name.charAt(0) || "U";
 }
 
-export function buildDailySummaryCsv(data: DailySummaryData): string {
-  const headers = ["البند", "التفاصيل", "القيمة"];
+export interface DailySummaryCsvLabels {
+  headers: [string, string, string];
+  date: string;
+  revenue: string;
+  invoices: string;
+  expenses: string;
+  shifts: string;
+  netProfit: string;
+  shiftSingular: string;
+  shiftPlural: string;
+  expenseFallback: string;
+  shiftSalesLine: (total: number, count: number) => string;
+  active: string;
+  completed: string;
+}
+
+const DEFAULT_CSV_LABELS: DailySummaryCsvLabels = {
+  headers: ["البند", "التفاصيل", "القيمة"],
+  date: "التاريخ",
+  revenue: "إجمالي الإيرادات",
+  invoices: "عدد الفواتير",
+  expenses: "إجمالي المصروفات",
+  shifts: "عدد الورديات",
+  netProfit: "صافي الربح",
+  shiftSingular: "الورديات",
+  shiftPlural: "المصروفات",
+  expenseFallback: "مصروف",
+  shiftSalesLine: (total, count) => `${total} / ${count} فاتورة`,
+  active: "نشطة",
+  completed: "مكتملة",
+};
+
+export function buildDailySummaryCsv(data: DailySummaryData, labels?: DailySummaryCsvLabels): string {
+  const L = labels || DEFAULT_CSV_LABELS;
+  const headers = L.headers;
   const lines: (string | number)[][] = [
-    ["التاريخ", data.date, ""],
-    ["إجمالي الإيرادات", "", data.summary.total_sales],
-    ["عدد الفواتير", "", data.summary.invoice_count],
-    ["إجمالي المصروفات", "", data.summary.total_expenses],
-    ["عدد الورديات", "", data.summary.shift_count],
-    ["صافي الربح", "", calcNetProfit(data)],
+    [L.date, data.date, ""],
+    [L.revenue, "", data.summary.total_sales],
+    [L.invoices, "", data.summary.invoice_count],
+    [L.expenses, "", data.summary.total_expenses],
+    [L.shifts, "", data.summary.shift_count],
+    [L.netProfit, "", calcNetProfit(data)],
     [],
-    ["الورديات", "", ""],
+    [L.shiftSingular, "", ""],
     ...data.shifts.map((s) => [
       getShiftDisplayName(s),
-      s.status === "open" ? "نشطة" : "مكتملة",
-      `${s.total_sales} / ${s.invoice_count} فاتورة`,
+      s.status === "open" ? L.active : L.completed,
+      L.shiftSalesLine(Number(s.total_sales || 0), Number(s.invoice_count || 0)),
     ]),
     [],
-    ["المصروفات", "", ""],
+    [L.shiftPlural, "", ""],
     ...(data.expenses.map((e: DailySummaryExpense) => [
-      e.description || "مصروف",
+      e.description || L.expenseFallback,
       e.category || "",
       e.amount,
     ]) as (string | number)[][]),

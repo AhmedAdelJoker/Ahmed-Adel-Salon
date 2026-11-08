@@ -6,6 +6,7 @@ import {
   Plus,
   Users,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 
 export default function BookingsHeaderActions({
@@ -19,26 +20,27 @@ export default function BookingsHeaderActions({
   onNavigate: (path: string) => void;
   onCreate: () => void;
 }) {
+  const { t } = useTranslation("bookings");
   return (
     <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-x-auto no-scrollbar pb-1">
       <Button
         variant="outline"
         onClick={() => onNavigate("/reception-board")}
         className="h-10 sm:h-11 px-3 text-xs font-black shadow-sm flex items-center gap-1.5 shrink-0"
-        title="الذهاب للوحة الاستقبال المباشرة"
+        title={t("header.goReceptionAria")}
       >
         <Users size={16} className="text-indigo-500 shrink-0" />
-        <span className="whitespace-nowrap">لوحة الاستقبال</span>
+        <span className="whitespace-nowrap">{t("header.reception")}</span>
       </Button>
 
       <Button
         variant="outline"
         onClick={() => onNavigate("/pos")}
         className="h-10 sm:h-11 px-3 text-xs font-black shadow-sm flex items-center gap-1.5 shrink-0"
-        title="نقطة البيع الكاشير"
+        title={t("header.goPosAria")}
       >
         <CreditCard size={16} className="text-emerald-500 shrink-0" />
-        <span className="whitespace-nowrap">الكاشير (POS)</span>
+        <span className="whitespace-nowrap">{t("header.pos")}</span>
       </Button>
 
       <Button
@@ -52,7 +54,9 @@ export default function BookingsHeaderActions({
           <Activity size={16} />
         )}
         <span className="whitespace-nowrap">
-          {viewMode === "grid" ? "عرض اللوحة" : "عرض الشبكة"}
+          {viewMode === "grid"
+            ? t("header.viewBoard")
+            : t("header.viewGrid")}
         </span>
       </Button>
 
@@ -62,7 +66,7 @@ export default function BookingsHeaderActions({
         className="h-10 sm:h-11 px-3 sm:px-4 text-xs font-black shadow-sm flex items-center gap-2 shrink-0"
       >
         <Clock size={16} />
-        <span className="whitespace-nowrap">المخطط الزمني</span>
+        <span className="whitespace-nowrap">{t("header.timeline")}</span>
       </Button>
 
       <Button
@@ -70,7 +74,7 @@ export default function BookingsHeaderActions({
         className="h-10 sm:h-11 px-5 sm:px-8 text-xs font-black shadow-accent flex items-center gap-2 shrink-0"
       >
         <Plus size={18} />
-        <span className="whitespace-nowrap">حجز موعد جديد</span>
+        <span className="whitespace-nowrap">{t("header.newBooking")}</span>
       </Button>
     </div>
   );

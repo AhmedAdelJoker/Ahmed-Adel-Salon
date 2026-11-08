@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import api from "@/services/api";
 import { adaptObject } from "@/services/apiAdapter";
@@ -21,6 +22,7 @@ interface DashboardApiPayload {
 }
 
 export function useReportsDashboard() {
+  const { t } = useTranslation("owner");
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const reportScope = searchParams.get("scope");
@@ -97,10 +99,10 @@ export function useReportsDashboard() {
     () => (Array.isArray(weeklyData) ? weeklyData : []),
     [weeklyData],
   );
-  const displayName = user?.full_name || "المدير";
+  const displayName = user?.full_name || t("reports.welcomeFallback", { defaultValue: "Manager" });
   const scopeLabel = employeeId
-    ? `تقرير مخصص: ${employeeName || `الموظف #${employeeId}`}`
-    : "نظرة عامة على المنشأة بالكامل";
+    ? t("reports.customScope", { name: employeeName || t("reports.employeeLabel", { id: employeeId }) })
+    : t("reports.fullScope");
 
   return {
     stats,

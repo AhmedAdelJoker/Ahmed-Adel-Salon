@@ -448,7 +448,7 @@ export default function Settings() {
               </div>
             </div>
           )}
-          <AnimatePresence mode="wait">
+          <AnimatePresence>
             {activeTab === "profile" && !enrollmentPending && (
               <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
                 <ContentPanel title="الملف الشخصي" subtitle="اسمك، بريدك، وصورتك — تُحفظ لكل حساب على حدة.">

@@ -1,77 +1,50 @@
-import React, { useRef, useCallback } from "react";
+import React, { useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { usePOS } from "@/pages/cashier/POS/POSContext";
-import { appointmentToCartItems } from "@/features/pos";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-  Clock,
-  User,
-  ShoppingBag,
   ChevronLeft,
+  Clock,
   RefreshCw,
+  ShoppingBag,
+  User,
   Zap,
 } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/core/utils";
+import { useIntlLocale } from "@/hooks/useAppLocale";
 import { motion } from "framer-motion";
-import { toast } from "react-hot-toast";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Badge } from "@/components/ui/badge";
 import { AnimatePresence } from "framer-motion";
 
-const ESTIMATED_ITEM_HEIGHT = 180; // First guess; each card is measured after it renders.
+const ESTIMATED_ITEM_HEIGHT = 152; // First guess; each card is measured after it renders.
 
+/**
+ * The reception queue — the normal starting point for a POS sale.
+ *
+ * Clicking a card loads the whole session (services, barber, customer) through
+ * the one `loadSession` action in the POS feature. The card used to assemble
+ * that cart itself, which is why this path and the `/bookings` handoff could
+ * drift apart on field spellings.
+ */
 const SessionsQueue = () => {
+  const { t } = useTranslation("pos");
   const {
     readyAppointments,
     readyAppointmentsLoading,
     fetchReadyAppointments,
-    setActiveAppointmentId,
-    setSelectedBarberId,
-    setCart,
-    setSelectedCustomerId,
-    selectedBarberId,
-    setCompletedCustomerName,
+    loadSession,
     activeAppointmentId,
-    barbers,
   } = usePOS();
 
-   
-  const parentRef = useRef<any>(null);
+  const parentRef = useRef<HTMLDivElement | null>(null);
 
   const handleLoadAppointment = useCallback(
     (appointment) => {
-      const appointmentId =
-        appointment.appointment_id ||
-        appointment.appointmentId ||
-        appointment.id;
-      const appointmentBarberId =
-        appointment.employee_id ||
-        appointment.employeeId ||
-        appointment.barber_id ||
-        appointment.barberId ||
-        "";
-
-      // Auto-select the barber in the global dropdown as well
-      if (appointmentBarberId) {
-        setSelectedBarberId(String(appointmentBarberId));
-      }
-
-      setCart(appointmentToCartItems(appointment, barbers, selectedBarberId));
-      setActiveAppointmentId(appointmentId);
-      setSelectedCustomerId(String(appointment.customer_id || "walk_in"));
-      // Auto-fill completed customer name for success screen
-      setCompletedCustomerName(appointment.customer_name || "عميل");
-      toast.success("تم تحميل بيانات الجلسة للمراجعة");
+      loadSession(appointment);
     },
-    [
-      barbers,
-      selectedBarberId,
-      setSelectedBarberId,
-      setCart,
-      setActiveAppointmentId,
-      setSelectedCustomerId,
-      setCompletedCustomerName,
-    ],
+    [loadSession],
   );
 
   // Virtualizer for large lists
@@ -88,57 +61,70 @@ const SessionsQueue = () => {
   });
 
   return (
-    <div className="flex flex-col h-full gap-3">
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="text-lg font-black flex items-center gap-2">
-          <Clock className="text-primary" size={20} />
-          الجلسات الجاهزة
-          <Badge
-            variant="primary"
-            className="rounded-full h-5 min-w-5 flex items-center justify-center text-[10px]"
-          >
-            {readyAppointments.length}
-          </Badge>
-        </h2>
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="flex items-center gap-1.5 text-sm font-black text-main">
+            <Clock className="text-primary" size={16} aria-hidden="true" />
+            {t("sessions.title")}
+            <Badge
+              variant="primary"
+              size="sm"
+              className="min-w-5 justify-center rounded-full tabular-nums"
+            >
+              {readyAppointments.length}
+            </Badge>
+          </h2>
+          <p className="mt-0.5 text-[10px] font-bold text-muted">
+            {t("sessions.subtitle")}
+          </p>
+        </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={fetchReadyAppointments}
           disabled={readyAppointmentsLoading}
-          className="h-10 w-10 p-0 rounded-xl touch-target"
-          aria-label="تحديث قائمة الجلسات"
+          className="h-9 w-9 rounded-lg p-0 touch-target"
+          aria-label={t("sessions.refresh")}
         >
           <RefreshCw
-            size={16}
+            size={15}
             className={readyAppointmentsLoading ? "animate-spin" : ""}
+            aria-hidden="true"
           />
         </Button>
       </div>
 
-      <div className="flex-1 overflow-hidden">
-        <AnimatePresence mode="popLayout">
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <AnimatePresence>
           {readyAppointments.length === 0 ? (
             <motion.div
               key="empty"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="flex flex-col items-center justify-center h-full text-center opacity-40"
+              exit={{ opacity: 0, scale: 0.97 }}
+              className="flex h-full flex-col items-center justify-center px-3 text-center opacity-60"
             >
-              <div className="h-16 w-16 rounded-2xl bg-soft flex items-center justify-center mb-3">
-                <ShoppingBag size={32} className="text-muted" />
+              <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-soft">
+                <ShoppingBag
+                  size={24}
+                  className="text-muted"
+                  aria-hidden="true"
+                />
               </div>
-              <h3 className="text-base font-black text-muted">لا توجد جلسات</h3>
+              <h3 className="text-xs font-black text-muted">
+                {t("sessions.empty")}
+              </h3>
+              <p className="mt-1 max-w-[14rem] text-[10px] font-bold leading-relaxed text-muted/80">
+                {t("sessions.empty_hint")}
+              </p>
             </motion.div>
           ) : (
             <motion.div
               key="sessions"
               ref={parentRef}
               className="h-full overflow-y-auto no-scrollbar touch-action-pan-y"
-              style={{
-                contain: "layout paint",
-                willChange: "transform",
-              }}
+              style={{ contain: "layout paint" }}
             >
               <div
                 style={{
@@ -170,21 +156,20 @@ const SessionsQueue = () => {
                     }}
                   >
                     <motion.div
-                      initial={{ opacity: 0, x: 20 }}
+                      initial={{ opacity: 0, x: 16 }}
                       animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
+                      exit={{ opacity: 0, x: -16 }}
                       // Capped: the old `index * 0.02` delay reached a full
                       // second by the 50th card, so a long queue visibly
                       // filled in one card at a time.
-                      transition={{ delay: Math.min(virtualRow.index, 8) * 0.02 }}
+                      transition={{
+                        delay: Math.min(virtualRow.index, 8) * 0.02,
+                      }}
                     >
                       <SessionCard
                         appt={readyAppointments[virtualRow.index]}
-                        index={virtualRow.index}
                         activeAppointmentId={activeAppointmentId}
                         handleLoadAppointment={handleLoadAppointment}
-                        barbers={barbers}
-                        formatCurrency={formatCurrency}
                       />
                     </motion.div>
                   </div>
@@ -202,69 +187,71 @@ const SessionsQueue = () => {
 const SessionCard = React.memo(
   ({
     appt,
-    index: _index,
     activeAppointmentId,
     handleLoadAppointment,
-    barbers: _barbers,
-    formatCurrency,
-  }: any) => {
-    const appointmentId = appt.appointment_id || appt.id;
-    const isActive = activeAppointmentId === appointmentId;
+  }: {
+    appt: any;
+    activeAppointmentId: string | number | null;
+    handleLoadAppointment: (appointment: any) => void;
+  }) => {
+    const { t } = useTranslation("pos");
+    const locale = useIntlLocale();
+    const appointmentId = appt?.appointment_id || appt?.id;
+    const isActive = String(activeAppointmentId) === String(appointmentId);
 
     return (
       <Card
         className={cn(
-          // bg-card (no backdrop-blur): one of these cards can be on screen
-          // per waiting session, and the blur behind a near-opaque surface was
-          // a visual no-op costing compositor time on every card.
-          "p-3 sm:p-4 group cursor-pointer transition-all duration-300 border border-border/50 rounded-2xl relative overflow-hidden bg-card shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950",
+          "group relative mb-2 cursor-pointer overflow-hidden rounded-xl border bg-card p-3 shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950",
           isActive
             ? "border-primary bg-primary/5 shadow-md shadow-primary/5"
-            : "hover:border-primary/30 hover:shadow-md hover:shadow-primary/5",
+            : "border-border/60 hover:border-primary/30 hover:shadow-md",
         )}
         onClick={() => handleLoadAppointment(appt)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
             handleLoadAppointment(appt);
           }
         }}
         tabIndex={0}
         role="button"
         aria-pressed={isActive}
-        aria-label={`جلسة ${appt.customer_name || "عميل مجهول"}، ${appt.appointment_time || "وقت غير محدد"}، ${formatCurrency(appt.total_estimated_price ?? appt.total_amount ?? 0)}`}
+        aria-label={t("sessions.aria", {
+          name: appt.customer_name || t("sessions.unknown_customer"),
+          time: appt.appointment_time || t("sessions.no_time"),
+          total: formatCurrency(
+            appt.total_estimated_price ?? appt.total_amount ?? 0,
+          ),
+        })}
       >
-        {/* Active Indicator */}
         {isActive && (
-          <div className="absolute top-0 right-0 w-1 h-full bg-primary" />
+          <div className="absolute inset-y-0 end-0 w-1 bg-primary" />
         )}
 
-        <div className="flex items-start justify-between relative z-10 gap-2">
-          <div className="space-y-2 min-w-0 flex-1">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-soft flex items-center justify-center text-primary shrink-0 group-hover:scale-105 transition-transform">
-                <User size={16} className="sm:size-5" />
-              </div>
+        <div className="relative z-10 flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-soft text-primary transition-transform group-hover:scale-105">
+                <User size={15} aria-hidden="true" />
+              </span>
               <div className="min-w-0">
-                <h4 className="text-xs sm:text-sm font-black text-main leading-tight truncate">
-                  {appt.customer_name || "عميل مجهول"}
-                </h4>
-                <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5">
-                  <Badge
-                    variant="secondary"
-                    className="text-[10px] sm:text-[10px] font-black h-3.5 sm:h-4 px-1 bg-soft text-muted border-none"
-                  >
+                <h3 className="truncate text-xs font-black leading-tight text-main">
+                  {appt.customer_name || t("sessions.unknown_customer")}
+                </h3>
+                <div className="mt-0.5 flex items-center gap-1.5">
+                  <Badge variant="secondary" size="sm" className="tabular-nums">
                     #{appointmentId}
                   </Badge>
-                  <span className="text-[10px] sm:text-[10px] font-bold text-muted flex items-center gap-1 bg-soft px-1 sm:px-1.5 py-0.5 rounded-md border border-border/50">
-                    <Clock size={8} />
+                  <span className="flex items-center gap-1 rounded bg-soft px-1 py-0.5 text-[9px] font-bold text-muted">
+                    <Clock size={8} aria-hidden="true" />
                     {(() => {
                       const timeStr = appt.appointment_time;
                       if (!timeStr) return "--:--";
                       const [h, m] = timeStr.split(":");
-                      const d = new Date();
-                      d.setHours(parseInt(h), parseInt(m), 0);
-                      return d.toLocaleTimeString("ar-EG", {
+                      const date = new Date();
+                      date.setHours(parseInt(h), parseInt(m), 0);
+                      return date.toLocaleTimeString(locale, {
                         hour: "2-digit",
                         minute: "2-digit",
                         hour12: true,
@@ -275,37 +262,44 @@ const SessionCard = React.memo(
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 px-1.5 py-0.5 sm:py-1 rounded-lg bg-primary/5 border border-primary/10 max-w-full">
-                <Zap size={10} className="text-primary shrink-0" />
-                <span className="text-[10px] sm:text-[10px] font-black text-primary truncate">
-                  {appt.employee_name || appt.barber_name || "بدون خبير"}
-                </span>
-              </div>
+            <div className="flex items-center gap-1 rounded-md border border-primary/10 bg-primary/5 px-1.5 py-0.5">
+              <Zap
+                size={9}
+                className="shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <span className="truncate text-[9px] font-black text-primary">
+                {appt.employee_name ||
+                  appt.barber_name ||
+                  t("sessions.no_expert")}
+              </span>
             </div>
           </div>
 
-          <div className="text-left flex flex-col items-end gap-1.5 shrink-0">
-            <div className="bg-card px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl shadow-sm border border-border/50 group-hover:border-primary/20 transition-all">
-              <p className="text-xs sm:text-base font-black text-primary tabular-nums">
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <div className="rounded-lg border border-border/50 bg-card px-2 py-1 shadow-sm">
+              <p className="text-xs font-black tabular-nums text-primary">
                 {formatCurrency(
                   appt.total_estimated_price ?? appt.total_amount ?? 0,
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-1 text-primary text-[10px] sm:text-[10px] font-black opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0 duration-300 uppercase">
-              مراجعة <ChevronLeft size={10} strokeWidth={3} />
+            <div className="flex items-center gap-0.5 text-[9px] font-black text-primary opacity-0 transition-all group-hover:opacity-100">
+              {t("sessions.review")}
+              <ChevronLeft size={9} strokeWidth={3} aria-hidden="true" />
             </div>
           </div>
         </div>
 
-        <div className="mt-2.5 sm:mt-3 flex flex-wrap gap-1 relative z-10">
-          {(appt.services || []).map((svc, sIdx) => (
+        <div className="relative z-10 mt-2 flex flex-wrap gap-1">
+          {(appt.services || []).map((service, index) => (
             <span
-              key={sIdx}
-              className="px-1.5 py-0.5 rounded-md sm:rounded-lg bg-soft text-[10px] sm:text-[10px] font-black text-muted border border-border/50 group-hover:border-primary/20 transition-all truncate max-w-[120px]"
+              key={index}
+              className="max-w-[8rem] truncate rounded border border-border/50 bg-soft px-1.5 py-0.5 text-[9px] font-black text-muted transition-colors group-hover:border-primary/20"
             >
-              {svc.service_name_snapshot || svc.service_name || svc.name}
+              {service.service_name_snapshot ||
+                service.service_name ||
+                service.name}
             </span>
           ))}
         </div>

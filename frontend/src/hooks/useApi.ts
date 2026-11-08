@@ -15,6 +15,7 @@ import type { PaginatedParams, PaginatedResult } from "@/types/common";
 const queryKeys = {
   employees: ["employees"],
   employeesArchive: ["employees", "archive"],
+  employeeStats: ["employees", "stats"],
   employeePerformance: ["reports", "employee-performance"],
   dailySummary: ["reports", "daily-summary"],
   products: ["products"],
@@ -29,8 +30,12 @@ const queryKeys = {
  
 type AnyRecord = Record<string, any>;
 
-function fetchEmployeesArchive(params?: PaginatedParams): Promise<unknown> {
-  return api.get("/employees/archive", { params }).then((r) => r.data);
+function fetchEmployeesArchive(params?: PaginatedParams): Promise<PaginatedResult<AnyRecord>> {
+  return api.get("/employees/archive", { params }).then((r) => normalizeListResponse(r));
+}
+
+function fetchEmployeeStats(): Promise<AnyRecord> {
+  return api.get("/employees/stats").then((r) => r.data);
 }
 
 function fetchProducts(params?: PaginatedParams): Promise<unknown> {
@@ -91,13 +96,24 @@ function fetchDailySummary(date: string): Promise<any> {
 
 type QueryOpts<T> = Omit<UseQueryOptions<T>, "queryKey" | "queryFn">;
 
-export function useEmployeesArchive<T = unknown>(
-  params: PaginatedParams = {},
+export function useEmployeeStats<T = AnyRecord>(
   options: QueryOpts<T> = {},
 ) {
   return useQuery<T>({
+    queryKey: [...queryKeys.employeeStats],
+    queryFn: () => fetchEmployeeStats() as Promise<T>,
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
+export function useEmployeesArchive<T = AnyRecord>(
+  params: PaginatedParams = {},
+  options: QueryOpts<PaginatedResult<T>> = {},
+) {
+  return useQuery<PaginatedResult<T>>({
     queryKey: [...queryKeys.employeesArchive, params],
-    queryFn: () => fetchEmployeesArchive(params) as Promise<T>,
+    queryFn: () => fetchEmployeesArchive(params) as Promise<PaginatedResult<T>>,
     staleTime: 60_000,
     ...options,
   });

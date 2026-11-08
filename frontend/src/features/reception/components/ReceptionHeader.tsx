@@ -3,6 +3,7 @@ import { Monitor, RefreshCw, UserPlus, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/PremiumUI";
 import { cn } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
 
 export default function ReceptionHeader({
   connected,
@@ -15,11 +16,12 @@ export default function ReceptionHeader({
   onRefresh: () => void;
   onNewClient: () => void;
 }) {
+  const { t } = useTranslation("reception");
   return (
     <PageHeader className={undefined}
-      title="لوحة التحكم والعمليات"
-      subtitle="متابعة دقيقة لمسار العميل داخل الصالون"
-      badge={connected ? "متصل مباشر" : "غير متصل"}
+      title={t("board.title")}
+      subtitle={t("board.subtitle")}
+      badge={connected ? t("board.connected") : t("board.disconnected")}
       icon={Monitor}
       actions={
         <div className="flex items-center gap-3 flex-wrap">
@@ -32,14 +34,14 @@ export default function ReceptionHeader({
             )}
           >
             {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
-            {connected ? "الاتصال الحي يعمل" : "إعادة الاتصال..."}
+            {connected ? t("board.connection_live") : t("board.connection_reconnecting")}
           </div>
           <Button
             variant="outline"
             size="icon"
             onClick={onRefresh}
-            aria-label="تحديث البيانات"
-            title="تحديث البيانات"
+            aria-label={t("board.refresh")}
+            title={t("board.refresh")}
             className="h-11 w-11 rounded-xl"
           >
             <RefreshCw
@@ -51,7 +53,7 @@ export default function ReceptionHeader({
             onClick={onNewClient}
             className="h-11 px-8 rounded-xl font-black bg-primary text-white shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3 text-sm"
           >
-            <UserPlus size={20} /> تسجيل عميل سريع
+            <UserPlus size={20} /> {t("board.new_client")}
           </Button>
         </div>
       }

@@ -3,6 +3,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { cn } from "@/lib/core/utils";
 import { normalizeStatus } from "@/pages/cashier/schedule/scheduleUtils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import i18n from "@/i18n";
 
 function formatDateInput(date) {
   const y = date.getFullYear();
@@ -16,13 +17,13 @@ function shiftMonth(date, offset) {
 }
 
 const DAY_LABELS = [
-  "السبت",
-  "الأحد",
-  "الاثنين",
-  "الثلاثاء",
-  "الأربعاء",
-  "الخميس",
-  "الجمعة",
+  i18n.t("schedule:miniCalendar.days.saturday"),
+  i18n.t("schedule:miniCalendar.days.sunday"),
+  i18n.t("schedule:miniCalendar.days.monday"),
+  i18n.t("schedule:miniCalendar.days.tuesday"),
+  i18n.t("schedule:miniCalendar.days.wednesday"),
+  i18n.t("schedule:miniCalendar.days.thursday"),
+  i18n.t("schedule:miniCalendar.days.friday"),
 ];
 
 function DayCell({
@@ -68,12 +69,20 @@ function DayCell({
         highlighted && "bg-accent/20 ring-2 ring-accent",
       )}
       role="gridcell"
-      aria-label={day === null ? "" : `يوم ${day}`}
+      aria-label={day === null ? "" : i18n.t("miniCalendar.dayLabel", { day })}
       aria-selected={selected}
       title={
         counts.total > 0
-          ? `${counts.total} مواعيد${counts.confirmed > 0 ? ` (${counts.confirmed} مؤكد)` : ""}`
-          : "لا توجد مواعيد"
+          ? i18n.t("miniCalendar.totalAppointments", {
+              total: counts.total,
+              confirmedSuffix:
+                counts.confirmed > 0
+                  ? i18n.t("miniCalendar.confirmedSuffix", {
+                      count: counts.confirmed,
+                    })
+                  : "",
+            })
+          : i18n.t("miniCalendar.noAppointments")
       }
     >
       {day !== null && (
@@ -159,10 +168,13 @@ const MiniCalendar = memo(function MiniCalendar({
     return cells;
   }, [viewMonth]);
 
-  const monthLabel = viewMonth.toLocaleDateString("ar-EG", {
-    month: "long",
-    year: "numeric",
-  });
+  const monthLabel = viewMonth.toLocaleDateString(
+    i18n.language === "ar" ? "ar-EG" : "en-US",
+    {
+      month: "long",
+      year: "numeric",
+    },
+  );
 
   return (
     <div className="select-none">
@@ -170,7 +182,7 @@ const MiniCalendar = memo(function MiniCalendar({
         <button
           onClick={() => setViewMonth((m) => shiftMonth(m, -1))}
           className="h-8 w-8 flex items-center justify-center rounded-lg bg-soft text-muted hover:text-accent hover:bg-card transition-all border border-border/60"
-          aria-label="الشهر السابق"
+          aria-label={i18n.t("miniCalendar.prevMonth")}
         >
           <ChevronRight size={16} />
         </button>
@@ -178,7 +190,7 @@ const MiniCalendar = memo(function MiniCalendar({
         <button
           onClick={() => setViewMonth((m) => shiftMonth(m, 1))}
           className="h-8 w-8 flex items-center justify-center rounded-lg bg-soft text-muted hover:text-accent hover:bg-card transition-all border border-border/60"
-          aria-label="الشهر التالي"
+          aria-label={i18n.t("miniCalendar.nextMonth")}
         >
           <ChevronLeft size={16} />
         </button>

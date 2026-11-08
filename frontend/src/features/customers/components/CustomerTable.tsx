@@ -18,6 +18,7 @@ import {
   getTierInfo,
 } from "@/features/customers/utils/customer";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useTranslation } from "react-i18next";
 
 const SORT_ACCESSORS: Record<string, (c: any) => number | string> = {
   name: (c) => customerName(c),
@@ -33,10 +34,14 @@ export default function CustomerTable({
   onOpenDetails,
   onNavigate,
   onDelete,
-  emptyTitle = "لا يوجد عملاء مطابقين",
+  emptyTitle,
   emptyHint,
   showClearFilter = false,
   onClearFilter,
+  selectedIds = new Set(),
+  onSelect,
+  onSelectAll,
+  isAllSelected = false,
 }: {
   rows: any[];
   loading: boolean;
@@ -48,9 +53,14 @@ export default function CustomerTable({
   emptyHint?: string;
   showClearFilter?: boolean;
   onClearFilter?: () => void;
+  selectedIds?: Set<number | string>;
+  onSelect?: (id: number | string) => void;
+  onSelectAll?: () => void;
+  isAllSelected?: boolean;
 }) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const { t } = useTranslation("customers");
 
   const sortedRows = useMemo(() => {
     if (!sortKey || !SORT_ACCESSORS[sortKey]) return rows;
@@ -110,17 +120,25 @@ export default function CustomerTable({
 
   return (
           <div className="scroll-x">
-            <table className="min-w-[52rem] w-full text-right">
+            <table className="min-w-[52rem] w-full text-end">
               <thead>
                 <tr className="border-b border-border bg-soft">
-                  <SortHeader label="ملف العميل" sort="name" />
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted">
-                    رقم التواصل
+                  <th className="px-4 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={onSelectAll}
+                      aria-label={t("bulk.selectAll")}
+                    />
                   </th>
-                  <SortHeader label="الزيارات" sort="visits" />
-                  <SortHeader label="الإنفاق" sort="spend" />
+                  <SortHeader label={t("table.customerProfile")} sort="name" />
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted">
+                    {t("table.contact")}
+                  </th>
+                  <SortHeader label={t("table.visits")} sort="visits" />
+                  <SortHeader label={t("table.spend")} sort="spend" />
                   <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-muted">
-                    الإجراءات
+                    {t("table.actions")}
                   </th>
                 </tr>
               </thead>
@@ -137,8 +155,27 @@ export default function CustomerTable({
                       "cursor-pointer transition hover:bg-soft/60",
                       loading && "pointer-events-none opacity-50",
                     )}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onOpenDetails(customer)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onOpenDetails(customer);
+                      }
+                    }}
                   >
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(customerId(customer))}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          onSelect?.(customerId(customer));
+                        }}
+                        aria-label={t("table.viewProfile")}
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-xs font-black text-primary">
@@ -156,7 +193,7 @@ export default function CustomerTable({
                                 tier.color,
                               )}
                             >
-                              <tier.icon size={9} /> {tier.label}
+                              <tier.icon size={9} /> {t(tier.label)}
                             </span>
                           </div>
                           <div className="text-[10px] font-bold text-muted">
@@ -175,7 +212,7 @@ export default function CustomerTable({
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={visitsVariant}>
-                        {visits} زيارة
+                        {t("table.visitBadge", { count: visits })}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-center text-xs font-black text-success">
@@ -191,7 +228,8 @@ export default function CustomerTable({
                         <Button
                           variant="primary"
                           size="icon"
-                          title="عرض الملف"
+                          title={t("table.viewProfile")}
+                          aria-label={t("table.viewProfile")}
                           onClick={(event) => {
                             event.stopPropagation();
                             onNavigate(customerId(customer));
@@ -202,7 +240,8 @@ export default function CustomerTable({
                         <Button
                           variant="secondary"
                           size="icon"
-                          title="فتح سريع"
+                          title={t("table.quickOpen")}
+                          aria-label={t("table.quickOpen")}
                           onClick={(event) => {
                             event.stopPropagation();
                             onOpenDetails(customer);
@@ -215,7 +254,8 @@ export default function CustomerTable({
                             variant="ghost"
                             size="icon"
                             className="text-danger hover:text-danger"
-                            title="أرشفة"
+                            title={t("table.archive")}
+                            aria-label={t("table.archive")}
                             onClick={(event) => {
                               event.stopPropagation();
                               onDelete(customer);
@@ -231,9 +271,9 @@ export default function CustomerTable({
                 })}
                 {sortedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6">
+                    <td colSpan={6} className="px-4 py-6">
                       <EmptyState
-                        title={emptyTitle}
+                        title={emptyTitle || t("table.emptyTitle")}
                         message={emptyHint}
                         variant="section"
                         action={
@@ -241,10 +281,11 @@ export default function CustomerTable({
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={onClearFilter}
+                              aria-label={t("toolbar.clearFilters")}
+onClick={onClearFilter}
                               className="mt-2 rounded-xl text-xs font-black"
                             >
-                              مسح البحث والفلتر
+                              {t("toolbar.clearFilters")}
                             </Button>
                           ) : undefined
                         }

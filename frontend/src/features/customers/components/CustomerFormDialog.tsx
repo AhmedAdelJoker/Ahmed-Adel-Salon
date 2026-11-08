@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { Dispatch, SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function CustomerFormDialog({
   open,
@@ -32,21 +33,22 @@ export default function CustomerFormDialog({
   onSubmit: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("customers");
   return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editing ? "تعديل بيانات العميل" : "إضافة عميل جديد"}
+              {editing ? t("form.editTitle") : t("form.createTitle")}
             </DialogTitle>
             <DialogDescription>
-              أدخل اسم العميل ورقم الجوال. رقم إضافي اختياري.
+              {t("form.description")}
             </DialogDescription>
           </DialogHeader>
           <div className="custom-scrollbar flex-1 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6 space-y-5">
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-slate-500">
-                الاسم الكامل <span className="text-red-500">*</span>
+                {t("form.nameLabel")} <span className="text-red-500">{t("form.nameRequired")}</span>
               </label>
               <Input
                 value={form.name || ""}
@@ -56,7 +58,7 @@ export default function CustomerFormDialog({
                     name: event.target.value,
                   }))
                 }
-                placeholder="مثال: أحمد محمد"
+                placeholder={t("form.namePlaceholder")}
                 className="h-12 text-lg"
                 autoFocus
               />
@@ -64,14 +66,14 @@ export default function CustomerFormDialog({
 
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-slate-500">
-                رقم الجوال <span className="text-red-500">*</span>
+                {t("form.phoneLabel")} <span className="text-red-500">{t("form.nameRequired")}</span>
               </label>
               <Input
                 value={form.phone || ""}
                 onChange={(event) =>
                   setForm((previous) => ({
                     ...previous,
-                    phone: event.target.value,
+                    phone: event.target.value.slice(0, 11),
                   }))
                 }
                 placeholder="010XXXXXXXX"
@@ -79,22 +81,20 @@ export default function CustomerFormDialog({
                 type="tel"
                 className="h-12 text-lg"
                 inputMode="numeric"
+                maxLength={11}
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1">
-                رقم إضافي (اختياري)
-                <span className="text-xs font-normal text-slate-400 uppercase tracking-normal">
-                  اختياري
-                </span>
+                {t("form.secondPhoneLabel")}
               </label>
               <Input
                 value={form.phone2 || ""}
                 onChange={(event) =>
                   setForm((previous) => ({
                     ...previous,
-                    phone2: event.target.value,
+                    phone2: event.target.value.slice(0, 11),
                   }))
                 }
                 placeholder="010XXXXXXXX"
@@ -102,6 +102,7 @@ export default function CustomerFormDialog({
                 type="tel"
                 className="h-12 text-lg"
                 inputMode="numeric"
+                maxLength={11}
               />
             </div>
           </div>
@@ -111,16 +112,18 @@ export default function CustomerFormDialog({
               className="flex-1"
               onClick={onClose}
               disabled={isSaving}
+              aria-label={t("form.cancel")}
             >
-              إلغاء
+              {t("form.cancel")}
             </Button>
             <Button
               className="flex-1"
               disabled={loading}
               onClick={onSubmit}
               loading={isSaving}
+              aria-label={editing ? t("form.saveEdit") : t("form.create")}
             >
-              {editing ? "حفظ التغييرات" : "إضافة العميل"}
+              {editing ? t("form.saveEdit") : t("form.create")}
             </Button>
           </DialogFooter>
         </DialogContent>

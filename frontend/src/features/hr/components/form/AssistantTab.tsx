@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Activity } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
 import {
   ASSISTANT_TASKS,
 } from "@/features/hr";
@@ -27,21 +28,21 @@ export default function AssistantTab({
   setFormData: Dispatch<SetStateAction<EmployeeRecord>>;
   employees: EmployeeRecord[];
 }) {
+  const { t } = useTranslation("owner");
   return (
           <div className="space-y-8 animate-in fade-in duration-500">
             {formData.jobTitle !== "barber_assistant" && (
               <div className="p-4 rounded-2xl bg-warning-soft border border-warning/20 flex gap-4 text-warning">
                 <Activity className="shrink-0" />
                 <p className="text-xs font-bold leading-relaxed">
-                  هذا القسم مخصص فقط للموظفين الذين يعملون بصفة "مساعد حلاق"
-                  لتحديد المشرف والمهام.
+                  {t("hr.assistantOnly")}
                 </p>
               </div>
             )}
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  المشرف المباشر (الخبير)
+                  {t("hr.supervisor")}
                 </label>
                 <Select
                   value={String(formData.assistantOfBarberId ?? "")}
@@ -50,7 +51,7 @@ export default function AssistantTab({
                   }
                 >
                   <SelectTrigger className={FIELD_SELECT_CLASS}>
-                    <SelectValue placeholder="اختر الخبير المسؤول..." />
+                    <SelectValue placeholder={t("hr.selectSupervisor")} />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     {employees
@@ -64,7 +65,7 @@ export default function AssistantTab({
                 </Select>
               </div>
               <div className="space-y-3">
-                <label className={FIELD_LABEL_CLASS}>المهام التشغيلية</label>
+                <label className={FIELD_LABEL_CLASS}>{t("hr.operationalTasks")}</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {ASSISTANT_TASKS.map((task) => (
                     <button

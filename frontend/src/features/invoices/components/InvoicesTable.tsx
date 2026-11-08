@@ -8,6 +8,7 @@ import {
   FileDown,
   FileText,
   Landmark,
+  MessageCircle,
   MoreHorizontal,
   Printer,
   RefreshCw,
@@ -15,6 +16,7 @@ import {
   Split,
   Wallet,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -44,10 +46,10 @@ import {
   invoiceNo,
   invoicePayment,
   invoicePaymentLabel,
-  statusLabels,
-  invoiceStatus,
+  invoiceStatusLabel,
   invoiceTotal,
   isInvoiceEditable,
+  type InvoiceRecord,
 } from "@/features/invoices/utils/invoice";
 
 export interface InvoicesTableSortConfig {
@@ -58,18 +60,21 @@ export interface InvoicesTableSortConfig {
 export interface InvoicesTableProps {
   loading: boolean;
   error?: string | null;
-  filteredInvoices: any[];
+  filteredInvoices: InvoiceRecord[];
   visibleColumns: Record<string, boolean>;
   sortConfig: InvoicesTableSortConfig;
   handleSort: (key: string) => void;
   busyPdfId: number | string | null;
+  busyWhatsappId?: number | string | null;
   hasFilters: boolean;
-  onSelectInvoice: (invoice: any) => void;
-  onPrintInvoice: (invoice: any) => void;
-  onOpenPdf: (invoice: any) => void;
-  onRequestAdjustment: (invoice: any) => void;
+  onSelectInvoice: (invoice: InvoiceRecord) => void;
+  onPrintInvoice: (invoice: InvoiceRecord) => void;
+  onOpenPdf: (invoice: InvoiceRecord) => void;
+  onSendWhatsapp: (invoice: InvoiceRecord) => void;
+  onRequestAdjustment: (invoice: InvoiceRecord) => void;
   onResetFilters: () => void;
   onRetry?: () => void;
+  onCreateFromPos?: () => void;
 }
 
 const PAYMENT_ICONS: Record<string, typeof Banknote> = {
@@ -80,7 +85,7 @@ const PAYMENT_ICONS: Record<string, typeof Banknote> = {
   split: Split,
 };
 
-function PaymentBadge({ invoice }: { invoice: any }) {
+function PaymentBadge({ invoice }: { invoice: InvoiceRecord }) {
   const method = invoicePayment(invoice);
   const Icon = PAYMENT_ICONS[method] || Banknote;
   return (
@@ -91,13 +96,13 @@ function PaymentBadge({ invoice }: { invoice: any }) {
   );
 }
 
-function StatusBadge({ invoice }: { invoice: any }) {
+function StatusBadge({ invoice }: { invoice: InvoiceRecord }) {
   const closed = invoiceIsClosed(invoice);
   return (
     <Badge
       variant={closed ? "danger" : "success"}
       size="sm"
-      className="font-bold"
+      className="gap-1 font-bold"
     >
       <span
         className={cn(
@@ -105,7 +110,7 @@ function StatusBadge({ invoice }: { invoice: any }) {
           closed ? "bg-danger" : "bg-success",
         )}
       />
-      {statusLabels[invoiceStatus(invoice)] || "مكتملة"}
+      {invoiceStatusLabel(invoice)}
     </Badge>
   );
 }
@@ -123,11 +128,13 @@ function SortLabel({
   onSort: (key: string) => void;
   align?: "start" | "end";
 }) {
+  const { t } = useTranslation("invoices");
   const active = sortConfig.key === sortKey;
   return (
     <button
       type="button"
       onClick={() => onSort(sortKey)}
+      aria-label={t("table.sortBy", { column: label })}
       className={cn(
         "inline-flex w-full items-center gap-1 rounded-md text-[11px] font-black text-muted transition-colors hover:text-main",
         align === "end" ? "justify-end" : "justify-start",
@@ -150,21 +157,27 @@ function SortLabel({
 function RowActions({
   invoice,
   busyPdfId,
+  busyWhatsappId,
   onSelectInvoice,
   onPrintInvoice,
   onOpenPdf,
+  onSendWhatsapp,
   onRequestAdjustment,
   compact = false,
 }: {
-  invoice: any;
+  invoice: InvoiceRecord;
   busyPdfId: number | string | null;
-  onSelectInvoice: (invoice: any) => void;
-  onPrintInvoice: (invoice: any) => void;
-  onOpenPdf: (invoice: any) => void;
-  onRequestAdjustment: (invoice: any) => void;
+  busyWhatsappId?: number | string | null;
+  onSelectInvoice: (invoice: InvoiceRecord) => void;
+  onPrintInvoice: (invoice: InvoiceRecord) => void;
+  onOpenPdf: (invoice: InvoiceRecord) => void;
+  onSendWhatsapp: (invoice: InvoiceRecord) => void;
+  onRequestAdjustment: (invoice: InvoiceRecord) => void;
   compact?: boolean;
 }) {
+  const { t } = useTranslation("invoices");
   const editable = isInvoiceEditable(invoice);
+  const id = invoiceId(invoice);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -172,25 +185,31 @@ function RowActions({
           variant="ghost"
           size="icon"
           className={cn("rounded-lg", compact ? "h-7 w-7" : "h-8 w-8")}
-          aria-label={`إجراءات الفاتورة ${invoiceNo(invoice)}`}
-          title="إجراءات"
+          aria-label={t("table.actionsLabel", { no: invoiceNo(invoice) })}
+          title={t("actions.viewDetails")}
           onClick={(event) => event.stopPropagation()}
         >
           <MoreHorizontal size={15} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuItem onSelect={() => onSelectInvoice(invoice)}>
-          <Eye size={14} /> تفاصيل الفاتورة
+          <Eye size={14} /> {t("actions.viewDetails")}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onPrintInvoice(invoice)}>
-          <Printer size={14} /> طباعة إيصال
+          <Printer size={14} /> {t("actions.printReceipt")}
         </DropdownMenuItem>
         <DropdownMenuItem
-          disabled={busyPdfId === invoiceId(invoice)}
+          disabled={busyPdfId === id}
           onSelect={() => onOpenPdf(invoice)}
         >
-          <FileDown size={14} /> تحميل PDF
+          <FileDown size={14} /> {t("actions.downloadPdf")}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={busyWhatsappId === id}
+          onSelect={() => onSendWhatsapp(invoice)}
+        >
+          <MessageCircle size={14} /> {t("actions.sendWhatsapp")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -198,7 +217,7 @@ function RowActions({
           onSelect={() => onRequestAdjustment(invoice)}
           className="text-warning focus:text-warning"
         >
-          <ShieldCheck size={14} /> طلب تعديل
+          <ShieldCheck size={14} /> {t("actions.requestAdjustment")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -213,6 +232,7 @@ function LoadingSkeleton() {
           <div
             key={row}
             className="grid grid-cols-[150px_1fr_110px_110px_90px_120px_44px] items-center gap-3 rounded-xl px-3 py-2.5"
+            aria-hidden="true"
           >
             <div className="h-3 w-24 animate-pulse rounded bg-soft" />
             <div className="space-y-1.5">
@@ -229,7 +249,7 @@ function LoadingSkeleton() {
       </div>
       <div className="space-y-2 p-3 lg:hidden">
         {[1, 2, 3, 4].map((row) => (
-          <div key={row} className="rounded-2xl border border-border/50 p-3">
+          <div key={row} className="rounded-2xl border border-border/50 p-3" aria-hidden="true">
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-2">
                 <div className="h-2.5 w-28 animate-pulse rounded bg-soft" />
@@ -256,15 +276,25 @@ export function InvoicesTable({
   sortConfig,
   handleSort,
   busyPdfId,
+  busyWhatsappId,
   hasFilters,
   onSelectInvoice,
   onPrintInvoice,
   onOpenPdf,
+  onSendWhatsapp,
   onRequestAdjustment,
   onResetFilters,
   onRetry,
+  onCreateFromPos,
 }: InvoicesTableProps) {
-  if (loading) return <LoadingSkeleton />;
+  const { t } = useTranslation("invoices");
+  // aria-sort belongs on the columnheader (<th>), not on the button inside it.
+  const ariaSort = (key: string) =>
+    sortConfig.key === key
+      ? (sortConfig.direction === "asc" ? "ascending" : "descending")
+      : undefined;
+
+  if (loading && filteredInvoices.length === 0) return <LoadingSkeleton />;
 
   if (error && filteredInvoices.length === 0) {
     return (
@@ -273,12 +303,12 @@ export function InvoicesTable({
           <AlertTriangle size={24} />
         </div>
         <div>
-          <p className="text-base font-black text-main">تعذر تحميل الفواتير</p>
+          <p className="text-base font-black text-main">{t("table.errorTitle")}</p>
           <p className="mt-1 max-w-sm text-xs font-bold text-muted">{error}</p>
         </div>
         {onRetry && (
           <Button variant="outline" className="h-9 rounded-xl" onClick={onRetry}>
-            <RefreshCw size={13} className="ms-1.5" /> إعادة المحاولة
+            <RefreshCw size={13} className="ms-1.5" /> {t("table.retry")}
           </Button>
         )}
       </div>
@@ -293,37 +323,56 @@ export function InvoicesTable({
         </div>
         <div>
           <p className="text-base font-black text-main">
-            {hasFilters ? "لا توجد فواتير مطابقة" : "لا توجد فواتير بعد"}
+            {hasFilters ? t("table.emptyTitleFiltered") : t("table.emptyTitleDefault")}
           </p>
           <p className="mt-1 text-xs font-bold text-muted">
-            {hasFilters
-              ? "جرّب تغيير الفترة أو مسح الفلاتر"
-              : "أول فاتورة تُصدر من نقطة البيع ستظهر هنا"}
+            {hasFilters ? t("table.emptyDescFiltered") : t("table.emptyDescDefault")}
           </p>
         </div>
-        {hasFilters && (
-          <Button
-            variant="outline"
-            className="h-9 rounded-xl"
-            onClick={onResetFilters}
-          >
-            <RefreshCw size={13} className="ms-1.5" /> مسح الفلاتر
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {hasFilters && (
+            <Button
+              variant="outline"
+              className="h-9 rounded-xl"
+              onClick={onResetFilters}
+            >
+              <RefreshCw size={13} className="ms-1.5" /> {t("table.clearFilters")}
+            </Button>
+          )}
+          {!hasFilters && onCreateFromPos && (
+            <Button className="h-9 rounded-xl" onClick={onCreateFromPos}>
+              {t("table.createFromPos")}
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
 
+  const handleRowKeyDown = (
+    event: React.KeyboardEvent<HTMLTableRowElement>,
+    invoice: InvoiceRecord,
+  ) => {
+    // The row is keyboard-activatable, but the inner buttons (row actions)
+    // bubble their own key events up. Without this guard, Enter on the
+    // actions menu opened the invoice details instead of the menu.
+    if (event.target !== event.currentTarget) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelectInvoice(invoice);
+    }
+  };
+
   return (
-    <>
+    <div aria-busy={loading || undefined} role={loading ? "status" : undefined}>
       <div className="hidden lg:block">
         <Table className="w-full">
           <TableHeader>
             <TableRow className="border-border/60 hover:bg-transparent">
               {visibleColumns.invoiceNo && (
-                <TableHead className="w-[150px]">
+                <TableHead scope="col" aria-sort={ariaSort("invoiceNo")} className="w-[150px]">
                   <SortLabel
-                    label="الفاتورة"
+                    label={t("table.invoice")}
                     sortKey="invoiceNo"
                     sortConfig={sortConfig}
                     onSort={handleSort}
@@ -331,16 +380,16 @@ export function InvoicesTable({
                 </TableHead>
               )}
               {visibleColumns.customer && (
-                <TableHead className="min-w-[190px]">
+                <TableHead scope="col" className="min-w-[190px]">
                   <span className="text-[11px] font-black text-muted">
-                    العميل والخبير
+                    {t("table.customerBarber")}
                   </span>
                 </TableHead>
               )}
               {visibleColumns.date && (
-                <TableHead className="w-[125px]">
+                <TableHead scope="col" aria-sort={ariaSort("date")} className="w-[125px]">
                   <SortLabel
-                    label="التاريخ"
+                    label={t("table.date")}
                     sortKey="date"
                     sortConfig={sortConfig}
                     onSort={handleSort}
@@ -348,23 +397,23 @@ export function InvoicesTable({
                 </TableHead>
               )}
               {visibleColumns.payment && (
-                <TableHead className="w-[120px]">
+                <TableHead scope="col" className="w-[120px]">
                   <span className="text-[11px] font-black text-muted">
-                    الدفع
+                    {t("table.payment")}
                   </span>
                 </TableHead>
               )}
               {visibleColumns.status && (
-                <TableHead className="w-[95px]">
+                <TableHead scope="col" className="w-[95px]">
                   <span className="text-[11px] font-black text-muted">
-                    الحالة
+                    {t("table.status")}
                   </span>
                 </TableHead>
               )}
               {visibleColumns.amount && (
-                <TableHead className="w-[135px] text-end">
+                <TableHead scope="col" aria-sort={ariaSort("amount")} className="w-[135px] text-end">
                   <SortLabel
-                    label="القيمة"
+                    label={t("table.amount")}
                     sortKey="amount"
                     sortConfig={sortConfig}
                     onSort={handleSort}
@@ -373,8 +422,8 @@ export function InvoicesTable({
                 </TableHead>
               )}
               {visibleColumns.actions && (
-                <TableHead className="w-[54px]">
-                  <span className="sr-only">إجراءات</span>
+                <TableHead scope="col" className="w-[54px]">
+                  <span className="sr-only">{t("table.actionsSr")}</span>
                 </TableHead>
               )}
             </TableRow>
@@ -386,15 +435,11 @@ export function InvoicesTable({
                 <TableRow
                   key={invoiceId(invoice) ?? index}
                   tabIndex={0}
-                  aria-label={`فاتورة ${invoiceNo(invoice)} - ${invoiceCustomer(invoice)}`}
+                  role="button"
+                  aria-label={`${t("table.invoice")} ${invoiceNo(invoice)} - ${invoiceCustomer(invoice)}`}
                   className="group/row cursor-pointer border-border/40 transition-colors hover:bg-primary-soft/25 focus-visible:bg-primary-soft/30 focus-visible:outline-none"
                   onClick={() => onSelectInvoice(invoice)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      onSelectInvoice(invoice);
-                    }
-                  }}
+                  onKeyDown={(event) => handleRowKeyDown(event, invoice)}
                 >
                   {visibleColumns.invoiceNo && (
                     <TableCell className="py-2.5">
@@ -412,7 +457,9 @@ export function InvoicesTable({
                         {invoiceCustomer(invoice)}
                       </div>
                       <div className="mt-0.5 truncate text-[10px] font-bold text-muted">
-                        الخبير: {invoiceBarber(invoice)}
+                        {t("table.barberPrefix", {
+                          name: invoiceBarber(invoice),
+                        })}
                       </div>
                     </TableCell>
                   )}
@@ -451,9 +498,11 @@ export function InvoicesTable({
                       <RowActions
                         invoice={invoice}
                         busyPdfId={busyPdfId}
+                        busyWhatsappId={busyWhatsappId}
                         onSelectInvoice={onSelectInvoice}
                         onPrintInvoice={onPrintInvoice}
                         onOpenPdf={onOpenPdf}
+                        onSendWhatsapp={onSendWhatsapp}
                         onRequestAdjustment={onRequestAdjustment}
                       />
                     </TableCell>
@@ -470,84 +519,94 @@ export function InvoicesTable({
           const created = formatDateParts(invoiceCreatedAt(invoice));
           return (
             <li key={invoiceId(invoice) ?? index}>
-              <div
-                role="button"
-                tabIndex={0}
-                aria-label={`فاتورة ${invoiceNo(invoice)} - ${invoiceCustomer(invoice)}`}
-                className="cursor-pointer p-3.5 transition-colors hover:bg-primary-soft/20 focus-visible:bg-primary-soft/30 focus-visible:outline-none"
-                onClick={() => onSelectInvoice(invoice)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onSelectInvoice(invoice);
-                  }
-                }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p
-                      dir="ltr"
-                      className="truncate font-mono text-[10px] font-bold text-muted"
-                    >
-                      {invoiceNo(invoice)}
-                    </p>
-                    <p className="mt-1 truncate text-sm font-black text-main">
-                      {invoiceCustomer(invoice)}
-                    </p>
-                    <p className="mt-0.5 truncate text-[10px] font-bold text-muted">
-                      الخبير: {invoiceBarber(invoice)}
-                    </p>
+              <div className="p-3.5">
+                <button
+                  type="button"
+                  aria-label={`${t("table.invoice")} ${invoiceNo(invoice)} - ${invoiceCustomer(invoice)}`}
+                  className="block w-full text-start transition-colors hover:bg-primary-soft/10 focus-visible:bg-primary-soft/30 focus-visible:outline-none rounded-xl p-1"
+                  onClick={() => onSelectInvoice(invoice)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      {visibleColumns.invoiceNo && (
+                        <p
+                          dir="ltr"
+                          className="truncate font-mono text-[10px] font-bold text-muted"
+                        >
+                          {invoiceNo(invoice)}
+                        </p>
+                      )}
+                      {visibleColumns.customer && (
+                        <>
+                          <p className="mt-1 truncate text-sm font-black text-main">
+                            {invoiceCustomer(invoice)}
+                          </p>
+                          <p className="mt-0.5 truncate text-[10px] font-bold text-muted">
+                            {t("table.barberPrefix", {
+                              name: invoiceBarber(invoice),
+                            })}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-end">
+                      {visibleColumns.amount && (
+                        <p className="text-base font-black tabular-nums text-primary">
+                          {formatCurrency(invoiceTotal(invoice))}
+                        </p>
+                      )}
+                      {visibleColumns.date && (
+                        <p className="mt-0.5 text-[10px] font-bold text-muted">
+                          {created.date} • {created.time}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="shrink-0 text-end">
-                    <p className="text-base font-black tabular-nums text-primary">
-                      {formatCurrency(invoiceTotal(invoice))}
-                    </p>
-                    <p className="mt-0.5 text-[10px] font-bold text-muted">
-                      {created.date} • {created.time}
-                    </p>
+                </button>
+                {(visibleColumns.payment || visibleColumns.status || visibleColumns.actions) && (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    {visibleColumns.payment && <PaymentBadge invoice={invoice} />}
+                    {visibleColumns.status && <StatusBadge invoice={invoice} />}
+                    {visibleColumns.actions && (
+                      <div className="ms-auto flex items-center gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 rounded-lg"
+                          aria-label={t("actions.viewDetails")}
+                          onClick={() => onSelectInvoice(invoice)}
+                        >
+                          <Eye size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 rounded-lg"
+                          aria-label={t("actions.printReceipt")}
+                          onClick={() => onPrintInvoice(invoice)}
+                        >
+                          <Printer size={14} />
+                        </Button>
+                        <RowActions
+                          invoice={invoice}
+                          busyPdfId={busyPdfId}
+                          busyWhatsappId={busyWhatsappId}
+                          onSelectInvoice={onSelectInvoice}
+                          onPrintInvoice={onPrintInvoice}
+                          onOpenPdf={onOpenPdf}
+                          onSendWhatsapp={onSendWhatsapp}
+                          onRequestAdjustment={onRequestAdjustment}
+                          compact
+                        />
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                  <PaymentBadge invoice={invoice} />
-                  <StatusBadge invoice={invoice} />
-                  <div
-                    className="ms-auto flex items-center gap-0.5"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 rounded-lg"
-                      aria-label={`عرض تفاصيل ${invoiceNo(invoice)}`}
-                      onClick={() => onSelectInvoice(invoice)}
-                    >
-                      <Eye size={14} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 rounded-lg"
-                      aria-label={`طباعة ${invoiceNo(invoice)}`}
-                      onClick={() => onPrintInvoice(invoice)}
-                    >
-                      <Printer size={14} />
-                    </Button>
-                    <RowActions
-                      invoice={invoice}
-                      busyPdfId={busyPdfId}
-                      onSelectInvoice={onSelectInvoice}
-                      onPrintInvoice={onPrintInvoice}
-                      onOpenPdf={onOpenPdf}
-                      onRequestAdjustment={onRequestAdjustment}
-                      compact
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             </li>
           );
         })}
       </ul>
-    </>
+    </div>
   );
 }

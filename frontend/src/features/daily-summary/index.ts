@@ -14,3 +14,4 @@ export {
   buildDailySummaryCsv,
   downloadCsv,
 } from "./utils";
+export type { DailySummaryCsvLabels } from "./utils";

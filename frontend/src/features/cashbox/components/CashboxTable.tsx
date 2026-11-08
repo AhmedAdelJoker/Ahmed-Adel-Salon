@@ -100,7 +100,7 @@ export function CashboxTable({ rows, onView, onPrint }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/20">
-              <AnimatePresence mode="popLayout">
+              <AnimatePresence>
                 {rows.map((row) => {
                   const isIn = row.direction === "in";
                   const voided = isVoided(row);

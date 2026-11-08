@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn, formatCurrency } from "@/lib/core/utils";
 import { getInitials, getTierInfo } from "@/features/customers/utils/customer";
+import { useTranslation } from "react-i18next";
 
 type GroupCustomer = {
   customer_id: number;
@@ -51,6 +52,7 @@ export default function MergeCustomersDialog({
   const [loading, setLoading] = useState(false);
   const [merging, setMerging] = useState(false);
   const [selected, setSelected] = useState<Record<string, number>>({});
+  const { t } = useTranslation("customers");
 
   const loadGroups = useCallback(async () => {
     try {
@@ -69,7 +71,7 @@ export default function MergeCustomersDialog({
       setSelected(defaults);
     } catch (error) {
       console.error("Duplicate groups load failed:", error);
-      toast.error("فشل تحميل مجموعات التكرار");
+      toast.error(t("toasts.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -88,9 +90,10 @@ export default function MergeCustomersDialog({
 
     const duplicates = group.customers.filter((c) => c.customer_id !== targetId);
     const confirmed = window.confirm(
-      `سيتم دمج ${duplicates.length} عميل داخل «${target.first_name} ${target.last_name}».\n` +
-        "ستُنقل كل المواعيد والفواتير والجلسات للعميل المُحتفظ به، وسيُؤرشف الباقون مع تسجيل سبب الدمج.\n" +
-        "هل تريد المتابعة؟",
+      t("mergeDialog.confirm", {
+        count: duplicates.length,
+        name: target.first_name + " " + target.last_name,
+      }),
     );
     if (!confirmed) return;
 
@@ -101,13 +104,13 @@ export default function MergeCustomersDialog({
           target_customer_id: targetId,
         });
       }
-      toast.success("تم دمج المجموعة بنجاح");
+      toast.success(t("mergeDialog.success"));
       await loadGroups();
       onMerged();
     } catch (error: any) {
       console.error("Customer merge failed:", error);
       toast.error(
-        error?.response?.data?.detail || "فشل دمج المجموعة",
+        error?.response?.data?.detail || t("mergeDialog.failed"),
         { duration: 6000 },
       );
       await loadGroups();
@@ -124,10 +127,10 @@ export default function MergeCustomersDialog({
             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <GitMerge size={14} className="text-primary" />
             </div>
-            دمج العملاء المكررين
+            {t("mergeDialog.title")}
           </DialogTitle>
           <DialogDescription className="text-[10px] text-muted">
-            مجموعات العملاء الذين يتشاركون نفس رقم الهاتف — اختر من كل مجموعة الصف الذي يبقى
+            {t("mergeDialog.subtitle")}
           </DialogDescription>
         </DialogHeader>
 
@@ -135,11 +138,11 @@ export default function MergeCustomersDialog({
           {loading ? (
             <div className="flex items-center justify-center py-10 gap-2 text-muted">
               <Loader2 size={16} className="animate-spin" />
-              <span className="text-xs font-bold">جاري التحميل…</span>
+              <span className="text-xs font-bold">{t("mergeDialog.loading")}</span>
             </div>
           ) : groups.length === 0 ? (
             <p className="text-xs font-bold text-muted text-center py-10">
-              لا توجد مجموعات مكررة حالياً
+              {t("mergeDialog.noDuplicates")}
             </p>
           ) : (
             groups.map((group) => (
@@ -165,7 +168,7 @@ export default function MergeCustomersDialog({
                     ) : (
                       <GitMerge size={12} />
                     )}
-                    <span className="ms-1.5">دمج الباقي مع المحدد</span>
+                    <span className="ms-1.5">{t("mergeDialog.mergeWith")}</span>
                   </Button>
                 </div>
                 <div className="space-y-1.5">
@@ -212,18 +215,18 @@ export default function MergeCustomersDialog({
                                 tier.color,
                               )}
                             >
-                              <tier.icon size={9} /> {tier.label}
+                              <tier.icon size={9} /> {t(tier.label)}
                             </span>
                           </div>
                           <p className="text-[9px] font-bold text-muted">
                             #{customer.customer_id} • {customer.visits_count}{" "}
-                            زيارة •{" "}
+                            {t("overview.visits")} •{" "}
                             {formatCurrency(customer.lifetime_spend)}
                           </p>
                         </div>
                         {isTarget && (
                           <span className="text-[8px] font-black text-primary shrink-0">
-                            يبقى
+                            {t("mergeDialog.keep")}
                           </span>
                         )}
                       </label>
@@ -242,15 +245,13 @@ export default function MergeCustomersDialog({
             disabled={loading}
             className="h-9 rounded-xl text-xs"
           >
-            <RefreshCw size={13} className="ms-1.5" /> تحديث
+            <RefreshCw size={13} className="ms-1.5" /> {t("mergeDialog.refresh")}
           </Button>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             className="h-9 rounded-xl text-xs"
-          >
-            إغلاق
-          </Button>
+          >{t("mergeDialog.close")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,19 +1,20 @@
 import '@testing-library/jest-dom';
 import { vi, beforeAll, afterAll } from 'vitest';
 
-// Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+// Mock ResizeObserver — radix Floating UI constructs it with `new`, so it
+// must be an actual class rather than a factory returning a plain object.
+global.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as { new (): ResizeObserver };
 
 // Mock IntersectionObserver
-global.IntersectionObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+global.IntersectionObserver = class IntersectionObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as { new (): IntersectionObserver };
 
 // Mock matchMedia
 Object.defineProperty(window, 'matchMedia', {
@@ -34,8 +35,14 @@ Object.defineProperty(window, 'matchMedia', {
 window.scrollTo = vi.fn();
 
 // Mock localStorage
+//
+// `getItem` reports Arabic as the stored language: jsdom's navigator is en-US,
+// so the i18next language detector would otherwise boot the whole suite in
+// English and every Arabic-text assertion in the component tests (the POS
+// a11y suite, for one) would miss. Tests that need another language call
+// `i18n.changeLanguage()` themselves.
 const localStorageMock = {
-  getItem: vi.fn(),
+  getItem: vi.fn((key: string) => (key === 'language' ? 'ar' : null)),
   setItem: vi.fn(),
   removeItem: vi.fn(),
   clear: vi.fn(),

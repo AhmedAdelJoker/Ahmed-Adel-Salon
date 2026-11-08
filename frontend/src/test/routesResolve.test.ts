@@ -122,7 +122,7 @@ describe("internal links resolve to declared routes", () => {
     expect(resolves("/")).toBe(true);
 
     // Query strings and hashes are stripped before matching.
-    expect(resolves("/owner/hr?employeeId=3")).toBe(true);
+    expect(resolves("/manager/hr?employeeId=3")).toBe(true);
 
     // Interpolated ids match a dynamic segment.
     expect(resolves("/customers/42")).toBe(true);

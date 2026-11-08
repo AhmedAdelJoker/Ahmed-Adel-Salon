@@ -1,10 +1,11 @@
-/** Reception done-today panel (moved from ReceptionBoard page, no logic changes). */
+/** Reception done-today panel (moved from ReceptionBoard page). */
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCheck, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/core/utils";
 import DoneCard from "@/features/reception/components/DoneCard";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useTranslation } from "react-i18next";
 
 export default function DonePanel({
   show,
@@ -15,6 +16,7 @@ export default function DonePanel({
   list: any[];
   revenue: number | string;
 }) {
+  const { t } = useTranslation("reception");
   return (
     <AnimatePresence>
       {show && (
@@ -30,9 +32,11 @@ export default function DonePanel({
                 <CheckCircle2 size={18} />
               </div>
               <div>
-                <h3 className="text-sm font-black text-main">مكتمل اليوم</h3>
+                <h3 className="text-sm font-black text-main">
+                  {t("done_panel.title")}
+                </h3>
                 <p className="text-[10px] font-bold text-muted">
-                  {list.length} عميل تم إنجاز خدمته
+                  {t("done_panel.subtitle", { count: list.length })}
                 </p>
               </div>
             </div>
@@ -43,13 +47,13 @@ export default function DonePanel({
           {list.length === 0 ? (
             <EmptyState variant="board"
               icon={CheckCheck}
-              title="لا مكتملة اليوم"
-              message="لم يتم إنهاء أي خدمة حتى الآن."
+              title={t("done_panel.empty_title")}
+              message={t("done_panel.empty_desc")}
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               {list.map((a) => (
-                <DoneCard key={a.id} appt={a} />
+                <DoneCard key={a.id} appt={a} t={t} />
               ))}
             </div>
           )}

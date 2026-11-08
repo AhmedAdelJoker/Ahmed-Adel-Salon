@@ -1,0 +1,241 @@
+{
+  "page": {
+    "title": "المخطط الزمني الذكي",
+    "subtitle": "إدارة المواعيد اليومية بدقة واحترافية",
+    "badge": "جدولة العمليات"
+  },
+  "toolbar": {
+    "shortcuts": "اختصارات",
+    "shortcutsLabel": "اختصارات لوحة المفاتيح",
+    "navDays": "تنقل بين الأيام",
+    "today": "العودة لليوم الحالي",
+    "viewDay": "الجدول",
+    "viewWeek": "الأسبوع",
+    "viewList": "القائمة",
+    "toggleSidebar": "إظهار/إخفاء الشريط الجانبي",
+    "backToBookings": "العودة للحجوزات",
+    "newBooking": "حجز جديد",
+    "search": "بحث سريع (اسم، خدمة، هاتف)...",
+    "searchAria": "بحث عن موعد",
+    "clearSearch": "مسح البحث",
+    "allBarbers": "جميع الموظفين",
+    "allStatuses": "جميع الحالات",
+    "period": "الفترة",
+    "rangeAll": "كل ساعات العمل",
+    "rangeMorning": "صباحاً (حتى 2 ظهراً)",
+    "rangeEvening": "مساءً (من 2 ظهراً)",
+    "clearFilters": "مسح كافة الفلاتر",
+    "clearFiltersShort": "مسح",
+    "prevDay": "اليوم السابق",
+    "prevDayTitle": "اليوم السابق (السهم الأيسر)",
+    "pickDate": "اختيار التاريخ",
+    "nextDay": "اليوم التالي",
+    "nextDayTitle": "اليوم التالي (السهم الأيمن)",
+    "viewMode": "عرض {{label}}",
+    "viewDayTitle": "عرض الجدول (D)",
+    "refresh": "تحديث البيانات",
+    "refreshAria": "تحديث قائمة المواعيد يدوياً",
+    "refreshTitle": "تحديث يدوي",
+    "liveConnectedTitle": "متصل بالخادم - تحديث تلقائي مباشر",
+    "liveDisconnectedTitle": "غير متصل - البيانات غير محدثة",
+    "liveConnected": "مباشر",
+    "liveDisconnected": "غير متصل",
+    "lastUpdated": "آخر تحديث: {{time}}",
+    "toggleSidebarAria": "إظهار/إخفاء الشريط الجانبي",
+    "toggleSidebarTitle": "الشريط الجانبي (L)",
+    "export": "تصدير",
+    "exportLabel": "خيارات التصدير",
+    "pdf": "PDF للجدول اليومي",
+    "csv": "CSV (بيانات المواعيد)"
+  },
+  "stats": {
+    "today": "مواعيد اليوم",
+    "waiting": "بانتظار الخدمة",
+    "inProgress": "قيد التنفيذ",
+    "reception": "عند الاستقبال",
+    "done": "مكتملة اليوم",
+    "cancelled": "ملغاة اليوم"
+  },
+  "contentPanel": {
+    "title": "الخريطة التشغيلية للمواعيد",
+    "subtitleDay": "خط زمني دقيق يعكس مدة كل خدمة. اسحب المواعيد لإعادة توزيعها بين الموظفين.",
+    "subtitleWeek": "نظرة أسبوعية شاملة على توزيع المواعيد.",
+    "subtitleList": "قائمة مفصلة بمواعيد اليوم مع كل التفاصيل."
+  },
+  "status": {
+    "WAITING": "قادم",
+    "CONFIRMED": "مؤكد",
+    "IN_PROGRESS": "قيد التنفيذ",
+    "AT_RECEPTION": "عند الاستقبال",
+    "AT_CASHIER": "عند الكاشير",
+    "DONE": "مكتمل",
+    "CANCELLED": "ملغي",
+    "NO_SHOW": "لم يحضر",
+    "LATE": "متأخر"
+  },
+  "dayBoard": {
+    "appointmentCount": "{{count}} موعد",
+    "zeroCount": "لا مواعيد",
+    "oneCount": "موعداً واحداً",
+    "twoCount": "موعدان",
+    "manyCount": "{{count}} مواعيد",
+    "manyAboveTen": "{{count}} موعداً",
+    "loadPercent": "{{percent}}%",
+    "headerLabel": "الجدول الزمني",
+    "noStaffTitle": "لا توجد بيانات موظفين",
+    "noStaffMessage": "يرجى اختيار فلتر مختلف أو التأكد من إضافة الموظفين وجداول عملهم في النظام."
+  },
+  "appointmentCard": {
+    "aria": "موعد {{customer}} الساعة {{time}}، حالة {{status}}",
+    "details": "اضغط للتفاصيل أو اسحب",
+    "unknownCustomer": "عميل مجهول"
+  },
+  "weekBoard": {
+    "weeklyOverview": "نظرة أسبوعية شاملة على توزيع المواعيد.",
+    "noAppointments": "لا يوجد مواعيد",
+    "appointmentCount": "{{count}} موعد"
+  },
+  "listView": {
+    "title": "قائمة مفصلة بمواعيد اليوم مع كل التفاصيل.",
+    "coming": "قادم: {{count}}",
+    "time": "الوقت",
+    "customer": "العميل",
+    "barber": "الموظف",
+    "phone": "الهاتف",
+    "service": "الخدمة",
+    "status": "الحالة",
+    "minuteShort": "دقيقة",
+    "onlineBooking": "حجز أونلاين"
+  },
+  "empty": {
+    "title": "لا توجد مواعيد في هذا اليوم",
+    "message": "استخدم زر \"حجز جديد\" لإضافة أول موعد اليوم."
+  },
+  "miniCalendar": {
+    "days": {
+      "saturday": "السبت",
+      "sunday": "الأحد",
+      "monday": "الأثنين",
+      "tuesday": "الثلاثاء",
+      "wednesday": "الأربعاء",
+      "thursday": "الخميس",
+      "friday": "الجمعة"
+    },
+    "monthYear": "نوفمبر ٢٠٢٦",
+    "dayLabel": "يوم {{day}}",
+    "totalAppointments": "{{total}} مواعيد{{confirmedSuffix}}",
+    "confirmedSuffix": " ({{count}} مؤكد)",
+    "noAppointments": "لا توجد مواعيد",
+    "prevMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي"
+  },
+  "scheduleModal": {
+    "title": "تفاصيل الموعد الكاملة",
+    "status": "الحالة",
+    "time": "الوقت",
+    "date": "التاريخ",
+    "barber": "الموظف",
+    "phone": "الهاتف",
+    "notes": "ملاحظات",
+    "noNotes": "لا توجد ملاحظات",
+    "createdAt": "أُنشأ في",
+    "close": "إغلاق",
+    "manage": "إدارة الحجز",
+    "servicesRequired": "الخدمات المطلوبة",
+    "bookingSourceOnline": "حجز أونلاين",
+    "bookingSourceRegular": "حجز عادي",
+    "edit": "تعديل التفاصيل",
+    "cancel": "إلغاء الموعد",
+    "transferPOS": "تحويل إلى نقطة البيع",
+    "changeStatus": "تغيير الحالة",
+    "statusWaiting": "بانتظار الخدمة",
+    "statusInProgress": "قيد التنفيذ",
+    "statusDone": "مكتمل",
+    "statusCancelled": "ملغي"
+  },
+  "agenda": {
+    "sidebarAria": "الشريط الجانبي للجدول",
+    "quickNav": "التنقل السريع",
+    "closeSidebar": "إغلاق الشريط الجانبي",
+    "total": "إجمالي المواعيد",
+    "active": "نشطة",
+    "done": "مكتملة",
+    "todayAgenda": "أجندة اليوم",
+    "coming": "{{count}} قادمة",
+    "noUpcoming": "لا توجد مواعيد قادمة"
+  },
+  "export": {
+    "title": "مخطط المواعيد اليومي",
+    "date": "التاريخ: {{date}}",
+    "page": "صفحة {{page}} من {{total}}",
+    "time": "الوقت",
+    "customerName": "اسم العميل",
+    "phone": "الهاتف",
+    "barber": "الموظف",
+    "status": "الحالة",
+    "notes": "ملاحظات",
+    "source": "المصدر",
+    "bookingSource": {
+      "online": "حجز أونلاين",
+      "walkin": "حجز دخول مباشر",
+      "phone": "حجز عبر الهاتف",
+      "regular": "حجز عادي"
+    }
+  },
+  "headerActions": {
+    "shortcuts": "اختصارات",
+    "shortcutsLabel": "اختصارات لوحة المفاتيح",
+    "navDays": "تنقل بين الأيام",
+    "today": "العودة لليوم الحالي",
+    "viewDay": "الجدول",
+    "viewWeek": "الأسبوع",
+    "viewList": "القائمة",
+    "toggleSidebar": "إظهار/إخفاء الشريط الجانبي",
+    "backToBookings": "العودة للحجوزات",
+    "newBooking": "حجز جديد"
+  },
+  "dragPreview": {
+    "badge": "جاري النقل...",
+    "unknownCustomer": "عميل مجهول",
+    "noBarber": "بدون موظف",
+    "instruction": "أفلت فوق موظف أو خانة لنقل الموعد، أو فوق يوم في التقويم الجانبي"
+  },
+  "slotDropZone": {
+    "slotLabel": "خانة {{slot}} - موظف رقم {{barberId}}",
+    "dropHere": "أفلت هنا"
+  },
+  "toasts": {
+    "loadFailed": "تعذر تحميل جدول المواعيد",
+    "undoSuccess": "تم التراجع عن النقل بنجاح",
+    "undoFailed": "فشل التراجع عن النقل",
+    "moved": "تم نقل موعد {{customer}}{{label}}",
+    "movedTo": "إلى",
+    "movedSameDay": "نفس اليوم",
+    "movedTime": "الساعة {{time}}",
+    "undo": "تراجع",
+    "conflict": "تعارض: يوجد موعد آخر في نفس التوقيت والتاريخ مع هذا الموظف. اختر خانة فارغة.",
+    "updateFailed": "فشل تحديث الموعد",
+    "exportSuccess": "تم تصدير الجدول بنجاح",
+    "exportFailed": "فشل تصدير الجدول",
+    "noReasonGiven": "بدون ذكر سبب",
+    "cancelled": "تم إلغاء الموعد بنجاح",
+    "cancelFailed": "فشل إلغاء الموعد",
+    "statusUpdated": "تم تحديث حالة الموعد",
+    "statusUpdateFailed": "فشل تحديث الحالة"
+  },
+  "conflict": {
+    "generic": "هذا الموعد يتعارض مع موعد آخر لنفس الموظف في نفس التوقيت. اختر وقتاً أو موظفاً آخر."
+  },
+  "time": {
+    "am": "ص",
+    "pm": "م"
+  },
+  "dateFilters": {
+    "today": "اليوم",
+    "tomorrow": "غداً",
+    "after_tomorrow": "بعد غد",
+    "this_week": "هذا الأسبوع",
+    "all": "الكل",
+    "custom": "تاريخ مخصص"
+  }
+}

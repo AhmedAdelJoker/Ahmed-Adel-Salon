@@ -1,4 +1,5 @@
 import { ShieldAlert } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { usePOS } from "@/pages/cashier/POS/POSContext";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,10 +11,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-const MAX_DISCOUNT_RATE = 0.4; // mirrors the server-side discount cap (40%)
-
 const ManagerApprovalModal = () => {
-  const { showApprovalModal, setShowApprovalModal } = usePOS();
+  const { t } = useTranslation("pos");
+  const { showApprovalModal, setShowApprovalModal, discountAllowance } = usePOS();
 
   return (
     <Dialog open={showApprovalModal} onOpenChange={setShowApprovalModal}>
@@ -23,21 +23,21 @@ const ManagerApprovalModal = () => {
             <ShieldAlert size={24} />
           </div>
           <DialogTitle className="text-center text-xl font-black">
-            الخصم يتجاوز الحد المسموح
+            {t("approval.title")}
           </DialogTitle>
           <DialogDescription className="text-center text-xs font-bold text-muted leading-relaxed">
-            تم رفض الفاتورة لأن مبلغ الخصم المُدخل يتجاوز النسق المسموح به (
-            {Math.round(MAX_DISCOUNT_RATE * 100)}% من إجمالي الفاتورة).
-            عدّل الخصم وأعد الإصدار، أو اطلب اعتماد الخصم الأكبر من شاشة
-            الإدارة.
+            {t("approval.description", {
+              label: discountAllowance?.label ?? t("approval.limit_fallback"),
+            })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button
+            autoFocus
             onClick={() => setShowApprovalModal(false)}
             className="h-11 w-full rounded-xl font-black"
           >
-            تعديل الخصم وإعادة المحاولة
+            {t("approval.retry_button")}
           </Button>
         </DialogFooter>
       </DialogContent>

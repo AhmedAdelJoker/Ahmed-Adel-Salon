@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { EmptyState } from "@/components/shared/EmptyState";
 import React, { useEffect, useState } from "react";
@@ -26,6 +27,8 @@ import {
   ContentPanel,
 } from "@/components/shared/PremiumUI";
 import { Button } from "@/components/ui/button";
+import i18n from "@/i18n";
+import { getIntlLocale } from "@/lib/format/locale";
 import { cn } from "@/lib/core/utils";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,6 +42,7 @@ import {
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("owner");
   const { user } = useAuth();
 
   interface ManagerStats {
@@ -90,7 +94,7 @@ const ManagerDashboard = () => {
         <div className="flex flex-col items-center gap-4 text-accent">
           <Monitor className="w-10 h-10 animate-pulse" />
           <p className="text-muted font-bold text-[10px] uppercase tracking-widest text-center">
-            تحليل النبض التشغيلي...
+            {t("manager.loading")}
           </p>
         </div>
       </div>
@@ -99,9 +103,9 @@ const ManagerDashboard = () => {
   return (
     <div className="erp-page space-y-8 pb-12">
       <PageHeader
-        title="مركز العمليات"
-        subtitle="متابعة الأداء الحي وكفاءة الفريق"
-        badge="لوحة المدير"
+        title={t("manager.title")}
+        subtitle={t("manager.subtitle")}
+        badge={t("manager.badge")}
         icon={Activity}
         actions={
           <Badge
@@ -109,34 +113,34 @@ const ManagerDashboard = () => {
             className="h-10 px-4 rounded-xl font-black text-[10px] uppercase tracking-wider"
           >
             <div className="h-1.5 w-1.5 rounded-full ms-2 bg-white animate-pulse" />
-            الرقابة التشغيلية نشطة
+            {t("manager.activeBadge")}
           </Badge>
         }
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="حضور الفريق"
-          value={`${stats?.active_barbers || 0} خبير`}
+          label={t("manager.activeBarbers")}
+          value={`${stats?.active_barbers || 0} ${t("manager.expert")}`}
           icon={UserCheck}
           variant="primary"
           trend="up"
           trendValue={5}
         />
         <StatCard
-          label="مواعيد اليوم"
+          label={t("manager.todayAppointments")}
           value={stats?.today_appointments || 0}
           icon={Calendar}
           variant="info"
         />
         <StatCard
-          label="ورديات نشطة"
+          label={t("manager.openShifts")}
           value={stats?.open_shifts || 0}
           icon={Users}
           variant="warning"
         />
         <StatCard
-          label="كفاءة العمل"
+          label={t("manager.efficiency")}
           value={stats?.operational_efficiency || "95%"}
           icon={Zap}
           variant="success"
@@ -148,16 +152,16 @@ const ManagerDashboard = () => {
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
         <ContentPanel
           className="xl:col-span-2"
-          title="مراقبة أداء الطاقم"
-          subtitle="تتبع الحالة والإنتاجية اللحظية"
+          title={t("manager.teamPerformanceTitle")}
+          subtitle={t("manager.teamPerformanceSubtitle")}
           actions={
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/owner/hr")}
+              onClick={() => navigate("/manager/hr")}
               className="text-[10px] font-black uppercase"
             >
-              إدارة الموظفين{" "}
+              {t("manager.manageEmployees")}{" "}
               <ArrowRight size={14} className="me-2 rotate-180" />
             </Button>
           }
@@ -168,19 +172,19 @@ const ManagerDashboard = () => {
               <TableHeader>
                 <TableRow className="border-b border-border bg-soft/50">
                   <TableHead className="px-4 py-4 text-right text-[10px] font-black uppercase tracking-widest text-muted sm:px-6">
-                    الخبير
+                    {t("manager.barber")}
                   </TableHead>
                   <TableHead className="px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted">
-                    الحالة
+                    {t("manager.status")}
                   </TableHead>
                   <TableHead className="hidden px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted md:table-cell">
-                    العمولة
+                    {t("manager.commission")}
                   </TableHead>
                   <TableHead className="hidden px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted lg:table-cell">
-                    تاريخ القيد
+                    {t("manager.joinDate")}
                   </TableHead>
                   <TableHead className="px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted sm:px-6">
-                    إجراء
+                    {t("manager.action")}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -197,10 +201,10 @@ const ManagerDashboard = () => {
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-black text-main">
-                            {barber.display_name || "غير محدد"}
+                            {barber.display_name || t("manager.notSpecified")}
                           </p>
                           <p className="text-[9px] font-bold uppercase text-muted">
-                            خبير معتمد
+                            {t("manager.certifiedExpert")}
                           </p>
                         </div>
                       </div>
@@ -210,7 +214,7 @@ const ManagerDashboard = () => {
                         variant={barber.is_active ? "success" : "secondary"}
                         className="h-5 px-2 text-[8px] font-black uppercase tracking-widest"
                       >
-                        {barber.is_active ? "نشط" : "غير متصل"}
+                        {barber.is_active ? t("manager.active") : t("manager.inactive")}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden px-4 py-4 text-center md:table-cell">
@@ -222,7 +226,7 @@ const ManagerDashboard = () => {
                       <span className="text-[10px] font-bold tabular-nums text-muted">
                         {barber.created_at
                           ? new Date(barber.created_at).toLocaleDateString(
-                              "ar-EG",
+                              getIntlLocale(i18n.language),
                             )
                           : "---"}
                       </span>
@@ -249,25 +253,25 @@ const ManagerDashboard = () => {
 
         <div className="space-y-8">
           <ContentPanel
-            title="مصفوفة الإجراءات"
-            subtitle="عمليات المدير السريعة"
+            title={t("manager.quickActionsTitle")}
+            subtitle={t("manager.quickActionsSubtitle")}
           >
             <div className="space-y-3">
               {[
                 {
-                  label: "سجل الحضور اليومي",
+                  label: t("manager.attendanceLog"),
                   icon: UserCheck,
                   to: "/attendance",
                   variant: "success",
                 },
                 {
-                  label: "مركز الاعتمادات",
+                  label: t("manager.approvalsCenter"),
                   icon: ShieldCheck,
                   to: "/approvals",
                   variant: "warning",
                 },
                 {
-                  label: "جدول المواعيد",
+                  label: t("manager.schedule"),
                   icon: Clock,
                   to: "/bookings",
                   variant: "info",
@@ -315,7 +319,7 @@ const ManagerDashboard = () => {
                   variant="warning"
                   className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5"
                 >
-                  مركز الموافقات
+                  {t("manager.approvalsBadge")}
                 </Badge>
               </div>
 
@@ -323,10 +327,10 @@ const ManagerDashboard = () => {
                 <div className="space-y-4">
                   <div>
                     <h4 className="text-2xl font-black text-main tracking-tight leading-none mb-1">
-                      {stats?.pending_discounts} طلبات
+                      {stats?.pending_discounts} {t("manager.requests")}
                     </h4>
                     <p className="text-[10px] font-bold text-muted uppercase tracking-widest">
-                      بانتظار قرارك الإداري
+                      {t("manager.awaitingDecision")}
                     </p>
                   </div>
                   <Button
@@ -334,14 +338,14 @@ const ManagerDashboard = () => {
                     variant="warning"
                     className="h-11 w-full gap-2 rounded-xl text-xs font-black uppercase tracking-widest"
                   >
-                    عرض الطلبات <ArrowRight size={16} />
+                    {t("manager.viewRequests")} <ArrowRight size={16} />
                   </Button>
                 </div>
               ) : (
                 <EmptyState
                   variant="inline"
                   icon={BarChart3}
-                  title="لا توجد عمليات معلقة بانتظار الموافقة"
+                  title={t("manager.noPending")}
                 />
               )}
             </div>

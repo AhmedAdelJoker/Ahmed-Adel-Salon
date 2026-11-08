@@ -10,6 +10,7 @@ import {
   User,
   Wallet,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +30,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/core/utils";
+import { currencyLabel, getCurrency } from "@/lib/core/currency";
 import {
-  PAYMENT_METHOD_OPTIONS,
+  PAYMENT_METHOD_VALUES,
   formatCurrency,
   formatDate,
   invoiceBarber,
@@ -40,21 +42,27 @@ import {
   invoiceIsClosed,
   invoiceNo,
   invoicePaymentLabel,
+  invoicePaymentRows,
   invoiceSubtotal,
+  invoiceTaxAmount,
+  invoiceTaxRate,
   invoiceTotal,
   itemName,
   itemQty,
   itemTotal,
+  itemUnitPrice,
+  paymentMethodLabel,
   rowsFromInvoice,
+  type InvoiceRecord,
 } from "@/features/invoices";
 
-const ADJUSTMENT_PAYMENTS = PAYMENT_METHOD_OPTIONS.filter((method) =>
-  ["cash", "card", "wallet", "bank_transfer"].includes(method.value),
+const ADJUSTMENT_PAYMENTS = PAYMENT_METHOD_VALUES.filter((value) =>
+  ["cash", "card", "wallet", "bank_transfer"].includes(value),
 );
 
 export interface AdjustmentDialogState {
   open: boolean;
-  invoice: Record<string, any> | null;
+  invoice: InvoiceRecord | null;
   type: string;
   reason: string;
   new_value: string;
@@ -62,7 +70,7 @@ export interface AdjustmentDialogState {
 }
 
 export interface InvoiceDetailsDialogProps {
-  selectedInvoice: Record<string, any> | null;
+  selectedInvoice: InvoiceRecord | null;
   onClose: () => void;
   onPrintSelected: () => void;
   onOpenPdfSelected?: () => void;
@@ -74,9 +82,18 @@ export function InvoiceDetailsDialog({
   onPrintSelected,
   onOpenPdfSelected,
 }: InvoiceDetailsDialogProps) {
+  const { t } = useTranslation("invoices");
   const closed = invoiceIsClosed(selectedInvoice);
   const items = selectedInvoice ? rowsFromInvoice(selectedInvoice) : [];
   const discount = selectedInvoice ? invoiceDiscount(selectedInvoice) : 0;
+  const subtotal = selectedInvoice ? invoiceSubtotal(selectedInvoice) : 0;
+  const taxAmount = selectedInvoice ? invoiceTaxAmount(selectedInvoice) : 0;
+  const taxRate = selectedInvoice ? invoiceTaxRate(selectedInvoice) : 0;
+  const paymentRows = selectedInvoice ? invoicePaymentRows(selectedInvoice) : [];
+  const hasPaymentSplit =
+    paymentRows.length > 0 &&
+    (new Set(paymentRows.map((row) => String(row?.payment_method || ""))).size > 1 ||
+      paymentRows.length > 1);
 
   return (
     <Dialog
@@ -105,22 +122,24 @@ export function InvoiceDetailsDialog({
                 </div>
               </div>
               <Badge variant={closed ? "danger" : "success"} size="sm">
-                {closed ? "ملغاة" : "مكتملة"}
+                {closed ? t("details.closedBadge") : t("details.completedBadge")}
               </Badge>
             </div>
           </DialogHeader>
 
           <div className="mt-5 rounded-2xl bg-primary-soft/70 p-4 text-center">
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">
-              إجمالي الفاتورة
+              {t("details.total")}
             </p>
             <p className="mt-1 text-3xl font-black tabular-nums text-primary">
               {selectedInvoice ? formatCurrency(invoiceTotal(selectedInvoice)) : "—"}
             </p>
             {discount > 0 && (
               <p className="mt-1 text-[10px] font-bold text-muted">
-                قبل الخصم {formatCurrency(invoiceSubtotal(selectedInvoice))} •
-                خصم {formatCurrency(discount)}
+                {t("details.beforeDiscount", {
+                  subtotal: formatCurrency(subtotal),
+                  discount: formatCurrency(discount),
+                })}
               </p>
             )}
           </div>
@@ -131,39 +150,77 @@ export function InvoiceDetailsDialog({
             <div className="grid grid-cols-2 gap-2">
               <InfoCell
                 icon={<User size={13} />}
-                label="العميل"
+                label={t("details.customer")}
                 value={invoiceCustomer(selectedInvoice)}
               />
               <InfoCell
                 icon={<User size={13} />}
-                label="الخبير"
+                label={t("details.barber")}
                 value={invoiceBarber(selectedInvoice)}
               />
               <InfoCell
                 icon={<Wallet size={13} />}
-                label="طريقة الدفع"
+                label={t("details.paymentMethod")}
                 value={invoicePaymentLabel(selectedInvoice)}
               />
               <InfoCell
                 icon={<Percent size={13} />}
-                label="عدد البنود"
-                value={`${items.length} بند`}
+                label={t("details.itemsCount")}
+                value={t("details.itemsCountText", { count: items.length })}
               />
             </div>
+
+            {(discount > 0 || taxAmount > 0) && (
+              <div className="mt-4 space-y-1 rounded-2xl border border-border/60 bg-soft/40 p-3 text-[10px] font-bold text-muted">
+                {discount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span>{t("details.discount")}</span>
+                    <span className="tabular-nums text-main">-{formatCurrency(discount)}</span>
+                  </div>
+                )}
+                {taxAmount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span>{taxRate > 0 ? t("details.taxRateLabel", { rate: taxRate }) : t("details.tax")}</span>
+                    <span className="tabular-nums text-main">{formatCurrency(taxAmount)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {hasPaymentSplit && (
+              <div className="mt-4">
+                <p className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-muted">
+                  {t("details.paymentBreakdown")}
+                </p>
+                <div className="divide-y divide-border/60 rounded-2xl border border-border/60">
+                  {paymentRows.map((row, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between gap-3 px-3.5 py-2 text-[11px] font-bold"
+                    >
+                      <span className="text-main">{paymentMethodLabel(row?.payment_method)}</span>
+                      <span className="tabular-nums text-primary">
+                        {formatCurrency(row?.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mt-5">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted">
-                  بنود الفاتورة
+                  {t("details.itemsTitle")}
                 </p>
                 <Badge size="sm" variant="secondary">
-                  {items.length} بند
+                  {t("details.itemsCountText", { count: items.length })}
                 </Badge>
               </div>
               <div className="divide-y divide-dashed divide-border/70 rounded-2xl border border-border/60">
                 {items.length === 0 && (
                   <p className="p-4 text-center text-xs font-bold text-muted">
-                    لا توجد بنود مسجلة
+                    {t("details.noItems")}
                   </p>
                 )}
                 {items.map((item, index) => (
@@ -176,7 +233,7 @@ export function InvoiceDetailsDialog({
                         {itemName(item)}
                       </p>
                       <p className="mt-0.5 text-[10px] font-bold text-muted">
-                        {itemQty(item)} × {formatCurrency(item.unit_price)}
+                        {itemQty(item)} × {formatCurrency(itemUnitPrice(item))}
                       </p>
                     </div>
                     <p className="shrink-0 text-xs font-black tabular-nums text-main">
@@ -195,7 +252,7 @@ export function InvoiceDetailsDialog({
             onClick={onClose}
             className="h-10 rounded-xl px-4"
           >
-            إغلاق
+            {t("details.close")}
           </Button>
           {onOpenPdfSelected && (
             <Button
@@ -203,14 +260,14 @@ export function InvoiceDetailsDialog({
               onClick={onOpenPdfSelected}
               className="h-10 rounded-xl px-4"
             >
-              <FileDown size={14} className="ms-1.5" /> PDF
+              <FileDown size={14} className="ms-1.5" /> {t("details.pdf")}
             </Button>
           )}
           <Button
             onClick={onPrintSelected}
             className="h-10 rounded-xl px-5 premium-button"
           >
-            <Printer size={14} className="ms-1.5" /> طباعة إيصال
+            <Printer size={14} className="ms-1.5" /> {t("details.printReceipt")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -247,24 +304,9 @@ export interface AdjustmentRequestDialogProps {
 }
 
 const ADJUSTMENT_TYPES = [
-  {
-    value: "discount",
-    label: "الخصم",
-    description: "تعديل قيمة الخصم",
-    icon: Percent,
-  },
-  {
-    value: "payment_method",
-    label: "طريقة الدفع",
-    description: "تصحيح وسيلة التحصيل",
-    icon: CreditCard,
-  },
-  {
-    value: "void",
-    label: "إلغاء الفاتورة",
-    description: "إيقاف الفاتورة نهائيًا",
-    icon: Ban,
-  },
+  { value: "discount", labelKey: "discount", descriptionKey: "discountDesc", icon: Percent },
+  { value: "payment_method", labelKey: "paymentMethod", descriptionKey: "paymentMethodDesc", icon: CreditCard },
+  { value: "void", labelKey: "void", descriptionKey: "voidDesc", icon: Ban },
 ];
 
 export function AdjustmentRequestDialog({
@@ -273,11 +315,13 @@ export function AdjustmentRequestDialog({
   adjustmentSubmitting,
   onSubmit,
 }: AdjustmentRequestDialogProps) {
+  const { t } = useTranslation("invoices");
   const invoice = adjustmentDialog.invoice;
   const type = adjustmentDialog.type;
   const paymentValue = String(adjustmentDialog.new_value || "");
   const discountValue = Number(adjustmentDialog.new_value);
   const subtotal = invoice ? invoiceSubtotal(invoice) : 0;
+  const currencySuffix = currencyLabel(getCurrency());
 
   const invalidDiscount =
     type === "discount" &&
@@ -303,10 +347,10 @@ export function AdjustmentRequestDialog({
             <ShieldCheck size={20} />
           </div>
           <DialogTitle className="text-center text-lg font-black">
-            طلب تعديل مالي
+            {t("adjustment.title")}
           </DialogTitle>
           <DialogDescription className="text-center text-[10px] font-bold text-muted">
-            يمر الطلب بمراجعة المدير قبل الاعتماد
+            {t("adjustment.subtitle")}
           </DialogDescription>
         </DialogHeader>
 
@@ -322,7 +366,7 @@ export function AdjustmentRequestDialog({
         <div className="space-y-4">
           <div>
             <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-muted">
-              نوع التعديل
+              {t("adjustment.typeLabel")}
             </label>
             <div className="grid grid-cols-3 gap-1.5">
               {ADJUSTMENT_TYPES.map((option) => {
@@ -346,10 +390,11 @@ export function AdjustmentRequestDialog({
                         : "border-border bg-card text-muted hover:border-primary/40 hover:text-main",
                     )}
                     aria-pressed={active}
+                    aria-label={t(`adjustment.${option.labelKey}`)}
                   >
                     <Icon size={16} className="mx-auto" />
                     <span className="mt-1 block text-[10px] font-black">
-                      {option.label}
+                      {t(`adjustment.${option.labelKey}`)}
                     </span>
                   </button>
                 );
@@ -360,7 +405,7 @@ export function AdjustmentRequestDialog({
           {type === "discount" && (
             <div>
               <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-muted">
-                قيمة الخصم الجديدة
+                {t("adjustment.newDiscountValue")}
               </label>
               <div className="relative">
                 <Input
@@ -376,19 +421,23 @@ export function AdjustmentRequestDialog({
                     }))
                   }
                   placeholder="0.00"
-                  className="h-10 pe-12 text-center font-black tabular-nums"
+                  className="h-10 pe-14 text-center font-black tabular-nums"
                 />
                 <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted">
-                  ج.م
+                  {currencySuffix}
                 </span>
               </div>
               <p className="mt-1 text-[9px] font-bold text-muted">
-                الخصم الحالي {formatCurrency(invoiceDiscount(invoice))} • الحد
-                الأقصى {formatCurrency(subtotal)}
+                {t("adjustment.currentDiscountMax", {
+                  current: formatCurrency(invoiceDiscount(invoice)),
+                  max: formatCurrency(subtotal),
+                })}
               </p>
               {invalidDiscount && adjustmentDialog.new_value !== "" && (
                 <p className="mt-1 text-[9px] font-bold text-danger">
-                  أدخل قيمة بين صفر و{formatCurrency(subtotal)}
+                  {t("adjustment.discountRangeError", {
+                    max: formatCurrency(subtotal),
+                  })}
                 </p>
               )}
             </div>
@@ -397,7 +446,7 @@ export function AdjustmentRequestDialog({
           {type === "payment_method" && (
             <div>
               <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-muted">
-                طريقة الدفع الصحيحة
+                {t("adjustment.correctPaymentMethod")}
               </label>
               <Select
                 value={paymentValue}
@@ -409,36 +458,37 @@ export function AdjustmentRequestDialog({
                 }
               >
                 <SelectTrigger className="h-10 rounded-xl font-bold">
-                  <SelectValue placeholder="اختر طريقة الدفع" />
+                  <SelectValue placeholder={t("adjustment.choosePaymentMethod")} />
                 </SelectTrigger>
                 <SelectContent>
                   {ADJUSTMENT_PAYMENTS.map((method) => (
-                    <SelectItem key={method.value} value={method.value}>
-                      {method.label}
+                    <SelectItem key={method} value={method}>
+                      {paymentMethodLabel(method)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="mt-1 text-[9px] font-bold text-muted">
-                الحالية: {invoicePaymentLabel(invoice)}
+                {t("adjustment.currentPaymentMethod", {
+                  method: invoicePaymentLabel(invoice),
+                })}
               </p>
             </div>
           )}
 
           {type === "void" && (
             <div className="rounded-xl border border-danger/20 bg-danger-soft p-3 text-[10px] font-bold leading-relaxed text-danger">
-              سيتم إلغاء الفاتورة نهائيًا بعد اعتماد المدير، ولن تُحسب ضمن
-              مبيعات الفترة.
+              {t("adjustment.voidWarning")}
             </div>
           )}
 
           <div>
             <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-muted">
-              سبب التعديل <span className="text-danger">*</span>
+              {t("adjustment.reasonLabel")} <span className="text-danger">*</span>
             </label>
             <textarea
               className="min-h-[76px] w-full rounded-xl border border-border bg-soft p-3 text-sm font-bold transition-all placeholder:text-muted/40 focus:outline-none focus:ring-4 focus:ring-primary/10"
-              placeholder="اذكر سبب التعديل بالتفصيل..."
+              placeholder={t("adjustment.reasonPlaceholder")}
               value={adjustmentDialog.reason}
               onChange={(event) =>
                 onAdjustmentDialogChange((prev) => ({
@@ -451,7 +501,7 @@ export function AdjustmentRequestDialog({
 
           <div>
             <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-muted">
-              ملاحظات إضافية
+              {t("adjustment.notesLabel")}
             </label>
             <Input
               value={adjustmentDialog.notes}
@@ -461,7 +511,7 @@ export function AdjustmentRequestDialog({
                   notes: event.target.value,
                 }))
               }
-              placeholder="اختياري"
+              placeholder={t("adjustment.notesPlaceholder")}
               className="h-10"
             />
           </div>
@@ -475,7 +525,7 @@ export function AdjustmentRequestDialog({
             }
             className="h-10 rounded-xl"
           >
-            تراجع
+            {t("adjustment.cancel")}
           </Button>
           <Button
             variant="warning"
@@ -484,7 +534,7 @@ export function AdjustmentRequestDialog({
             onClick={onSubmit}
             className="h-10 rounded-xl px-6 font-black"
           >
-            إرسال الطلب
+            {t("adjustment.submit")}
           </Button>
         </DialogFooter>
       </DialogContent>

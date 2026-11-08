@@ -221,6 +221,7 @@ function InvoiceArchive() {
                     onDeleteDraft={(monthKey, draft) =>
                       setConfirmDeleteDraft({ monthKey, draft })
                     }
+                    onOpenLedger={(monthKey) => navigate(`/invoices?month=${monthKey}`)}
                     daysInMonth={daysInMonth}
                   />
                 ))}

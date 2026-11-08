@@ -2,20 +2,11 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { LogOut, Scissors, ChevronRight, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { hasRoleAccess, normalizeRole } from "@/lib/access/roles";
-import { getNavGroups } from "@/app/route-registry";
-
-const roleLabel = (role) =>
-  ({
-    OWNER: "المالك",
-    ADMIN: "مدير النظام",
-    MANAGER: "المدير",
-    CASHIER: "الكاشير",
-    BARBER: "الخبير",
-    ACCOUNTANT: "المحاسب",
-  })[normalizeRole(role)] || "المستخدم";
+import { hasRoleAccess, roleTranslationKey } from "@/lib/access/roles";
+import { getNavGroups, routeKey } from "@/app/route-registry";
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
 import { AnimatePresence } from "framer-motion";
@@ -101,7 +92,10 @@ export default function Sidebar({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation("routes");
+  const { t: tCommon } = useTranslation("common");
   const { user, logout, loading } = useAuth();
+  const roleLabel = tCommon(roleTranslationKey(user?.role));
 
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(() => {
@@ -123,12 +117,19 @@ export default function Sidebar({
           ...group,
           // A menu entry the user cannot open is a dead end, so the registry
           // roles and any per-user permission override both apply here.
-          items: group.items.filter((item) =>
-            hasRoleAccess(user, item.roles as string[], item.to),
-          ),
+          items: group.items
+            .filter((item) =>
+              hasRoleAccess(user, item.roles as string[], item.to),
+            )
+            .map((item) => ({
+              ...item,
+              label: t(`nav.${routeKey(item.to)}`, {
+                defaultValue: item.label,
+              }),
+            })),
         }))
         .filter((group) => group.items.length > 0),
-    [user],
+    [user, t],
   );
 
   useEffect(() => {
@@ -203,7 +204,7 @@ export default function Sidebar({
               </div>
               <div className="flex flex-col">
                 <span className="text-xl font-black tracking-tight text-main leading-tight">
-                  Barber Luxe
+                  Salon Pro
                 </span>
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-accent/60">
                   Premium Suite
@@ -235,6 +236,9 @@ export default function Sidebar({
         {/* Navigation Section */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6 custom-scrollbar scroll-smooth">
           {visibleGroups.map((group, gIdx) => {
+            const groupTitle = t(`group.${group.id}`, {
+              defaultValue: group.title,
+            });
             const isExpanded = visuallyCollapsed || expandedGroups[group.title];
             return (
               <div key={group.title} className="space-y-3">
@@ -244,7 +248,7 @@ export default function Sidebar({
                     className="flex w-full items-center justify-between px-3 py-1 text-right text-[11px] font-black uppercase tracking-[0.25em] text-muted/40 hover:text-accent transition-colors group/title"
                   >
                     <span className="group-hover/title:translate-x-1 transition-transform">
-                      {group.title}
+                      {groupTitle}
                     </span>
                     <ChevronDown
                       size={14}
@@ -328,7 +332,7 @@ export default function Sidebar({
                   <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/10 border border-accent/20">
                     <div className="h-1 w-1 rounded-full bg-accent" />
                     <span className="text-[10px] text-accent font-black uppercase tracking-wider">
-                      {roleLabel(user?.role)}
+                      {roleLabel}
                     </span>
                   </div>
                 </div>
@@ -338,7 +342,7 @@ export default function Sidebar({
 
           <button
             onClick={() => logout()}
-            aria-label="تسجيل الخروج"
+            aria-label={tCommon("logout")}
             className={cn(
               "group relative flex h-14 w-full items-center gap-4 rounded-2xl px-5 text-[13px] font-black text-danger/70 hover:text-danger hover:bg-danger/10 transition-all duration-300 overflow-hidden border border-transparent hover:border-danger/20",
               visuallyCollapsed ? "justify-center" : "justify-start",
@@ -350,9 +354,9 @@ export default function Sidebar({
             />
             {!visuallyCollapsed && (
               <div className="flex flex-col items-start">
-                <span className="leading-none">تسجيل الخروج</span>
+                <span className="leading-none">{tCommon("logout")}</span>
                 <span className="text-[9px] opacity-50 uppercase tracking-widest mt-1">
-                  End Session
+                  {tCommon("end_session")}
                 </span>
               </div>
             )}

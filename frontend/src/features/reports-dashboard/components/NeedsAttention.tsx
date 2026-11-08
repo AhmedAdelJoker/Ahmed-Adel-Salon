@@ -1,5 +1,6 @@
 import { AlertOctagon, AlertTriangle, ArrowLeft, Bell, CheckCircle2, RefreshCw } from "lucide-react";
 
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { PremiumCard, SkeletonCard } from "@/components/shared/PremiumUI";
 import { cn } from "@/lib/core/utils";
@@ -27,6 +28,7 @@ export interface NeedsAttentionProps {
  * a dashboard nobody trusts on the days it matters.
  */
 export function NeedsAttention({ onNavigate }: NeedsAttentionProps) {
+  const { t } = useTranslation("owner");
   const { alerts, counts, loading, error, reload } = useNeedsAttention(4);
 
   if (loading) {
@@ -34,7 +36,7 @@ export function NeedsAttention({ onNavigate }: NeedsAttentionProps) {
       <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
         <div className="flex items-center gap-2 px-5 pt-5">
           <span className="text-[10px] font-black tracking-widest text-muted uppercase">
-            يحتاج انتباهك
+            {t("needsAttention.title")}
           </span>
         </div>
         <div className="p-5">
@@ -52,11 +54,11 @@ export function NeedsAttention({ onNavigate }: NeedsAttentionProps) {
       <div className="rounded-2xl border border-danger/20 bg-danger-soft px-4 py-3 flex flex-wrap items-center gap-3 text-danger">
         <AlertTriangle size={18} className="shrink-0" />
         <p className="text-xs font-bold flex-1 min-w-[200px]">
-          {error} — لم يتم تأكيد وجود أو عدم وجود بنود تنتظرك.
+          {error} — {t("needsAttention.errorNote")}
         </p>
         <Button variant="outline" size="sm" onClick={reload} className="shrink-0">
           <RefreshCw size={14} className="ms-1.5" />
-          إعادة المحاولة
+          {t("needsAttention.retry")}
         </Button>
       </div>
     );
@@ -71,14 +73,13 @@ export function NeedsAttention({ onNavigate }: NeedsAttentionProps) {
               <CheckCircle2 size={20} />
             </span>
             <div>
-              <p className="text-sm font-black text-main">لا يوجد ما ينتظرك</p>
+              <p className="text-sm font-black text-main">{t("needsAttention.allClearTitle")}</p>
               <p className="text-xs text-muted">
-                لا طلبات موافقة، ولا مستندات منتهية، ولا نقص مخزون، ولا إشعارات
-                غير مقروءة.
+                {t("needsAttention.allClearBody")}
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={reload} aria-label="تحديث">
+          <Button variant="ghost" size="sm" onClick={reload} aria-label={t("needsAttention.refresh")}>
             <RefreshCw size={14} />
           </Button>
         </div>
@@ -94,20 +95,20 @@ export function NeedsAttention({ onNavigate }: NeedsAttentionProps) {
             <Bell size={18} />
           </span>
           <div>
-            <p className="text-sm font-black text-main">يحتاج انتباهك</p>
+            <p className="text-sm font-black text-main">{t("needsAttention.title")}</p>
             <p className="text-[10px] font-bold text-muted">
               {counts.total === 1
-                ? "بند واحد بانتظارك"
-                : `${counts.total} بنود بانتظارك`}
+                ? t("needsAttention.oneItem")
+                : t("needsAttention.manyItems", { count: counts.total })}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <CountPill label="حرجة" value={counts.high} tone="danger" />
-          <CountPill label="مراجعة" value={counts.medium} tone="warning" />
-          <CountPill label="معلومة" value={counts.low} tone="info" />
-          <Button variant="ghost" size="sm" onClick={reload} aria-label="تحديث">
+          <CountPill label={t("needsAttention.high")} value={counts.high} tone="danger" />
+          <CountPill label={t("needsAttention.medium")} value={counts.medium} tone="warning" />
+          <CountPill label={t("needsAttention.low")} value={counts.low} tone="info" />
+          <Button variant="ghost" size="sm" onClick={reload} aria-label={t("needsAttention.refresh")}>
             <RefreshCw size={14} />
           </Button>
         </div>
@@ -158,7 +159,7 @@ export function NeedsAttention({ onNavigate }: NeedsAttentionProps) {
             className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-accent hover:underline"
           >
             <AlertOctagon size={12} />
-            عرض {counts.total - alerts.length} بنداً آخر
+            {t("needsAttention.remaining", { count: counts.total - alerts.length })}
           </button>
         </div>
       )}

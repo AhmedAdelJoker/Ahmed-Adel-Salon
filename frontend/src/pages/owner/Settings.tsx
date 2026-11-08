@@ -1,5 +1,6 @@
 import { useAuth } from "@/context/AuthContext";
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Store,
@@ -22,6 +23,8 @@ import {
   Receipt,
   Coins,
   ExternalLink,
+  Percent,
+  Target,
 } from "lucide-react";
 import api, { staticURL } from "@/services/api";
 import { adaptObject } from "@/services/apiAdapter";
@@ -80,19 +83,48 @@ const normalizeShopSettings = (data: Record<string, any> = {}, fallback: Record<
   receipt_footer:
     data.receipt_footer ?? data.receiptFooter ?? fallback.receipt_footer ?? "",
   currency: data.currency ?? fallback.currency ?? "EGP",
+  // VAT percentage (0–100). Normalized to a string so the number input and
+  // the dirty-check both compare consistently; 0 means no tax line.
+  tax_rate: String(
+    data.tax_rate ?? data.taxRate ?? fallback.tax_rate ?? "0",
+  ),
+  // Cashier discount limit (read-only here; editable only by the owner's
+  // back-office flow). Kept as strings for consistent dirty-check display.
+  cashier_discount_limit_type:
+    data.cashier_discount_limit_type ??
+    data.cashierDiscountLimitType ??
+    fallback.cashier_discount_limit_type ??
+    "percent",
+  cashier_discount_limit_value: String(
+    data.cashier_discount_limit_value ??
+      data.cashierDiscountLimitValue ??
+      fallback.cashier_discount_limit_value ??
+      "0",
+  ),
+  // Monthly sales target (reference only, read-only in this view).
+  monthly_revenue_target: String(
+    data.monthly_revenue_target ??
+      data.monthlyRevenueTarget ??
+      fallback.monthly_revenue_target ??
+      "0",
+  ),
 });
 
 const SETTINGS_TABS = [
-  { id: "shop", label: "بيانات المنشأة", icon: Store },
-  { id: "hours", label: "ساعات العمل", icon: Clock },
-  { id: "services", label: "الخدمات والعروض", icon: Scissors },
-  { id: "website", label: "الموقع العام", icon: Globe },
-  { id: "loyalty", label: "نظام الولاء", icon: Trophy },
-  { id: "users", label: "إدارة المستخدمين", icon: Users },
-  { id: "security", label: "الأمان والوصول", icon: Lock },
+  { id: "shop", key: "settings.tabShop", icon: Store },
+  { id: "hours", key: "settings.tabHours", icon: Clock },
+  { id: "services", key: "settings.tabServices", icon: Scissors },
+  { id: "website", key: "settings.tabWebsite", icon: Globe },
+  { id: "loyalty", key: "settings.tabLoyalty", icon: Trophy },
+  { id: "users", key: "settings.tabUsers", icon: Users },
+  { id: "security", key: "settings.tabSecurity", icon: Lock },
 ];
 
 const Settings = () => {
+  // The POS-domain fields (VAT rate) use the `pos` namespace; the rest of this
+  // page still carries Arabic literals pending its own migration.
+  const { t } = useTranslation("pos");
+  const { t: ot } = useTranslation("owner");
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -143,6 +175,10 @@ const Settings = () => {
     googleMapsUrl: "",
     receipt_footer: "",
     currency: "EGP",
+    tax_rate: "0",
+    cashier_discount_limit_type: "percent",
+    cashier_discount_limit_value: "0",
+    monthly_revenue_target: "0",
   });
 
   const getLogoPreviewUrl = () => {
@@ -157,7 +193,7 @@ const Settings = () => {
       if (!file || !validateImageSize(file)) return;
       const ext = file.name.split(".").pop()?.toLowerCase() || "";
       if (!["jpg", "jpeg", "png", "webp"].includes(ext)) {
-        toast.error("صيغة اللوجو غير مدعومة. الصيغ المسموحة: JPG, JPEG, PNG, WEBP");
+        toast.error(ot("settings.logoFormat"));
         return;
       }
       setLogoUploading(true);
@@ -173,9 +209,9 @@ const Settings = () => {
           setShopInitial((cur) => cur ?? { ...next });
           return next;
         });
-        toast.success("تم رفع لوجو المحل بنجاح");
+        toast.success(ot("settings.logoUploaded"));
       } catch {
-        toast.error("فشل رفع لوجو المحل");
+        toast.error(ot("settings.logoUploadFailed"));
       } finally {
         setLogoUploading(false);
       }
@@ -203,11 +239,11 @@ const Settings = () => {
         setPublicSiteStale(Boolean(settingsData.publicSiteStale));
         setSettingsReady(true);
       } else {
-        setLoadError("تعذر تحميل بيانات المنشأة. تحقق من الاتصال ثم أعد المحاولة.");
+        setLoadError(ot("settings.loadShopFailed"));
       }
     } catch {
-      setLoadError("تعذر تحميل بيانات الإعدادات. تحقق من الاتصال بالخادم ثم أعد المحاولة.");
-      toast.error("فشل تحميل بيانات المنشأة");
+      setLoadError(ot("settings.loadSettingsFailed"));
+      toast.error(ot("settings.loadShopToast"));
     } finally {
       setInitialLoading(false);
     }
@@ -229,6 +265,7 @@ const Settings = () => {
       "google_maps_url",
       "receipt_footer",
       "currency",
+      "tax_rate",
     ];
     return keys.some((k) => String(shopSettings[k] ?? "") !== String(shopInitial[k] ?? ""));
   }, [shopSettings, shopInitial]);
@@ -245,8 +282,8 @@ const Settings = () => {
   }, [shopSettings]);
 
   const dirtyLabel = useMemo(() => {
-    if (activeTab === "shop" && shopIsDirty) return "بيانات المنشأة";
-    if (activeTab === "hours" && hoursDirty) return "ساعات العمل";
+    if (activeTab === "shop" && shopIsDirty) return ot("settings.dirtyShop");
+    if (activeTab === "hours" && hoursDirty) return ot("settings.dirtyHours");
     return null;
   }, [activeTab, shopIsDirty, hoursDirty]);
 
@@ -284,7 +321,7 @@ const Settings = () => {
       if (dirtyLabel) {
         window.history.pushState(null, "", `${window.location.pathname}?tab=${activeTab}`);
         const proceed = window.confirm(
-          `لديك تغييرات غير محفوظة في ${dirtyLabel}. هل تريد المتابعة بدون حفظ؟`,
+          ot("settings.unsavedConfirm", { label: dirtyLabel }),
         );
         if (proceed) setSearchParams({ tab: target }, { replace: true });
         return;
@@ -318,24 +355,30 @@ const Settings = () => {
   };
 
   const validateShopFields = useCallback(() => {
-    if (!shopSettings.salon_name.trim()) return "المسمى التجاري مطلوب";
-    if (shopSettings.salon_name.trim().length > 255) return "المسمى التجاري طويل جداً (255 حرف كحد أقصى)";
-    if (shopSettings.shop_phone && shopSettings.shop_phone.trim().length > 30) return "رقم التواصل طويل جداً";
-    if (shopSettings.shop_whatsapp && shopSettings.shop_whatsapp.trim().length > 30) return "رقم الواتساب طويل جداً";
-    if (shopSettings.address.trim().length > 500) return "العنوان طويل جداً (500 حرف كحد أقصى)";
+    if (!shopSettings.salon_name.trim()) return ot("settings.vNameRequired");
+    if (shopSettings.salon_name.trim().length > 255) return ot("settings.vNameTooLong");
+    if (shopSettings.shop_phone && shopSettings.shop_phone.trim().length > 30) return ot("settings.vPhoneTooLong");
+    if (shopSettings.shop_whatsapp && shopSettings.shop_whatsapp.trim().length > 30) return ot("settings.vWhatsappTooLong");
+    if (shopSettings.address.trim().length > 500) return ot("settings.vAddressTooLong");
     if (shopSettings.google_maps_url) {
       const v = shopSettings.google_maps_url.trim();
-      if (v && !/^https?:\/\//i.test(v)) return "رابط الخريطة يجب أن يبدأ بـ https://";
-      if (v.length > 1000) return "رابط الخريطة طويل جداً";
+      if (v && !/^https?:\/\//i.test(v)) return ot("settings.vMapUrl");
+      if (v.length > 1000) return ot("settings.vMapTooLong");
     }
-    if (shopSettings.receipt_footer && shopSettings.receipt_footer.length > 500) return "تذييل الإيصال طويل جداً (500 حرف كحد أقصى)";
+    if (shopSettings.receipt_footer && shopSettings.receipt_footer.length > 500) return ot("settings.vFooterTooLong");
+    const tax = Number(shopSettings.tax_rate);
+    if (
+      shopSettings.tax_rate.trim() !== "" &&
+      (!Number.isFinite(tax) || tax < 0 || tax > 100)
+    )
+      return t("pos:settings_tax.invalid");
     return null;
-  }, [shopSettings]);
+  }, [shopSettings, t]);
 
   const handleShopSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!settingsReady) {
-      toast.error("بيانات المنشأة لم تُحمّل بعد — أعد تحميل الصفحة");
+      toast.error(ot("settings.notLoaded"));
       return;
     }
     const validationError = validateShopFields();
@@ -357,6 +400,8 @@ const Settings = () => {
         googleMapsUrl: shopSettings.google_maps_url.trim() || shopSettings.googleMapsUrl.trim() || null,
         receiptFooter: shopSettings.receipt_footer.trim() || null,
         currency: shopSettings.currency.trim() || "EGP",
+        // 0 disables the tax line on invoices entirely.
+        taxRate: Number(shopSettings.tax_rate || 0),
       };
       if (settingsVersion) payload.expectedVersion = settingsVersion;
 
@@ -368,17 +413,17 @@ const Settings = () => {
       setSettingsVersion(Number(updated.version) || settingsVersion);
       setPublicSiteStale(Boolean(updated.publicSiteStale));
 
-      toast.success("تم حفظ بيانات المنشأة بنجاح");
+      toast.success(ot("settings.saved"));
     } catch (err: unknown) {
       if (isConflict(err)) {
-        const [line] = toErrorLines(err, "تم تعديل الإعدادات من مستخدم آخر");
-        setShopConflict(line?.message ?? "تم تعديل الإعدادات من مستخدم آخر");
-        toast.error("تعارض في الحفظ — الإعدادات تغيّرت من مستخدم آخر");
+        const [line] = toErrorLines(err, ot("settings.conflictFallback"));
+        setShopConflict(line?.message ?? ot("settings.conflictFallback"));
+        toast.error(ot("settings.conflictToast"));
         return;
       }
-      const lines = toErrorLines(err, "فشل حفظ بيانات المنشأة");
+      const lines = toErrorLines(err, ot("settings.saveFailedFallback"));
       setShopSaveErrors(lines);
-      toast.error(errorHeadline(lines, "فشل حفظ بيانات المنشأة"));
+      toast.error(errorHeadline(lines, ot("settings.saveFailedFallback")));
     } finally {
       setLoading(false);
     }
@@ -391,9 +436,9 @@ const Settings = () => {
       const updated = (adaptObject(res, {}) || {}) as Record<string, unknown>;
       setPublicSiteStale(Boolean(updated.publicSiteStale));
       setSettingsVersion(Number(updated.version) || settingsVersion);
-      toast.success("تم نشر الموقع العام بنجاح");
+      toast.success(ot("settings.published"));
     } catch {
-      toast.error("فشل نشر الموقع العام");
+      toast.error(ot("settings.publishFailed"));
     } finally {
       setPublishing(false);
     }
@@ -408,9 +453,9 @@ const Settings = () => {
       const normalized = normalizeShopSettings(updated, {}) as Record<string, string>;
       setShopSettings((prev) => ({ ...prev, ...normalized, logo_url: "", logoUrl: "" }));
       setShopInitial((prev) => (prev ? { ...prev, logo_url: "", logoUrl: "", google_maps_url: normalized.google_maps_url ?? prev.google_maps_url, googleMapsUrl: normalized.googleMapsUrl ?? prev.googleMapsUrl } : prev));
-      toast.success("تمت إزالة الشعار");
+      toast.success(ot("settings.logoRemoved"));
     } catch {
-      toast.error("فشل إزالة الشعار");
+      toast.error(ot("settings.logoRemoveFailed"));
     } finally {
       setLoading(false);
     }
@@ -420,9 +465,9 @@ const Settings = () => {
     return (
       <div className="erp-page-container space-y-6 pb-24">
         <PageHeader
-          title={isOwnerLike ? "إعدادات المنشأة" : "ساعات العمل"}
-          subtitle="جاري تحميل الإعدادات..."
-          badge={isOwnerLike ? "لوحة التحكم الكاملة" : "وصول المدير"}
+          title={isOwnerLike ? ot("settings.settingsTitle") : ot("settings.tabHours")}
+          subtitle={ot("settings.loadingSubtitle")}
+          badge={isOwnerLike ? ot("settings.fullBadge") : ot("settings.managerBadge")}
           icon={SettingsIcon}
           className={undefined}
           actions={undefined}
@@ -439,19 +484,19 @@ const Settings = () => {
     return (
       <div className="erp-page-container space-y-6 pb-24">
         <PageHeader
-          title={isOwnerLike ? "إعدادات المنشأة" : "ساعات العمل"}
-          subtitle="إدارة الهوية الرقمية، الكوادر، السياسات المالية، وتفضيلات النظام."
-          badge={isOwnerLike ? "لوحة التحكم الكاملة" : "وصول المدير"}
+          title={isOwnerLike ? ot("settings.settingsTitle") : ot("settings.tabHours")}
+          subtitle={ot("settings.settingsSubtitle")}
+          badge={isOwnerLike ? ot("settings.fullBadge") : ot("settings.managerBadge")}
           icon={SettingsIcon}
           className={undefined}
           actions={undefined}
         />
         <PremiumCard className="border-dashed">
           <div className="flex flex-col items-center gap-4 py-14 text-center">
-            <p className="text-lg font-black text-main">تعذر تحميل بيانات الإعدادات</p>
+            <p className="text-lg font-black text-main">{ot("settings.loadErrorTitle")}</p>
             <p className="max-w-md text-sm font-bold text-muted">{loadError}</p>
             <Button onClick={fetchData} loading={loading}>
-              <Activity size={16} /> إعادة المحاولة
+              <Activity size={16} /> {ot("settings.retry")}
             </Button>
           </div>
         </PremiumCard>
@@ -461,13 +506,13 @@ const Settings = () => {
   return (
     <div className="erp-page-container space-y-10 pb-24">
       <PageHeader
-        title={isOwnerLike ? "إعدادات المنشأة" : "ساعات العمل"}
+        title={isOwnerLike ? ot("settings.settingsTitle") : ot("settings.tabHours")}
         subtitle={
           isOwnerLike
-            ? "إدارة الهوية الرقمية، الكوادر، السياسات المالية، وتفضيلات النظام."
-            : "إدارة بروتوكول ساعات التشغيل — الوصول المحدود للمدير."
+            ? ot("settings.settingsSubtitle")
+            : ot("settings.managerSubtitle")
         }
-        badge={isOwnerLike ? "لوحة التحكم الكاملة" : "وصول المدير"}
+        badge={isOwnerLike ? ot("settings.fullBadge") : ot("settings.managerBadge")}
         icon={SettingsIcon}
         className={undefined}
         actions={
@@ -476,14 +521,14 @@ const Settings = () => {
             className="h-10 rounded-xl px-5 text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary border-none shadow-sm"
           >
             <ShieldCheck size={16} className="ms-2" strokeWidth={2.5} />{" "}
-            {isOwnerLike ? "صلاحيات وصول المالك" : "صلاحيات المدير — ساعات العمل فقط"}
+            {isOwnerLike ? ot("settings.ownerAccess") : ot("settings.managerAccess")}
           </Badge>
         }
       />
       {!isOwnerLike && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3 text-[11px] font-black text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
           <Clock size={16} className="shrink-0" />
-          أنت تدخل كمدير — يمكنك تعديل ساعات العمل فقط. باقي الإعدادات متاحة للمالك.
+          {ot("settings.managerOnlyNote")}
         </div>
       )}
 
@@ -494,8 +539,7 @@ const Settings = () => {
         >
           <Globe size={16} className="shrink-0 text-sky-700 dark:text-sky-300" />
           <p className="flex-1 text-[11px] font-black leading-relaxed text-sky-900 dark:text-sky-200">
-            عدّلت الإعدادات بعد آخر نشر — الموقع العام لازم ينشر تاني عشان يشوف التعديلات دي
-            (وقت الدوام، الاسم، الشعار).
+            {ot("settings.staleNote")}
           </p>
           <Button
             variant="primary"
@@ -504,7 +548,7 @@ const Settings = () => {
             loading={publishing}
             className="h-8 shrink-0 rounded-xl px-4 text-[11px] font-black"
           >
-            <Upload size={13} className="ms-1" /> انشر الآن
+            <Upload size={13} className="ms-1" /> {ot("settings.publishNow")}
           </Button>
         </div>
       )}
@@ -515,7 +559,7 @@ const Settings = () => {
           <div
             ref={tabListRef}
             role="tablist"
-            aria-label="أقسام الإعدادات"
+            aria-label={ot("settings.tabsAria")}
             aria-orientation="vertical"
             className="sticky top-24 space-y-2 flex lg:flex-col overflow-x-auto pb-4 lg:pb-0 no-scrollbar snap-x snap-mandatory bg-card/40 lg:bg-transparent p-2 rounded-2xl border border-border/40 lg:border-none lg:p-0"
           >
@@ -553,7 +597,7 @@ const Settings = () => {
                       <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
                     </div>
                     <span className="text-[11px] font-black tracking-wide whitespace-nowrap">
-                      {tab.label}
+                      {ot(tab.key)}
                     </span>
                   </div>
 
@@ -582,11 +626,10 @@ const Settings = () => {
               </div>
               <div className="flex items-center gap-3 mb-4 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
                 <Zap size={16} strokeWidth={3} className="animate-pulse" />{" "}
-                حماية البيانات
+                {ot("settings.dataProtection")}
               </div>
               <p className="text-[11px] font-bold text-muted leading-relaxed relative z-10">
-                يتم تأمين كافة التغييرات عبر بروتوكولات تشفير متقدمة، لضمان سرية
-                بيانات منشأتك وعملائك.
+                {ot("settings.dataProtectionText")}
               </p>
             </PremiumCard>
           </div>
@@ -600,7 +643,7 @@ const Settings = () => {
           tabIndex={-1}
           className="flex-1 min-w-0 focus-visible:outline-none"
         >
-          <AnimatePresence mode="wait">
+          <AnimatePresence>
             <motion.div
               key={activeTab}
               initial={{ opacity: 0, x: 20 }}
@@ -611,19 +654,19 @@ const Settings = () => {
               {activeTab === "shop" && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <ContentPanel
-                    title="الهوية الرقمية للمنشأة"
-                    subtitle="اسم المحل والشعار وطرق التواصل — تُطبّق تلقائياً في الفواتير والتقارير والموقع العام."
+                    title={ot("settings.identityTitle")}
+                    subtitle={ot("settings.identitySubtitle")}
                     actions={
                       <div className="flex items-center gap-2">
                         <Badge
                           variant={shopCompleteness.done === shopCompleteness.total ? "success" : "secondary"}
                           className="rounded-full px-3 py-1 text-[10px] font-black tabular-nums"
                         >
-                          {shopCompleteness.done}/{shopCompleteness.total} مكتمل
+                          {ot("settings.complete", { done: shopCompleteness.done, total: shopCompleteness.total })}
                         </Badge>
                         {shopIsDirty && (
                           <Badge variant="warning" className="rounded-full px-3 py-1 text-[10px] font-black">
-                            غير محفوظ
+                            {ot("settings.unsavedBadge")}
                           </Badge>
                         )}
                         <Button
@@ -632,7 +675,7 @@ const Settings = () => {
                           disabled={!settingsReady || logoUploading}
                           className="h-9 rounded-xl px-5 text-xs font-black hidden sm:inline-flex"
                         >
-                          حفظ
+                          {ot("settings.save")}
                         </Button>
                       </div>
                     }
@@ -653,7 +696,7 @@ const Settings = () => {
                           onClick={fetchData}
                           className="h-8 self-start rounded-xl border-amber-300 px-3 text-[11px] font-black text-amber-800 dark:border-amber-700 dark:text-amber-200"
                         >
-                          <Activity size={13} className="ms-1" /> جلب أحدث نسخة
+                          <Activity size={13} className="ms-1" /> {ot("settings.fetchLatest")}
                         </Button>
                       </div>
                     )}
@@ -666,8 +709,8 @@ const Settings = () => {
                         <p className="flex items-center gap-2 text-[11px] font-black text-rose-700 dark:text-rose-300">
                           <ShieldCheck size={16} className="shrink-0" />
                           {shopSaveErrors.length === 1
-                            ? "تعذر الحفظ"
-                            : `تعذر الحفظ — ${shopSaveErrors.length} أخطاء من الخادم`}
+                            ? ot("settings.saveFailedOne")
+                            : ot("settings.saveFailedMany", { count: shopSaveErrors.length })}
                         </p>
                         <ul className="mt-2 space-y-1 pe-4">
                           {shopSaveErrors.map((line, index) => (
@@ -709,16 +752,16 @@ const Settings = () => {
                               <img
                                 src={getLogoPreviewUrl() ?? ""}
                                 className="h-full w-full object-contain p-2"
-                                alt="شعار المنشأة"
+                                alt={ot("settings.logoAlt")}
                               />
                             ) : (
                               <ImageIcon className="text-muted/30 w-10 h-10" />
                             )}
                           </div>
                           <div className="space-y-1">
-                            <p className="text-sm font-black text-main">شعار المنشأة</p>
+                            <p className="text-sm font-black text-main">{ot("settings.logoTitle")}</p>
                             <p className="text-[11px] font-bold leading-relaxed text-muted">
-                              JPG / PNG / WEBP حتى 2MB — اسحب الملف هنا أو اختر من الجهاز. يظهر في الفواتير الحرارية والتقارير.
+                              {ot("settings.logoHint")}
                             </p>
                           </div>
                           <div className="flex flex-wrap items-center justify-center gap-2 w-full">
@@ -729,7 +772,7 @@ const Settings = () => {
                               )}
                             >
                               <Upload size={14} strokeWidth={2.5} />
-                              {logoUploading ? "جاري الرفع..." : "رفع شعار"}
+                              {logoUploading ? ot("settings.uploading") : ot("settings.uploadLogo")}
                               <input
                                 type="file"
                                 className="hidden"
@@ -747,7 +790,7 @@ const Settings = () => {
                                 disabled={!settingsReady || logoUploading}
                                 className="h-9 rounded-xl text-rose-600 hover:bg-rose-50 border-rose-200 font-black text-xs dark:text-rose-400 dark:hover:bg-rose-950/40 dark:border-rose-900"
                               >
-                                إزالة
+                                {ot("settings.remove")}
                               </Button>
                             )}
                           </div>
@@ -758,9 +801,9 @@ const Settings = () => {
                           <div className="px-4 py-3 border-b border-border/60 bg-soft/40 flex items-center gap-2">
                             <Receipt size={14} className="text-muted" />
                             <span className="text-[10px] font-black uppercase tracking-widest text-muted">
-                              معاينة الإيصال
+                              {ot("settings.receiptPreview")}
                             </span>
-                            <span className="me-auto text-[10px] font-bold text-muted">حيّة</span>
+                            <span className="me-auto text-[10px] font-bold text-muted">{ot("settings.live")}</span>
                           </div>
                           <div className="p-4 flex flex-col items-center gap-2 text-center">
                             {getLogoPreviewUrl() ? (
@@ -775,10 +818,10 @@ const Settings = () => {
                               </div>
                             )}
                             <p className="text-sm font-black text-main leading-tight truncate max-w-full">
-                              {shopSettings.salon_name.trim() || "اسم المنشأة"}
+                              {shopSettings.salon_name.trim() || ot("settings.shopNameFallback")}
                             </p>
                             <p className="text-[11px] font-bold text-muted tabular-nums leading-relaxed">
-                              {[shopSettings.shop_phone.trim(), shopSettings.shop_whatsapp.trim()].filter(Boolean).join(" • ") || "رقم التواصل"}
+                              {[shopSettings.shop_phone.trim(), shopSettings.shop_whatsapp.trim()].filter(Boolean).join(" • ") || ot("settings.contactFallback")}
                               {shopSettings.address.trim() ? ` • ${shopSettings.address.trim()}` : ""}
                             </p>
                             {shopSettings.google_maps_url.trim() && (
@@ -788,14 +831,21 @@ const Settings = () => {
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-[11px] font-black text-primary hover:underline"
                               >
-                                <MapPin size={12} /> فتح الخريطة <ExternalLink size={10} />
+                                <MapPin size={12} /> {ot("settings.openMap")} <ExternalLink size={10} />
                               </a>
                             )}
                             <div className="w-full border-t border-dashed border-border my-1" />
                             <p className="text-[11px] font-bold leading-relaxed text-muted whitespace-pre-wrap break-words max-w-full">
-                              {shopSettings.receipt_footer.trim() || "تذييل الإيصال يظهر هنا — مثال: شكراً لزيارتكم"}
+                              {shopSettings.receipt_footer.trim() || ot("settings.footerFallback")}
                             </p>
-                            <p className="text-[10px] font-bold text-muted/60">العملة: {shopSettings.currency || "EGP"}</p>
+                            <p className="text-[10px] font-bold text-muted/60">{ot("settings.currencyLine", { code: shopSettings.currency || "EGP" })}</p>
+                            {Number(shopSettings.tax_rate || 0) > 0 && (
+                              <p className="text-[10px] font-bold text-muted/60">
+                                {t("pos:settings_tax.preview_tax", {
+                                  rate: Number(shopSettings.tax_rate),
+                                })}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -805,14 +855,14 @@ const Settings = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-1.5">
                             <label htmlFor="settings-salon-name" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
-                              <Store size={11} /> المسمى التجاري الرسمي <span className="text-danger">*</span>
+                              <Store size={11} /> {ot("settings.tradeName")} <span className="text-danger">*</span>
                             </label>
                             <Input
                               id="settings-salon-name"
                               value={shopSettings.salon_name}
                               onChange={(e) => setShopSettings({ ...shopSettings, salon_name: e.target.value })}
                               maxLength={255}
-                              placeholder="مثال: صالون الأناقة"
+                              placeholder={ot("settings.salonNamePlaceholder")}
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                             />
                             <p className="text-[10px] font-bold text-muted me-1 tabular-nums">
@@ -821,7 +871,7 @@ const Settings = () => {
                           </div>
                           <div className="space-y-1.5">
                             <label htmlFor="settings-shop-phone" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
-                              <Bell size={11} /> رقم التواصل
+                              <Bell size={11} /> {ot("settings.contactLabel")}
                             </label>
                             <Input
                               id="settings-shop-phone"
@@ -829,15 +879,15 @@ const Settings = () => {
                               onChange={(e) => setShopSettings({ ...shopSettings, shop_phone: e.target.value })}
                               maxLength={30}
                               inputMode="tel"
-                              placeholder="01xxxxxxxxx"
+                              placeholder={ot("settings.phonePlaceholder")}
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                               dir="ltr"
                             />
-                            <p className="text-[10px] font-bold text-muted me-1">يظهر في الفاتورة الحرارية</p>
+                            <p className="text-[10px] font-bold text-muted me-1">{ot("settings.thermalHint")}</p>
                           </div>
                           <div className="space-y-1.5">
                             <label htmlFor="settings-shop-whatsapp" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
-                              <MessageCircle size={11} /> واتساب
+                              <MessageCircle size={11} /> {ot("settings.whatsappLabel")}
                             </label>
                             <Input
                               id="settings-shop-whatsapp"
@@ -845,55 +895,132 @@ const Settings = () => {
                               onChange={(e) => setShopSettings({ ...shopSettings, shop_whatsapp: e.target.value })}
                               maxLength={30}
                               inputMode="tel"
-                              placeholder="01xxxxxxxxx — اختياري"
+                              placeholder={ot("settings.whatsappPlaceholder")}
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                               dir="ltr"
                             />
-                            <p className="text-[10px] font-bold text-muted me-1">للتواصل وروابط الحجز</p>
+                            <p className="text-[10px] font-bold text-muted me-1">{ot("settings.bookingHint")}</p>
                           </div>
                           <div className="space-y-1.5">
                             <label htmlFor="settings-currency" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
-                              <Coins size={11} /> العملة
+                              <Coins size={11} /> {ot("settings.currencyLabel")}
                             </label>
                             <Select
                               value={shopSettings.currency || "EGP"}
                               onValueChange={(v) => setShopSettings({ ...shopSettings, currency: v })}
                             >
                               <SelectTrigger id="settings-currency" className="h-11 rounded-xl bg-soft border-border/60 font-bold">
-                                <SelectValue placeholder="العملة" />
+                                <SelectValue placeholder={ot("settings.currencyPlaceholder")} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="EGP">جنيه مصري — EGP</SelectItem>
-                                <SelectItem value="SAR">ريال سعودي — SAR</SelectItem>
-                                <SelectItem value="USD">دولار — USD</SelectItem>
-                                <SelectItem value="AED">درهم إماراتي — AED</SelectItem>
-                                {/* The fifth entry was `value="ج.م"` labelled ج.م:
-                                    an option whose value was a rendered symbol
-                                    rather than a currency code, and identical to
-                                    the EGP entry above it. Selecting it stored
-                                    "ج.م" in business_settings.currency, which no
-                                    formatter understood. The codes above are the
-                                    contract. */}
+                                <SelectItem value="EGP">{ot("settings.curEGP")}</SelectItem>
+                                <SelectItem value="SAR">{ot("settings.curSAR")}</SelectItem>
+                                <SelectItem value="USD">{ot("settings.curUSD")}</SelectItem>
+                                <SelectItem value="AED">{ot("settings.curAED")}</SelectItem>
+                                {/* The fifth entry used to be a currency
+                                    symbol as its value, identical to the EGP
+                                    entry above it, which no formatter understood.
+                                    The codes above are the contract. */}
                               </SelectContent>
                             </Select>
+                            <p className="text-[10px] font-bold text-muted me-1">{ot("settings.invoicesReportsHint")}</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label htmlFor="settings-tax-rate" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
+                              <Percent size={11} /> {t("pos:settings_tax.label")}
+                            </label>
+                            <div className="relative">
+                              <Input
+                                id="settings-tax-rate"
+                                type="number"
+                                min={0}
+                                max={100}
+                                step="0.5"
+                                inputMode="decimal"
+                                value={shopSettings.tax_rate}
+                                onChange={(e) => setShopSettings({ ...shopSettings, tax_rate: e.target.value })}
+                                placeholder="0"
+                                aria-label={t("pos:settings_tax.aria")}
+                                className="h-11 rounded-xl bg-soft border-border/60 font-bold ps-4 pe-9 focus:bg-card transition-all"
+                                dir="ltr"
+                              />
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted">%</span>
+                            </div>
+                            <p className="text-[10px] font-bold text-muted me-1">
+                              {t("pos:settings_tax.help")}
+                            </p>
+                          </div>
+                          {/* Cashier discount limit — read-only reference. Values come from
+                              the owner's back-office config; this POS view only surfaces them. */}
+                          <div className="space-y-1.5">
+                            <label
+                              htmlFor="settings-cashier-discount-limit"
+                              className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5"
+                            >
+                              <Percent size={11} />
+                              {t("pos:settings_tax.cashier_discount_limit")}
+                            </label>
+                            <div
+                              id="settings-cashier-discount-limit"
+                              className="flex items-center gap-2 bg-soft border border-border/60 rounded-lg h-11 px-3 font-bold text-muted"
+                            >
+                              {shopSettings.cashier_discount_limit_type === "percent"
+                                ? t("pos:logic.discount_limit_percent", {
+                                    value: shopSettings.cashier_discount_limit_value,
+                                  })
+                                : `${shopSettings.cashier_discount_limit_value} ${
+                                    shopSettings.currency || "EGP"
+                                  }`}
+                            </div>
+                            <p className="text-[10px] font-bold text-muted me-1">
+                              {t("pos:settings_tax.cashier_discount_limit_help")}
+                            </p>
+                          </div>
+                          {/* Monthly sales target — read-only reference. */}
+                          <div className="space-y-1.5">
+                            <label
+                              htmlFor="settings-monthly-sales-target"
+                              className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5"
+                            >
+                              <Target size={11} />
+                              {t("pos:settings_tax.monthly_sales_target")}
+                            </label>
+                            <div
+                              id="settings-monthly-sales-target"
+                              className="flex items-center gap-2 bg-soft border border-border/60 rounded-lg h-11 px-3 font-bold text-muted"
+                            >
+                              {Number(shopSettings.monthly_revenue_target || 0) > 0
+                                ? `${Number(
+                                    shopSettings.monthly_revenue_target,
+                                  ).toLocaleString(undefined, {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0,
+                                  })} ${
+                                    shopSettings.currency || "EGP"
+                                  }`
+                                : "—"}
+                            </div>
+                            <p className="text-[10px] font-bold text-muted me-1">
+                              {t("pos:settings_tax.monthly_sales_target_help")}
+                            </p>
                           </div>
                           <div className="md:col-span-2 space-y-1.5">
                             <label htmlFor="settings-address" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
-                              <MapPin size={11} /> العنوان الجغرافي
+                              <MapPin size={11} /> {ot("settings.addressLabel")}
                             </label>
                             <Input
                               id="settings-address"
                               value={shopSettings.address}
                               onChange={(e) => setShopSettings({ ...shopSettings, address: e.target.value })}
                               maxLength={500}
-                              placeholder="المنطقة، الشارع، علامة مميزة"
+                              placeholder={ot("settings.addressPlaceholder")}
                               className="h-11 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                             />
                             <p className="text-[10px] font-bold text-muted me-1 tabular-nums">{shopSettings.address.length}/500</p>
                           </div>
                           <div className="md:col-span-2 space-y-1.5">
                             <label htmlFor="settings-maps-url" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
-                              <Globe size={11} /> رابط الخريطة (Google Maps)
+                              <Globe size={11} /> {ot("settings.mapsLabel")}
                             </label>
                             <div className="flex gap-2">
                               <Input
@@ -901,7 +1028,7 @@ const Settings = () => {
                                 value={shopSettings.google_maps_url}
                                 onChange={(e) => setShopSettings({ ...shopSettings, google_maps_url: e.target.value, googleMapsUrl: e.target.value })}
                                 maxLength={1000}
-                                placeholder="https://maps.app.goo.gl/... — اختياري"
+                                placeholder={ot("settings.mapsPlaceholder")}
                                 className="h-11 flex-1 rounded-xl bg-soft border-border/60 font-bold px-4 focus:bg-card transition-all"
                                 dir="ltr"
                               />
@@ -912,18 +1039,18 @@ const Settings = () => {
                                   size="icon"
                                   className="h-11 w-11 rounded-xl shrink-0"
                                   onClick={() => window.open(shopSettings.google_maps_url.trim(), "_blank", "noopener,noreferrer")}
-                                  title="فتح الخريطة"
-                                  aria-label="فتح رابط الخريطة"
+                                  title={ot("settings.openMapTitle")}
+                                  aria-label={ot("settings.openMapAria")}
                                 >
                                   <ExternalLink size={16} />
                                 </Button>
                               )}
                             </div>
-                            <p className="text-[10px] font-bold text-muted me-1">يظهر زر الخريطة في الموقع العام — يجب أن يبدأ بـ https://</p>
+                            <p className="text-[10px] font-bold text-muted me-1">{ot("settings.mapButtonHint")}</p>
                           </div>
                           <div className="md:col-span-2 space-y-1.5">
                             <label htmlFor="settings-receipt-footer" className="text-[10px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1.5">
-                              <Receipt size={11} /> تذييل الإيصال
+                              <Receipt size={11} /> {ot("settings.footerLabel")}
                             </label>
                             <Textarea
                               id="settings-receipt-footer"
@@ -931,11 +1058,11 @@ const Settings = () => {
                               onChange={(e) => setShopSettings({ ...shopSettings, receipt_footer: e.target.value })}
                               maxLength={500}
                               rows={3}
-                              placeholder="مثال: شكراً لزيارتكم — نتطلع لخدمتكم مجدداً"
+                              placeholder={ot("settings.footerPlaceholder")}
                               className="rounded-xl bg-soft border-border/60 font-bold"
                             />
                             <p className="text-[10px] font-bold text-muted me-1 tabular-nums">
-                              {shopSettings.receipt_footer.length}/500 — يظهر أسفل كل فاتورة
+                              {ot("settings.footerCounter", { count: shopSettings.receipt_footer.length })}
                             </p>
                           </div>
                         </div>
@@ -945,9 +1072,7 @@ const Settings = () => {
                             <Store size={14} />
                           </div>
                           <p className="text-xs font-bold leading-relaxed text-muted">
-                            هذه البيانات تُطبّق تلقائياً في <span className="text-main">الفواتير الحرارية</span> و
-                            <span className="text-main"> التقارير</span> و<span className="text-main"> الموقع العام</span>.
-                            عدّلها هنا مرة واحدة.
+                            {ot("settings.autoApplyText")}
                           </p>
                         </div>
                       </div>
@@ -956,7 +1081,7 @@ const Settings = () => {
 
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-bold text-muted hidden sm:inline">
-                      {shopIsDirty ? "لديك تغييرات غير محفوظة" : "محفوظ"}
+                      {shopIsDirty ? ot("settings.unsavedChanges") : ot("settings.savedState")}
                     </span>
                     <div className="flex gap-2 me-auto">
                       <Button
@@ -967,7 +1092,7 @@ const Settings = () => {
                         disabled={!shopIsDirty || loading || logoUploading}
                         className="h-11 rounded-xl px-6 text-xs font-black"
                       >
-                        تراجع
+                        {ot("settings.revert")}
                       </Button>
                       <Button
                         onClick={handleShopSubmit}
@@ -975,7 +1100,7 @@ const Settings = () => {
                         disabled={!settingsReady || logoUploading}
                         className="h-11 rounded-xl px-8 text-xs font-black"
                       >
-                        حفظ بيانات المنشأة
+                        {ot("settings.saveShop")}
                       </Button>
                     </div>
                   </div>
@@ -996,16 +1121,15 @@ const Settings = () => {
 
               {(activeTab === "profile" || activeTab === "preferences") && (
                 <ContentPanel
-                  title="تم نقل هذا القسم"
-                  subtitle="حسابك الشخصي وتفضيلات الواجهة الآن في صفحة موحدة لكل الأدوار."
+                  title={ot("settings.movedTitle")}
+                  subtitle={ot("settings.movedSubtitle")}
                 >
                   <div className="flex flex-col sm:flex-row items-center gap-4 p-2">
                     <p className="text-sm font-bold text-muted flex-1">
-                      انتقل إلى <span className="text-main font-black">حسابي</span> — نفس الرابط{" "}
+                      {ot("settings.movedText")}{" "}
                       <span dir="ltr" className="font-mono text-xs bg-soft border rounded px-2 py-1">
                         /settings
                       </span>{" "}
-                      لكل المستخدمين.
                     </p>
                     <Button
                       onClick={() =>
@@ -1014,7 +1138,7 @@ const Settings = () => {
                       }
                       className="h-11 rounded-xl px-6 text-xs font-black shrink-0"
                     >
-                      فتح حسابي
+                      {ot("settings.openMyAccount")}
                     </Button>
                   </div>
                 </ContentPanel>
@@ -1027,10 +1151,10 @@ const Settings = () => {
       <ConfirmDialog
         open={Boolean(pendingTab)}
         onOpenChange={(open) => !open && setPendingTab(null)}
-        title="لديك تغييرات غير محفوظة"
-        description={`التعديلات في ${dirtyLabel ?? "هذا القسم"} ستُفقد إذا تابعت. يمكنك العودة والإكمال أولاً.`}
-        confirmText="متابعة بدون حفظ"
-        cancelText="العودة والإكمال"
+        title={ot("settings.unsavedTitle")}
+        description={ot("settings.unsavedDesc", { label: dirtyLabel ?? ot("settings.thisSection") })}
+        confirmText={ot("settings.continueWithoutSaving")}
+        cancelText={ot("settings.goBack")}
         variant="danger"
         onConfirm={() => pendingTab && commitTab(pendingTab)}
       />

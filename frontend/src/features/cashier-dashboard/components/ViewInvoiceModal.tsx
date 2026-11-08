@@ -28,6 +28,16 @@ export interface ViewInvoiceModalProps {
   onPrint: (invoice: TodayInvoice | null) => void;
 }
 
+/** Matches the receipt's labels — the five instruments a POS invoice can
+ * carry, plus the split umbrella. */
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: "نقدي",
+  card: "شبكة",
+  wallet: "محفظة",
+  bank_transfer: "تحويل بنكي",
+  split: "دفع مقسم",
+};
+
 export function ViewInvoiceModal({
   viewInvoice,
   setViewInvoice,
@@ -60,9 +70,9 @@ export function ViewInvoiceModal({
                   وسيلة الدفع
                 </p>
                 <p className="font-black text-main">
-                  {viewInvoice.data.payment_method === "cash"
-                    ? "نقدي"
-                    : "شبكة"}
+                  {PAYMENT_METHOD_LABELS[
+                    String(viewInvoice.data.payment_method || "").toLowerCase()
+                  ] ?? viewInvoice.data.payment_method}
                 </p>
               </div>
               <div className="rounded-xl bg-soft p-4 border border-border">
@@ -72,6 +82,12 @@ export function ViewInvoiceModal({
                 <p className="text-xl font-black text-primary tabular-nums">
                   {formatCurrency(viewInvoice.data.total_amount)}
                 </p>
+                {Number(viewInvoice.data.tax_amount || 0) > 0 && (
+                  <p className="text-[10px] font-bold text-muted mt-1 tabular-nums">
+                    شامل ضريبة {Number(viewInvoice.data.tax_rate || 0)}% (
+                    {formatCurrency(viewInvoice.data.tax_amount)})
+                  </p>
+                )}
               </div>
             </div>
             <div className="space-y-3">

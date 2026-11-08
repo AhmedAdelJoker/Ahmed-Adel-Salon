@@ -1,5 +1,7 @@
 import { ArrowDown, Trophy } from "lucide-react";
 
+import { useTranslation } from "react-i18next";
+import i18n from "@/i18n";
 import { cn, formatCurrency } from "@/lib/core/utils";
 
 export interface RankRow {
@@ -40,10 +42,12 @@ export function RankingTable({
   title,
   rows,
   unavailable = false,
-  emptyMessage = "لا توجد بيانات في هذه الفترة",
+  emptyMessage,
   className,
 }: RankingTableProps) {
+  const { t } = useTranslation("owner");
   const leader = rows?.[0]?.revenue ?? 0;
+  const resolvedEmpty = emptyMessage ?? t("rankingTable.noData");
 
   return (
     <div
@@ -63,11 +67,11 @@ export function RankingTable({
 
       {unavailable ? (
         <p className="px-4 py-6 text-center text-[10px] font-bold text-muted">
-          تعذّر تحميل هذا الجدول
+          {t("rankingTable.loadFailed")}
         </p>
       ) : !rows || rows.length === 0 ? (
         <p className="px-4 py-6 text-center text-[10px] font-bold text-muted">
-          {emptyMessage}
+          {resolvedEmpty}
         </p>
       ) : (
         <table className="w-full border-collapse text-right">
@@ -84,13 +88,13 @@ export function RankingTable({
                 scope="col"
                 className="px-2 py-2 text-[9px] font-black uppercase tracking-widest text-muted"
               >
-                الاسم
+                {t("rankingTable.name")}
               </th>
               <th
                 scope="col"
                 className="px-4 py-2 text-[9px] font-black uppercase tracking-widest text-muted"
               >
-                الإيراد
+                {t("rankingTable.revenue")}
               </th>
             </tr>
           </thead>
@@ -107,7 +111,7 @@ export function RankingTable({
                   <td className="w-8 py-1.5 pe-1 ps-4 align-middle">
                     <span className="flex items-center justify-center">
                       {isLeader ? (
-                        <Trophy size={12} className="text-accent" aria-label="الأعلى" />
+                        <Trophy size={12} className="text-accent" aria-label={t("rankingTable.top")} />
                       ) : (
                         <span className="text-[10px] font-black tabular-nums text-muted">
                           {index + 1}
@@ -160,12 +164,13 @@ export function Delta({
   suffix?: string;
   className?: string;
 }) {
+  const { t } = useTranslation("owner");
   // No baseline means no comparison. Showing "+100%" against a baseline that was
   // never measured is the single most misleading thing a delta can do.
   if (value === null) {
     return (
       <span className={cn("text-[9px] font-black text-muted", className)}>
-        لا مقارنة
+        {t("rankingTable.noComparison")}
       </span>
     );
   }
@@ -182,7 +187,7 @@ export function Delta({
       )}
     >
       {!flat && <ArrowDown size={9} className={up ? "rotate-180" : ""} />}
-      {flat ? "ثابت" : `${up ? "+" : ""}${Math.round(value)}${suffix}`}
+      {flat ? t("rankingTable.flat") : `${up ? "+" : ""}${Math.round(value)}${suffix}`}
     </span>
   );
 }

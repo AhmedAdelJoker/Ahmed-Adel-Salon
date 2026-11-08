@@ -2,15 +2,16 @@
  * Pure financial-analytics helpers for the owner Financial Reports page.
  * Kept side-effect free (except downloadCsvFile) so they are unit-testable.
  */
-import { formatCurrency } from "@/lib/core/utils";
 import type { TrendPoint } from "@/types/reports";
 
 export interface DayAnomaly {
   date: string;
   label: string;
   kind: "rev_spike" | "exp_spike" | "net_drop";
-  message: string;
+  value: number;
+  mean: number;
   severity: "high" | "medium";
+  message?: string;
 }
 
 export interface MonthlyBucket {
@@ -56,7 +57,8 @@ export function detectAnomalies(trends: TrendPoint[]): DayAnomaly[] {
         date: t.date,
         label: t.label,
         kind: "rev_spike",
-        message: `قفزة إيرادات يوم ${t.date} (${formatCurrency(t.rev)}) أعلى بكثير من المتوسط ${formatCurrency(r.mean)}`,
+        value: t.rev,
+        mean: r.mean,
         severity: t.rev >= r.mean + 3 * r.std ? "high" : "medium",
       });
     }
@@ -68,7 +70,8 @@ export function detectAnomalies(trends: TrendPoint[]): DayAnomaly[] {
         date: t.date,
         label: t.label,
         kind: "exp_spike",
-        message: `قفزة مصروفات يوم ${t.date} (${formatCurrency(t.exp)}) مقابل متوسط ${formatCurrency(e.mean)} — راجع بنود ذلك اليوم`,
+        value: t.exp,
+        mean: e.mean,
         severity: medianExp > 0 && t.exp >= medianExp * 3 ? "high" : "medium",
       });
     }
@@ -77,7 +80,8 @@ export function detectAnomalies(trends: TrendPoint[]): DayAnomaly[] {
         date: t.date,
         label: t.label,
         kind: "net_drop",
-        message: `هبوط حاد بالصافي يوم ${t.date} (${formatCurrency(t.net)}) — افحص الإيراد والمصروف معاً`,
+        value: t.net,
+        mean: n.mean,
         severity: "medium",
       });
     }

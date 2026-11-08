@@ -1,4 +1,6 @@
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/core/utils";
+import { getIntlLocale } from "@/lib/format/locale";
 
 export interface RevenueSparklineProps {
   /** Oldest first. */
@@ -30,6 +32,8 @@ export function RevenueSparkline({
   unavailable = false,
   className,
 }: RevenueSparklineProps) {
+  const { t } = useTranslation("owner");
+  const { i18n } = useTranslation("owner");
   if (unavailable || data.length === 0) {
     return (
       <div
@@ -38,7 +42,7 @@ export function RevenueSparkline({
           className,
         )}
       >
-        لا يتوفر رسم بياني
+        {t("revenueSparkline.noChart")}
       </div>
     );
   }
@@ -70,8 +74,8 @@ export function RevenueSparkline({
         role="img"
         aria-label={
           hasRevenue
-            ? `إيراد آخر ${data.length} يوماً، أعلى قيمة ${peak}`
-            : `لا يوجد إيراد مسجّل خلال آخر ${data.length} يوماً`
+              ? t("revenueSparkline.hasRevenue", { days: data.length, peak })
+              : t("revenueSparkline.noRevenue", { days: data.length })
         }
       >
         <polygon points={area} className="fill-accent/10" />
@@ -114,8 +118,10 @@ export function RevenueSparkline({
         <span>{data[0]?.date.slice(5)}</span>
         <span>
           {baseline != null && baseline > 0
-            ? `المتوسط السابق ${Math.round(baseline).toLocaleString("ar-EG-u-nu-latn")}`
-            : "لا يوجد متوسط سابق"}
+            ? t("revenueSparkline.baseline", {
+                value: Math.round(baseline).toLocaleString(getIntlLocale(i18n.language)),
+              })
+            : t("revenueSparkline.noBaseline")}
         </span>
         <span>{data[data.length - 1]?.date.slice(5)}</span>
       </div>

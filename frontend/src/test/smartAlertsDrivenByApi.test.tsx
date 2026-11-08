@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import "@/i18n";
 
 /**
  * `/owner/alerts` rendered five hardcoded findings from a `useState` literal:
@@ -93,7 +94,7 @@ describe("owner alerts page is driven by the API", () => {
           message: "طلب discount على الفاتورة INV-1042",
           priority: "high",
           occurred_at: "2026-10-04T09:00:00",
-          destination: "/owner/adjustment-requests",
+          destination: "/approvals",
         },
         {
           key: "low-stock-3",
@@ -151,7 +152,7 @@ describe("owner alerts page is driven by the API", () => {
           message: "م",
           priority: "high",
           occurred_at: "2026-10-04T09:00:00",
-          destination: "/owner/adjustment-requests",
+          destination: "/approvals",
         },
       ]),
     );

@@ -1,8 +1,17 @@
 import { api } from "@/services/api";
 
 export const scheduleService = {
-  listAppointments: async () => {
-    const response = await api.get("/appointments");
+  listAppointments: async (params?: {
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const response = await api.get("/appointments", {
+      params: {
+        date_filter: params ? "custom" : undefined,
+        start_date: params?.startDate,
+        end_date: params?.endDate,
+      },
+    });
     return Array.isArray(response.data) ? response.data : [];
   },
 

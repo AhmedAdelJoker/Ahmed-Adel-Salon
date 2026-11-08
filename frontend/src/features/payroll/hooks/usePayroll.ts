@@ -13,6 +13,7 @@ function readTotalCount(response: unknown, fallback: number): number {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { formatCurrency } from "@/lib/core/utils";
 import { pctGrowth } from "@/lib/money/financialAnalytics";
 import { Clock, TrendingDown, Users, Wallet } from "lucide-react";
@@ -28,11 +29,6 @@ import type {
 } from "@/types/payroll";
 import type { EmployeeRecord } from "@/types/employee";
 
-export const MONTHS = [
-  { value: 1, label: "يناير" }, { value: 2, label: "فبراير" }, { value: 3, label: "مارس" }, { value: 4, label: "أبريل" },
-  { value: 5, label: "مايو" }, { value: 6, label: "يونيو" }, { value: 7, label: "يوليو" }, { value: 8, label: "أغسطس" },
-  { value: 9, label: "سبتمبر" }, { value: 10, label: "أكتوبر" }, { value: 11, label: "نوفمبر" }, { value: 12, label: "ديسمبر" },
-];
 export const YEARS = [2024, 2025, 2026, 2027];
 export const toNumber = (v: unknown) => Number(v || 0);
 export const calculateNetSalary = (form: Record<string, unknown>) => toNumber(form.base_salary) + toNumber(form.commission_amount) + toNumber(form.bonus_amount) - toNumber(form.deduction_amount) - toNumber(form.advance_amount);
@@ -55,6 +51,7 @@ export function pctLabel(part: unknown, total: unknown): string {
 }
 
 export function usePayroll() {
+  const { t, i18n } = useTranslation("owner");
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -123,18 +120,18 @@ export function usePayroll() {
       setAdvances(adaptList(advancesRes));
       setEmployees(adaptList(employeesRes));
     } catch {
-      toast.error("فشل تحميل بيانات الرواتب");
+      toast.error(t("payroll.loadFailed"));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [period, employeeIdFilter]);
+  }, [period, employeeIdFilter, i18n.language]);
 
   useEffect(() => { fetchData(false); }, [fetchData]);
 
   const handleCalculate = async () => {
     try {
-      await toast.promise(payrollService.calculate(period), { loading: "جاري حساب رواتب الشهر...", success: "تم تحديث حسابات الرواتب", error: "فشل حساب الرواتب" });
+      await toast.promise(payrollService.calculate(period), { loading: t("payroll.calcLoading"), success: t("payroll.calcSuccess"), error: t("payroll.calcError") });
       fetchData(true);
     } catch {}
   };
@@ -142,7 +139,7 @@ export function usePayroll() {
   const handlePay = async () => {
     if (!selectedRecord) return;
     try {
-      await toast.promise(payrollService.pay(selectedRecord.id as string | number, payData), { loading: "جاري تأكيد الصرف...", success: "تم صرف الراتب وتسجيل المصروف", error: "فشل الصرف" });
+      await toast.promise(payrollService.pay(selectedRecord.id as string | number, payData), { loading: t("payroll.payLoading"), success: t("payroll.paySuccess"), error: t("payroll.payError") });
       setIsPayModalOpen(false); setSelectedRecord(null); fetchData(true);
     } catch {}
   };
@@ -151,7 +148,7 @@ export function usePayroll() {
     const ids = Array.from(selectedIds);
     const rows = payrolls.filter((r) => ids.includes(String(r.id)) && r.status !== "paid" && r.status !== "cancelled");
     if (rows.length === 0) {
-      toast.error("حدد رواتب قابلة للصرف أولاً");
+      toast.error(t("payroll.selectPayable"));
       return;
     }
     setBulkPaying(true);
@@ -167,31 +164,31 @@ export function usePayroll() {
     }
     setBulkPaying(false);
     setSelectedIds(new Set());
-    if (ok) toast.success(`تم صرف ${ok} راتب بنجاح`);
-    if (fail) toast.error(`فشل صرف ${fail} راتب`);
+    if (ok) toast.success(t("payroll.bulkPaySuccess", { count: ok }));
+    if (fail) toast.error(t("payroll.bulkPayFailed", { count: fail }));
     fetchData(true);
   };
 
   const handleCancel = async () => {
     if (!cancelId) return;
-    try { await payrollService.cancel(cancelId); toast.success("تم الإلغاء"); setCancelId(null); fetchData(true); } catch { toast.error("فشل الإلغاء"); }
+    try { await payrollService.cancel(cancelId); toast.success(t("payroll.cancelledOk")); setCancelId(null); fetchData(true); } catch { toast.error(t("payroll.cancelFailed")); }
   };
 
   const handleCreateAdvance = async () => {
-    if (!advanceData.employee_id || !advanceData.amount) return toast.error("أكمل بيانات السلفة");
+    if (!advanceData.employee_id || !advanceData.amount) return toast.error(t("payroll.advanceIncomplete"));
     const amt = toNumber(advanceData.amount);
-    if (amt <= 0) return toast.error("المبلغ يجب أن يكون أكبر من صفر");
+    if (amt <= 0) return toast.error(t("payroll.amountPositive"));
     try {
       setIsSavingAdvance(true);
-      await toast.promise(salaryAdvanceService.create({ ...advanceData, amount: amt } as unknown as AdvanceData), { loading: "جاري تسجيل السلفة...", success: "تم تسجيل السلفة", error: "فشل التسجيل" });
+      await toast.promise(salaryAdvanceService.create({ ...advanceData, amount: amt } as unknown as AdvanceData), { loading: t("payroll.advanceLoading"), success: t("payroll.advanceSuccess"), error: t("payroll.advanceError") });
       setIsAdvanceModalOpen(false); setAdvanceData({ employee_id: "", amount: "", description: "", advance_date: new Date().toISOString().split("T")[0] }); fetchData(true);
     } finally { setIsSavingAdvance(false); }
   };
 
-  const handleDeleteAdvance = async (id: number | string) => { try { await salaryAdvanceService.remove(id); toast.success("تم الحذف"); fetchData(true); } catch { toast.error("فشل الحذف"); } };
+  const handleDeleteAdvance = async (id: number | string) => { try { await salaryAdvanceService.remove(id); toast.success(t("payroll.deleteOk")); fetchData(true); } catch { toast.error(t("payroll.deleteFailed")); } };
 
   const fetchExpectedNet = async (empId: number | string) => {
-    try { const res = await payrollService.expectedNet({ employee_id: empId, ...period }); setExpectedData(res as unknown as typeof expectedData); setIsExpectedModalOpen(true); } catch { toast.error("فشل تحميل التقرير"); }
+    try { const res = await payrollService.expectedNet({ employee_id: empId, ...period }); setExpectedData(res as unknown as typeof expectedData); setIsExpectedModalOpen(true); } catch { toast.error(t("payroll.expectedNetFailed")); }
   };
 
   const openEditModal = (row: PayrollRecord) => {
@@ -208,13 +205,13 @@ export function usePayroll() {
     const bonus = toNumber(editData.bonus_amount);
     const ded = toNumber(editData.deduction_amount);
     const adv = toNumber(editData.advance_amount);
-    if (base < 0 || comm < 0 || bonus < 0 || ded < 0 || adv < 0) return toast.error("القيم لا يمكن أن تكون سالبة");
+    if (base < 0 || comm < 0 || bonus < 0 || ded < 0 || adv < 0) return toast.error(t("payroll.negativeValues"));
     const totalAdd = base + comm + bonus;
     const totalDed = ded + adv;
-    if (totalDed > totalAdd) return toast.error("الاستقطاعات والسلف تتجاوز الاستحقاقات");
+    if (totalDed > totalAdd) return toast.error(t("payroll.deductionsExceed"));
     try {
       setIsSavingEdit(true);
-      await toast.promise(payrollService.update(editingRecord.id as string | number, { base_salary: base, commission_amount: comm, bonus_amount: bonus, deduction_amount: ded, advance_amount: adv, payment_method: editData.payment_method || null, notes: editData.notes?.trim() || null, net_salary: calculateNetSalary(editData as unknown as Record<string, unknown>) } as unknown as Parameters<typeof payrollService.update>[1]), { loading: "جاري الحفظ...", success: "تم حفظ التعديلات", error: "فشل الحفظ" });
+      await toast.promise(payrollService.update(editingRecord.id as string | number, { base_salary: base, commission_amount: comm, bonus_amount: bonus, deduction_amount: ded, advance_amount: adv, payment_method: editData.payment_method || null, notes: editData.notes?.trim() || null, net_salary: calculateNetSalary(editData as unknown as Record<string, unknown>) } as unknown as Parameters<typeof payrollService.update>[1]), { loading: t("payroll.saveLoading"), success: t("payroll.saveSuccess"), error: t("payroll.saveError") });
       closeEditModal(); fetchData(true);
     } finally { setIsSavingEdit(false); }
   };
@@ -287,12 +284,12 @@ export function usePayroll() {
   const handlePrint = () => window.print();
 
   const pieData = useMemo(() => [
-    { name: "الأساسي", value: toNumber(summary?.total_base_salary) },
-    { name: "العمولات", value: toNumber(summary?.total_commissions) },
-    { name: "المكافآت", value: toNumber(summary?.total_bonuses) },
-    { name: "الاستقطاعات", value: toNumber(summary?.total_deductions) },
-    { name: "السلف", value: toNumber(summary?.total_advances) },
-  ], [summary]);
+    { name: t("payroll.pieBase"), value: toNumber(summary?.total_base_salary) },
+    { name: t("payroll.pieCommissions"), value: toNumber(summary?.total_commissions) },
+    { name: t("payroll.pieBonuses"), value: toNumber(summary?.total_bonuses) },
+    { name: t("payroll.pieDeductions"), value: toNumber(summary?.total_deductions) },
+    { name: t("payroll.pieAdvances"), value: toNumber(summary?.total_advances) },
+  ], [summary, i18n.language]);
 
   const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
 
@@ -301,12 +298,12 @@ export function usePayroll() {
     const unpaid = toNumber(summary?.unpaid_total);
     const paid = toNumber(summary?.paid_total);
     return [
-      { label: "الموارد البشرية", icon: Users, desc: `${employees.length} موظف نشط • الأساسي من ملف الموظف`, color: "bg-primary", href: "/owner/hr", badge: `${employees.length}` },
-      { label: "الحضور", icon: Clock, desc: `الانضباط يحسب الحوافز والخصومات تلقائياً`, color: "bg-emerald-500", href: "/attendance", badge: `${toNumber(summary?.employees_count) || employees.length} سجل` },
-      { label: "السلف المعلقة", icon: TrendingDown, desc: advCount ? `${advCount} سلفة بانتظار الخصم` : "لا توجد سلف معلقة حالياً", color: "bg-rose-500", href: "/owner/payroll#advances", badge: `${advCount}` },
-      { label: "الخزنة", icon: Wallet, desc: unpaid > 0 ? `متبقي ${formatCurrency(unpaid)} للصرف` : `تم صرف ${formatCurrency(paid)} بالكامل`, color: "bg-amber-500", href: "/owner/cashbox", badge: unpaid > 0 ? "متبقي" : "مكتمل" },
+      { label: t("payroll.sysHR"), icon: Users, desc: t("payroll.sysHRDesc", { count: employees.length }), color: "bg-primary", href: "/manager/hr", badge: `${employees.length}` },
+      { label: t("payroll.sysAttendance"), icon: Clock, desc: t("payroll.sysAttendanceDesc"), color: "bg-emerald-500", href: "/attendance", badge: t("payroll.recordsBadge", { count: toNumber(summary?.employees_count) || employees.length }) },
+      { label: t("payroll.sysAdvances"), icon: TrendingDown, desc: advCount ? t("payroll.sysAdvancesPending", { count: advCount }) : t("payroll.sysAdvancesNone"), color: "bg-rose-500", href: "/owner/payroll#advances", badge: `${advCount}` },
+      { label: t("payroll.sysCashbox"), icon: Wallet, desc: unpaid > 0 ? t("payroll.sysCashboxUnpaid", { amount: formatCurrency(unpaid) }) : t("payroll.sysCashboxPaid", { amount: formatCurrency(paid) }), color: "bg-amber-500", href: "/owner/cashbox", badge: unpaid > 0 ? t("payroll.remainingBadge") : t("payroll.completeBadge") },
     ];
-  }, [employees.length, advances.length, summary]);
+  }, [employees.length, advances.length, summary, i18n.language]);
 
   const applyPreset = (preset: "current" | "prev") => {
     const now = new Date();
@@ -321,8 +318,8 @@ export function usePayroll() {
 
   const prevLabel = useMemo(() => {
     const p = prevPeriodOf(period);
-    return `${MONTHS.find((m) => m.value === p.month)?.label} ${p.year}`;
-  }, [period]);
+    return `${t(`payroll.months.m${p.month}`)} ${p.year}`;
+  }, [period, i18n.language]);
 
   return {
     navigate,

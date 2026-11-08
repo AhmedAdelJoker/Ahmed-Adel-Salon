@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,8 @@ import { hasRoleAccess } from "@/lib/access/roles";
 import {
   getSearchCategories,
   getSearchEntries,
+  routeKey,
+  SEARCH_CATEGORY_KEYS,
   type NavItem,
 } from "@/app/route-registry";
 
@@ -20,6 +23,7 @@ export default function CommandPalette() {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation("routes");
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -44,39 +48,52 @@ export default function CommandPalette() {
     };
   }, []);
 
-  const roleFiltered = useMemo(
+  // Labels are translated before filtering so the English UI searches English
+  // words, not the Arabic labels the registry stores.
+  const localizedEntries = useMemo(
     () =>
       // The palette used to be a static list with no role filter, so any role
       // could jump to owner-only pages and get bounced by the guard.
-      getSearchEntries().filter((entry: NavItem) =>
-        hasRoleAccess(user, entry.roles as string[], entry.to),
-      ),
-    [user],
+      getSearchEntries()
+        .filter((entry: NavItem) =>
+          hasRoleAccess(user, entry.roles as string[], entry.to),
+        )
+        .map((entry) => ({
+          ...entry,
+          label: t(`nav.${routeKey(entry.to)}`, {
+            defaultValue: entry.label,
+          }),
+        })),
+    [user, t],
   );
 
   const filteredLinks = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return roleFiltered;
+    if (!term) return localizedEntries;
 
-    return roleFiltered.filter((entry) =>
-      `${entry.label} ${entry.searchCategory ?? ""}`
-        .toLowerCase()
-        .includes(term),
-    );
-  }, [query, roleFiltered]);
+    return localizedEntries.filter((entry) => {
+      const category = entry.searchCategory
+        ? t(`category.${SEARCH_CATEGORY_KEYS[entry.searchCategory]}`)
+        : "";
+      return `${entry.label} ${category}`.toLowerCase().includes(term);
+    });
+  }, [query, localizedEntries, t]);
 
-  const groupedLinks = useMemo(() => {
-    const order = getSearchCategories();
-    return filteredLinks.reduce<Record<string, NavItem[]>>(
-      (accumulator, entry) => {
-        const key = entry.searchCategory ?? "";
-        accumulator[key] = accumulator[key] || [];
-        accumulator[key].push(entry);
-        return accumulator;
-      },
-      {},
-    );
-  }, [filteredLinks]);
+  const groupedLinks = useMemo(
+    () =>
+      getSearchCategories()
+        .map((category) => ({
+          category,
+          label: t(`category.${SEARCH_CATEGORY_KEYS[category]}`, {
+            defaultValue: category,
+          }),
+          entries: filteredLinks.filter(
+            (entry) => entry.searchCategory === category,
+          ),
+        }))
+        .filter((group) => group.entries.length > 0),
+    [filteredLinks, t],
+  );
 
   const handleSelect = (to: string) => {
     navigate(to);
@@ -90,9 +107,11 @@ export default function CommandPalette() {
         className="max-w-xl border-none bg-transparent p-0 shadow-none"
         showCloseButton={false}
       >
-        <DialogTitle className="sr-only">البحث السريع</DialogTitle>
+        <DialogTitle className="sr-only">
+          {t("ui.searchTitle")}
+        </DialogTitle>
         <DialogDescription className="sr-only">
-          انتقال سريع بين الصفحات والإجراءات الأساسية.
+          {t("ui.searchDescription")}
         </DialogDescription>
 
         <div className="overflow-hidden rounded-premium border border-border bg-card shadow-premium">
@@ -100,9 +119,9 @@ export default function CommandPalette() {
             <Search size={18} className="text-primary" />
             <input
               autoFocus
-              aria-label="البحث السريع عن صفحة أو مهمة"
-              placeholder="ابحث عن صفحة أو مهمة..."
-              className="flex-1 bg-transparent text-right text-sm font-bold text-main outline-none placeholder:text-muted/60"
+              aria-label={t("ui.searchLabel")}
+              placeholder={t("ui.searchPlaceholder")}
+              className="flex-1 bg-transparent text-start text-sm font-bold text-main outline-none placeholder:text-muted/60"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -113,52 +132,45 @@ export default function CommandPalette() {
 
           <div className="max-h-96 overflow-y-auto p-2">
             {filteredLinks.length ? (
-              Object.entries(groupedLinks)
-                .sort(
-                  ([a], [b]) =>
-                    getSearchCategories().indexOf(
-                      a as never,
-                    ) - getSearchCategories().indexOf(b as never),
-                )
-                .map(([category, links]) => (
-                  <section key={category} className="mb-2 last:mb-0">
-                    <div className="mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-muted/60">
-                      {category}
-                    </div>
-                    <div className="space-y-0.5">
-                      {links.map((link) => {
-                        const Icon = link.icon;
-                        return (
-                          <button
-                            key={link.to}
-                            type="button"
-                            onClick={() => handleSelect(link.to)}
-                            className="group flex w-full items-center justify-between rounded-lg px-3 py-2 text-right transition hover:bg-soft"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-8 w-8 items-center justify-center rounded bg-soft text-muted group-hover:text-primary">
-                                <Icon size={16} />
-                              </div>
-                              <div className="text-left">
-                                <div className="text-sm font-bold text-main">
-                                  {link.label}
-                                </div>
+              groupedLinks.map((group) => (
+                <section key={group.category} className="mb-2 last:mb-0">
+                  <div className="mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-muted/60">
+                    {group.label}
+                  </div>
+                  <div className="space-y-0.5">
+                    {group.entries.map((link) => {
+                      const Icon = link.icon;
+                      return (
+                        <button
+                          key={link.to}
+                          type="button"
+                          onClick={() => handleSelect(link.to)}
+                          className="group flex w-full items-center justify-between rounded-lg px-3 py-2 text-start transition hover:bg-soft"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded bg-soft text-muted group-hover:text-primary">
+                              <Icon size={16} />
+                            </div>
+                            <div className="text-start">
+                              <div className="text-sm font-bold text-main">
+                                {link.label}
                               </div>
                             </div>
-                            <ChevronRight
-                              size={14}
-                              className="text-muted/40"
-                            />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </section>
-                ))
+                          </div>
+                          <ChevronRight
+                            size={14}
+                            className="text-muted/40 rtl:rotate-180"
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))
             ) : (
               <div className="flex min-h-40 flex-col items-center justify-center p-6 text-center text-muted">
                 <Search size={32} className="mb-2 opacity-20" />
-                <p className="text-sm font-bold">لا توجد نتائج مطابقة</p>
+                <p className="text-sm font-bold">{t("ui.noResults")}</p>
               </div>
             )}
           </div>

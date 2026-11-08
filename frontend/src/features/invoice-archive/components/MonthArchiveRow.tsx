@@ -53,6 +53,8 @@ export interface MonthArchiveRowProps {
   onSelectInvoice: (invoice: MonthInvoice) => void;
   onFinalizeDraft: (monthKey: string, draft: MonthInvoice) => void;
   onDeleteDraft: (monthKey: string, draft: MonthInvoice) => void;
+  /** Opens the invoices ledger on this month. When omitted, the button is hidden. */
+  onOpenLedger?: (monthKey: string) => void;
   daysInMonth: (key: string) => number;
 }
 
@@ -146,6 +148,7 @@ export function MonthArchiveRow({
   onSelectInvoice,
   onFinalizeDraft,
   onDeleteDraft,
+  onOpenLedger,
   daysInMonth,
 }: MonthArchiveRowProps) {
   const perDay = monthData
@@ -267,6 +270,18 @@ export function MonthArchiveRow({
                 <Lock size={9} />
                 الشهر مقفل
               </span>
+            )}
+            {onOpenLedger && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 shrink-0 rounded-lg text-[10px] font-black text-primary"
+                onClick={() => onOpenLedger(month.key)}
+                title={`عرض فواتير ${month.label_ar ?? month.key} في السجل`}
+              >
+                <ChevronLeft size={12} className="ms-1 rtl:rotate-180" />
+                فتح في السجل
+              </Button>
             )}
           </div>
 

@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DollarSign, TrendingUp, Plus, Trash2, Wallet, Landmark } from "lucide-react";
-import { currencyLabel } from "@/lib/core/currency";
+import { currencyLabelForLanguage } from "@/features/hr/utils/helpers";
 import {
   FIELD_LABEL_CLASS,
   FIELD_INPUT_CLASS,
@@ -28,6 +28,7 @@ import {
 } from "@/features/hr/utils/phone";
 import FieldError from "./FieldError";
 import MoneyInput from "./MoneyInput";
+import { useTranslation } from "react-i18next";
 
 export default function FinancialTab({
   formData,
@@ -36,12 +37,13 @@ export default function FinancialTab({
   formData: EmployeeRecord;
   setFormData: Dispatch<SetStateAction<EmployeeRecord>>;
 }) {
-  const salaryError = validateMoney(formData.baseSalary, "الراتب الأساسي");
+  const { t, i18n } = useTranslation("owner");
+  const salaryError = validateMoney(formData.baseSalary, t("hr.baseSalary"));
   const commissionError = validateCommission(formData.commissionRate);
-  const bonusError = validateMoney(formData.fixedBonus, "الحافز الثابت");
+  const bonusError = validateMoney(formData.fixedBonus, t("hr.fixedBonus"));
   const deductionsError = validateMoney(
     formData.defaultDeductions,
-    "الخصومات الثابتة",
+    t("hr.fixedDeductions"),
   );
 
   const paymentMethod = String(formData.paymentMethod ?? "cash");
@@ -49,13 +51,13 @@ export default function FinancialTab({
   const walletError = typedWallet
     ? validatePhone(typedWallet)
     : paymentMethod === "wallet"
-      ? "رقم المحفظة مطلوب عند اختيار التحويل للمحفظة"
+       ? t("hr.walletRequired")
       : null;
   const typedBank = String(formData.bankAccount ?? "").trim();
   const bankError = typedBank
     ? validateBankAccount(typedBank)
     : paymentMethod === "bank"
-      ? "رقم الحساب البنكي مطلوب عند اختيار التحويل البنكي"
+       ? t("hr.bankRequired")
       : null;
 
   return (
@@ -63,12 +65,14 @@ export default function FinancialTab({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <DollarSign size={14} /> الراتب الأساسي
+                   <DollarSign size={14} /> {t("hr.baseSalary")}
                 </label>
                 <MoneyInput
                   value={formData.baseSalary}
                   onChange={(v) => setFormData({ ...formData, baseSalary: v })}
-                  suffix={currencyLabel()}
+                  suffix={currencyLabelForLanguage(
+                    i18n.resolvedLanguage || i18n.language,
+                  )}
                   invalid={Boolean(salaryError)}
                   describedBy={salaryError ? "base-salary-error" : undefined}
                 />
@@ -78,7 +82,7 @@ export default function FinancialTab({
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <TrendingUp size={14} /> نسبة العمولة
+                   <TrendingUp size={14} /> {t("hr.commissionRate")}
                 </label>
                 <MoneyInput
                   value={formData.commissionRate}
@@ -95,7 +99,7 @@ export default function FinancialTab({
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <Plus size={14} /> حوافز ثابتة
+                   <Plus size={14} /> {t("hr.fixedBonus")}
                 </label>
                 <MoneyInput
                   value={formData.fixedBonus}
@@ -109,7 +113,7 @@ export default function FinancialTab({
               </div>
               <div className="space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <Trash2 size={14} /> خصومات دورية
+                   <Trash2 size={14} /> {t("hr.fixedDeductions")}
                 </label>
                 <MoneyInput
                   value={formData.defaultDeductions}
@@ -127,7 +131,7 @@ export default function FinancialTab({
               </div>
               <div className="md:col-span-2 space-y-2">
                 <label className={FIELD_LABEL_CLASS}>
-                  <Wallet size={14} /> قناة صرف المستحقات
+                   <Wallet size={14} /> {t("hr.paymentChannel")}
                 </label>
                 <Select
                   value={formData.paymentMethod}
@@ -139,11 +143,11 @@ export default function FinancialTab({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    <SelectItem value="cash">نقدي (Cash)</SelectItem>
+                     <SelectItem value="cash">{t("hr.cash")}</SelectItem>
                     <SelectItem value="wallet">
-                      محفظة إلكترونية (Wallet)
+                       {t("hr.wallet")}
                     </SelectItem>
-                    <SelectItem value="bank">تحويل بنكي (Bank)</SelectItem>
+                     <SelectItem value="bank">{t("hr.bankTransfer")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -157,7 +161,7 @@ export default function FinancialTab({
               {paymentMethod === "wallet" && (
                 <div className="md:col-span-2 space-y-2">
                   <label className={FIELD_LABEL_CLASS}>
-                    <Wallet size={14} /> رقم المحفظة الإلكترونية
+                     <Wallet size={14} /> {t("hr.walletNumber")}
                   </label>
                   <Input
                     value={String(formData.walletNumber ?? "")}
@@ -178,7 +182,7 @@ export default function FinancialTab({
                   />
                   {walletError && (
                     <FieldError id="wallet-number-error">
-                      رقم المحفظة: {walletError}
+                       {t("hr.walletError", { error: walletError })}
                     </FieldError>
                   )}
                 </div>
@@ -186,7 +190,7 @@ export default function FinancialTab({
               {paymentMethod === "bank" && (
                 <div className="md:col-span-2 space-y-2">
                   <label className={FIELD_LABEL_CLASS}>
-                    <Landmark size={14} /> رقم الحساب البنكي
+                   <Landmark size={14} /> {t("hr.bankAccount")}
                   </label>
                   <Input
                     value={String(formData.bankAccount ?? "")}
@@ -197,7 +201,7 @@ export default function FinancialTab({
                     dir="ltr"
                     maxLength={34}
                     autoComplete="off"
-                    placeholder="EG… أو رقم الحساب المحلي"
+                     placeholder={t("hr.walletPlaceholder")}
                     aria-invalid={Boolean(bankError)}
                     aria-describedby={bankError ? "bank-account-error" : undefined}
                   />

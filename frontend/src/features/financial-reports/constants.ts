@@ -7,32 +7,32 @@ import { CHART_COLORS } from "@/lib/core/chart";
 export { CHART_COLORS };
 
 export const PAYMENT_LABELS: Record<string, string> = {
-  cash: "نقدي",
-  credit_card: "بطاقة ائتمان",
-  card: "بطاقة",
-  visa: "فيزا",
-  mastercard: "ماستركارد",
-  wallet: "محفظة إلكترونية",
-  instapay: "انستاباي",
-  bank_transfer: "تحويل بنكي",
-  vodafone_cash: "فودافون كاش",
-  orange_money: "أورانج موني",
+  cash: "finFeat.pay.cash",
+  credit_card: "finFeat.pay.credit_card",
+  card: "finFeat.pay.card",
+  visa: "finFeat.pay.visa",
+  mastercard: "finFeat.pay.mastercard",
+  wallet: "finFeat.pay.wallet",
+  instapay: "finFeat.pay.instapay",
+  bank_transfer: "finFeat.pay.bank_transfer",
+  vodafone_cash: "finFeat.pay.vodafone_cash",
+  orange_money: "finFeat.pay.orange_money",
 };
 
 export type PresetId = "today" | "week" | "month" | "quarter";
 
 export const PRESETS: Array<{ id: PresetId; label: string }> = [
-  { id: "today", label: "اليوم" },
-  { id: "week", label: "7 أيام" },
-  { id: "month", label: "الشهر" },
-  { id: "quarter", label: "90 يوم" },
+  { id: "today", label: "finRep.preset.today" },
+  { id: "week", label: "finRep.preset.week" },
+  { id: "month", label: "finRep.preset.month" },
+  { id: "quarter", label: "finRep.preset.quarter" },
 ];
 
 export const REPORT_EXPORTS = [
   {
-    title: "التدقيق الاستراتيجي للنمو",
-    desc: "تقرير شامل يجمع الأداء المالي والخدمات الأكثر ربحية وإنتاجية الفريق بنظرة استراتيجية.",
-    details: "يتضمن: ملخص KPIs، قائمة Top 5 خدمات، ترتيب أداء الموظفين.",
+    title: "finRep.reportCards.growth.title",
+    desc: "finRep.reportCards.growth.desc",
+    details: "finRep.reportCards.growth.details",
     icon: Sparkles,
     color: "text-purple-600 bg-purple-500/10",
     format: "PREMIUM PDF",
@@ -41,9 +41,9 @@ export const REPORT_EXPORTS = [
     file: "strategic_growth_report",
   },
   {
-    title: "تقرير الإيرادات التفصيلي",
-    desc: "كشف محاسبي بالمبيعات والتحصيلات مفصلاً حسب طريقة الدفع لمطابقة الخزينة.",
-    details: "يتضمن: التاريخ، رقم الفاتورة، العميل، طريقة الدفع، القيمة الصافية.",
+    title: "finRep.reportCards.revenue.title",
+    desc: "finRep.reportCards.revenue.desc",
+    details: "finRep.reportCards.revenue.details",
     icon: FileSpreadsheet,
     color: "text-indigo-600 bg-indigo-500/10",
     format: "EXCEL SHEET",
@@ -52,9 +52,9 @@ export const REPORT_EXPORTS = [
     file: "revenue_report",
   },
   {
-    title: "كشف ميزان العمليات اليومي",
-    desc: "سجل زمني دقيق للحركات النقدية اليومية خلال الفترة المختارة لضمان دقة الأرشفة.",
-    details: "يتضمن: تفصيل الحركات اليومية وإجمالي الوارد والصادر لكل يوم.",
+    title: "finRep.reportCards.ledger.title",
+    desc: "finRep.reportCards.ledger.desc",
+    details: "finRep.reportCards.ledger.details",
     icon: History,
     color: "text-amber-600 bg-amber-500/10",
     format: "ACCOUNTING PDF",

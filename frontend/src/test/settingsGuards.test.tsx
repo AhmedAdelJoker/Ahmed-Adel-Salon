@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter, useLocation } from "react-router-dom";
 
 import Settings from "@/pages/owner/Settings";
+import "@/i18n";
 
 const mockNavigate = vi.fn();
 let confirmSpy: ReturnType<typeof vi.spyOn>;

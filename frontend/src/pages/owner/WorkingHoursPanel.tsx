@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
 import {
   errorHeadline,
   isConflict,
@@ -37,8 +38,6 @@ import {
   type ApiErrorLine,
 } from "@/lib/core/apiErrors";
 import {
-  DAYS_AR,
-  DAYS_SHORT_AR,
   PRESETS,
   WORKING_HOURS_DAYS,
   buildTimeline,
@@ -46,17 +45,14 @@ import {
   cloneWorkingHours,
   crossesMidnight,
   dayKeyFor,
-  durationLabel,
   emptyDay,
   findTimelineGaps,
-  formatDuration,
   formatRange,
   makeDay,
   normalizeWorkingHours,
   sameWorkingHours,
   summarizeWorkingHours,
   timelineCoverage,
-  todayStatusLabel,
   validateDay,
   weekBarPercent,
   windowMinutes,
@@ -75,6 +71,29 @@ type PendingAction =
   | { kind: "discard" };
 
 const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanelProps) => {
+  const { t, i18n } = useTranslation("owner");
+
+  const dayName = (d: DayKey): string => t(`workingHours.day.${d}`);
+  const dayShort = (d: DayKey): string => t(`workingHours.dayShort.${d}`);
+  const fmtDur = (minutes: number): string => {
+    if (minutes <= 0) return "—";
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (m === 0) return t("workingHours.durHour", { h });
+    if (h === 0) return t("workingHours.durMin", { m });
+    return t("workingHours.durHM", { h, m });
+  };
+  const errLabel = (raw: string | null): string => {
+    if (!raw) return "";
+    if (raw === "حدد وقت الفتح والإغلاق") return t("workingHours.errMissing");
+    if (raw === "صيغة الوقت غير صحيحة") return t("workingHours.errFormat");
+    if (raw === "وقت الإغلاق لا يمكن أن يساوي وقت الفتح") return t("workingHours.errSame");
+    if (raw.startsWith("مدة الدوام قصيرة جداً")) return t("workingHours.errShort");
+    return raw;
+  };
+  const presetLabel = (id: string): string => t(`workingHours.preset.${id}_label`);
+  const presetDesc = (id: string): string => t(`workingHours.preset.${id}_desc`);
+
   const emptyHours = useMemo(() => normalizeWorkingHours(), []);
   const [hours, setHours] = useState<WorkingHoursMap>(() => cloneWorkingHours(emptyHours));
   const [initialHours, setInitialHours] = useState<WorkingHoursMap>(() =>
@@ -110,8 +129,8 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
       setInitialHours(cloneWorkingHours(normalized));
       handleVersion(Number((settings as Record<string, unknown> | undefined)?.version ?? 0) || undefined);
     } catch {
-      setLoadError("تعذر تحميل ساعات العمل. تحقق من الاتصال ثم أعد المحاولة.");
-      toast.error("فشل تحميل ساعات العمل");
+      setLoadError(t("workingHours.loadError"));
+      toast.error(t("workingHours.loadToast"));
     } finally {
       setLoading(false);
     }
@@ -138,7 +157,13 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
   }, [isDirty]);
 
   const stats = useMemo(() => summarizeWorkingHours(hours), [hours]);
-  const todayStatus = useMemo(() => todayStatusLabel(hours[todayKey]), [hours, todayKey]);
+  const todayStatus = useMemo(() => {
+    const cfg = hours[todayKey];
+    if (!cfg?.is_open) return { title: t("workingHours.closed"), hint: t("workingHours.todayClosedHint"), open: false };
+    const range = formatRange(cfg);
+    const duration = fmtDur(windowMinutes(cfg));
+    return { title: range ?? t("workingHours.open"), hint: `${duration}${crossesMidnight(cfg) ? ` • ${t("workingHours.endsNextDay")}` : ""}`, open: true };
+  }, [hours, todayKey, t]);
 
   const errors = useMemo(() => {
     const map = {} as Record<DayKey, string | null>;
@@ -166,7 +191,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
 
   const handleResetDay = (day: DayKey) => {
     setHours((prev) => ({ ...prev, [day]: { ...initialHours[day] } }));
-    toast.success(`تمت إعادة ${DAYS_AR[day]} للحالة المحفوظة`);
+    toast.success(t("workingHours.dayReset", { day: dayName(day) }));
   };
 
   const applyCopyToAll = (source: DayKey) => {
@@ -175,8 +200,8 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
     setHours(buildWorkingHours(() => ({ ...src })));
     toast.success(
       src.is_open
-        ? `تم نسخ ${DAYS_AR[source]} (${formatRange(src)}) إلى كل الأيام`
-        : `تم نسخ حالة ${DAYS_AR[source]} (مغلق) إلى كل الأيام`,
+        ? t("workingHours.copyFrom", { day: dayName(source), range: formatRange(src) ?? "" })
+        : t("workingHours.copyFromClosed", { day: dayName(source) }),
     );
   };
 
@@ -184,18 +209,18 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
     const preset = PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
     setHours(preset.build());
-    toast.success("تم تطبيق القالب — راجع الأيام ثم احفظ");
+    toast.success(t("workingHours.presetApplied"));
   };
 
   const handleResetAll = () => {
     setHours(cloneWorkingHours(initialHours));
-    toast.success("تم التراجع عن التعديلات غير المحفوظة");
+    toast.success(t("workingHours.resetAll"));
   };
 
   const handleSave = async () => {
     if (hasErrors) {
       const firstErrDay = WORKING_HOURS_DAYS.find((d) => errors[d]);
-      if (firstErrDay) toast.error(`${DAYS_AR[firstErrDay]}: ${errors[firstErrDay]}`);
+      if (firstErrDay) toast.error(`${dayName(firstErrDay)}: ${errLabel(errors[firstErrDay])}`);
       return;
     }
     setSaving(true);
@@ -215,17 +240,17 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
       setInitialHours(cloneWorkingHours(persisted));
       const nextVersion = Number(raw.version ?? 0) || undefined;
       if (nextVersion) handleVersion(nextVersion);
-      toast.success("تم حفظ ساعات العمل بنجاح");
+      toast.success(t("workingHours.saved"));
     } catch (err: unknown) {
       if (isConflict(err)) {
-        const [line] = toErrorLines(err, "تم تعديل الإعدادات من مستخدم آخر");
-        setConflict(line?.message ?? "تم تعديل الإعدادات من مستخدم آخر");
-        toast.error("تعارض في الحفظ — الإعدادات تغيّرت من مستخدم آخر");
+        const [line] = toErrorLines(err, t("workingHours.conflictFallback"));
+        setConflict(line?.message ?? t("workingHours.conflictFallback"));
+        toast.error(t("workingHours.conflictToast"));
         return;
       }
-      const lines = toErrorLines(err, "فشل الحفظ");
+      const lines = toErrorLines(err, t("workingHours.saveFailedFallback"));
       setSaveErrors(lines);
-      toast.error(errorHeadline(lines, "فشل الحفظ"));
+      toast.error(errorHeadline(lines, t("workingHours.saveFailedFallback")));
     } finally {
       setSaving(false);
     }
@@ -247,7 +272,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
   const confirmPreset = (presetId: string) => {
     const preset = PRESETS.find((p) => p.id === presetId);
     if (preset && sameWorkingHours(hours, preset.build())) {
-      toast("القالب مطابق للمواعيد الحالية", { icon: "ℹ️" });
+      toast(t("workingHours.presetSameToast"), { icon: "ℹ️" });
       return;
     }
     setPending({ kind: "preset", presetId });
@@ -276,10 +301,10 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
     return (
       <div className="space-y-6">
         <div className="rounded-2xl border border-dashed border-border bg-card p-8 flex flex-col items-center gap-4 text-center">
-          <p className="text-sm font-black text-main">تعذر تحميل بروتوكول التشغيل</p>
+          <p className="text-sm font-black text-main">{t("workingHours.loadTitle")}</p>
           <p className="text-xs font-bold text-muted max-w-md">{loadError}</p>
           <Button onClick={fetchHours} className="h-11 rounded-xl px-6 text-xs font-black">
-            <RotateCcw size={14} className="ms-2" /> إعادة المحاولة
+            <RotateCcw size={14} className="ms-2" /> {t("workingHours.retry")}
           </Button>
         </div>
       </div>
@@ -292,28 +317,28 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label="أيام مفتوحة"
+          label={t("workingHours.openDays")}
           value={`${stats.openDays} / 7`}
           icon={Sun}
           variant="success"
-          hint={`${stats.totalHours} ساعة تشغيل أسبوعياً`}
+          hint={t("workingHours.perWeek", { hours: stats.totalHours })}
         />
         <StatCard
-          label="أيام مغلقة"
+          label={t("workingHours.closedDays")}
           value={`${stats.closedDays}`}
           icon={Moon}
           variant="secondary"
-          hint={stats.closedDays === 0 ? "يعمل طوال الأسبوع" : "أيام راحة مجدولة"}
+          hint={stats.closedDays === 0 ? t("workingHours.allWeek") : t("workingHours.restDays")}
         />
         <StatCard
-          label="إجمالي الساعات"
-          value={`${stats.totalHours} س`}
+          label={t("workingHours.totalHours")}
+          value={`${stats.totalHours} ${t("workingHours.hoursUnit")}`}
           icon={Timer}
           variant="primary"
-          hint={stats.totalHours >= 60 ? "أسبوع تشغيلي مكثف" : stats.totalHours >= 40 ? "دوام متوازن" : "دوام مخفف"}
+          hint={stats.totalHours >= 60 ? t("workingHours.intensiveWeek") : stats.totalHours >= 40 ? t("workingHours.balancedWeek") : t("workingHours.lightWeek")}
         />
         <StatCard
-          label={`اليوم • ${DAYS_AR[todayKey]}`}
+          label={`${t("workingHours.todayLabel")} • ${dayName(todayKey)}`}
           value={todayStatus.title}
           icon={CalendarRange}
           variant={todayStatus.open ? "success" : "warning"}
@@ -325,21 +350,19 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
         <div className="flex items-start gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-[11px] font-black text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200">
           <Moon size={16} className="mt-0.5 shrink-0" />
           <span>
-            {overnightCount === 1 ? "يوم واحد" : `${overnightCount} أيام`} يتخطى منتصف الليل
-            ({stats.overnightDays.map((d) => DAYS_AR[d]).join("، ")}) — المواعيد تُحسب على اليوم الذي
-            يبدأ فيه الدوام، وتستمر حتى اليوم التالي.
+            {overnightCount === 1 ? t("workingHours.oneDay") : t("workingHours.daysOvernight", { count: overnightCount })} {t("workingHours.overnightNote", { days: stats.overnightDays.map((d) => dayName(d)).join((i18n.resolvedLanguage || i18n.language || "ar").startsWith("en") ? ", " : "\u060C ") })}
           </span>
         </div>
       )}
 
       <ContentPanel
-        title="بروتوكول ساعات التشغيل"
-        subtitle="تتحكم هذه المواعيد في الحجز العام، توفر المواعيد، وفتح الورديات. يمكنك إبقاء كل الأيام مغلقة حتى تعيّن دوامك، واعتماداً على يوم واحد هادئ كبداية."
+        title={t("workingHours.panelTitle")}
+        subtitle={t("workingHours.panelSubtitle")}
         actions={
           <div className="flex items-center gap-2">
             {isDirty && (
               <Badge variant="warning" className="rounded-full px-3 py-1 text-[10px] font-black">
-                غير محفوظ
+                {t("workingHours.unsavedBadge")}
               </Badge>
             )}
         {conflict && (
@@ -358,10 +381,10 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                 onClick={fetchHours}
                 className="h-8 rounded-xl border-amber-300 px-3 text-[11px] font-black text-amber-800 dark:border-amber-700 dark:text-amber-200"
               >
-                <RotateCcw size={13} className="ms-1" /> جلب أحدث نسخة
+                <RotateCcw size={13} className="ms-1" /> {t("workingHours.fetchLatest")}
               </Button>
               <span className="text-[10px] font-bold text-amber-700/80 dark:text-amber-300/80">
-                تعديلاتك هتتمسح من الشاشة — انسخها لو محتاج تحتفظ بيها.              </span>
+                {t("workingHours.conflictNote")}</span>
             </div>
           </div>
         )}
@@ -374,8 +397,8 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
             <div className="flex items-center gap-2 text-[11px] font-black text-rose-700 dark:text-rose-300">
               <AlertTriangle size={16} className="shrink-0" />
               {saveErrors.length === 1
-                ? "تعذر الحفظ"
-                : `تعذر الحفظ — ${saveErrors.length} أخطاء من الخادم`}
+                ? t("workingHours.saveFailedOne")
+                : t("workingHours.saveFailedMany", { count: saveErrors.length })}
             </div>
             <ul className="mt-2 space-y-1 pe-4">
               {saveErrors.map((line, index) => (
@@ -393,7 +416,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
 
         {hasErrors && (
               <Badge variant="danger" className="rounded-full px-3 py-1 text-[10px] font-black">
-                راجع الأخطاء
+                {t("workingHours.reviewErrors")}
               </Badge>
             )}
             <Button
@@ -402,7 +425,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
               disabled={!isDirty || saving}
               className="h-9 rounded-xl px-4 text-xs font-black hidden sm:inline-flex"
             >
-              <RotateCcw size={14} className="ms-1" /> تراجع
+              <RotateCcw size={14} className="ms-1" /> {t("workingHours.revert")}
             </Button>
             <Button
               onClick={handleSave}
@@ -410,7 +433,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
               disabled={!isDirty || hasErrors}
               className="h-9 rounded-xl px-5 text-xs font-black"
             >
-              <Save size={14} className="ms-1" /> حفظ المواعيد
+              <Save size={14} className="ms-1" /> {t("workingHours.saveHours")}
             </Button>
           </div>
         }
@@ -421,7 +444,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
             className="mb-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[11px] font-black text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"
           >
             <AlertTriangle size={16} className="shrink-0" />
-            يوجد خطأ في أحد الأيام — راجع الحقول المميزة باللون الأحمر قبل الحفظ.
+            {t("workingHours.dayErrorBanner")}
           </div>
         )}
 
@@ -434,10 +457,10 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
           <div className="p-4 sm:p-5">
             <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
               <h4 className="text-[11px] font-black uppercase tracking-widest text-muted flex items-center gap-2">
-                <Sparkles size={14} className="text-primary" /> معاينة الأسبوع
+                <Sparkles size={14} className="text-primary" /> {t("workingHours.weekPreview")}
               </h4>
               <span className="text-[10px] font-bold text-muted hidden sm:inline">
-                العرض يتناسب مع مدة الدوام — الأعمدة الأطول تعني يوماً أطول
+                {t("workingHours.weekPreviewHint")}
               </span>
             </div>
             <div className="grid grid-cols-7 gap-2">
@@ -460,10 +483,10 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                   >
                     {isToday && (
                       <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-2 py-0.5 text-[8px] font-black text-white shadow">
-                        اليوم
+                        {t("workingHours.todayLabel")}
                       </span>
                     )}
-                    <div className="text-[10px] font-black text-main mt-1">{DAYS_AR[day]}</div>
+                    <div className="text-[10px] font-black text-main mt-1">{dayName(day)}</div>
                     <div className="w-full flex-1 flex items-end justify-center" style={{ minHeight: 56 }}>
                       <div
                         className={cn(
@@ -476,14 +499,14 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                           err && cfg.is_open && "bg-rose-500",
                         )}
                         style={{ height: `${pct}%`, minHeight: cfg.is_open ? 28 : 22 }}
-                        title={cfg.is_open ? range ?? "" : "مغلق"}
+                        title={cfg.is_open ? range ?? "" : t("workingHours.closed")}
                       >
                         {cfg.is_open ? (
                           <span className="hidden sm:inline tabular-nums">
                             {overnight ? `${cfg.open_time}–${cfg.close_time} +1` : `${cfg.open_time}–${cfg.close_time}`}
                           </span>
                         ) : (
-                          "مغلق"
+                          t("workingHours.closed")
                         )}
                         {overnight && (
                           <Moon
@@ -494,11 +517,11 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                       </div>
                     </div>
                     <div className="text-[9px] font-bold tabular-nums text-muted h-3">
-                      {cfg.is_open ? durationLabel(cfg.open_time, cfg.close_time) || "—" : "—"}
+                      {cfg.is_open ? fmtDur(windowMinutes(cfg)) || "—" : "—"}
                     </div>
                     {err && (
                       <div className="text-[8px] font-black text-rose-600 text-center leading-tight">
-                        {err}
+                        {errLabel(err)}
                       </div>
                     )}
                   </div>
@@ -519,7 +542,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
           <div className="p-4 flex flex-col gap-4">
             <div className="flex flex-col gap-3">
               <span className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center gap-1.5">
-                <Wand2 size={12} className="text-primary" /> قوالب سريعة:
+                <Wand2 size={12} className="text-primary" /> {t("workingHours.quickTemplates")}
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
                 {PRESETS.map((preset) => (
@@ -530,10 +553,10 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                     className="group flex flex-col items-start gap-0.5 rounded-xl border border-border bg-card px-3 py-2.5 text-right transition-all hover:border-primary/40 hover:bg-primary-soft/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                   >
                     <span className="text-[11px] font-black text-main group-hover:text-primary transition-colors">
-                      {preset.label}
+                      {presetLabel(preset.id)}
                     </span>
                     <span className="text-[9px] font-bold text-muted leading-snug">
-                      {preset.description}
+                      {presetDesc(preset.id)}
                     </span>
                   </button>
                 ))}
@@ -547,7 +570,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                     htmlFor="working-hours-copy-source"
                     className="text-[10px] font-black text-muted px-2 whitespace-nowrap"
                   >
-                    نسخ من
+                    {t("workingHours.copyFromLabel")}
                   </label>
                   <Select value={applySource} onValueChange={(v) => setApplySource(v as DayKey)}>
                     <SelectTrigger
@@ -559,7 +582,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                     <SelectContent>
                       {WORKING_HOURS_DAYS.map((d) => (
                         <SelectItem key={d} value={d}>
-                          {DAYS_AR[d]} {hours[d]?.is_open ? `(${hours[d].open_time}-${hours[d].close_time})` : "(مغلق)"}
+                          {dayName(d)} {hours[d]?.is_open ? `(${hours[d].open_time}-${hours[d].close_time})` : `(${t("workingHours.closed")})`}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -570,13 +593,12 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                     onClick={() => confirmCopyAll(applySource)}
                     className="h-8 rounded-lg text-[11px] font-black gap-1 shrink-0"
                   >
-                    <Copy size={13} /> تطبيق على الكل
+                    <Copy size={13} /> {t("workingHours.applyAll")}
                   </Button>
                 </div>
               </div>
               <p className="text-[10px] font-bold text-muted leading-relaxed lg:text-left">
-                القوالب والنسخ تكتب فوق المواعيد الحالية فوراً بعد التأكيد — يمكنك التراجع قبل الحفظ.
-                «تطبيق على الكل» ينسخ حالة يوم واحد (مفتوح/مغلق مع أوقاته) إلى باقي الأسبوع.
+                {t("workingHours.templatesNote")}
               </p>
             </div>
           </div>
@@ -588,7 +610,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
               const cfg = hours[day] || emptyDay();
               const err = errors[day];
               const isToday = day === todayKey;
-              const dur = cfg.is_open ? formatDuration(windowMinutes(cfg)) : null;
+              const dur = cfg.is_open ? fmtDur(windowMinutes(cfg)) : null;
               const overnight = crossesMidnight(cfg);
               const range = formatRange(cfg);
               return (
@@ -612,14 +634,14 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                           isToday && cfg.is_open && "ring-2 ring-primary/20",
                         )}
                       >
-                        {DAYS_AR[day].charAt(0)}
+                        {dayName(day).charAt(0)}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-black text-main">{DAYS_AR[day]}</span>
+                          <span className="text-sm font-black text-main">{dayName(day)}</span>
                           {isToday && (
                             <Badge variant="primary" className="h-5 text-[9px] px-2">
-                              اليوم
+                              {t("workingHours.todayLabel")}
                             </Badge>
                           )}
                           <span
@@ -636,7 +658,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                                 cfg.is_open ? "bg-emerald-500" : "bg-muted",
                               )}
                             />
-                            {cfg.is_open ? "مفتوح" : "مغلق"}
+                            {cfg.is_open ? t("workingHours.open") : t("workingHours.closed")}
                           </span>
                           {dur && (
                             <span className="inline-flex h-5 items-center rounded-full bg-primary/10 border border-primary/15 px-2 text-[9px] font-black text-primary tabular-nums">
@@ -645,14 +667,14 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                           )}
                           {overnight && (
                             <span className="inline-flex items-center gap-1 h-5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 text-[9px] font-black">
-                              <Moon size={9} /> بعد منتصف الليل
+                              <Moon size={9} /> {t("workingHours.afterMidnight")}
                             </span>
                           )}
                         </div>
                         <div className="text-[10px] font-bold text-muted mt-1 tabular-nums">
                           {cfg.is_open
                             ? `${range} — ${dur}`
-                            : "عطلة أسبوعية — لا يُستقبل حجز"}
+                            : t("workingHours.weeklyOff")}
                         </div>
                       </div>
                     </div>
@@ -669,7 +691,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                               htmlFor={`open-${day}`}
                               className="text-[9px] font-black text-muted uppercase tracking-widest me-1 block"
                             >
-                              الفتح
+                              {t("workingHours.openLabel")}
                             </label>
                             <Input
                               id={`open-${day}`}
@@ -691,9 +713,9 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                               htmlFor={`close-${day}`}
                               className="text-[9px] font-black text-muted uppercase tracking-widest me-1 flex items-center gap-1"
                             >
-                              الإغلاق
+                              {t("workingHours.closeLabel")}
                               {overnight && (
-                                <span className="text-indigo-500 font-black">(اليوم التالي)</span>
+                                <span className="text-indigo-500 font-black">{t("workingHours.nextDay")}</span>
                               )}
                             </label>
                             <Input
@@ -713,7 +735,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                         </motion.div>
                       ) : (
                         <div className="hidden sm:flex h-10 items-center rounded-xl bg-soft border border-dashed border-border px-4 text-[11px] font-black text-muted">
-                          مغلق — لن تظهر مواعيد لهذا اليوم
+                          {t("workingHours.closedNoSlots")}
                         </div>
                       )}
 
@@ -723,8 +745,8 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                             variant="ghost"
                             size="sm"
                             onClick={() => confirmCopyAll(day)}
-                            title={`نسخ ${DAYS_AR[day]} إلى كل الأيام`}
-                            aria-label={`نسخ مواعيد ${DAYS_AR[day]} إلى كل الأيام`}
+                            title={t("workingHours.copyAllTitle", { day: dayName(day) })}
+                            aria-label={t("workingHours.copyAllAria", { day: dayName(day) })}
                             className="h-8 w-8 p-0 rounded-xl border border-border bg-card hover:bg-soft"
                           >
                             <Copy size={14} />
@@ -733,8 +755,8 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                             variant="ghost"
                             size="sm"
                             onClick={() => handleResetDay(day)}
-                            title="إعادة هذا اليوم للحالة المحفوظة"
-                            aria-label={`إعادة ${DAYS_AR[day]} للحالة المحفوظة`}
+                            title={t("workingHours.resetDayTitle")}
+                            aria-label={t("workingHours.resetDayAria", { day: dayName(day) })}
                             className="h-8 w-8 p-0 rounded-xl border border-border bg-card hover:bg-soft"
                           >
                             <RotateCcw size={14} />
@@ -743,13 +765,13 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                         <div className="h-6 w-px bg-border hidden sm:block" />
                         <div className="flex items-center gap-2">
                           <span className={cn("text-[11px] font-black", cfg.is_open ? "text-primary" : "text-muted")}>
-                            {cfg.is_open ? "مفتوح" : "مغلق"}
+                            {cfg.is_open ? t("workingHours.open") : t("workingHours.closed")}
                           </span>
                           <Switch
                             checked={cfg.is_open}
                             onCheckedChange={() => handleToggle(day)}
                             className="data-[state=checked]:bg-primary"
-                            aria-label={`تبديل ${DAYS_AR[day]}`}
+                            aria-label={t("workingHours.toggleAria", { day: dayName(day) })}
                           />
                         </div>
                       </div>
@@ -762,7 +784,7 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
                       className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-black text-rose-700"
                     >
                       <AlertTriangle size={14} className="shrink-0" />
-                      {err}
+                      {errLabel(err)}
                     </div>
                   )}
                 </div>
@@ -789,19 +811,16 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
           </div>
           <div className="min-w-0">
             <div className="text-[11px] font-black leading-none">
-              {isDirty ? "تعديلات غير محفوظة — سيتأثر الحجز والورديات" : "المواعيد متزامنة مع الخادم"}
+              {isDirty ? t("workingHours.dirtyTitle") : t("workingHours.syncedTitle")}
             </div>
             <p className="text-[11px] font-bold leading-relaxed mt-1 opacity-80">
-              {isDirty
-                ? "بعد الحفظ: سيُحدّث الموقع العام، وتُفلتر المواعيد المتاحة، ويُمنع فتح وردية خارج الساعات المحددة. لم يتم الحفظ بعد."
-                : "أي تغيير هنا ينعكس فور حفظه على صفحة الحجز العامة وجدولة المواعيد ونظام الورديات."}
+              {isDirty ? t("workingHours.dirtyDesc") : t("workingHours.syncedDesc")}
             </p>
           </div>
         </div>
 
         <p className="text-center text-[10px] font-bold text-muted">
-          نصيحة: استخدم القالب «دوام متأخر» للمحلات التي تعمل بعد منتصف الليل — وقت الإغلاق يقبل
-          ساعة أبكر من الفتح ويُحسب على اليوم التالي.
+          {t("workingHours.tip")}
         </p>
       </ContentPanel>
 
@@ -810,24 +829,24 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
         onOpenChange={(open) => !open && setPending(null)}
         title={
           pending?.kind === "copy-all"
-            ? "تطبيق مواعيد يوم واحد على الأسبوع"
+            ? t("workingHours.confirmCopyTitle")
             : pending?.kind === "preset"
-              ? "تطبيق قالب جاهز"
-              : "التراجع عن التعديلات"
+              ? t("workingHours.confirmPresetTitle")
+              : t("workingHours.confirmDiscardTitle")
         }
         description={
           pending?.kind === "copy-all" && pending
-            ? `سيتم استبدال مواعيد الستة أيام الأخرى بمواعيد ${DAYS_AR[pending.source]}. يمكنك التراجع قبل الحفظ.`
+            ? t("workingHours.confirmCopyDesc", { day: dayName(pending.source) })
             : pending?.kind === "preset" && pending
-              ? `${PRESETS.find((p) => p.id === pending.presetId)?.description}. سيتم استبدال المواعيد الحالية بالكامل.`
-              : "سيتم تجاهل التعديلات غير المحفوظة والعودة للحالة الأخيرة المحفوظة على الخادم."
+              ? t("workingHours.confirmPresetDesc", { desc: presetDesc(pending.presetId) })
+              : t("workingHours.confirmDiscardDesc")
         }
-        confirmText={pending?.kind === "discard" ? "تراجع" : "تطبيق"}
+        confirmText={pending?.kind === "discard" ? t("workingHours.revert") : t("workingHours.apply")}
         variant={pending?.kind === "discard" ? "danger" : "primary"}
         onConfirm={runPending}
       />
       <span className="sr-only" aria-live="polite">
-        {isDirty ? "لديك تعديلات غير محفوظة على ساعات العمل" : "ساعات العمل محفوظة"}
+        {isDirty ? t("workingHours.srDirty") : t("workingHours.srSaved")}
       </span>
     </div>
   );
@@ -836,6 +855,17 @@ const WorkingHoursPanel = ({ onDirtyChange, onVersionChange }: WorkingHoursPanel
 type WeekTimelineProps = { hours: WorkingHoursMap };
 
 const WeekTimeline = ({ hours }: WeekTimelineProps) => {
+  const { t } = useTranslation("owner");
+  const dayName = (d: DayKey): string => t(`workingHours.day.${d}`);
+  const dayShort = (d: DayKey): string => t(`workingHours.dayShort.${d}`);
+  const fmtDur = (minutes: number): string => {
+    if (minutes <= 0) return "—";
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (m === 0) return t("workingHours.durHour", { h });
+    if (h === 0) return t("workingHours.durMin", { m });
+    return t("workingHours.durHM", { h, m });
+  };
   const blocks = useMemo(() => buildTimeline(hours), [hours]);
   const gaps = useMemo(() => findTimelineGaps(hours), [hours]);
   const coverage = useMemo(() => timelineCoverage(hours), [hours]);
@@ -856,11 +886,11 @@ const WeekTimeline = ({ hours }: WeekTimelineProps) => {
       <div className="p-4 sm:p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h4 className="text-[11px] font-black uppercase tracking-widest text-muted flex items-center gap-2">
-            <CalendarRange size={14} className="text-primary" /> الجدول الزمني للأسبوع
+            <CalendarRange size={14} className="text-primary" /> {t("workingHours.weekTimeline")}
           </h4>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[9px] font-black tabular-nums">
-              تغطية {coverage}%
+              {t("workingHours.coverage", { pct: coverage })}
             </Badge>
             {gaps.slice(0, 2).map((gap) => (
               <Badge
@@ -868,7 +898,7 @@ const WeekTimeline = ({ hours }: WeekTimelineProps) => {
                 variant="warning"
                 className="rounded-full px-2.5 py-1 text-[9px] font-black"
               >
-                {gap.label}
+                {gap.hours >= 24 ? t("workingHours.gapDays", { days: Math.round((gap.hours / 24) * 10) / 10 }) : t("workingHours.gapHours", { hours: gap.hours })}
               </Badge>
             ))}
           </div>
@@ -878,7 +908,7 @@ const WeekTimeline = ({ hours }: WeekTimelineProps) => {
           <div
             className="relative h-11 w-full overflow-hidden rounded-xl border border-border bg-soft/40"
             role="img"
-            aria-label={`تغطية الدوام الأسبوعي ${coverage} بالمئة`}
+            aria-label={t("workingHours.coverageAria", { pct: coverage })}
           >
             {blocks.map((block) => (
               <div
@@ -897,14 +927,14 @@ const WeekTimeline = ({ hours }: WeekTimelineProps) => {
                 }}
                 title={
                   block.kind === "open"
-                    ? `${block.label} — ${block.detail}`
-                    : `${block.label}: مغلق`
+                    ? `${dayName(block.day)} — ${fmtDur(windowMinutes(hours[block.day]))}${block.overnight ? ` • ${t("workingHours.endsNext")}` : ""}`
+                    : t("workingHours.closedBlock", { label: dayName(block.day) })
                 }
               >
                 {block.width > 7 ? (
                   <span className="truncate px-1">
                     {block.overnight ? "🌙 " : ""}
-                    {block.detail.split(" •")[0]}
+                    {fmtDur(windowMinutes(hours[block.day]))}
                   </span>
                 ) : null}
               </div>
@@ -922,15 +952,14 @@ const WeekTimeline = ({ hours }: WeekTimelineProps) => {
           <div className="mt-1.5 grid grid-cols-7 text-center text-[8px] font-black text-muted">
             {WORKING_HOURS_DAYS.map((day) => (
               <span key={day} className={cn(day === todayKey && "text-primary")}>
-                {DAYS_SHORT_AR[day]}
+                {dayShort(day)}
               </span>
             ))}
           </div>
         </div>
 
         <p className="text-[10px] font-bold text-muted leading-relaxed">
-          الخط الأحمر يحدد اللحظة الحالية. الفجوات المغلقة بالأ badges أعلاه هي الفترات التي لا
-          يمكن فيها استقبال حجز — والدوام الذي يتخطى منتصف الليل يظهر بنفس اللون مثل البندوت.
+          {t("workingHours.timelineNote")}
         </p>
       </div>
     </PremiumCard>

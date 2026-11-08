@@ -38,6 +38,8 @@ import {
   DateText,
 } from "@/components/shared/DisplayComponents";
 import { cn } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "@/lib/format/locale";
 import { staticURL } from "@/services/api";
 import {
   useExpensesData,
@@ -51,6 +53,8 @@ import {
 } from "@/features/expenses";
 
 const ExpensesPage = () => {
+  const { t, i18n } = useTranslation("owner");
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
   const navigate = useNavigate();
   const { user } = useAuth();
   const isOwner = ["OWNER", "ADMIN"].includes(String(user?.role || "").toUpperCase());
@@ -104,20 +108,20 @@ const ExpensesPage = () => {
   return (
     <div className="erp-page space-y-6 pb-10">
       <PageHeader
-        title="إدارة المصاريف"
-        subtitle="مركز التحكم المالي — تتبع التدفقات النقدية وتكاليف التشغيل لحظياً"
-        badge="المالية • Expenses Control"
+        title={t("expenses.title")}
+        subtitle={t("expenses.subtitle")}
+        badge={t("expenses.badge")}
         icon={TrendingDown}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" className="h-11 rounded-xl px-3 text-xs border-border bg-card font-black hover:border-primary/20" onClick={exportToCSV}>
-              <Download size={14} className="ms-1.5" /> <span className="hidden sm:inline">تصدير CSV</span>
+              <Download size={14} className="ms-1.5" /> <span className="hidden sm:inline">{t("expenses.exportCsv")}</span>
             </Button>
             <Button variant="outline" className="h-11 rounded-xl px-3 text-xs border-border bg-card font-black" onClick={() => navigate("/expenses/archive")}>
-              <Archive size={14} className="ms-1.5" /> <span className="hidden sm:inline">الأرشيف</span>
+              <Archive size={14} className="ms-1.5" /> <span className="hidden sm:inline">{t("expenses.archive")}</span>
             </Button>
             <Button className="h-11 rounded-xl px-5 text-xs bg-slate-900 hover:bg-slate-800 text-white font-black shadow-lg" onClick={() => { resetForm(); setIsModalOpen(true); }}>
-              <Plus size={14} className="ms-1.5" /> إضافة مصروف
+              <Plus size={14} className="ms-1.5" /> {t("expenses.addExpense")}
             </Button>
           </div>
         }
@@ -170,8 +174,8 @@ const ExpensesPage = () => {
         <EmptyState
           variant="section"
           icon={FileText}
-          title="لا توجد مصاريف"
-          message="لم نعثر على سجلات مطابقة للفلتر الحالي"
+          title={t("expenses.emptyTitle")}
+          message={t("expenses.emptyMessage")}
           action={
             <div className="flex gap-2 mt-2">
               <Button
@@ -181,7 +185,7 @@ const ExpensesPage = () => {
                 }}
                 className="h-11 rounded-xl px-6 font-black"
               >
-                <Plus size={14} className="ms-1.5" /> إضافة مصروف
+                <Plus size={14} className="ms-1.5" /> {t("expenses.addExpenseBtn")}
               </Button>
               {hasActiveFilters && (
                 <Button
@@ -195,7 +199,7 @@ const ExpensesPage = () => {
                   }}
                   className="h-11 rounded-xl"
                 >
-                  مسح الفلاتر
+                  {t("expenses.clearFilters")}
                 </Button>
               )}
             </div>
@@ -220,9 +224,9 @@ const ExpensesPage = () => {
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-[14px] font-black text-main truncate max-w-[220px] sm:max-w-[320px]">{exp.title}</h3>
                           <Badge variant="outline" className="h-6 rounded-full px-2.5 text-[10px] font-black border-0 text-white" style={{ backgroundColor: catColor }}>{exp.category}</Badge>
-                          {isPending && <Badge className="h-6 rounded-full bg-amber-500 text-white border-0 text-[10px] font-black animate-pulse">بانتظار الاعتماد</Badge>}
-                          {isCancelled && <Badge variant="danger" className="h-6 rounded-full text-[10px] font-black">ملغي</Badge>}
-                          {exp.invoice_image_url && <a href={exp.invoice_image_url.startsWith("http") ? exp.invoice_image_url : `${staticURL}${exp.invoice_image_url}`} target="_blank" rel="noreferrer" className="h-6 inline-flex items-center gap-1 rounded-full bg-slate-900 text-white px-2.5 text-[10px] font-black"><ImageIcon size={10} /> فاتورة</a>}
+                          {isPending && <Badge className="h-6 rounded-full bg-amber-500 text-white border-0 text-[10px] font-black animate-pulse">{t("expenses.pendingApproval")}</Badge>}
+                          {isCancelled && <Badge variant="danger" className="h-6 rounded-full text-[10px] font-black">{t("expenses.cancelled")}</Badge>}
+                          {exp.invoice_image_url && <a href={exp.invoice_image_url.startsWith("http") ? exp.invoice_image_url : `${staticURL}${exp.invoice_image_url}`} target="_blank" rel="noreferrer" className="h-6 inline-flex items-center gap-1 rounded-full bg-slate-900 text-white px-2.5 text-[10px] font-black"><ImageIcon size={10} /> {t("expenses.invoiceLabel")}</a>}
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-[11px] font-bold text-muted">
                           <span className="flex items-center gap-1"><Calendar size={12} className="text-muted/60" /><DateText value={exp.expense_date} /></span>
@@ -240,23 +244,23 @@ const ExpensesPage = () => {
                           <CurrencyText value={exp.amount} tone={isCancelled ? "muted" : "primary"} />
                         </span>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl bg-soft border border-border hover:bg-slate-900 hover:text-white" onClick={() => handleView(exp)} title="عرض التفاصيل">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl bg-soft border border-border hover:bg-slate-900 hover:text-white" onClick={() => handleView(exp)} title={t("expenses.viewDetails")}>
                             <Eye size={14} />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl bg-soft border border-border hover:bg-slate-900 hover:text-white" onClick={() => handleEdit(exp)} title={isOwner ? "تعديل" : "عرض"}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl bg-soft border border-border hover:bg-slate-900 hover:text-white" onClick={() => handleEdit(exp)} title={isOwner ? t("expenses.edit") : t("expenses.viewDetails")}>
                             {isOwner ? <FileText size={14} /> : <Eye size={14} />}
                           </Button>
                           {isPending && isOwner && exp.id && (
                             <Button size="sm" className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] px-3" onClick={() => exp.id != null && handleApprove(exp.id)}>
-                              <CheckCircle2 size={12} className="ms-1" /> اعتماد
+                              <CheckCircle2 size={12} className="ms-1" /> {t("expenses.approve")}
                             </Button>
                           )}
                           {isOwner ? (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-muted hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200" onClick={() => setDeleteId(exp.id ?? null)} title="حذف (محمي)">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-muted hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200" onClick={() => setDeleteId(exp.id ?? null)} title={t("expenses.deleteProtected")} >
                               <Trash2 size={14} />
                             </Button>
                           ) : (
-                            <span className="h-8 w-8 rounded-xl bg-soft border border-border flex items-center justify-center" title="محمي">
+                            <span className="h-8 w-8 rounded-xl bg-soft border border-border flex items-center justify-center" title={t("expenses.protected")}>
                               <ShieldCheck size={14} className="text-emerald-500" />
                             </span>
                           )}
@@ -286,7 +290,7 @@ const ExpensesPage = () => {
               locale="ar"
             />
             <p className="mt-1 text-center text-[10px] font-bold text-muted">
-              صفحة {currentPage} من {totalPages} • {totalCount} سجل
+              {t("expenses.pageOf", { page: currentPage, total: totalPages, count: totalCount })}
             </p>
           </PremiumCard>
         );
@@ -309,10 +313,10 @@ const ExpensesPage = () => {
           <DialogHeader className="p-6 pb-4 border-b border-border/40 bg-gradient-to-br from-slate-50 to-white">
             <DialogTitle className="text-base font-black flex items-center gap-3">
               <span className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center"><Wallet size={16} /></span>
-              {isEditing ? (isOwner ? "تعديل المصروف" : "تفاصيل المصروف") : "إضافة مصروف جديد"}
+              {isEditing ? (isOwner ? t("expenses.editExpense") : t("expenses.viewExpense")) : t("expenses.addExpenseModal")}
             </DialogTitle>
-            <DialogDescription id="expense-dialog-desc" className="sr-only">نموذج إضافة أو تعديل بيانات المصروف</DialogDescription>
-            {!isOwner && isEditing && <Badge className="mt-2 bg-amber-500 text-white rounded-full w-fit">قراءة فقط - المالك فقط يمكنه التعديل</Badge>}
+            <DialogDescription id="expense-dialog-desc" className="sr-only">{t("expenses.formDesc")}</DialogDescription>
+            {!isOwner && isEditing && <Badge className="mt-2 bg-amber-500 text-white rounded-full w-fit">{t("expenses.readOnly")}</Badge>}
           </DialogHeader>
           <div className="p-6 space-y-5 max-h-[62vh] overflow-y-auto">
             <ExpenseFormSections
@@ -326,17 +330,17 @@ const ExpensesPage = () => {
             />
           </div>
           <DialogFooter className="p-5 pt-4 border-t border-border bg-soft/30 gap-2 flex-row">
-            <Button variant="outline" onClick={() => { resetForm(); setIsModalOpen(false); }} className="h-11 flex-1 rounded-xl font-black">إلغاء</Button>
+            <Button variant="outline" onClick={() => { resetForm(); setIsModalOpen(false); }} className="h-11 flex-1 rounded-xl font-black">{t("expenses.cancel")}</Button>
             {(!isEditing || isOwner) && (
               <Button onClick={handleSubmit} disabled={isSubmitting || uploading} className="h-11 flex-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black">
-                {isSubmitting ? <RefreshCw size={14} className="ms-1.5 animate-spin" /> : <Save size={14} className="ms-1.5" />} {isEditing ? "حفظ التعديل" : "إضافة"}
+                {isSubmitting ? <RefreshCw size={14} className="ms-1.5 animate-spin" /> : <Save size={14} className="ms-1.5" />} {isEditing ? t("expenses.saveEdit") : t("expenses.add")}
               </Button>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)} title="حذف المصروف" description="حذف السجلات المالية غير مسموح به حالياً لضمان نزاهة البيانات. سيتم إلغاء الطلب." onConfirm={handleDelete} confirmText="حاول الحذف" cancelText="إغلاق" variant="danger" />
+      <ConfirmDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)} title={t("expenses.deleteTitle")} description={t("expenses.deleteDesc")} onConfirm={handleDelete} confirmText={t("expenses.tryDelete")} cancelText={t("expenses.close")} variant="danger" />
     </div>
   );
 };

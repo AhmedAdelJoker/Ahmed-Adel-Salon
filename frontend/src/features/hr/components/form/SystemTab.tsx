@@ -21,6 +21,7 @@ import {
   FIELD_SELECT_CLASS,
 } from "@/features/hr";
 import { cn } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
 import { validateUsername, passwordRequirements } from "@/features/hr/utils/validators";
 import FieldError from "./FieldError";
 
@@ -33,6 +34,7 @@ export default function SystemTab({
   setFormData: Dispatch<SetStateAction<EmployeeRecord>>;
   editingEmp: EmployeeRecord | null;
 }) {
+  const { t } = useTranslation("owner");
   const typedUsername = String(formData.username ?? "").trim();
   const usernameError = typedUsername ? validateUsername(typedUsername) : null;
   /*
@@ -52,10 +54,10 @@ export default function SystemTab({
                 </div>
                 <div>
                   <div className="text-sm font-black uppercase tracking-widest">
-                    حساب دخول الموظف
+                    {t("hr.loginAccount")}
                   </div>
                   <div className="text-xs font-medium text-muted leading-relaxed">
-                    تفعيل الصلاحيات التقنية للمنظومة
+                    {t("hr.enablePermissions")}
                   </div>
                 </div>
               </div>
@@ -71,7 +73,7 @@ export default function SystemTab({
             {formData.hasLoginAccount && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-3xl border border-border bg-soft/50">
                 <div className="space-y-2">
-                  <label className={FIELD_LABEL_CLASS}>اسم المستخدم</label>
+                  <label className={FIELD_LABEL_CLASS}>{t("hr.username")}</label>
                   <Input
                     value={formData.username}
                     onChange={(e) =>
@@ -88,12 +90,12 @@ export default function SystemTab({
                     <FieldError id="username-error">{usernameError}</FieldError>
                   ) : (
                     <p className="text-[11px] font-bold text-muted">
-                      يُستخدم لتسجيل الدخول — حروف إنجليزية وأرقام و . _ -
+                      {t("hr.usernameHint")}
                     </p>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <label className={FIELD_LABEL_CLASS}>كلمة المرور</label>
+                  <label className={FIELD_LABEL_CLASS}>{t("hr.password")}</label>
                   <Input
                     type="password"
                     value={formData.password}
@@ -104,7 +106,7 @@ export default function SystemTab({
                     dir="ltr"
                     autoComplete="new-password"
                     placeholder={
-                      editingEmp ? "••••••••" : "أدخل كلمة المرور..."
+                      editingEmp ? "••••••••" : t("hr.passwordPlaceholder")
                     }
                   />
                   {/*
@@ -135,7 +137,7 @@ export default function SystemTab({
                   )}
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <label className={FIELD_LABEL_CLASS}>مستوى الوصول</label>
+                  <label className={FIELD_LABEL_CLASS}>{t("hr.accessLevel")}</label>
                   <Select
                     value={formData.role}
                     onValueChange={(v) => setFormData({ ...formData, role: v })}
@@ -155,7 +157,7 @@ export default function SystemTab({
               </div>
             )}
             <div className="space-y-2">
-              <label className={FIELD_LABEL_CLASS}>ملاحظات إدارية</label>
+              <label className={FIELD_LABEL_CLASS}>{t("hr.adminNotes")}</label>
               <textarea
                 value={formData.personalNotes}
                 onChange={(e) =>

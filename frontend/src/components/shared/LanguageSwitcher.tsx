@@ -5,7 +5,7 @@ import { Languages } from "lucide-react";
 
 export default function LanguageSwitcher({ className = "" }) {
   const { loading } = useAuth();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation("common");
   const { toggleLanguage } = usePreferences();
   const isArabic = i18n.language === "ar";
 
@@ -15,9 +15,7 @@ export default function LanguageSwitcher({ className = "" }) {
       disabled={loading}
       onClick={toggleLanguage}
       className={`btn btn-secondary btn-md rounded-2xl font-black ${className}`}
-      aria-label={
-        isArabic ? "Switch language to English" : "تبديل اللغة إلى العربية"
-      }
+      aria-label={t(isArabic ? "switch_to_english" : "switch_to_arabic")}
       dir={isArabic ? "rtl" : "ltr"}
     >
       <Languages size={16} aria-hidden="true" />

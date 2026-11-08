@@ -43,6 +43,18 @@ const PHYSICAL = [
 ];
 
 /**
+ * `border-l`/`border-r` are ambiguous as plain prefixes: `border-line` is a
+ * semantic color token, not border-left width. A real physical border side is
+ * the bare utility or a width suffix (`border-l`, `border-l-2`, `border-l-[3px]`).
+ */
+function isPhysicalBorderSide(utility: string, prefix: "border-l" | "border-r") {
+  if (!utility.startsWith(prefix)) return false;
+  if (utility.length === prefix.length) return true;
+  const rest = utility.slice(prefix.length);
+  return /^-(?:\d|\[)/.test(rest);
+}
+
+/**
  * Tokens where the physical direction is deliberate.
  *
  * `left-1/2` is the centring idiom: paired with a physical translate it is
@@ -96,7 +108,14 @@ function countPhysicalSpacing(): { total: number; byFile: Map<string, number> } 
     for (const match of code.matchAll(/(?<![\w-])((?:[a-z-]+:)*)([a-z]+-[^\s"'`]+)/g)) {
       const utility = match[2];
       if (INTENTIONAL.test(utility)) continue;
-      if (PHYSICAL.some((p) => utility.startsWith(p) && utility.length > p.length)) {
+      if (
+        PHYSICAL.some((p) => {
+          if (p === "border-l" || p === "border-r") {
+            return isPhysicalBorderSide(utility, p);
+          }
+          return utility.startsWith(p) && utility.length > p.length;
+        })
+      ) {
         count += 1;
       }
     }

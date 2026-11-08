@@ -299,7 +299,7 @@ export function StockWizard({
           </DialogDescription>
         </div>
 
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           <motion.div
             key={currentStepData.id}
             initial={{ opacity: 0, x: 20 }}

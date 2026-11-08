@@ -1,9 +1,10 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/core/utils";
 import { getHomePath, hasRoleAccess } from "@/lib/access/roles";
-import { getMobileNavItems } from "@/app/route-registry";
+import { getMobileNavItems, routeKey } from "@/app/route-registry";
 
 export function getMobileHomePath(role: unknown): string {
   return getHomePath(role);
@@ -12,6 +13,7 @@ export function getMobileHomePath(role: unknown): string {
 export default function MobileNav() {
   const { user } = useAuth();
   const location = useLocation();
+  const { t } = useTranslation("routes");
 
   const links = useMemo(
     () =>
@@ -39,13 +41,16 @@ export default function MobileNav() {
 
   return (
     <nav
-      aria-label="التنقل السريع"
+      aria-label={t("ui.quickNav")}
       className="fixed inset-x-4 bottom-4 z-50 lg:hidden"
     >
       <div className="mx-auto max-w-lg rounded-2xl border border-border bg-card/90 px-2 py-2 shadow-premium backdrop-blur-xl">
         <div className={`grid gap-1 ${gridCols}`}>
           {links.map((link) => {
             const Icon = link.icon;
+            const label = t(`nav.${routeKey(link.to)}`, {
+              defaultValue: link.label,
+            });
             const isActive =
               location.pathname === link.to ||
               location.pathname.startsWith(`${link.to}/`);
@@ -53,7 +58,7 @@ export default function MobileNav() {
               <NavLink
                 key={link.to}
                 to={link.to}
-                aria-label={link.label}
+                aria-label={label}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 rounded-xl py-2 transition-all",
@@ -67,7 +72,7 @@ export default function MobileNav() {
                   strokeWidth={isActive ? 2.5 : 2}
                   aria-hidden="true"
                 />
-                <span className="text-[10px] font-bold">{link.label}</span>
+                <span className="text-[10px] font-bold">{label}</span>
               </NavLink>
             );
           })}

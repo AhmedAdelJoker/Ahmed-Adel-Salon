@@ -5,6 +5,7 @@ import api from "@/services/api";
 import { adaptList } from "@/services/apiAdapter";
 import { aiService } from "@/lib/aiService";
 import { pctGrowth, downloadCsvFile } from "@/lib/money/financialAnalytics";
+import { useTranslation } from "react-i18next";
 
 export type OpPresetId = "today" | "week" | "month" | "quarter";
 export type OpTabId = "finance" | "operations" | "history";
@@ -108,6 +109,7 @@ async function fetchInvoicesRange(from: string, to: string): Promise<any[]> {
 }
 
 export function useOperationalReports() {
+  const { t } = useTranslation("owner");
   const initial = useMemo(() => presetRange("month"), []);
   const [activeTab, setActiveTab] = useState<OpTabId>("finance");
   const [preset, setPreset] = useState<OpPresetId>("month");
@@ -151,8 +153,8 @@ export function useOperationalReports() {
       setLastUpdated(new Date());
     } catch (error) {
       console.error("Error fetching operational data:", error);
-      setLoadError("تعذر تحميل البيانات التشغيلية. تحقق من الاتصال ثم أعد المحاولة.");
-      if (!hasLoadedRef.current) toast.error("فشل تحميل البيانات التشغيلية");
+      setLoadError(t("opRepHook.loadError"));
+      if (!hasLoadedRef.current) toast.error(t("opRepHook.loadFailedToast"));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -257,14 +259,14 @@ export function useOperationalReports() {
       }
       const items = Array.isArray(inv.items) ? inv.items : [];
       items.forEach((item: any) => {
-        const sName = String(item.service_name || item.name || "خدمة أخرى").trim() || "خدمة أخرى";
+        const sName = String(item.service_name || item.name || t("opRepHook.serviceFallback")).trim() || t("opRepHook.serviceFallback");
         const price = safeNum(item.price ?? item.total ?? item.amount);
         const currentS = serviceMap.get(sName) || { name: sName, count: 0, revenue: 0 };
         serviceMap.set(sName, { ...currentS, count: currentS.count + 1, revenue: currentS.revenue + price });
         // H3 fix: no random rating — count + revenue only (deterministic).
         const bName =
-          String(item.barber_name || item.employee_name || inv.barber_name || "غير محدد").trim() ||
-          "غير محدد";
+          String(item.barber_name || item.employee_name || inv.barber_name || t("opRepHook.unspecified")).trim() ||
+          t("opRepHook.unspecified");
         const currentB = barberMap.get(bName) || { name: bName, count: 0, revenue: 0 };
         barberMap.set(bName, { ...currentB, count: currentB.count + 1, revenue: currentB.revenue + price });
       });
@@ -328,7 +330,7 @@ export function useOperationalReports() {
           String(t.category || ""),
           String(t.amount ?? ""),
           dayKeyOf(t.transaction_date || t.created_at),
-          t.direction === "in" ? "إيداع" : "مصروف",
+          t.direction === "in" ? t("opRepHook.deposit") : t("opRepHook.expense"),
         ]
           .join(" ")
           .toLowerCase();
@@ -351,21 +353,21 @@ export function useOperationalReports() {
 
   const handleExportHistoryCsv = useCallback(() => {
     if (!filteredHistory.length) {
-      toast.error("لا توجد بيانات للتصدير");
+      toast.error(t("opRepHook.exportEmpty"));
       return;
     }
     downloadCsvFile(
       `operational_history_${startDate}_${endDate}`,
-      ["التاريخ", "البيان", "التصنيف", "النوع", "القيمة"],
+      [t("opRepHook.cvs.date"), t("opRepHook.cvs.label"), t("opRepHook.cvs.category"), t("opRepHook.cvs.type"), t("opRepHook.cvs.value")],
       filteredHistory.map((t: any) => [
         dayKeyOf(t.transaction_date || t.created_at),
-        String(t.note || "عملية تشغيلية"),
-        String(t.category || "عام"),
-        t.direction === "in" ? "إيداع" : "مصروف",
+        String(t.note || t("opRepHook.noteFallback")),
+        String(t.category || t("opRepHook.categoryFallback")),
+        t.direction === "in" ? t("opRepHook.deposit") : t("opRepHook.expense"),
         safeNum(t.amount),
       ]),
     );
-    toast.success("تم تصدير السجل بنجاح");
+    toast.success(t("opRepHook.exportSuccess"));
   }, [filteredHistory, startDate, endDate]);
 
   const handlePrint = useCallback(() => {

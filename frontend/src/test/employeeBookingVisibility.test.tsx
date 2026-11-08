@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import "@/i18n";
 import { renderHook, act, waitFor, render, screen } from "@testing-library/react";
 import api from "@/services/api";
 import { useEmployeeForm } from "@/features/hr/hooks/useEmployeeForm";

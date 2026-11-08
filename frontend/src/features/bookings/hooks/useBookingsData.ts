@@ -1,21 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSocket } from "@/context/SocketContext";
 import { toast } from "react-hot-toast";
 
 import api from "@/services/api";
 import { adaptList } from "@/services/apiAdapter";
-import { getApiErrorMessage } from "@/lib/core/utils";
 import {
   TODAY,
   timeOnly,
   emptyForm,
+  bookingApiErrorMessage,
+  readBookingDraft,
+  writeBookingDraft,
 } from "@/features/bookings";
 import type { BookingRecord } from "@/features/bookings/types";
 
 import { useBookingsBoard } from "@/features/bookings/hooks/useBookingsBoard";
 
 export function useBookingsData() {
+  const { t } = useTranslation("bookings");
   const navigate = useNavigate();
   const location = useLocation();
   const socketContext = useSocket?.();
@@ -93,6 +97,31 @@ export function useBookingsData() {
     return () => clearTimeout(phoneTimerRef.current);
   }, []);
 
+  // Persist the create-form draft while the dialog is open (create mode
+  // only — edit mode already has a booking to edit).
+  useEffect(() => {
+    if (!isModalOpen || editingBooking) return;
+    writeBookingDraft({
+      customerMode,
+      foundCustomer,
+      customerId: formData.customerId,
+      customerName: formData.customerName,
+      customerLastName: formData.customerLastName,
+      customerPhone: formData.customerPhone,
+      employeeId: formData.employeeId,
+      appointmentTime: formData.appointmentTime,
+      notes: formData.notes,
+      services: formData.services,
+      bookingSource: formData.bookingSource,
+    });
+  }, [
+    isModalOpen,
+    editingBooking,
+    formData,
+    customerMode,
+    foundCustomer,
+  ]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isTyping = ["INPUT", "TEXTAREA", "SELECT"].includes(
@@ -143,7 +172,7 @@ export function useBookingsData() {
 
   const handleTransferToPOS = useCallback(
     (booking: BookingRecord) => {
-      toast.success("جاري الانتقال لنقطة البيع الكاشير...");
+      toast.success(t("toasts.goingToPos"));
       navigate("/pos", {
         state: {
           bookingId: booking.id,
@@ -153,7 +182,7 @@ export function useBookingsData() {
         },
       });
     },
-    [navigate],
+    [navigate, t],
   );
 
   const handleOpenCustomerProfile = useCallback(
@@ -171,15 +200,17 @@ export function useBookingsData() {
         await api.patch(`/appointments/${booking.id}/status`, {
           status: "waiting",
         });
-        toast.success("تم تفعيل الحجز وإرساله للوحة الاستقبال");
+        toast.success(t("toasts.activated"));
         invalidateAppointments();
       } catch (err) {
-        toast.error(getApiErrorMessage(err, "فشل تفعيل الحجز"));
+        toast.error(
+          bookingApiErrorMessage(err, t("toasts.activateFailed"), t("conflict.generic")),
+        );
       } finally {
         setActionLoading(null);
       }
     },
-    [invalidateAppointments],
+    [invalidateAppointments, t],
   );
 
   const handleRescheduleBooking = useCallback(
@@ -190,15 +221,17 @@ export function useBookingsData() {
           appointment_date: newDate,
           appointment_time: newTime,
         });
-        toast.success("تم إعادة جدولة الحجز بنجاح");
+        toast.success(t("toasts.rescheduled"));
         invalidateAppointments();
       } catch (err) {
-        toast.error(getApiErrorMessage(err, "فشل إعادة الجدولة"));
+        toast.error(
+          bookingApiErrorMessage(err, t("toasts.rescheduleFailed"), t("conflict.generic")),
+        );
       } finally {
         setActionLoading(null);
       }
     },
-    [invalidateAppointments],
+    [invalidateAppointments, t],
   );
 
   const canEditBooking = useCallback(
@@ -247,10 +280,12 @@ export function useBookingsData() {
         await api.patch(`/appointments/${bookingId}/assign-barber`, {
           employee_id: targetBarberId,
         });
-        toast.success("تم تغيير الخبير بنجاح");
+        toast.success(t("toasts.barberChanged"));
         invalidateAppointments();
       } catch (err) {
-        toast.error(getApiErrorMessage(err, "فشل تغيير الخبير"));
+        toast.error(
+          bookingApiErrorMessage(err, t("toasts.barberChangeFailed"), t("conflict.generic")),
+        );
       } finally {
         setActionLoading(null);
       }
@@ -275,10 +310,12 @@ export function useBookingsData() {
         await api.patch(`/appointments/${booking.id}/status`, {
           status: newStatus.toLowerCase(),
         });
-        toast.success("تم تحديث حالة الحجز");
+        toast.success(t("toasts.statusUpdated"));
         invalidateAppointments();
       } catch (err) {
-        toast.error(getApiErrorMessage(err, "فشل تحديث الحالة"));
+        toast.error(
+          bookingApiErrorMessage(err, t("toasts.statusUpdateFailed"), t("conflict.generic")),
+        );
       } finally {
         setActionLoading(null);
       }
@@ -292,19 +329,21 @@ export function useBookingsData() {
       setSaving(true);
       await api.patch(`/appointments/${bookingToCancel.id}/status`, {
         status: "cancelled",
-        cancellation_reason: cancellationReason || "بدون ذكر سبب",
+        cancellation_reason: cancellationReason || t("toasts.noReasonGiven"),
       });
-      toast.success("تم إلغاء الحجز بنجاح");
+      toast.success(t("toasts.cancelled"));
       setIsCancelDialogOpen(false);
       setCancellationReason("");
       invalidateAppointments();
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "فشل إلغاء الحجز"));
+      toast.error(
+        bookingApiErrorMessage(err, t("toasts.cancelFailed"), t("conflict.generic")),
+      );
     } finally {
       setSaving(false);
       setBookingToCancel(null);
     }
-  }, [bookingToCancel, cancellationReason, invalidateAppointments]);
+  }, [bookingToCancel, cancellationReason, invalidateAppointments, t]);
 
   const checkConflict = useCallback(
     async (empId: string | number, date: string, time: string) => {
@@ -334,12 +373,10 @@ export function useBookingsData() {
         // A failed conflict check used to pass silently, so the booking was
         // saved with no double-booking warning at all.
         console.error(e);
-        setConflictMsg(
-          "تعذر التحقق من تعارض المواعيد. راجع المواعيد يدوياً قبل الحفظ.",
-        );
+        setConflictMsg(t("toasts.conflictCheckFailed"));
       }
     },
-    [formData.services, services, editingBooking?.id],
+    [formData.services, services, editingBooking?.id, t],
   );
 
   const checkCustomerDuplicate = useCallback(
@@ -376,9 +413,7 @@ export function useBookingsData() {
         // taken. Clear it and say so instead.
         console.error("Error fetching slots:", e);
         setAvailableSlots([]);
-        setSlotsError(
-          "تعذر تحميل الأوقات المتاحة. أعد المحاولة قبل اختيار الموعد.",
-        );
+        setSlotsError(t("toasts.slotsLoadFailed"));
       }
     },
     [],
@@ -429,7 +464,9 @@ export function useBookingsData() {
 
   const onPhoneChange = useCallback(
     (value: string) => {
-      const val = String(value || "").replace(/\D/g, "");
+      // Egyptian mobile numbers are 11 digits; the cap is enforced here too so
+      // a pasted longer value is trimmed even though maxLength guards typing.
+      const val = String(value || "").replace(/\D/g, "").slice(0, 11);
       setFormData((prev: any) => ({ ...prev, customerPhone: val }));
       clearTimeout(phoneTimerRef.current);
       if (val.length < 8) {
@@ -459,37 +496,42 @@ export function useBookingsData() {
       });
       setCustomerMode("found");
       setCustomerSuggestions([]);
-      toast.success(`تم اختيار: ${customer.first_name || customer.name}`);
+      toast.success(
+        t("toasts.pickedCustomer", {
+          name: customer.first_name || customer.name,
+        }),
+      );
     },
-    [checkCustomerDuplicate, editingBooking?.id],
+    [checkCustomerDuplicate, editingBooking?.id, t],
   );
 
   const handleSaveBooking = useCallback(async () => {
     if (customerMode === "search")
-      return toast.error("يرجى إدخال رقم هاتف العميل للبحث");
+      return toast.error(t("toasts.phoneRequiredSearch"));
     if (customerMode === "new" && !formData.customerName)
-      return toast.error("يرجى إدخال اسم العميل الجديد");
+      return toast.error(t("toasts.nameRequired"));
     if (!formData.employeeId || formData.employeeId === "")
-      return toast.error("يرجى اختيار الخبير المسؤول");
-    if (!formData.appointmentTime) return toast.error("يرجى اختيار وقت الموعد");
+      return toast.error(t("toasts.barberRequired"));
+    if (!formData.appointmentTime)
+      return toast.error(t("toasts.timeRequired"));
     if (formData.services.length === 0)
-      return toast.error("يرجى اختيار خدمة واحدة على الأقل");
+      return toast.error(t("toasts.serviceRequired"));
     if (conflictMsg) return toast.error(conflictMsg);
 
     const today = new Date().toISOString().slice(0, 10);
     if (formData.appointmentDate < today)
-      return toast.error("لا يمكن الحجز في تاريخ سابق");
+      return toast.error(t("toasts.pastDateForbidden"));
     if (formData.appointmentDate === today) {
       const now = new Date();
       const [h, m] = formData.appointmentTime.split(":").map(Number);
       const apptTime = new Date();
       apptTime.setHours(h, m, 0);
-      if (apptTime <= now) return toast.error("لا يمكن الحجز في وقت مضى");
+      if (apptTime <= now) return toast.error(t("toasts.pastTimeForbidden"));
     }
 
     if (duplicateBooking)
       return toast.error(
-        duplicateBooking.message || "هذا العميل لديه حجز في هذا اليوم",
+        duplicateBooking.message || t("toasts.duplicateDefault"),
       );
 
     try {
@@ -520,15 +562,19 @@ export function useBookingsData() {
 
       if (editingBooking) {
         await api.patch(`/appointments/${editingBooking.id}`, payload);
-        toast.success("تم تحديث الحجز بنجاح");
+        toast.success(t("toasts.updated"));
       } else {
         await api.post("/appointments", payload);
-        toast.success("تم تسجيل الحجز بنجاح");
+        toast.success(t("toasts.created"));
       }
+      // The draft served its purpose; a fresh create starts truly fresh.
+      writeBookingDraft(null);
       setIsModalOpen(false);
       invalidateAppointments();
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "حدث خطأ أثناء الحفظ"));
+      toast.error(
+        bookingApiErrorMessage(err, t("toasts.saveFailed"), t("conflict.generic")),
+      );
     } finally {
       setSaving(false);
     }
@@ -539,13 +585,27 @@ export function useBookingsData() {
     duplicateBooking,
     editingBooking,
     invalidateAppointments,
+    t,
   ]);
 
   const openCreate = useCallback(() => {
     setEditingBooking(null);
-    setFormData({ ...emptyForm, appointmentDate: TODAY });
-    setCustomerMode("search");
-    setFoundCustomer(null);
+    // Restore a previously saved create-draft so an accidental close never
+    // loses a half-typed form. The date is always today; everything else
+    // (name, phone, expert, time, services, notes) returns as it was.
+    const draft = readBookingDraft();
+    setFormData({
+      ...emptyForm,
+      ...(draft || {}),
+      appointmentDate: TODAY,
+    });
+    if (draft) {
+      setCustomerMode(draft.customerMode === "new" ? "new" : draft.foundCustomer ? "found" : "search");
+      setFoundCustomer(draft.foundCustomer || null);
+    } else {
+      setCustomerMode("search");
+      setFoundCustomer(null);
+    }
     setConflictMsg("");
     setDuplicateBooking(null);
     setAvailableSlots([]);
@@ -556,7 +616,7 @@ export function useBookingsData() {
   const openEdit = useCallback(
     (b: BookingRecord) => {
       if (!canEditBooking(b)) {
-        toast.error("لا يمكن تعديل حجز يوم سابق. يرجى إنشاء حجز جديد.");
+        toast.error(t("toasts.pastEditForbidden"));
         return;
       }
       setEditingBooking(b);

@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { usePOS } from "@/pages/cashier/POS/POSContext";
 import { useSalon } from "@/context/SalonContext";
 import { useAuth } from "@/context/AuthContext";
@@ -17,6 +18,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/core/utils";
+import { parseBackendStamp } from "@/lib/format/date";
 import { posShiftService } from "@/services/posShiftService";
 import { isOpenShiftStatus } from "@/features/pos/utils";
 import { toast } from "react-hot-toast";
@@ -33,8 +35,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { currencyLabel } from "@/lib/core/currency";
+import { useIntlLocale } from "@/hooks/useAppLocale";
 
 const ShiftSidebar = () => {
+  const { t } = useTranslation("pos");
+  const locale = useIntlLocale();
   const {
     currentShift,
     fetchShift,
@@ -117,10 +122,10 @@ const ShiftSidebar = () => {
   const wasOpenRef = React.useRef<boolean | null>(null);
   React.useEffect(() => {
     if (wasOpenRef.current === true && !hasOpenShift && !manualCloseRef.current) {
-      toast.success("انتهت الوردية تلقائياً بعد نهاية الدوام الرسمي");
+      toast.success(t("shift_sidebar.toasts.auto_closed"));
     }
     wasOpenRef.current = hasOpenShift;
-  }, [hasOpenShift]);
+  }, [hasOpenShift, t]);
 
   // financial_rules.shiftCloseWarningMinutes arrives pre-computed from
   // /pos-shifts/current/stats as closing_in_minutes; the server is the single
@@ -145,17 +150,17 @@ const ShiftSidebar = () => {
       if (warnedShiftRef.current !== shiftId) {
         warnedShiftRef.current = shiftId;
         const mins = Math.max(1, Math.round(Number(closingIn)));
-        toast(
-          `تنبيه: الوردية ستُغلق تلقائياً بعد ${mins} دقيقة — جهّز الكاش وابدأ الجرد`,
-          { icon: "⏰", duration: 8000 },
-        );
+        toast(t("shift_sidebar.toasts.auto_close_warning", { mins }), {
+          icon: "⏰",
+          duration: 8000,
+        });
       }
     }
-  }, [liveStats, hasOpenShift, currentShift]);
+  }, [liveStats, hasOpenShift, currentShift, t]);
 
   const handleOpenShift = async () => {
     if (!isShopOpen) {
-      toast.error("عذراً، المحل مغلق حالياً ولا يمكن فتح وردية جديدة.");
+      toast.error(t("shift_sidebar.toasts.shop_closed"));
       return;
     }
     try {
@@ -164,11 +169,11 @@ const ShiftSidebar = () => {
       manualCloseRef.current = false;
       await fetchShift();
       await refreshBalance();
-      toast.success("تم فتح الوردية بنجاح — تم التحديث في الخزنة المركزية");
+      toast.success(t("shift_sidebar.toasts.open_success"));
     } catch (error) {
        
       const apiErr = error as { response?: { data?: { detail?: unknown } } };
-      toast.error((apiErr.response?.data?.detail as string) || "فشل فتح الوردية");
+      toast.error((apiErr.response?.data?.detail as string) || t("shift_sidebar.toasts.open_failed"));
     } finally {
       setIsOpeningShift(false);
     }
@@ -191,7 +196,7 @@ const ShiftSidebar = () => {
       await refreshBalance();
       setShowCloseShift(false);
       setNeedsApproval(false);
-      toast.success("تم إنهاء الوردية بنجاح — الخزنة محدثة");
+      toast.success(t("shift_sidebar.toasts.close_success"));
 
       // Print enriched report
       printShiftReport(closedData);
@@ -218,7 +223,7 @@ const ShiftSidebar = () => {
       toast.error(
         typeof detail === "string" && detail.trim()
           ? detail
-          : "فشل إنهاء الوردية",
+          : t("shift_sidebar.toasts.close_failed"),
       );
     } finally {
       manualCloseRef.current = false;
@@ -247,7 +252,7 @@ const ShiftSidebar = () => {
           .slice(0, 6),
       );
     } catch {
-      toast.error("تعذر تحميل سجل الورديات");
+      toast.error(t("shift_sidebar.toasts.history_load_failed"));
     } finally {
       setHistoryLoading(false);
     }
@@ -267,7 +272,7 @@ const ShiftSidebar = () => {
         } as any,
       });
     } catch {
-      toast.error("تعذر تجميع تقرير الوردية للطباعة");
+      toast.error(t("shift_sidebar.toasts.report_collect_failed"));
     }
   };
 
@@ -304,42 +309,44 @@ const ShiftSidebar = () => {
     const receiptData = {
       invoiceId: `shift-${shift.id}`,
       invoiceNo: `SHIFT-${shift.id}`,
-      customerName: `الكاشير: ${stats.cashier_name || "—"}`,
-      createdAt: new Date().toLocaleString("ar-EG"),
+      customerName: t("shift_sidebar.report.cashier_line", {
+        name: stats.cashier_name || "—",
+      }),
+      createdAt: new Date().toLocaleString(locale),
       paymentMethod: "cash",
       items: [
         {
-          name: "الرصيد الافتتاحي",
+          name: t("shift_sidebar.report.opening_balance"),
           qty: 1,
           price: Number(shift.opening_cash || 0),
           barber: "",
         },
         {
-          name: "إجمالي المبيعات (كاش)",
+          name: t("shift_sidebar.report.cash_sales"),
           qty: 1,
           price: Number(stats.cash_sales || 0),
           barber: "",
         },
         {
-          name: "مبيعات الشبكة (Card)",
+          name: t("shift_sidebar.report.card_sales"),
           qty: 1,
           price: Number(stats.card_sales || 0),
           barber: "",
         },
         {
-          name: "مبيعات الدفع المزدوج",
+          name: t("shift_sidebar.report.split_sales"),
           qty: 1,
           price: Number(stats.split_sales || 0),
           barber: "",
         },
         {
-          name: "إجمالي الخصومات",
+          name: t("shift_sidebar.report.discounts_total"),
           qty: 1,
           price: Number(shift.discount_total || 0),
           barber: "",
         },
         {
-          name: "إجمالي المصروفات",
+          name: t("shift_sidebar.report.expenses_total"),
           qty: 1,
           price: Number(stats.total_expenses || 0),
           barber: "",
@@ -350,10 +357,12 @@ const ShiftSidebar = () => {
       total: Number(shift.expected_closing_cash || 0),
       // Shop identity comes from the owner's business settings (same source
       // the invoice PDF uses), not a hardcoded brand string.
-      shopName: `${String(businessSettings?.salon_name || "صالون برو").trim()} - تقرير وردية`,
+      shopName: `${String(businessSettings?.salon_name || t("receipt.default_shop")).trim()} - ${t("shift_sidebar.report.title")}`,
       shopPhone: businessSettings?.shop_phone || "",
       shopAddress: businessSettings?.shop_address || "",
-      footer: `نظام صالون برو - ${new Date().getFullYear()} © جميع الحقوق محفوظة`,
+      footer: t("shift_sidebar.report.footer", {
+        year: new Date().getFullYear(),
+      }),
       qrDataUrl: "",
       widthMm: 80,
     };
@@ -361,13 +370,15 @@ const ShiftSidebar = () => {
     try {
        
       await printReceiptNative(receiptData as any);
-      toast.success("تم إرسال تقرير الوردية للطابعة");
+      toast.success(t("shift_sidebar.toasts.report_sent"));
     } catch (error) {
       console.error("Shift report print error:", error);
-      toast.error("فشل طباعة التقرير، سيتم فتح نافذة الطباعة");
-      // Fallback to browser print
+      toast.error(t("shift_sidebar.toasts.report_print_failed"));
+      // Fallback to browser print. The document is generated in the active UI
+      // language rather than a hardcoded Arabic page.
+      const lang = locale.split("-")[0];
       const reportHtml = `
-        <html lang="ar">
+        <html lang="${lang}">
           <head>
             <meta charset="UTF-8">
             <style>
@@ -396,45 +407,45 @@ const ShiftSidebar = () => {
           </head>
           <body>
             <div class="header">
-              <h1>تقرير إغلاق الوردية</h1>
-              <div class="header-meta">الموظف: ${stats.cashier_name || "—"}</div>
-              <div class="header-meta">رقم الوردية: #${shift.id} • بتاريخ: ${new Date().toLocaleString("ar-EG")}</div>
+              <h1>${t("shift_sidebar.report.close_title")}</h1>
+              <div class="header-meta">${t("shift_sidebar.report.staff_line", { name: stats.cashier_name || "—" })}</div>
+              <div class="header-meta">${t("shift_sidebar.report.shift_no_line", { id: shift.id, date: new Date().toLocaleString(locale) })}</div>
             </div>
 
-            <div class="section-title">ملخص الحساب النقدي</div>
+            <div class="section-title">${t("shift_sidebar.report.cash_summary_title")}</div>
             <div class="grid">
               <div class="item">
-                <div class="label">الرصيد الافتتاحي</div>
+                <div class="label">${t("shift_sidebar.report.opening_balance")}</div>
                 <div class="value">${formatCurrency(shift.opening_cash || 0)}</div>
               </div>
               <div class="item">
-                <div class="label">إجمالي المبيعات (كاش)</div>
+                <div class="label">${t("shift_sidebar.report.cash_sales")}</div>
                 <div class="value" style="color: #059669">${formatCurrency(stats.cash_sales || 0)}</div>
               </div>
               <div class="item" style="grid-column: span 2; background: #f3f4f6; border: 2px solid #D4AF37;">
-                <div class="label">الرصيد المتوقع بالصندوق</div>
+                <div class="label">${t("shift_sidebar.report.expected_drawer")}</div>
                 <div class="value" style="font-size: 24px;">${formatCurrency(shift.expected_closing_cash || 0)}</div>
               </div>
               <div class="item" style="grid-column: span 2; background: #fff; border: 2px solid #111827;">
-                <div class="label">الرصيد الفعلي (المجرود)</div>
+                <div class="label">${t("shift_sidebar.report.counted_drawer")}</div>
                 <div class="value" style="font-size: 24px;">${formatCurrency(shift.actual_closing_cash || 0)}</div>
               </div>
             </div>
 
-            <div class="section-title">تفاصيل العمليات</div>
+            <div class="section-title">${t("shift_sidebar.report.operations_title")}</div>
             <table class="stats-table">
-              <tr><td>إجمالي المبيعات (الكل)</td><td>${formatCurrency(shift.total_sales || 0)}</td></tr>
-              <tr><td>مبيعات الشبكة (Card)</td><td>${formatCurrency(stats.card_sales || 0)}</td></tr>
-              <tr><td>مبيعات الدفع المزدوج</td><td>${formatCurrency(stats.split_sales || 0)}</td></tr>
-              <tr><td>إجمالي الخصومات</td><td style="color: #dc2626">${formatCurrency(shift.discount_total || 0)}</td></tr>
-              <tr><td>عدد الخدمات المنفذة</td><td>${stats.service_count || 0}</td></tr>
-              <tr><td>عدد المنتجات المباعة</td><td>${stats.product_count || 0}</td></tr>
-              <tr><td>إجمالي المصروفات (أثناء الوردية)</td><td style="color: #dc2626">${formatCurrency(stats.total_expenses || 0)}</td></tr>
+              <tr><td>${t("shift_sidebar.report.all_sales")}</td><td>${formatCurrency(shift.total_sales || 0)}</td></tr>
+              <tr><td>${t("shift_sidebar.report.card_sales")}</td><td>${formatCurrency(stats.card_sales || 0)}</td></tr>
+              <tr><td>${t("shift_sidebar.report.split_sales")}</td><td>${formatCurrency(stats.split_sales || 0)}</td></tr>
+              <tr><td>${t("shift_sidebar.report.discounts_total")}</td><td style="color: #dc2626">${formatCurrency(shift.discount_total || 0)}</td></tr>
+              <tr><td>${t("shift_sidebar.report.services_count")}</td><td>${stats.service_count || 0}</td></tr>
+              <tr><td>${t("shift_sidebar.report.products_count")}</td><td>${stats.product_count || 0}</td></tr>
+              <tr><td>${t("shift_sidebar.report.expenses_during_shift")}</td><td style="color: #dc2626">${formatCurrency(stats.total_expenses || 0)}</td></tr>
             </table>
 
             <div class="footer">
-              نظام صالون برو - ${new Date().getFullYear()} © جميع الحقوق محفوظة
-              <br/>تم استخراج هذا التقرير آلياً بواسطة ${stats.cashier_name || "النظام"}
+              ${t("shift_sidebar.report.footer", { year: new Date().getFullYear() })}
+              <br/>${t("shift_sidebar.report.auto_generated", { name: stats.cashier_name || t("shift_sidebar.report.system_fallback") })}
             </div>
             <script>window.onload = () => { window.focus(); setTimeout(() => { window.print(); window.close(); }, 500); };</script>
           </body>
@@ -461,7 +472,7 @@ const ShiftSidebar = () => {
               <Activity size={14} className="sm:size-4" />
             </div>
             <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white tracking-tight">
-              الوردية
+              {t("shift_sidebar.title")}
             </h2>
           </div>
           <Badge
@@ -472,19 +483,19 @@ const ShiftSidebar = () => {
                 : "bg-amber-500 text-white shadow-sm shadow-amber-500/10",
             )}
           >
-            {hasOpenShift ? "نشطة" : "مغلقة"}
+            {hasOpenShift ? t("shift_sidebar.status_open") : t("shift_sidebar.status_closed")}
           </Badge>
         </div>
 
         {hasOpenShift && (
           <div className="mb-3 sm:mb-4 p-2 sm:p-2.5 rounded-xl bg-soft/50 border border-border/50 relative z-10">
             <div className="flex items-center gap-1.5 text-[10px] sm:text-[10px] font-black text-muted uppercase tracking-widest mb-0.5 pe-1">
-              <User size={10} className="text-primary" /> المسؤول
+              <User size={10} className="text-primary" /> {t("shift_sidebar.responsible")}
             </div>
             <div className="text-[11px] sm:text-xs font-black text-main truncate">
               {currentShift?.user?.full_name ||
                 currentShift?.user?.username ||
-                "جاري التحميل..."}
+                t("shift_sidebar.loading")}
             </div>
           </div>
         )}
@@ -498,8 +509,7 @@ const ShiftSidebar = () => {
                   className="text-amber-600 shrink-0 mt-0.5"
                 />
                 <p className="text-[10px] font-bold text-amber-700 leading-tight">
-                  المحل خارج ساعات العمل الرسمية حالياً. لا يمكن بدء وردية
-                  جديدة.
+                  {t("shift_sidebar.outside_hours_notice")}
                 </p>
               </div>
             )}
@@ -508,7 +518,7 @@ const ShiftSidebar = () => {
                 htmlFor="opening-cash"
                 className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest me-1"
               >
-                الرصيد الافتتاحي
+                {t("shift_sidebar.opening_cash_label")}
               </label>
               <div className="relative">
                 <Input
@@ -534,7 +544,7 @@ const ShiftSidebar = () => {
               loading={isOpeningShift}
             >
               <Zap size={14} className="sm:size-4" fill="currentColor" />
-              {isShopOpen ? "فتح الوردية" : "المحل مغلق حالياً"}
+              {isShopOpen ? t("shift_sidebar.open_button") : t("shift_sidebar.shop_closed_button")}
             </Button>
           </div>
         ) : (
@@ -543,7 +553,7 @@ const ShiftSidebar = () => {
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <Clock size={14} className="text-emerald-600 sm:size-4" />
                 <span className="text-[10px] sm:text-[10px] font-black text-emerald-700 dark:text-emerald-400">
-                  بدأت
+                  {t("shift_sidebar.started")}
                 </span>
               </div>
               <span className="text-[11px] sm:text-xs font-black text-slate-700 dark:text-white tabular-nums">
@@ -555,7 +565,7 @@ const ShiftSidebar = () => {
                       ? openedAt
                       : openedAt.replace(" ", "T") + "Z",
                   );
-                  return dateObj.toLocaleTimeString("ar-EG", {
+                  return dateObj.toLocaleTimeString(locale, {
                     hour: "2-digit",
                     minute: "2-digit",
                     hour12: true,
@@ -569,7 +579,7 @@ const ShiftSidebar = () => {
               onClick={() => openCloseDialog()}
             >
               <LogOut size={14} className="sm:size-4" />
-              إغلاق الوردية
+              {t("shift_sidebar.close_button")}
             </Button>
           </div>
         )}
@@ -580,7 +590,7 @@ const ShiftSidebar = () => {
           onClick={openHistory}
         >
           <Printer size={12} />
-          سجل الورديات السابقة
+          {t("shift_sidebar.history_title")}
         </Button>
       </Card>
 
@@ -588,7 +598,7 @@ const ShiftSidebar = () => {
       <div className="grid grid-cols-2 lg:grid-cols-1 gap-2 sm:gap-3">
         {[
           {
-            label: "جلسات جاهزة",
+            label: t("shift_sidebar.tiles.ready_sessions"),
             value: readyAppointments.length,
             icon: Clock,
             bgClass: "bg-indigo-500/5",
@@ -596,7 +606,7 @@ const ShiftSidebar = () => {
             iconBg: "bg-indigo-500 text-white",
           },
           {
-            label: "مبيعات الوردية",
+            label: t("shift_sidebar.tiles.shift_sales"),
             value: formatCurrency(liveStats?.total_sales || 0),
             icon: Wallet,
             bgClass: "bg-emerald-500/5",
@@ -604,7 +614,7 @@ const ShiftSidebar = () => {
             iconBg: "bg-emerald-500 text-white",
           },
           {
-            label: "عدد الفواتير",
+            label: t("shift_sidebar.tiles.invoice_count"),
             value: liveStats?.invoice_count || 0,
             icon: FileText,
             bgClass: "bg-sky-500/5",
@@ -612,7 +622,7 @@ const ShiftSidebar = () => {
             iconBg: "bg-sky-500 text-white",
           },
           {
-            label: "رصيد الخزنة (مرتبط)",
+            label: t("shift_sidebar.tiles.vault_linked"),
             value: formatCurrency(vaultCashBalance || drawerBalance),
             icon: Wallet,
             bgClass: "bg-emerald-500/5",
@@ -620,7 +630,7 @@ const ShiftSidebar = () => {
             iconBg: "bg-emerald-500 text-white",
           },
           {
-            label: "الخزنة • الإجمالي",
+            label: t("shift_sidebar.tiles.vault_total"),
             value: formatCurrency(valutBalance || drawerBalance),
             icon: Wallet,
             bgClass: "bg-slate-500/5",
@@ -674,10 +684,10 @@ const ShiftSidebar = () => {
         >
           <DialogHeader className="mb-6">
             <DialogTitle className="text-3xl font-black tracking-tight">
-              إنهاء جلسة الكاشير
+              {t("shift_sidebar.close_dialog_title")}
             </DialogTitle>
             <DialogDescription className="font-bold text-muted text-base">
-              يرجى جرد الصندوق وإدخال المبلغ الفعلي المتوفر الآن.
+              {t("shift_sidebar.close_dialog_desc")}
             </DialogDescription>
           </DialogHeader>
 
@@ -685,7 +695,7 @@ const ShiftSidebar = () => {
             <div className="grid grid-cols-1 gap-4">
               <div className="p-5 rounded-premium bg-soft/50 border border-border/50 backdrop-blur-sm">
                 <div className="flex justify-between items-center text-sm font-bold">
-                  <span className="text-muted">المتوقع بالنظام:</span>
+                  <span className="text-muted">{t("shift_sidebar.expected_label")}</span>
                   <span className="text-xl font-black text-main">
                     {expectedAmount == null ? "—" : formatCurrency(expectedAmount)}
                   </span>
@@ -694,7 +704,7 @@ const ShiftSidebar = () => {
 
               <div className="space-y-3">
                 <label className="text-xs font-black text-main uppercase tracking-widest me-1">
-                  رصيد الإغلاق الفعلي
+                  {t("shift_sidebar.counted_cash_label")}
                 </label>
                 <div className="relative">
                   <Input
@@ -711,14 +721,14 @@ const ShiftSidebar = () => {
               {(difference !== 0 || closingNote || overDiscrepancyLimit) && (
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-muted uppercase tracking-widest me-1">
-                    ملاحظة الإغلاق
+                    {t("shift_sidebar.closing_note_label")}
                     {(difference !== 0 || overDiscrepancyLimit) &&
-                      " (مطلوبة عند وجود فرق)"}
+                      t("shift_sidebar.note_required_hint")}
                   </label>
                   <Input
                     value={closingNote}
                     onChange={(e) => setClosingNote(e.target.value)}
-                    placeholder="مثال: مصروف غير مسجل / عجل عملاء"
+                    placeholder={t("shift_sidebar.note_placeholder")}
                     className="h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 font-bold text-xs px-3"
                   />
                 </div>
@@ -727,14 +737,13 @@ const ShiftSidebar = () => {
               {showCoSignature && (
                 <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-3">
                   <p className="text-[10px] font-black text-amber-700 dark:text-amber-300 leading-relaxed">
-                    الفارق تجاوز الحد المسموح — أدخل ملاحظة السبب واسم مستخدم
-                    المدير وكلمة سره لاعتماد الإغلاق
+                    {t("shift_sidebar.cosign_hint")}
                   </p>
                   <div className="grid grid-cols-1 gap-2">
                     <Input
                       value={approverName}
                       onChange={(e) => setApproverName(e.target.value)}
-                      placeholder="اسم مستخدم المدير"
+                      placeholder={t("shift_sidebar.approver_name_ph")}
                       className="h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 font-bold text-xs px-3"
                       autoComplete="username"
                     />
@@ -742,7 +751,7 @@ const ShiftSidebar = () => {
                       type="password"
                       value={approverPassword}
                       onChange={(e) => setApproverPassword(e.target.value)}
-                      placeholder="كلمة سر المدير"
+                      placeholder={t("shift_sidebar.approver_password_ph")}
                       className="h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 font-bold text-xs px-3"
                       autoComplete="current-password"
                     />
@@ -771,8 +780,8 @@ const ShiftSidebar = () => {
                   )}
                   <span className="text-sm font-black uppercase">
                     {expectedAmount == null
-                      ? "أرقام الوردية غير محمّلة بعد"
-                      : "العجز / الزيادة:"}
+                      ? t("shift_sidebar.figures_not_loaded")
+                      : t("shift_sidebar.variance_label")}
                   </span>
                 </div>
                 {expectedAmount == null ? (
@@ -794,14 +803,14 @@ const ShiftSidebar = () => {
               loading={isClosingShift}
             >
               <Printer size={20} className="ms-2" />
-              إنهاء الوردية والطباعة
+              {t("shift_sidebar.close_and_print")}
             </Button>
             <Button
               variant="ghost"
               onClick={() => setShowCloseShift(false)}
               className="rounded-2xl h-14 px-8 font-black text-muted hover:bg-soft transition-all"
             >
-              إلغاء
+              {t("shift_sidebar.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -812,10 +821,10 @@ const ShiftSidebar = () => {
         <DialogContent className="max-w-md rounded-[2rem] p-6">
           <DialogHeader className="mb-4">
             <DialogTitle className="text-xl font-black tracking-tight">
-              سجل الورديات السابقة
+              {t("shift_sidebar.history_title")}
             </DialogTitle>
             <DialogDescription className="font-bold text-muted text-xs">
-              آخر 6 ورديات مغلقة — اضغط اطبع لاستخراج نسخة تقرير مطابقة للحسابات.
+              {t("shift_sidebar.history_desc")}
             </DialogDescription>
           </DialogHeader>
 
@@ -826,20 +835,14 @@ const ShiftSidebar = () => {
               </div>
             ) : historyShifts.length === 0 ? (
               <div className="py-10 text-center text-xs font-bold text-muted">
-                لا توجد ورديات مغلقة بعد
+                {t("shift_sidebar.history_empty")}
               </div>
             ) : (
               historyShifts.map((s) => {
                 const actual = Number(s.actual_closing_cash || 0);
                 const expected = Number(s.expected_closing_cash || 0);
                 const variance = Math.round((actual - expected) * 100) / 100;
-                const closedAt = s.closed_at
-                  ? new Date(
-                      s.closed_at.includes("Z") || s.closed_at.includes("+")
-                        ? s.closed_at
-                        : s.closed_at.replace(" ", "T") + "Z",
-                    )
-                  : null;
+                const closedAt = parseBackendStamp(s.closed_at);
                 return (
                   <div
                     key={s.id}
@@ -850,7 +853,7 @@ const ShiftSidebar = () => {
                         #{s.id} • {s.user?.full_name || s.user?.username || "—"}
                       </p>
                       <p className="text-[10px] font-bold text-muted">
-                        {closedAt ? closedAt.toLocaleString("ar-EG") : "—"} •{" "}
+                        {closedAt ? closedAt.toLocaleString(locale) : "—"} •{" "}
                         {formatCurrency(Number(s.total_sales || 0))}
                       </p>
                       <p
@@ -864,10 +867,10 @@ const ShiftSidebar = () => {
                         )}
                       >
                         {variance === 0
-                          ? "مطابقة تماماً"
+                          ? t("shift_sidebar.variance_exact")
                           : variance > 0
-                            ? `زيادة +${variance}`
-                            : `عجز ${variance}`}
+                            ? t("shift_sidebar.variance_over", { amount: variance })
+                            : t("shift_sidebar.variance_short", { amount: variance })}
                       </p>
                     </div>
                     <Button
@@ -877,7 +880,7 @@ const ShiftSidebar = () => {
                       onClick={() => printHistoricShift(s)}
                     >
                       <Printer size={12} className="me-1" />
-                      اطبع
+                      {t("shift_sidebar.print")}
                     </Button>
                   </div>
                 );
@@ -891,7 +894,7 @@ const ShiftSidebar = () => {
               onClick={() => setShowHistory(false)}
               className="h-10 w-full rounded-xl font-black text-muted hover:bg-soft"
             >
-              إغلاق
+              {t("shift_sidebar.close")}
             </Button>
           </DialogFooter>
         </DialogContent>

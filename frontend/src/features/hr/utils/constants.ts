@@ -372,6 +372,32 @@ export function hiddenFormSteps(
   );
 }
 
+/**
+ * Why someone left, as a short code rather than free text.
+ *
+ * Stored on the row, shown through `t("hr.reason*")`, so the archive reads the
+ * owner's language instead of whichever language was typed the day they left.
+ * Anything the server holds that is not one of these still displays as written.
+ */
+export const ARCHIVE_REASON_VALUES = [
+  "resignation",
+  "termination",
+  "contract_end",
+  "retirement",
+  "relocation",
+  "other",
+] as const;
+
+/** Where each stored code finds its label. Flat keys, like the rest of `hr`. */
+export const ARCHIVE_REASON_LABEL_KEY: Record<string, string> = {
+  resignation: "hr.reasonResignation",
+  termination: "hr.reasonTermination",
+  contract_end: "hr.reasonContractEnd",
+  retirement: "hr.reasonRetirement",
+  relocation: "hr.reasonRelocation",
+  other: "hr.reasonOther",
+};
+
 export const FIELD_LABEL_CLASS =
   "flex items-center gap-2 text-[10px] font-black tracking-widest text-muted uppercase";
 export const FIELD_INPUT_CLASS =

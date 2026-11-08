@@ -36,5 +36,27 @@
   "save_business_settings": "حفظ إعدادات النشاط",
   "send_to_customer": "إرسال للعميل",
   "download_pdf": "تحميل PDF",
-  "print_invoice": "طباعة الفاتورة"
+  "print_invoice": "طباعة الفاتورة",
+  "open_sidebar": "فتح القائمة الجانبية",
+  "open_search": "فتح البحث الذكي",
+  "smart_search": "البحث الذكي",
+  "switch_light": "التبديل إلى الوضع الفاتح",
+  "switch_dark": "التبديل إلى الوضع الداكن",
+  "user_menu": "قائمة المستخدم",
+  "account_settings": "إعدادات الحساب",
+  "end_session": "إنهاء الجلسة",
+  "vault": "الخزنة",
+  "vault_hint": "الخزنة المركزية — مرتبط بالخزنة (نقدي + رقمي)",
+  "cash": "نقدي",
+  "switch_to_english": "التبديل إلى الإنجليزية",
+  "switch_to_arabic": "التبديل إلى العربية",
+  "role": {
+    "owner": "المالك",
+    "admin": "مدير النظام",
+    "manager": "المدير",
+    "cashier": "الكاشير",
+    "barber": "الخبير",
+    "accountant": "المحاسب",
+    "user": "المستخدم"
+  }
 }

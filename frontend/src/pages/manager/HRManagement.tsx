@@ -1,9 +1,8 @@
 import { useAuth } from "@/context/AuthContext";
-import { formatCurrency } from "@/lib/core/utils";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useUI } from "@/context/UIContext";
 import { useHrData, useEmployeeDocuments, useEmployeeForm } from "@/features/hr";
+import { useUI } from "@/context/UIContext";
 import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import {
   User,
@@ -24,6 +23,8 @@ import {
   Info,
   Save,
   FileClock,
+  Users,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +46,6 @@ import {
 } from "@/components/shared/PremiumUI";
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
-import { currencyLabel } from "@/lib/core/currency";
 
 import {
   PersonalTab,
@@ -61,33 +61,45 @@ import {
   ExpiringDocsAlert,
   EmployeeCardGrid,
   EmployeeTable,
+  ArchiveEmployeeDialog,
+  formatEmployeeMoney,
 } from "@/features/hr";
 import { describeDraftAge } from "@/features/hr/utils/draft";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "@/lib/format/locale";
 import { issuesForStep } from "@/features/hr/utils/formIssues";
 
 const HRManagement = () => {
+  const { t, i18n } = useTranslation("owner");
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
+
   const navigate = useNavigate();
   const { user: _user } = useAuth();
   const { openEmployeeQuickView } = useUI();
-  const [searchParams] = useSearchParams();
-  const _highlightedEmployeeId = searchParams.get("employeeId");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const handledEmployeeIdRef = useRef<string | null>(null);
+  const handledEditRef = useRef<string | null>(null);
   void _user;
-  void _highlightedEmployeeId;
 
   const {
     employees,
     allServices,
     loading,
+    isInitialLoading,
+    loadError,
+    searchPending,
     searchTerm,
     setSearchTerm,
+    statusFilter,
+    setStatusFilter,
     activeView,
     setActiveView,
     filteredEmployees,
     stats,
     fetchEmployees,
-    // Phase 2: pagination
     page,
     setPage,
+    size,
     totalCount,
   } = useHrData();
   const {
@@ -108,6 +120,10 @@ const HRManagement = () => {
     setDeleteTarget,
     archiveTarget,
     setArchiveTarget,
+    archiveImpact,
+    archiveForm,
+    setArchiveForm,
+    openArchive,
     formData,
     setFormData,
     imagePreview,
@@ -140,6 +156,28 @@ const HRManagement = () => {
       fetchDocuments(editingEmp.id);
     }
   }, [editingEmp, activeTab, fetchDocuments]);
+
+  // Deep links: /manager/hr?employeeId=ID opens the employee file,
+  // /manager/hr?edit=ID opens the edit form. Consume each param once.
+  useEffect(() => {
+    const employeeId = searchParams.get("employeeId");
+    if (!employeeId || handledEmployeeIdRef.current === employeeId) return;
+    handledEmployeeIdRef.current = employeeId;
+    openEmployeeQuickView(employeeId);
+    const next = new URLSearchParams(searchParams);
+    next.delete("employeeId");
+    setSearchParams(next, { replace: true });
+  }, [openEmployeeQuickView, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId || handledEditRef.current === editId) return;
+    handledEditRef.current = editId;
+    void openEdit({ id: editId });
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+  }, [openEdit, searchParams, setSearchParams]);
 
 
 
@@ -221,19 +259,8 @@ const HRManagement = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex min-h-125 flex-col items-center justify-center gap-4 erp-page">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-accent/10 border-t-accent" />
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted">
-          جاري مزامنة بيانات الكوادر...
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="erp-page space-y-8 pb-20">
+    <div className="erp-page space-y-5 pb-16">
       {/* Vacation is not a punishment: info tone, and the employee stays. */}
       <ConfirmDialog
         open={!!deleteTarget}
@@ -241,86 +268,93 @@ const HRManagement = () => {
         variant="info"
         title={
           deleteTarget?.status === "active"
-            ? "تسجيل إجازة للموظف؟"
-            : "إرجاع الموظف للعمل؟"
+            ? t("hr.leaveTitle")
+            : t("hr.returnTitle")
         }
         confirmText={
-          deleteTarget?.status === "active" ? "تسجيل إجازة" : "إرجاع للعمل"
+          deleteTarget?.status === "active" ? t("hr.leaveConfirm") : t("hr.returnConfirm")
         }
         description={
           deleteTarget?.status === "active"
-            ? `سيبقى ${deleteTarget?.fullName} في قائمة الفريق ببادج "في إجازة"، ويتوقف ظهوره في الكاشير والحجوزات حتى إرجاعه بضغطة واحدة.`
-            : `سيعود ${deleteTarget?.fullName} نشطاً في القائمة، حسب مفاتيح الظهور المحفوظة له.`
+            ? t("hr.leaveDesc", { name: deleteTarget?.fullName })
+            : t("hr.returnDesc", { name: deleteTarget?.fullName })
         }
         onConfirm={handleToggleStatus}
         loading={isActionLoading}
       />
 
-      {/* Archive is the heavier decision: the employee actually left the salon. */}
-      <ConfirmDialog
+      {/* Archive is the heavier decision: the employee actually left the salon,
+          and what that strands is shown before the button, not after. */}
+      <ArchiveEmployeeDialog
         open={!!archiveTarget}
-        onOpenChange={(open) => !open && setArchiveTarget(null)}
-        variant="danger"
-        title="أرشفة الموظف (ترك العمل)؟"
-        confirmText="أرشفة"
-        description={`سيختفي ${archiveTarget?.fullName} من قائمة الفريق وينتقل إلى الأرشيف مع الاحتفاظ بكامل سجله. يمكن استعادته من صفحة الأرشيف عند الحاجة.`}
+        onOpenChange={(open) => {
+          if (!open) setArchiveTarget(null);
+        }}
+        targetName={archiveTarget?.fullName}
+        impact={archiveImpact}
+        form={archiveForm}
+        setForm={setArchiveForm}
         onConfirm={handleArchiveEmployee}
         loading={isActionLoading}
       />
 
-      <ExpiringDocsAlert expiringDocs={expiringDocs} />
-
       {/* ═══ HEADER SECTION ═══ */}
       <PageHeader
-        title="إدارة الموظفين"
-        subtitle="منظومة احترافية لإدارة شؤون الموظفين، تتبع الأداء، وتنسيق العمليات اليومية للصالون بأعلى معايير الإبداع."
-        badge="الكوادر البشرية المتميزة"
-        icon={Sparkles}
+        title={t("hr.title")}
+        subtitle={t("hr.subtitle")}
+        badge={t("hr.badge")}
+        icon={Users}
         actions={
           <>
             <Button
               onClick={openCreate}
-              className="h-11 rounded-2xl bg-accent px-8 text-sm font-black shadow-xl shadow-accent/20 transition-all active:scale-95"
+              className="h-11 rounded-xl bg-accent px-6 text-sm font-semibold text-content-on-accent shadow-sm transition-all active:scale-[0.98]"
             >
-              <Plus className="ms-2" size={20} strokeWidth={3} /> إضافة موظف
-              جديد
+              <Plus size={18} className="ms-1.5" strokeWidth={2.5} /> {t("hr.addEmployee")}
             </Button>
             <Button
               variant="outline"
-              onClick={() => navigate("/owner/hr/archive")}
-              className="h-9 rounded-xl border-border bg-card/50 px-5 text-xs font-black text-muted transition-all hover:border-accent/20 hover:text-main"
+              onClick={() => navigate("/manager/hr/archive")}
+              className="h-11 gap-2 rounded-xl border-line bg-raised px-4 text-xs font-semibold text-content-secondary transition-colors hover:border-accent hover:text-content"
             >
-              <Archive className="ms-2" size={16} /> الأرشيف
+              <Archive size={16} />
+              {t("hr.archiveButton")}
+              {/* The count is why the button is worth clicking: it says whether
+                  anyone has left since the last time the owner looked. */}
+              <span className="rounded-md bg-sunken px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-content-tertiary">
+                {stats.resigned}
+              </span>
             </Button>
           </>
         }
       />
 
-      <HrStatsGrid stats={stats} />
+      <ExpiringDocsAlert expiringDocs={expiringDocs} />
 
-      {/* ═══ RELATED NAV — هوية HR (مرحلة 3) ═══ */}
+      <HrStatsGrid stats={stats} loading={isInitialLoading} />
+
+      {/* ═══ RELATED NAV ═══ */}
       <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
-        <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ms-2">
-            <Sparkles size={12} className="text-accent" /> انتقال سريع
+        <div className="flex flex-wrap items-center gap-2 p-2.5">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-content-tertiary ms-1.5">
+            <Sparkles size={12} className="text-accent" /> {t("hr.quickNav")}
           </span>
           {[
-            { label: "الرواتب", desc: "المستحقات والسلف", icon: Wallet, href: "/owner/payroll", color: "bg-warning text-white" },
-            { label: "الحضور", icon: Clock, desc: "الانضباط اليومي", href: "/attendance", color: "bg-info text-white" },
-            { label: "أرشيف الموظفين", icon: Archive, desc: "من تركوا العمل والسجل", href: "/owner/hr/archive", color: "bg-soft text-muted border border-border" },
-            { label: "تقارير الأداء", icon: BarChart3, desc: "الإنتاجية والعمولة", href: "/owner/employee-reports", color: "bg-primary text-white" },
+            { label: t("hr.navPayroll"), desc: t("hr.navPayrollDesc"), icon: Wallet, href: "/owner/payroll", tone: "text-warning" },
+            { label: t("hr.navAttendance"), desc: t("hr.navAttendanceDesc"), icon: Clock, href: "/attendance", tone: "text-info" },
+            { label: t("hr.navReports"), desc: t("hr.navReportsDesc"), icon: BarChart3, href: "/owner/employee-reports", tone: "text-accent" },
           ].map((l) => (
             <button
               key={l.href}
               onClick={() => navigate(l.href)}
-              className="inline-flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-right hover:border-accent/20 hover:bg-soft transition-colors group"
+              className="inline-flex items-center gap-2.5 rounded-lg border border-line bg-raised px-3 py-2 text-start transition-colors hover:border-accent hover:bg-sunken group"
             >
-              <span className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", l.color)}>
+              <span className={cn("flex h-7 w-7 items-center justify-center rounded-md border border-line bg-sunken shrink-0", l.tone)}>
                 <l.icon size={14} />
               </span>
-              <span className="text-right">
-                <span className="block text-xs font-black text-main group-hover:text-accent transition-colors">{l.label}</span>
-                <span className="block text-[10px] font-bold text-muted leading-none">{l.desc}</span>
+              <span className="text-start">
+                <span className="block text-xs font-semibold text-content group-hover:text-accent transition-colors">{l.label}</span>
+                <span className="block text-[10px] font-medium text-content-tertiary leading-none">{l.desc}</span>
               </span>
             </button>
           ))}
@@ -331,48 +365,114 @@ const HRManagement = () => {
       <HrToolbar
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
         activeView={activeView}
         setActiveView={setActiveView}
+        resultCount={filteredEmployees.length}
+        totalCount={totalCount}
+        page={page}
+        size={size}
+        counts={
+          isInitialLoading
+            ? undefined
+            : {
+                all: Math.max(stats.total - stats.resigned, 0),
+                active: stats.active,
+                suspended: stats.suspended,
+              }
+        }
+        onRefresh={() => void fetchEmployees()}
+        refreshing={loading && !isInitialLoading}
+        searchPending={searchPending}
       />
 
       {/* ═══ EMPLOYEE CONTENT ═══ */}
-      <AnimatePresence mode="wait">
-        {activeView === "cards" ? (
-          <EmployeeCardGrid
-            employees={filteredEmployees}
-            onEdit={openEdit}
-            onDelete={setDeleteTarget}
-            onArchive={setArchiveTarget}
-            onCreate={openCreate}
-          />
-        ) : (
-          <EmployeeTable
-            employees={filteredEmployees}
-            onEdit={openEdit}
-            onDelete={setDeleteTarget}
-            onArchive={setArchiveTarget}
-          />
-        )}
-      </AnimatePresence>
+      {isInitialLoading ? (
+        <HrBoardSkeleton label={t("hr.syncing")} />
+      ) : (
+        <>
+          {loadError && (
+            <div className="flex flex-col gap-3 rounded-xl border border-warning-line bg-warning-bg p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <AlertTriangle
+                  size={18}
+                  className="mt-0.5 shrink-0 text-warning"
+                  aria-hidden="true"
+                />
+                <div>
+                  <p className="text-sm font-bold text-content">
+                    {t("hr.loadFailed")}
+                  </p>
+                  <p className="mt-0.5 text-xs font-medium text-content-secondary">
+                    {t("hr.loadFailedHint")}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => void fetchEmployees()}
+                className="h-9 shrink-0 rounded-lg border-line bg-raised px-3 text-xs font-semibold"
+              >
+                {t("hr.refresh")}
+              </Button>
+            </div>
+          )}
 
-      {/* Phase 2: unified pagination — reads X-Total-Count header */}
-      {totalCount > 0 && (() => {
+          {!(loadError && employees.length === 0) && (
+            <AnimatePresence mode="wait" initial={false}>
+              {activeView === "cards" ? (
+                <EmployeeCardGrid
+                  key="cards"
+                  employees={filteredEmployees}
+                  onEdit={openEdit}
+                  onDelete={setDeleteTarget}
+                  onArchive={openArchive}
+                  onCreate={openCreate}
+                  hasActiveFilters={
+                    Boolean(searchTerm.trim()) || statusFilter !== "all"
+                  }
+                  onClearFilters={() => {
+                    setSearchTerm("");
+                    setStatusFilter("all");
+                  }}
+                />
+              ) : (
+                <EmployeeTable
+                  key="table"
+                  employees={filteredEmployees}
+                  onEdit={openEdit}
+                  onDelete={setDeleteTarget}
+                  onArchive={openArchive}
+                  onCreate={openCreate}
+                  hasActiveFilters={
+                    Boolean(searchTerm.trim()) || statusFilter !== "all"
+                  }
+                  onClearFilters={() => {
+                    setSearchTerm("");
+                    setStatusFilter("all");
+                  }}
+                />
+              )}
+            </AnimatePresence>
+          )}
+        </>
+      )}
+
+      {totalCount > size && (() => {
         const paginator = createPaginationState({
           page,
-          size: 50,
+          size,
           total: totalCount,
         });
         return (
-          <div className="card-surface mt-4 rounded-2xl px-2 py-3">
+          <div className="card-surface rounded-xl px-2 py-2">
             <Pagination
               paginator={paginator}
               onPageChange={setPage}
               showSizeChanger={false}
-              locale="ar"
+              locale={locale.startsWith("ar") ? "ar" : "en"}
             />
-            <p className="text-center text-[10px] font-bold text-muted">
-              صفحة {page} • {totalCount} موظف إجمالي
-            </p>
           </div>
         );
       })()}
@@ -408,13 +508,13 @@ const HRManagement = () => {
                     <FileClock size={20} className="mt-0.5 shrink-0 text-primary" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-black text-main">
-                        يوجد نموذج غير مكتمل محفوظ
+                        {t("hr.draftFound")}
                       </p>
                       <p className="mt-0.5 text-[11px] font-bold leading-relaxed text-muted">
                         {draftOffer.formData.fullName
-                          ? `مسودة "${String(draftOffer.formData.fullName)}" `
-                          : "مسودة "}
-                        {describeDraftAge(draftOffer.savedAt)} على هذا الجهاز.
+                          ? t("hr.draftOffer", { name: String(draftOffer.formData.fullName) })
+                          : t("hr.draftOfferFallback")}
+                        {t("hr.draftAge", { age: describeDraftAge(draftOffer.savedAt) })}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Button
@@ -422,7 +522,7 @@ const HRManagement = () => {
                           onClick={resumeDraft}
                           className="rounded-xl font-black"
                         >
-                          استكمال المسودة
+                          {t("hr.resumeDraft")}
                         </Button>
                         <Button
                           size="sm"
@@ -430,7 +530,7 @@ const HRManagement = () => {
                           onClick={dismissDraft}
                           className="rounded-xl font-black"
                         >
-                          تجاهل والبدء من جديد
+                          {t("hr.discardDraft")}
                         </Button>
                       </div>
                     </div>
@@ -439,35 +539,37 @@ const HRManagement = () => {
               )}
               <div>
                 <DialogTitle className="text-2xl font-black text-main tracking-tight">
-                  {editingEmp ? "تحديث ملف موظف" : "إضافة كادر جديد للمنظومة"}
+                  {editingEmp ? t("hr.editEmployee") : t("hr.newEmployee")}
                 </DialogTitle>
                 <DialogDescription className="text-[10px] font-bold text-muted uppercase tracking-[0.2em]">
-                  {editingEmp ? formData.fullName : "بناء هوية وظيفية متكاملة"}
+                  {editingEmp ? formData.fullName : t("hr.newEmployeeDesc")}
                 </DialogDescription>
               </div>
             </div>
             <button
+              type="button"
               onClick={() => setIsModalOpen(false)}
-              className="h-12 w-12 rounded-2xl bg-soft text-muted transition-all hover:bg-danger-soft hover:text-danger flex items-center justify-center"
+              aria-label={t("hr.close")}
+              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-soft text-muted transition-all hover:bg-danger-soft hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              <X size={24} strokeWidth={3} />
+              <X size={24} strokeWidth={3} aria-hidden="true" />
             </button>
           </div>
 
           <div className="flex flex-1 overflow-hidden">
             {/* LEFT: Live Preview - Professional & Responsive */}
-            <aside className="hidden w-[380px] xl:flex flex-col border-l border-border bg-gradient-to-b from-card to-soft/30 p-6 lg:p-8 backdrop-blur-md overflow-y-auto custom-scrollbar">
+            <aside className="hidden w-[380px] xl:flex flex-col border-e border-border bg-gradient-to-b from-card to-soft/30 p-6 lg:p-8 backdrop-blur-md overflow-y-auto custom-scrollbar">
               <div className="mb-6 text-center">
                 <div className="inline-flex items-center gap-2 rounded-full bg-accent/10 border border-accent/15 px-3 py-1">
                   <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                  <span className="text-[9px] font-black text-accent uppercase tracking-[0.2em]">معاينة مباشرة</span>
+                  <span className="text-[9px] font-black text-accent uppercase tracking-[0.2em]">{t("hr.livePreview")}</span>
                 </div>
-                <p className="mt-3 text-[11px] font-bold text-muted">هكذا سيظهر الموظف في الكارد والبحث</p>
+                <p className="mt-3 text-[11px] font-bold text-muted">{t("hr.livePreviewDesc")}</p>
               </div>
 
               <div className={cn("relative overflow-hidden rounded-[2rem] border bg-card shadow-xl", currentBlueprint.cardBg)}>
                 <div className={cn("absolute inset-x-0 top-0 h-1", currentBlueprint.accent)} />
-                <div className={cn("absolute -right-12 -top-12 h-40 w-40 rounded-full opacity-[0.07]", currentBlueprint.accent)} />
+                <div className={cn("absolute -end-12 -top-12 h-40 w-40 rounded-full opacity-[0.07]", currentBlueprint.accent)} />
                 <div className="relative z-10 flex flex-col items-center gap-5 p-7">
                   <div className="relative">
                     {/* Decorative ring */}
@@ -475,22 +577,22 @@ const HRManagement = () => {
                     <div className="relative rounded-[1.6rem] p-1.5 bg-card shadow-xl ring-1 ring-border/50">
                       <div className="h-28 w-28 rounded-[1.3rem] overflow-hidden bg-soft flex items-center justify-center">
                         {imagePreview || formData.profileImageUrl ? (
-                          <img src={imagePreview || (formData.profileImageUrl?.startsWith("http") ? formData.profileImageUrl : `${staticURL}${formData.profileImageUrl}`)} alt={formData.fullName || "صورة الموظف"} className="h-full w-full object-cover" onError={(e)=> { e.currentTarget.style.display='none'; setImagePreview(null); }} />
+                          <img src={imagePreview || (formData.profileImageUrl?.startsWith("http") ? formData.profileImageUrl : `${staticURL}${formData.profileImageUrl}`)} alt={formData.fullName || t("hr.employeeImage")} className="h-full w-full object-cover" onError={(e)=> { e.currentTarget.style.display='none'; setImagePreview(null); }} />
                         ) : (
                           <div className="flex flex-col items-center gap-1 text-muted/40">
                             <User size={32} strokeWidth={1.5} />
-                            <span className="text-[8px] font-black uppercase">بدون صورة</span>
+                            <span className="text-[8px] font-black uppercase">{t("hr.noImage")}</span>
                           </div>
                         )}
                       </div>
                     </div>
-                    <div className={cn("absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full border-[3px] border-card shadow-md flex items-center justify-center text-white", formData.status === "active" ? "bg-success" : formData.status === "suspended" ? "bg-warning" : "bg-danger") }>
+                    <div className={cn("absolute -bottom-1.5 -end-1.5 h-7 w-7 rounded-full border-[3px] border-card shadow-md flex items-center justify-center text-white", formData.status === "active" ? "bg-success" : formData.status === "suspended" ? "bg-warning" : "bg-danger") }>
                       {formData.status === "active" ? <CheckCircle2 size={14} strokeWidth={3} /> : formData.status === "suspended" ? <Clock size={14} strokeWidth={3} /> : <X size={14} strokeWidth={3} />}
                     </div>
                   </div>
                   <div className="text-center space-y-2 w-full">
                     <h4 className="text-[18px] font-black text-main tracking-tight line-clamp-1 px-2">
-                      {formData.fullName || "اسم الموظف"}
+                      {formData.fullName || t("hr.employeeName")}
                     </h4>
                     <div className="flex items-center justify-center">
                       <Badge className={cn("rounded-full px-3.5 py-1 text-[10px] font-black tracking-widest border shadow-sm", currentBlueprint.badgeClass)}>
@@ -506,23 +608,29 @@ const HRManagement = () => {
 
                   <div className="w-full grid grid-cols-2 gap-2.5 pt-5 border-t border-border/60">
                     <div className="rounded-2xl bg-soft border border-border/50 p-3 text-center">
-                      <div className="text-[8px] font-black text-muted uppercase tracking-widest mb-1">الحالة</div>
+                      <div className="text-[8px] font-black text-muted uppercase tracking-widest mb-1">{t("hr.statusLabel")}</div>
                       <div className="flex items-center justify-center gap-1.5">
                         <div className={cn("h-2 w-2 rounded-full", formData.status==="active"?"bg-success animate-pulse":formData.status==="suspended"?"bg-warning":"bg-danger")} />
-                        <span className="text-[11px] font-black text-main">{formData.status==="active"?"نشط":formData.status==="suspended"?"في إجازة":"أرشيف"}</span>
+                        <span className="text-[11px] font-black text-main">{formData.status==="active"?t("hr.statusActive"):formData.status==="suspended"?t("hr.statusSuspended"):t("hr.statusArchived")}</span>
                       </div>
                     </div>
                     <div className="rounded-2xl bg-soft border border-border/50 p-3 text-center">
-                      <div className="text-[8px] font-black text-muted uppercase tracking-widest mb-1">الراتب</div>
-                      <div className="text-[11px] font-black text-main">{Number(formData.baseSalary||0).toLocaleString("ar-EG")} <span className="text-[9px] text-muted">{currencyLabel()}</span></div>
+                      <div className="text-[8px] font-black text-muted uppercase tracking-widest mb-1">{t("hr.salaryLabel")}</div>
+                      <div className="text-[11px] font-black tabular-nums text-main">
+                        {formatEmployeeMoney(
+                          formData.baseSalary || 0,
+                          locale,
+                          i18n.resolvedLanguage || i18n.language,
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   <div className="w-full grid grid-cols-3 gap-1.5">
                     {[
-                      {k:"POS", v:formData.showInPos, label:"الكاشير"},
-                      {k:"Booking", v:formData.showInBooking, label:"الحجز"},
-                      {k:"Login", v:formData.hasLoginAccount, label:"الدخول"},
+                      {k:"POS", v:formData.showInPos, label:t("hr.rolePos")},
+                      {k:"Booking", v:formData.showInBooking, label:t("hr.roleBooking")},
+                      {k:"Login", v:formData.hasLoginAccount, label:t("hr.roleLogin")},
                     ].map((f) => (
                       <div key={f.k} className={cn("flex flex-col items-center gap-1 py-2.5 rounded-xl border text-[8px] font-black transition-all", f.v ? "bg-accent border-accent text-white shadow-md" : "bg-soft border-border text-muted/50")}>
                         <span className="tracking-widest">{f.k}</span>
@@ -537,7 +645,7 @@ const HRManagement = () => {
               <div className="mt-6 space-y-5">
                 <div className="space-y-2.5">
                   <div className="flex items-center gap-2 text-[10px] font-black text-muted uppercase tracking-widest">
-                    <div className="h-6 w-6 rounded-lg bg-accent/10 flex items-center justify-center text-accent"><Sparkles size={12} /></div> أولويات الدور
+                    <div className="h-6 w-6 rounded-lg bg-accent/10 flex items-center justify-center text-accent"><Sparkles size={12} /></div> {t("hr.rolePriorities")}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {currentBlueprint.focus.map((f) => (
@@ -548,16 +656,16 @@ const HRManagement = () => {
                   </div>
                 </div>
                 <div className="rounded-2xl border border-border bg-soft p-4 shadow-sm relative overflow-hidden">
-                  <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-accent/5" />
+                  <div className="absolute -end-6 -top-6 h-20 w-20 rounded-full bg-accent/5" />
                   <div className="relative flex items-center gap-2.5 mb-2">
                     <div className="h-7 w-7 rounded-lg bg-accent/10 text-accent flex items-center justify-center"><Building2 size={14} /></div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted">موجز الدور</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted">{t("hr.roleSummary")}</span>
                   </div>
                   <p className="relative text-[11px] font-medium leading-relaxed text-main line-clamp-3">{currentBlueprint.summary}</p>
                 </div>
                 {formData.bioAr && (
                   <div className="rounded-2xl border border-border bg-card p-4">
-                    <div className="text-[10px] font-black text-muted uppercase tracking-widest mb-2">النبذة المهنية</div>
+                    <div className="text-[10px] font-black text-muted uppercase tracking-widest mb-2">{t("hr.professionalBio")}</div>
                     <p className="text-xs font-bold leading-relaxed text-main line-clamp-3">“{formData.bioAr}”</p>
                   </div>
                 )}
@@ -593,11 +701,17 @@ const HRManagement = () => {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[11px] font-black text-main truncate">{formData.fullName || "بدون اسم"}</div>
+                    <div className="text-[11px] font-black text-main truncate">{formData.fullName || t("hr.noName")}</div>
                     <div className="text-[10px] font-bold text-accent">{currentBlueprint.title}</div>
                     <div className="flex gap-1 mt-1">
-                      <span className={cn("text-[8px] px-1.5 py-0.5 rounded-full font-black border", formData.status==="active"?"bg-success text-white border-success":formData.status==="suspended"?"bg-warning text-white border-warning":"bg-danger text-white border-danger")}>{formData.status==="active"?"نشط":formData.status==="suspended"?"في إجازة":"أرشيف"}</span>
-                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-soft border border-border font-bold text-muted">{formatCurrency(formData.baseSalary || 0)}</span>
+                      <span className={cn("text-[8px] px-1.5 py-0.5 rounded-full font-black border", formData.status==="active"?"bg-success text-white border-success":formData.status==="suspended"?"bg-warning text-white border-warning":"bg-danger text-white border-danger")}>{formData.status==="active"?t("hr.statusActive"):formData.status==="suspended"?t("hr.statusSuspended"):t("hr.statusArchived")}</span>
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-soft border border-border font-bold tabular-nums text-muted">
+                        {formatEmployeeMoney(
+                          formData.baseSalary || 0,
+                          locale,
+                          i18n.resolvedLanguage || i18n.language,
+                        )}
+                      </span>
                     </div>
                   </div>
                   <div className="text-[9px] font-black text-muted">{Math.round(((DYNAMIC_TABS.findIndex(t=>t.id===activeTab)+1)/DYNAMIC_TABS.length)*100)}%</div>
@@ -605,7 +719,7 @@ const HRManagement = () => {
               </div>
 
               <div className="flex-1 max-w-2xl mx-auto w-full">
-                <AnimatePresence mode="wait">
+                <AnimatePresence>
                   <motion.div
                     key={activeTab}
                     initial={{ opacity: 0, scale: 0.98, x: 20 }}
@@ -629,7 +743,7 @@ const HRManagement = () => {
                   disabled={DYNAMIC_TABS.findIndex((t) => t.id === activeTab) === 0}
                   className="h-11 sm:h-12 px-6 sm:px-8 rounded-xl font-black text-[11px] uppercase tracking-widest order-2 sm:order-1"
                 >
-                  <ArrowRight size={16} className="ms-2" /> السابق
+                  <ArrowRight size={16} className="ms-2" /> {t("hr.prev")}
                 </Button>
                 <div className="hidden sm:flex items-center gap-2 order-2">
                   {DYNAMIC_TABS.map((tab) => (
@@ -641,7 +755,7 @@ const HRManagement = () => {
                     onClick={goNext}
                     className="h-11 sm:h-12 px-6 sm:px-8 rounded-xl bg-accent text-white font-black text-[11px] uppercase tracking-widest order-1 sm:order-3"
                   >
-                    التالي <ArrowLeft size={16} className="me-2" />
+                    {t("hr.next")} <ArrowLeft size={16} className="me-2" />
                   </Button>
                 ) : (
                   <div className="hidden sm:block w-[100px] order-3" />
@@ -661,11 +775,11 @@ const HRManagement = () => {
                     className="rounded-xl font-black text-[11px] text-muted"
                   >
                     <Save size={14} className="ms-2" />
-                    حفظ كمسودة والمتابعة لاحقاً
+                    {t("hr.saveDraft")}
                   </Button>
                   {draftSavedAt && (
                     <span className="text-[10px] font-bold text-muted">
-                      حُفظت {describeDraftAge(draftSavedAt)}
+                      {t("hr.draftSaved", { age: describeDraftAge(draftSavedAt) })}
                     </span>
                   )}
                 </div>
@@ -678,18 +792,18 @@ const HRManagement = () => {
               <div className="xl:hidden mt-6">
                 {activeTab !== "review" && (
                   <p className="text-center text-[10px] font-bold text-muted">
-                    أكمل الخطوات للوصول للمراجعة ثم اضغط "قبول"
+                    {t("hr.completeSteps")}
                   </p>
                 )}
               </div>
             </main>
 
             {/* RIGHT: Step Progress Sidebar */}
-            <nav className="hidden w-80 flex-col border-r border-border bg-card/80 p-10 backdrop-blur-md xl:flex">
+            <nav className="hidden w-80 flex-col border-s border-border bg-card/80 p-10 backdrop-blur-md xl:flex">
               <div className="mb-10 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="text-[10px] font-black text-muted uppercase tracking-[0.3em]">
-                    خطوات الإعداد
+                    {t("hr.stepsTitle")}
                   </div>
                   <div className="text-[11px] font-black text-accent tabular-nums">
                     {Math.round(
@@ -710,7 +824,7 @@ const HRManagement = () => {
               </div>
 
               <div className="relative space-y-2">
-                <div className="absolute right-5.75 top-4 bottom-4 w-px bg-border/40" />
+                <div className="absolute start-5.75 top-4 bottom-4 w-px bg-border/40" />
                 {DYNAMIC_TABS.map((tab, idx) => {
                   const isActive = activeTab === tab.id;
                   const isPast =
@@ -750,12 +864,12 @@ const HRManagement = () => {
                         )}
                         {problems.length > 0 && (
                           <span
-                            className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-card bg-danger"
+                            className="absolute -top-1 -end-1 h-3.5 w-3.5 rounded-full border-2 border-card bg-danger"
                             aria-hidden="true"
                           />
                         )}
                       </div>
-                      <div className="text-right">
+                      <div className="text-start">
                         <div
                           className={cn(
                             "text-[11px] font-black uppercase tracking-widest transition-colors",
@@ -766,7 +880,7 @@ const HRManagement = () => {
                         </div>
                         {isActive && (
                           <div className="text-[8px] font-bold text-muted/60 uppercase">
-                            قيد الإكمال الآن
+                            {t("hr.inProgress")}
                           </div>
                         )}
                       </div>
@@ -792,7 +906,7 @@ const HRManagement = () => {
                   <div className="mb-6 rounded-2xl border border-border/60 bg-soft/60 p-3.5">
                     <p className="flex items-center gap-1.5 text-[10px] font-black text-muted">
                       <Info size={12} className="shrink-0" />
-                      خطوات لا تنطبق على هذا المسار
+                      {t("hr.notApplicable")}
                     </p>
                     <ul className="mt-2 space-y-2">
                       {hiddenSteps.map((step) => (
@@ -808,7 +922,7 @@ const HRManagement = () => {
                 )}
                 {activeTab !== "review" && (
                   <p className="text-center text-[10px] font-bold text-muted-foreground animate-pulse">
-                    أكمل الخطوات للوصول للمراجعة ثم اضغط "قبول"
+                    {t("hr.completeSteps")}
                   </p>
                 )}
               </div>
@@ -819,5 +933,26 @@ const HRManagement = () => {
     </div>
   );
 };
+
+/**
+ * The first load shows the shape of the board, not a spinner that replaces it.
+ * The header, stats strip and toolbar stay in place, so the page never jumps
+ * when the roster arrives.
+ */
+function HrBoardSkeleton({ label }: { label: string }) {
+  return (
+    <div className="space-y-3" role="status" aria-busy="true">
+      <span className="sr-only">{label}</span>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div
+            key={index}
+            className="h-48 animate-pulse rounded-xl border border-line bg-sunken"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default HRManagement;

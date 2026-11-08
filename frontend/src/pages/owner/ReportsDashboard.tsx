@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 import {
   Activity,
@@ -22,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn, formatCurrency } from "@/lib/core/utils";
+import { getIntlLocale } from "@/lib/format/locale";
 
 import { PERIODS } from "@/features/reports-dashboard/constants";
 import { useReportsDashboard } from "@/features/reports-dashboard/hooks/useReportsDashboard";
@@ -62,6 +64,7 @@ import {
  */
 export default function ReportsDashboard() {
   const navigate = useNavigate();
+  const { t } = useTranslation("owner");
   const dir = i18n.dir() as "rtl" | "ltr";
 
   const {
@@ -98,7 +101,7 @@ export default function ReportsDashboard() {
   }, []);
 
   // Today's revenue against the mean of the days before it. Null when there is no
-  // baseline, which renders as "لا مقارنة" rather than a confident percentage.
+  // baseline, which renders as an em dash rather than a confident percentage.
   const todayVsBaseline = useMemo(() => {
     const today = summary?.daily?.find((d) => d.is_today);
     const baseline = summary?.previous_window_average;
@@ -112,7 +115,7 @@ export default function ReportsDashboard() {
         name: b.name,
         revenue: b.revenue,
         count: b.invoices,
-        countLabel: "فاتورة",
+        countLabel: t("reports.countInvoice"),
       })) ?? null,
     [summary],
   );
@@ -123,7 +126,7 @@ export default function ReportsDashboard() {
         name: s.name,
         revenue: s.revenue,
         count: s.count,
-        countLabel: "مرة",
+        countLabel: t("reports.countTime"),
       })) ?? null,
     [summary],
   );
@@ -132,7 +135,7 @@ export default function ReportsDashboard() {
     () => [
       {
         key: "todayRevenue",
-        label: "إيراد اليوم",
+        label: t("reports.todayRevenue"),
         value: stats.todayRevenue,
         icon: Wallet,
         trend: stats.todayRevenueTrend,
@@ -141,7 +144,7 @@ export default function ReportsDashboard() {
       },
       {
         key: "netProfit",
-        label: "صافي الربح",
+        label: t("reports.netProfit"),
         value: stats.netProfit,
         icon: Activity,
         trend: stats.netProfitTrend,
@@ -150,7 +153,7 @@ export default function ReportsDashboard() {
       },
       {
         key: "todayAppointments",
-        label: "مواعيد اليوم",
+        label: t("reports.todayAppointments"),
         value: stats.todayAppointments,
         icon: LayoutDashboard,
         trend: stats.todayAppointmentsTrend,
@@ -159,7 +162,7 @@ export default function ReportsDashboard() {
       },
       {
         key: "occupancy",
-        label: "الإشغال",
+        label: t("reports.occupancy"),
         value: stats.occupancy,
         icon: Zap,
         trend: null,
@@ -175,9 +178,9 @@ export default function ReportsDashboard() {
     return (
       <div className="erp-page space-y-4 pb-8" dir={dir} aria-busy="true" aria-live="polite">
         <PageHeader
-          title={`أهلاً بك، ${displayName}`}
+          title={t("reports.welcome", { name: displayName })}
           subtitle={scopeLabel}
-          badge="لوحة القيادة التنفيذية"
+          badge={t("reports.executiveBadgeLoading")}
           icon={LayoutDashboard}
          
         />
@@ -202,20 +205,20 @@ export default function ReportsDashboard() {
       aria-live="polite"
     >
       <PageHeader
-        title={`أهلاً بك، ${displayName}`}
+        title={t("reports.welcome", { name: displayName })}
         subtitle={scopeLabel}
-        badge="لوحة القيادة"
+        badge={t("reports.executiveBadge")}
         icon={LayoutDashboard}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Select value={period} onValueChange={handlePeriodChange}>
-              <SelectTrigger className="h-9 rounded-xl" aria-label="اختيار الفترة">
-                <SelectValue placeholder="الفترة" />
+              <SelectTrigger className="h-9 rounded-xl" aria-label={t("reports.periodSelect")}>
+                <SelectValue placeholder={t("reports.periodPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 {PERIODS.map((p) => (
                   <SelectItem key={p.value} value={p.value}>
-                    {p.label}
+                    {t(`reports.${p.label}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -223,7 +226,7 @@ export default function ReportsDashboard() {
 
             {employeeId && (
               <Badge variant="info" size="sm" className="rounded-xl px-3 py-1.5">
-                {employeeName || `الموظف #${employeeId}`}
+                {employeeName || t("reports.employeeLabel", { id: employeeId })}
               </Badge>
             )}
 
@@ -235,13 +238,13 @@ export default function ReportsDashboard() {
               variant="outline"
               className="h-9 rounded-xl"
               disabled={busy}
-              aria-label="تحديث البيانات"
+              aria-label={t("reports.refreshData")}
             >
               <RefreshCw
                 className={cn("ms-1.5 h-3.5 w-3.5", busy && "animate-spin")}
                 aria-hidden="true"
               />
-              <span className="hidden sm:inline">تحديث</span>
+              <span className="hidden sm:inline">{t("reports.refresh")}</span>
             </Button>
 
           </div>
@@ -277,7 +280,7 @@ export default function ReportsDashboard() {
             className="shrink-0"
           >
             <RefreshCw size={13} className="ms-1.5" />
-            إعادة المحاولة
+            {t("reports.retry")}
           </Button>
         </div>
       )}
@@ -304,7 +307,7 @@ export default function ReportsDashboard() {
         <PremiumCard className="lg:col-span-2 p-0 overflow-hidden" hoverable={false} animate={false}>
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-muted">
-              اتجاه الإيراد · 14 يوماً
+              {t("reports.revenueTrend")}
             </h3>
             <Delta value={todayVsBaseline} />
           </div>
@@ -320,13 +323,13 @@ export default function ReportsDashboard() {
 
         <div className="flex flex-col gap-3">
           <MiniPanel
-            title="ملخّص الفترة"
+            title={t("reports.summaryPanel")}
             loading={loading}
             rows={[
-              { label: "المصروفات", value: stats.todayExpenses, money: true },
-              { label: "متوسط الفاتورة", value: stats.avgInvoice, money: true },
-              { label: "هدف الشهر", value: stats.monthGoal, percent: true },
-              { label: "عملاء جدد", value: stats.newCustomersThisWeek ?? 0 },
+              { label: t("reports.expenses"), value: stats.todayExpenses, money: true },
+              { label: t("reports.avgInvoice"), value: stats.avgInvoice, money: true },
+              { label: t("reports.monthGoal"), value: stats.monthGoal, percent: true },
+              { label: t("reports.newCustomers"), value: stats.newCustomersThisWeek ?? 0 },
             ]}
           />
         </div>
@@ -335,17 +338,17 @@ export default function ReportsDashboard() {
       {/* 4. Who and what is carrying it. */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <RankingTable
-          title="الأعلى إيراداً"
+          title={t("reports.topRevenue")}
           rows={topBarbers}
           unavailable={failures.barbers || Boolean(opsError)}
-          emptyMessage="لم تُسجَّل فواتير موصوفة بموظف في هذه الفترة"
+          emptyMessage={t("reports.noInvoicesByEmployee")}
          
         />
         <RankingTable
-          title="الخدمات الأعلى مبيعاً"
+          title={t("reports.topServices")}
           rows={topServices}
           unavailable={failures.services || Boolean(opsError)}
-          emptyMessage="لم تُسجَّل بيانات مبيعات في هذه الفترة"
+          emptyMessage={t("reports.noSalesData")}
          
         />
       </div>
@@ -426,12 +429,12 @@ function KpiCell({
               ? formatCurrency(value)
               : percent
                 ? `${value}%`
-                : Number(value).toLocaleString("ar-EG-u-nu-latn")}
+                : Number(value).toLocaleString(getIntlLocale(i18n.language))}
         </span>
       </div>
 
       {unknown && (
-        <p className="mt-0.5 text-[9px] font-bold text-muted">تعذّر الحساب</p>
+        <p className="mt-0.5 text-[9px] font-bold text-muted">{i18n.t("owner:reports.couldNotCalculate")}</p>
       )}
     </div>
   );

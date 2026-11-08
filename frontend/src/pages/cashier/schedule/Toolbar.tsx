@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Search,
   ChevronRight,
@@ -96,18 +97,19 @@ const Toolbar = ({
   sidebarOpen,
   onToggleSidebar,
 }: any) => {
+  const { t, i18n } = useTranslation("schedule");
   const today = formatDateInput(new Date());
 
   const quickDates = [
-    { label: "اليوم", date: today },
-    { label: "غداً", date: shiftDate(today, 1) },
-    { label: "بعد غدٍ", date: shiftDate(today, 2) },
+    { label: t("dateFilters.today"), date: today },
+    { label: t("dateFilters.tomorrow"), date: shiftDate(today, 1) },
+    { label: t("dateFilters.after_tomorrow"), date: shiftDate(today, 2) },
   ];
 
   const viewButtons = [
-    { key: "day", label: "الجدول", icon: LayoutGrid },
-    { key: "week", label: "الأسبوع", icon: ListTree },
-    { key: "list", label: "القائمة", icon: ListOrdered },
+    { key: "day", label: t("toolbar.viewDay"), icon: LayoutGrid },
+    { key: "week", label: t("toolbar.viewWeek"), icon: ListTree },
+    { key: "list", label: t("toolbar.viewList"), icon: ListOrdered },
   ];
 
   return (
@@ -126,14 +128,14 @@ const Toolbar = ({
             className="w-full h-11 pe-10 rounded-xl bg-soft border border-border focus:bg-card focus:border-accent focus:ring-0 transition-all font-bold placeholder:text-muted text-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="بحث سريع (اسم، خدمة، هاتف)..."
-            aria-label="بحث عن موعد"
+            placeholder={t("toolbar.search")}
+            aria-label={t("toolbar.searchAria")}
           />
           {search && (
             <button
               onClick={() => setSearch("")}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-accent transition-colors"
-              aria-label="مسح البحث"
+              aria-label={t("toolbar.clearSearch")}
             >
               <X size={15} />
             </button>
@@ -142,11 +144,11 @@ const Toolbar = ({
 
         <Select value={barberFilter} onValueChange={setBarberFilter}>
           <SelectTrigger className="h-11 px-4 rounded-xl bg-soft border-border text-xs font-black min-w-[140px]">
-            <SelectValue placeholder="جميع الموظفين" />
+            <SelectValue placeholder={t("toolbar.allBarbers")} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all" className="font-bold">
-              جميع الموظفين
+              {t("toolbar.allBarbers")}
             </SelectItem>
             {barbers.map((b) => (
               <SelectItem key={b.id} value={String(b.id)} className="font-bold">
@@ -158,11 +160,11 @@ const Toolbar = ({
 
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="h-11 px-4 rounded-xl bg-soft border-border text-xs font-black min-w-[140px]">
-            <SelectValue placeholder="جميع الحالات" />
+            <SelectValue placeholder={t("toolbar.allStatuses")} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all" className="font-bold">
-              جميع الحالات
+              {t("toolbar.allStatuses")}
             </SelectItem>
             {Object.entries(statusMap).map(([key, val]) => (
               <SelectItem key={key} value={key} className="font-bold">
@@ -170,7 +172,7 @@ const Toolbar = ({
                   <span
                     className={cn("w-2 h-2 rounded-full shrink-0", val.dot)}
                   />
-                  {val.label}
+                  {t(val.label)}
                 </span>
               </SelectItem>
             ))}
@@ -179,17 +181,17 @@ const Toolbar = ({
 
         <Select value={range} onValueChange={setRange}>
           <SelectTrigger className="h-11 px-4 rounded-xl bg-soft border-border text-xs font-black min-w-[130px]">
-            <SelectValue placeholder="الفترة" />
+            <SelectValue placeholder={t("toolbar.period")} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all" className="font-bold">
-              كل ساعات العمل
+              {t("toolbar.rangeAll")}
             </SelectItem>
             <SelectItem value="morning" className="font-bold">
-              صباحاً (حتى 2 ظهراً)
+              {t("toolbar.rangeMorning")}
             </SelectItem>
             <SelectItem value="evening" className="font-bold">
-              مساءً (من 2 ظهراً)
+              {t("toolbar.rangeEvening")}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -200,9 +202,9 @@ const Toolbar = ({
           onClick={onClearFilters}
           className="h-11 rounded-xl text-xs gap-1.5 text-muted"
           disabled={!hasActiveFilters}
-          aria-label="مسح كافة الفلاتر"
+          aria-label={t("toolbar.clearFilters")}
         >
-          <X size={14} /> مسح
+          <X size={14} /> {t("toolbar.clearFiltersShort")}
         </Button>
       </div>
 
@@ -223,8 +225,8 @@ const Toolbar = ({
           <button
             onClick={() => setSelectedDate(shiftDate(selectedDate, -1))}
             className="h-9 w-9 flex items-center justify-center hover:bg-card rounded-lg transition-all group border border-transparent hover:border-border"
-            aria-label="اليوم السابق"
-            title="اليوم السابق (السهم الأيسر)"
+            aria-label={t("toolbar.prevDay")}
+            title={t("toolbar.prevDayTitle")}
           >
             <ChevronRight
               size={18}
@@ -236,13 +238,13 @@ const Toolbar = ({
             className="bg-transparent border-none text-sm font-black focus:ring-0 p-0 text-center w-32 cursor-pointer text-accent"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            aria-label="اختيار التاريخ"
+            aria-label={t("toolbar.pickDate")}
           />
           <button
             onClick={() => setSelectedDate(shiftDate(selectedDate, 1))}
             className="h-9 w-9 flex items-center justify-center hover:bg-card rounded-lg transition-all group border border-transparent hover:border-border"
-            aria-label="اليوم التالي"
-            title="اليوم التالي (السهم الأيمن)"
+            aria-label={t("toolbar.nextDay")}
+            title={t("toolbar.nextDayTitle")}
           >
             <ChevronLeft
               size={18}
@@ -263,8 +265,11 @@ const Toolbar = ({
                   : "text-muted hover:text-accent hover:bg-white",
               )}
               aria-pressed={viewMode === key}
-              aria-label={`عرض ${label}`}
-              title={label === "الجدول" ? "عرض الجدول (D)" : undefined}
+              aria-label={t("toolbar.viewMode", { label })}
+              aria-keyshortcuts={
+                key === "day" ? "d" : key === "week" ? "w" : "v"
+              }
+              title={key === "day" ? t("toolbar.viewDayTitle") : undefined}
             >
               <Icon size={14} />
               <span className="hidden md:inline">{label}</span>
@@ -281,8 +286,8 @@ const Toolbar = ({
           )}
           title={
             live
-              ? "متصل بالخادم - تحديث تلقائي مباشر"
-              : "غير متصل - البيانات غير محدثة"
+              ? t("toolbar.liveConnectedTitle")
+              : t("toolbar.liveDisconnectedTitle")
           }
         >
           {live ? (
@@ -290,15 +295,20 @@ const Toolbar = ({
           ) : (
             <WifiOff size={14} />
           )}
-          {live ? "مباشر" : "غير متصل"}
+          {live ? t("toolbar.liveConnected") : t("toolbar.liveDisconnected")}
           <span className="hidden sm:inline text-muted font-bold tabular-nums">
-            {lastUpdated ? `· ${lastUpdated}` : ""}
+            {lastUpdated ? `· ${t("toolbar.lastUpdated", {
+              time: new Intl.DateTimeFormat(
+                i18n.language === "ar" ? "ar-EG" : "en-US",
+                { hour: "2-digit", minute: "2-digit" },
+              ).format(new Date(lastUpdated)),
+            })}` : ""}
           </span>
           <button
             onClick={onRefresh}
             className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-            aria-label="تحديث البيانات"
-            title="تحديث يدوي"
+            aria-label={t("toolbar.refresh")}
+            title={t("toolbar.refreshTitle")}
           >
             <RefreshCcw size={13} />
           </button>
@@ -312,9 +322,9 @@ const Toolbar = ({
             "h-11 w-11 rounded-xl p-0",
             sidebarOpen && "border-accent/50 text-accent",
           )}
-          aria-label="إظهار/إخفاء الشريط الجانبي"
+          aria-label={t("toolbar.toggleSidebarAria")}
           aria-pressed={sidebarOpen}
-          title="الشريط الجانبي (L)"
+          title={t("toolbar.toggleSidebarTitle")}
         >
           <PanelRight size={16} />
         </Button>
@@ -327,17 +337,17 @@ const Toolbar = ({
               className="h-11 rounded-xl gap-2 px-4"
             >
               <FileDown size={15} />{" "}
-              <span className="hidden sm:inline text-xs">تصدير</span>
+              <span className="hidden sm:inline text-xs">{t("toolbar.export")}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>خيارات التصدير</DropdownMenuLabel>
+            <DropdownMenuLabel>{t("toolbar.exportLabel")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onExport("pdf")}>
-              PDF للجدول اليومي
+              {t("toolbar.pdf")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onExport("csv")}>
-              CSV (بيانات المواعيد)
+              {t("toolbar.csv")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

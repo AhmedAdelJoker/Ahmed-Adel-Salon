@@ -1,0 +1,115 @@
+{
+  "board": {
+    "title": "لوحة التحكم والعمليات",
+    "subtitle": "متابعة دقيقة لمسار العميل داخل الصالون",
+    "connected": "متصل مباشر",
+    "disconnected": "غير متصل",
+    "connection_live": "الاتصال الحي يعمل",
+    "connection_reconnecting": "إعادة الاتصال...",
+    "refresh": "تحديث البيانات",
+    "new_client": "تسجيل عميل سريع",
+    "kpi_total": "إجمالي اليوم",
+    "kpi_waiting": "قيد الانتظار",
+    "kpi_in_service": "قيد الخدمة",
+    "kpi_cashier": "بالصندوق",
+    "kpi_done": "مكتمل اليوم",
+    "kpi_revenue": "إيراد اليوم",
+    "toolbar_search_placeholder": "بحث فوري بالاسم أو الهاتف...",
+    "toolbar_clear": "مسح البحث",
+    "toolbar_all_barbers": "كل الخبراء",
+    "toolbar_done_today": "مكتمل اليوم ({{count}})",
+    "error_title": "حدث خطأ في تحميل البيانات",
+    "error_message": "تعذر جلب المواعيد من الخادم. يرجى المحاولة مرة أخرى.",
+    "error_retry": "إعادة المحاولة",
+    "empty_column": "القائمة فارغة",
+    "empty_column_desc": "لا يوجد عملاء في هذه المرحلة حالياً."
+  },
+  "columns": {
+    "waiting": {
+      "title": "قائمة الانتظار",
+      "desc": "بانتظار دورهم أو تأكيد حضورهم"
+    },
+    "in_service": {
+      "title": "قيد الخدمة",
+      "desc": "عملاء يتلقون خدماتهم حالياً"
+    },
+    "review": {
+      "title": "المراجعة المالية",
+      "desc": "بانتظار مراجعة الفاتورة النهائية"
+    },
+    "cashier": {
+      "title": "صندوق الدفع",
+      "desc": "بانتظار العميل عند الكاشير"
+    }
+  },
+  "card": {
+    "unknown_customer": "عميل مجهول",
+    "phone_unavailable": "غير متوفر",
+    "service_general": "خدمة عامة",
+    "barber_label": "الخبير",
+    "barber_auto": "توزيع تلقائي",
+    "more_services": "+{{count}} أخرى",
+    "action_direct_barber": "توجيه للخبير",
+    "action_confirm_arrival": "تأكيد الوصول",
+    "action_edit": "تعديل",
+    "action_cancel": "إلغاء",
+    "action_complete": "إنهاء وإرسال للاستقبال",
+    "action_ready_payment": "تأكيد جاهزية الدفع",
+    "status_collecting": "قيد التحصيل الآن",
+    "action_reassign": "تغيير خبير الخدمة",
+    "waiting_minutes": "منذ {{mins}} د",
+    "waiting_hours": "منذ {{h}} س {{m}} د",
+    "waiting_now": "الآن"
+  },
+  "fast_client": {
+    "title": "تسجيل عميل سريع",
+    "subtitle": "إضافة عميل جديد أو حالي مباشرة إلى مسار العمليات",
+    "phone_label": "رقم الهاتف",
+    "phone_placeholder": "مثال: ٠١٠٩٩٩٩٩٩٩٩",
+    "name_label": "اسم العميل",
+    "name_placeholder": "الاسم الثلاثي",
+    "vip_customer": "عميل مميز",
+    "visits_count": "إجمالي {{count}} زيارة سابقة للمحل",
+    "archived_data": "بيانات مؤرشفة",
+    "services_label": "اختيار الخدمات المطلوبة",
+    "services_selected": "خدمات مختارة",
+    "category_all": "الكل",
+    "summary_title": "ملخص العملية",
+    "summary_services": "إجمالي الخدمات:",
+    "summary_duration": "الوقت المقدر:",
+    "summary_minutes": "دقيقة",
+    "summary_total": "الإجمالي المستحق:",
+    "barber_label": "اختيار الخبير",
+    "barber_auto": "توزيع تلقائي (الأول متاح)",
+    "notes_label": "ملاحظات الكاشير",
+    "notes_placeholder": "أي تفاصيل خاصة...",
+    "saving": "جارٍ الحفظ...",
+    "save": "حفظ وتأكيد تسجيل العميل",
+    "validation_service": "يرجى اختيار خدمة واحدة على الأقل",
+    "validation_phone_name": "يرجى إدخال رقم الهاتف واسم العميل",
+    "validation_phone_invalid": "يرجى إدخال رقم موبايل صحيح (مثال: 01012345678)",
+    "error_barber_busy": "الخبير محجوز في هذا التوقيت، يرجى اختيار وقت آخر أو خبير آخر",
+    "success": "تم تسجيل العميل بنجاح",
+    "error": "فشل تسجيل العميل",
+    "customer_found": "تم العثور على العميل: {{name}}"
+  },
+  "time": {
+    "label": "توقيت الموعد",
+    "placeholder": "اختر الوقت",
+    "today": "اليوم"
+  },
+  "dialogs": {
+    "reassign_title": "تغيير الخبير",
+    "reassign_desc": "اختر خبيراً آخراً لهذا الموعد",
+    "cancel_title": "تأكيد إلغاء الحجز",
+    "cancel_desc": "هل أنت متأكد من إلغاء حجز {{name}}؟ لا يمكن التراجع عن هذا الإجراء.",
+    "cancel_back": "تراجع",
+    "cancel_confirm": "تأكيد الإلغاء"
+  },
+  "done_panel": {
+    "title": "مكتمل اليوم",
+    "subtitle": "{{count}} عميل تم إنجاز خدمته",
+    "empty_title": "لا مكتملة اليوم",
+    "empty_desc": "لم يتم إنهاء أي خدمة حتى الآن."
+  }
+}

@@ -1,4 +1,4 @@
-import { formatTime12h } from "@/lib/core/utils";
+import { formatTime12h, getApiErrorMessage } from "@/lib/core/utils";
 import { toast } from "react-hot-toast";
 
 export const TODAY = new Date().toISOString().slice(0, 10);
@@ -25,6 +25,55 @@ export const rawStatus = (b) => String(b?.status || "").toLowerCase();
 
 export const timeOnly = (t) => (t ? String(t).slice(0, 5) : "");
 
+/**
+ * Unified error-to-message helper for all appointment write actions.
+ * A 409 (double-booking and similar conflicts) must always surface as a
+ * clear Arabic message: the server's own detail is shown when readable,
+ * otherwise one shared fallback is used instead of the per-handler
+ * technical messages.
+ */
+export const bookingApiErrorMessage = (
+  err: any,
+  fallback: string,
+  conflictFallback?: string,
+): string => {
+  if (err?.response?.status === 409) {
+    const detail = err?.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+    // A pre-translated shared fallback supplied by the caller (which has
+    // access to the i18n context), keeping this utility context-free.
+    if (conflictFallback) return conflictFallback;
+    return "تعارض في الحجز مع موعد آخر لنفس الخبير. اختر وقتاً أو خبيراً آخر.";
+  }
+  return getApiErrorMessage(err, fallback);
+};
+
+const BOOKING_DRAFT_KEY = "salonpro.bookings.createDraft.v1";
+
+/**
+ * Best-effort draft persistence for the "create booking" form, so an
+ * accidental dialog close (Escape, guard error, navigation) never loses a
+ * half-typed phone number or service selection. Storage may be unavailable
+ * (private mode, eviction) — the draft is then simply not restored.
+ */
+export const readBookingDraft = (): any => {
+  try {
+    const raw = window?.localStorage.getItem(BOOKING_DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const writeBookingDraft = (draft: any) => {
+  try {
+    if (!draft) window?.localStorage.removeItem(BOOKING_DRAFT_KEY);
+    else window.localStorage.setItem(BOOKING_DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // Storage unavailable; the draft is best-effort only.
+  }
+};
+
 export const getExpectedEndTime = (startTime, durationMinutes) => {
   if (!startTime || !durationMinutes) return null;
   try {
@@ -42,31 +91,31 @@ export const statusConfig = (status) => {
   return (
     {
       PENDING: {
-        label: "قيد المراجعة",
+        label: "status.PENDING",
         variant: "info",
         color: "text-sky-600 dark:text-sky-400",
         bg: "bg-sky-500/10 border-sky-500/20",
       },
       CONFIRMED: {
-        label: "مؤكد ومجدول",
+        label: "status.CONFIRMED",
         variant: "warning",
         color: "text-amber-600 dark:text-amber-400",
         bg: "bg-amber-500/10 border-amber-500/20",
       },
       ACTIVE_BOARD: {
-        label: "نشط بالاستقبال",
+        label: "status.ACTIVE_BOARD",
         variant: ("accent" as any),
         color: "text-indigo-600 dark:text-indigo-400",
         bg: "bg-indigo-500/10 border-indigo-500/20",
       },
       DONE: {
-        label: "مكتمل ومغلق",
+        label: "status.DONE",
         variant: "success",
         color: "text-emerald-600 dark:text-emerald-400",
         bg: "bg-emerald-500/10 border-emerald-500/20",
       },
       CANCELLED: {
-        label: "ملغي",
+        label: "status.CANCELLED",
         variant: "danger",
         color: "text-rose-600 dark:text-rose-400",
         bg: "bg-rose-500/10 border-rose-500/20",
@@ -153,11 +202,11 @@ export const sendWhatsAppMessage = (booking, type) => {
 
   let message = "";
   if (type === "reminder") {
-    message = `مرحباً ${name} 👋✨\nنود تذكيرك بموعدك اليوم ${date} في تمام الساعة ${time} مع الخبير (${barber}) في صالون Barber Luxe Pro.\nننتظر زيارتك بكل رحب وسرور! 💈✂️`;
+    message = `مرحباً ${name} 👋✨\nنود تذكيرك بموعدك اليوم ${date} في تمام الساعة ${time} مع الخبير (${barber}) في صالون Salon Pro Pro.\nننتظر زيارتك بكل رحب وسرور! 💈✂️`;
   } else if (type === "confirm") {
-    message = `أهلاً بك ${name} ✨\nتم تأكيد حجز موعدك بنجاح يوم ${date} الساعة ${time} مع الخبير (${barber}) في صالون Barber Luxe Pro.\nيسعدنا دائماً تقديم أرقى الخدمات لك! ✂️🌟`;
+    message = `أهلاً بك ${name} ✨\nتم تأكيد حجز موعدك بنجاح يوم ${date} الساعة ${time} مع الخبير (${barber}) في صالون Salon Pro Pro.\nيسعدنا دائماً تقديم أرقى الخدمات لك! ✂️🌟`;
   } else if (type === "thank_you") {
-    message = `عزيزنا ${name} 🌟\nسعدنا جداً بزيارتك اليوم في صالون Barber Luxe Pro!\nنأمل أن تكون التجربة والخدمة قد حازت على رضاك التام. نتطلع لرؤيتك مجدداً قريباً! ✨💈`;
+    message = `عزيزنا ${name} 🌟\nسعدنا جداً بزيارتك اليوم في صالون Salon Pro Pro!\nنأمل أن تكون التجربة والخدمة قد حازت على رضاك التام. نتطلع لرؤيتك مجدداً قريباً! ✨💈`;
   }
 
   const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;

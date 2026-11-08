@@ -8,10 +8,12 @@ import {
   Columns,
   Download,
   Loader2,
+  RefreshCw,
   Search,
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,34 +29,39 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/core/utils";
+import { getIntlLocale } from "@/lib/format/locale";
+import i18n from "@/i18n";
 import {
-  PAYMENT_METHOD_OPTIONS,
-  statusOptions,
+  PAYMENT_METHOD_VALUES,
+  STATUS_FILTER_VALUES,
+  paymentMethodLabel,
+  statusFilterLabel,
 } from "@/features/invoices/utils/invoice";
 import type { DateRange, TimePreset } from "@/features/invoices/hooks/useInvoicesData";
 
-const PRESETS: { key: Exclude<TimePreset, "custom">; label: string }[] = [
-  { key: "today", label: "اليوم" },
-  { key: "week", label: "الأسبوع" },
-  { key: "month", label: "الشهر" },
-  { key: "last_month", label: "الشهر الماضي" },
+const PRESETS: { key: Exclude<TimePreset, "custom">; labelKey: string }[] = [
+  { key: "today", labelKey: "presetToday" },
+  { key: "week", labelKey: "presetWeek" },
+  { key: "month", labelKey: "presetMonth" },
+  { key: "last_month", labelKey: "presetLastMonth" },
 ];
 
-const COLUMN_OPTIONS = [
-  { key: "invoiceNo", label: "رقم الفاتورة" },
-  { key: "customer", label: "العميل والخبير" },
-  { key: "date", label: "التاريخ" },
-  { key: "payment", label: "وسيلة الدفع" },
-  { key: "status", label: "الحالة" },
-  { key: "amount", label: "القيمة" },
-  { key: "actions", label: "الإجراءات" },
-];
+const COLUMN_KEYS = [
+  "invoiceNo",
+  "customer",
+  "date",
+  "payment",
+  "status",
+  "amount",
+  "actions",
+] as const;
 
 function shortDate(value: string): string {
   if (!value) return "…";
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("ar-EG-u-nu-latn", {
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
+  return date.toLocaleDateString(locale, {
     day: "2-digit",
     month: "short",
   });
@@ -80,6 +87,7 @@ export interface InvoicesToolbarProps {
   visibleColumns: Record<string, boolean>;
   toggleColumn: (key: string) => void;
   exportToCSV: () => void;
+  exporting?: boolean;
 }
 
 export function InvoicesToolbar({
@@ -102,7 +110,9 @@ export function InvoicesToolbar({
   visibleColumns,
   toggleColumn,
   exportToCSV,
+  exporting = false,
 }: InvoicesToolbarProps) {
+  const { t } = useTranslation("invoices");
   const [rangeOpen, setRangeOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState(fromDate);
@@ -131,6 +141,15 @@ export function InvoicesToolbar({
     setFiltersOpen(false);
   };
 
+  const paymentChips = PAYMENT_METHOD_VALUES.map((value) => ({
+    value,
+    label: paymentMethodLabel(value),
+  }));
+  const statusChips = STATUS_FILTER_VALUES.map((value) => ({
+    value,
+    label: statusFilterLabel(value),
+  }));
+
   return (
     <div className="rounded-3xl border border-border/70 bg-card p-3 shadow-soft sm:p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -140,6 +159,7 @@ export function InvoicesToolbar({
               key={preset.key}
               type="button"
               onClick={() => onApplyPreset(preset.key)}
+              aria-pressed={timePreset === preset.key}
               className={cn(
                 "h-8 shrink-0 whitespace-nowrap rounded-xl px-3 text-[11px] font-black transition-colors sm:px-4",
                 timePreset === preset.key
@@ -147,7 +167,7 @@ export function InvoicesToolbar({
                   : "text-muted hover:bg-card hover:text-main",
               )}
             >
-              {preset.label}
+              {t(`toolbar.${preset.labelKey}`)}
             </button>
           ))}
         </div>
@@ -165,11 +185,13 @@ export function InvoicesToolbar({
           </PopoverTrigger>
           <PopoverContent className="w-[300px] p-4" align="start">
             <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-muted">
-              فترة مخصصة
+              {t("toolbar.customRange")}
             </p>
             <div className="grid grid-cols-2 gap-2">
               <label className="space-y-1">
-                <span className="text-[10px] font-bold text-muted">من</span>
+                <span className="text-[10px] font-bold text-muted">
+                  {t("toolbar.from")}
+                </span>
                 <Input
                   type="date"
                   value={draftFrom}
@@ -178,7 +200,9 @@ export function InvoicesToolbar({
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-[10px] font-bold text-muted">إلى</span>
+                <span className="text-[10px] font-bold text-muted">
+                  {t("toolbar.to")}
+                </span>
                 <Input
                   type="date"
                   value={draftTo}
@@ -189,7 +213,7 @@ export function InvoicesToolbar({
             </div>
             {invalidRange && (
               <p className="mt-2 text-[10px] font-bold text-danger">
-                تاريخ البداية يجب أن يكون قبل تاريخ النهاية
+                {t("toolbar.invalidRange")}
               </p>
             )}
             <div className="mt-3 flex items-center gap-2">
@@ -201,7 +225,7 @@ export function InvoicesToolbar({
                   setRangeOpen(false);
                 }}
               >
-                تطبيق الفترة
+                {t("toolbar.applyRange")}
               </Button>
               <Button
                 variant="ghost"
@@ -212,7 +236,7 @@ export function InvoicesToolbar({
                   setRangeOpen(false);
                 }}
               >
-                إلغاء
+                {t("toolbar.cancel")}
               </Button>
             </div>
           </PopoverContent>
@@ -223,8 +247,8 @@ export function InvoicesToolbar({
             variant="ghost"
             size="icon"
             className="h-9 w-9 rounded-xl"
-            aria-label="الفترة السابقة"
-            title="الفترة السابقة"
+            aria-label={t("toolbar.previousPeriod")}
+            title={t("toolbar.previousPeriod")}
             onClick={() => onShiftMonth(-1)}
           >
             <ChevronRight size={16} />
@@ -233,8 +257,8 @@ export function InvoicesToolbar({
             variant="ghost"
             size="icon"
             className="h-9 w-9 rounded-xl"
-            aria-label="الفترة التالية"
-            title="الفترة التالية"
+            aria-label={t("toolbar.nextPeriod")}
+            title={t("toolbar.nextPeriod")}
             onClick={() => onShiftMonth(1)}
           >
             <ChevronLeft size={16} />
@@ -251,7 +275,8 @@ export function InvoicesToolbar({
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="ابحث برقم الفاتورة أو اسم العميل..."
+            placeholder={t("toolbar.searchPlaceholder")}
+            aria-label={t("toolbar.searchPlaceholder")}
             className="h-10 w-full border-border/70 bg-soft/50 ps-9 pe-9 text-sm focus-visible:bg-card sm:h-11"
           />
           {searchPending && (
@@ -263,7 +288,7 @@ export function InvoicesToolbar({
           {!searchPending && query && (
             <button
               type="button"
-              aria-label="مسح البحث"
+              aria-label={t("toolbar.clearSearch")}
               onClick={() => setQuery("")}
               className="absolute end-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted hover:bg-soft hover:text-main"
             >
@@ -281,11 +306,11 @@ export function InvoicesToolbar({
             }}
           >
             <SelectTrigger className="h-10 w-[150px] rounded-xl font-bold xl:h-11">
-              <SelectValue placeholder="طريقة الدفع" />
+              <SelectValue placeholder={t("toolbar.allPayments")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">كل طرق الدفع</SelectItem>
-              {PAYMENT_METHOD_OPTIONS.map((method) => (
+              <SelectItem value="all">{t("toolbar.allPayments")}</SelectItem>
+              {paymentChips.map((method) => (
                 <SelectItem key={method.value} value={method.value}>
                   {method.label}
                 </SelectItem>
@@ -301,10 +326,10 @@ export function InvoicesToolbar({
             }}
           >
             <SelectTrigger className="h-10 w-[125px] rounded-xl font-bold xl:h-11">
-              <SelectValue placeholder="الحالة" />
+              <SelectValue placeholder={t("statuses.all")} />
             </SelectTrigger>
             <SelectContent>
-              {statusOptions.map((option) => (
+              {statusChips.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -320,7 +345,7 @@ export function InvoicesToolbar({
           aria-expanded={filtersOpen}
         >
           <SlidersHorizontal size={15} className="ms-1" />
-          فلاتر
+          {t("toolbar.filter")}
           {activeFilters > 0 && (
             <span className="ms-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-black text-white">
               {activeFilters}
@@ -333,9 +358,9 @@ export function InvoicesToolbar({
             <Button
               variant="ghost"
               size="icon"
-              className="hidden h-10 w-10 shrink-0 rounded-xl sm:inline-flex"
-              aria-label="إظهار أو إخفاء الأعمدة"
-              title="إظهار/إخفاء الأعمدة"
+              className="h-10 w-10 shrink-0 rounded-xl"
+              aria-label={t("toolbar.columnsToggle")}
+              title={t("toolbar.columnsToggle")}
             >
               <Columns size={16} />
             </Button>
@@ -343,32 +368,32 @@ export function InvoicesToolbar({
           <PopoverContent className="w-52 p-2" side="bottom" align="end">
             <div className="flex items-center justify-between border-b border-border px-2 py-1.5">
               <p className="text-[10px] font-black uppercase tracking-widest text-muted">
-                الأعمدة
+                {t("toolbar.columns")}
               </p>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-5 w-5"
-                aria-label="إغلاق"
+                aria-label={t("toolbar.hideColumns")}
                 onClick={() => setShowColumnPicker(false)}
               >
                 <X size={10} />
               </Button>
             </div>
             <div className="space-y-0.5 py-1">
-              {COLUMN_OPTIONS.map((column) => (
+              {COLUMN_KEYS.map((key) => (
                 <label
-                  key={column.key}
+                  key={key}
                   className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-soft"
                 >
                   <input
                     type="checkbox"
-                    checked={visibleColumns[column.key]}
-                    onChange={() => toggleColumn(column.key)}
+                    checked={Boolean(visibleColumns[key])}
+                    onChange={() => toggleColumn(key)}
                     className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary"
                   />
                   <span className="text-xs font-bold text-main">
-                    {column.label}
+                    {t(`columns.${key}`)}
                   </span>
                 </label>
               ))}
@@ -381,10 +406,15 @@ export function InvoicesToolbar({
           size="icon"
           className="h-10 w-10 shrink-0 rounded-xl"
           onClick={exportToCSV}
-          aria-label="تصدير CSV"
-          title="تصدير CSV"
+          disabled={exporting}
+          aria-label={t("toolbar.exportCsv")}
+          title={exporting ? t("toolbar.exporting") : t("toolbar.exportCsv")}
         >
-          <Download size={16} />
+          {exporting ? (
+            <RefreshCw size={16} className="animate-spin" />
+          ) : (
+            <Download size={16} />
+          )}
         </Button>
       </div>
 
@@ -398,11 +428,11 @@ export function InvoicesToolbar({
             }}
           >
             <SelectTrigger className="h-10 w-full rounded-xl font-bold">
-              <SelectValue placeholder="طريقة الدفع" />
+              <SelectValue placeholder={t("toolbar.allPayments")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">كل طرق الدفع</SelectItem>
-              {PAYMENT_METHOD_OPTIONS.map((method) => (
+              <SelectItem value="all">{t("toolbar.allPayments")}</SelectItem>
+              {paymentChips.map((method) => (
                 <SelectItem key={method.value} value={method.value}>
                   {method.label}
                 </SelectItem>
@@ -417,10 +447,10 @@ export function InvoicesToolbar({
             }}
           >
             <SelectTrigger className="h-10 w-full rounded-xl font-bold">
-              <SelectValue placeholder="الحالة" />
+              <SelectValue placeholder={t("statuses.all")} />
             </SelectTrigger>
             <SelectContent>
-              {statusOptions.map((option) => (
+              {statusChips.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -433,31 +463,30 @@ export function InvoicesToolbar({
       {activeFilters > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {query.trim() && (
-            <FilterChip label={`بحث: ${query.trim()}`} onClear={() => setQuery("")} />
+            <FilterChip
+              label={t("toolbar.searchChip", { term: query.trim() })}
+              onClear={() => setQuery("")}
+              clearLabel={t("toolbar.removeFilter", { label: t("toolbar.searchChip", { term: query.trim() }) })}
+            />
           )}
           {paymentFilter !== "all" && (
             <FilterChip
-              label={
-                PAYMENT_METHOD_OPTIONS.find(
-                  (method) => method.value === paymentFilter,
-                )?.label || paymentFilter
-              }
+              label={paymentMethodLabel(paymentFilter)}
               onClear={() => {
                 setPaymentFilter("all");
                 setCurrentPage(1);
               }}
+              clearLabel={t("toolbar.removeFilter", { label: paymentMethodLabel(paymentFilter) })}
             />
           )}
           {statusFilter !== "all" && (
             <FilterChip
-              label={
-                statusOptions.find((option) => option.value === statusFilter)
-                  ?.label || statusFilter
-              }
+              label={statusFilterLabel(statusFilter)}
               onClear={() => {
                 setStatusFilter("all");
                 setCurrentPage(1);
               }}
+              clearLabel={t("toolbar.removeFilter", { label: statusFilterLabel(statusFilter) })}
             />
           )}
           <button
@@ -465,7 +494,7 @@ export function InvoicesToolbar({
             onClick={resetFilters}
             className="ms-1 text-[10px] font-black text-muted underline-offset-4 hover:text-danger hover:underline"
           >
-            مسح الكل
+            {t("toolbar.clearFilters")}
           </button>
         </div>
       )}
@@ -476,9 +505,11 @@ export function InvoicesToolbar({
 function FilterChip({
   label,
   onClear,
+  clearLabel,
 }: {
   label: string;
   onClear: () => void;
+  clearLabel: string;
 }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-lg bg-primary-soft px-2 py-1 text-[10px] font-bold text-primary">
@@ -486,7 +517,7 @@ function FilterChip({
       <button
         type="button"
         onClick={onClear}
-        aria-label={`إزالة فلتر ${label}`}
+        aria-label={clearLabel}
         className="rounded p-0.5 hover:bg-primary/10"
       >
         <X size={10} />

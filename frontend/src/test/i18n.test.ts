@@ -138,7 +138,7 @@ describe("i18n", () => {
     // resource bundle, and every lookup silently falls through to the default.
     const entry = readFileSync(join(__dirname, "..", "i18n", "index.ts"), "utf8");
     const registered = new Set(
-      [...entry.matchAll(/(\w+):\s*\w+(?:Common|Appearance)\b/g)].map((m) => m[1]),
+      [...entry.matchAll(/(\w+):\s*\w+(?:Common|Appearance|POS|Reception|Bookings|Schedule|Owner|Customers|Routes|Invoices)\b/g)].map((m) => m[1]),
     );
     const unregistered = [...new Set(Object.keys(readLocale("ar")))].filter(
       (ns) => !registered.has(ns),
@@ -163,15 +163,19 @@ describe("i18n", () => {
   });
 
   it("does not leave English inside the Arabic locale", () => {
-    // The reverse leak, with one exception: a few loanwords are conventional in
-    // Arabic UI and would read as errors if translated.
-    const ALLOWED = /\b(?:SMTP|API|URL|ID|SSL|POS|QR|CSV|PDF|Excel|Web|Email|PIN|VAT)\b/;
+    // The reverse leak, with two exceptions: interpolation placeholders
+    // (`{{name}}`) are template syntax, not prose, and a few loanwords and
+    // product terms are conventional in Arabic UI and would read as errors if
+    // translated.
+    const PLACEHOLDER = /\{\{[^{}]*\}\}/g;
+    const ALLOWED =
+      /\b(?:requestDevice|WebUSB|Electron|TAURI|Chrome|Edge|Ctrl|Enter|SMTP|API|URL|SSL|POS|CSV|PDF|Excel|Email|VAT|USB|QR|Code|Web|ID|VIP|XXX)\b/g;
     const leaks: string[] = [];
 
     for (const [ns, tree] of Object.entries(readLocale("ar"))) {
       for (const path of flatten(tree)) {
         const value = String(lookup(tree, path) ?? "");
-        const stripped = value.replace(ALLOWED, "");
+        const stripped = value.replace(PLACEHOLDER, "").replace(ALLOWED, "");
         if (/[A-Za-z]{3,}/.test(stripped)) leaks.push(`ar/${ns}:${path} → "${value}"`);
       }
     }

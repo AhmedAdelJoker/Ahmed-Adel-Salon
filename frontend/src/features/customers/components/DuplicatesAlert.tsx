@@ -1,6 +1,7 @@
 /** Customers DuplicatesAlert — counts come from GET /customers/stats. */
 import { Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 
 export default function DuplicatesAlert({
   groupCount,
@@ -11,6 +12,7 @@ export default function DuplicatesAlert({
   customerCount: number;
   onMerge?: () => void;
 }) {
+  const { t } = useTranslation("customers");
   if (groupCount === 0) return null;
   return (
         <div
@@ -23,14 +25,14 @@ export default function DuplicatesAlert({
             </div>
             <div className="flex-1">
               <p className="text-sm font-black text-main">
-                تم اكتشاف {groupCount} مجموعة من العملاء المكررين
+                {t("duplicatesAlert.title", { groupCount })}
               </p>
               <p className="text-[10px] font-bold text-muted">
-                عملاء يتشاركون نفس رقم الهاتف — دمجهم يحفظ السجلات في مكان واحد
+                {t("duplicatesAlert.hint")}
               </p>
             </div>
             <span className="text-xs font-black tabular-nums text-warning bg-warning/10 px-3 py-1 rounded-lg">
-              {customerCount} عميل
+              {t("duplicatesAlert.count", { customerCount })}
             </span>
             {onMerge && (
               <Button
@@ -38,7 +40,7 @@ export default function DuplicatesAlert({
                 onClick={onMerge}
                 className="h-9 rounded-xl px-3 text-[10px] shrink-0"
               >
-                بدء الدمج
+                {t("duplicatesAlert.merge")}
               </Button>
             )}
           </div>

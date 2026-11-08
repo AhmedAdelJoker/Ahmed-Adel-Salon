@@ -74,6 +74,15 @@ export type SearchCategory =
   | "المالية"
   | "النظام";
 
+/** Stable translation key for each command-palette category. */
+export const SEARCH_CATEGORY_KEYS: Record<SearchCategory, string> = {
+  المالية: "finance",
+  العملاء: "customers",
+  الإدارة: "management",
+  تشغيل: "operations",
+  النظام: "system",
+};
+
 export interface AppNavSpec {
   /** Sidebar / mobile label. */
   label: string;
@@ -170,8 +179,8 @@ const ActivityLogs = lazy(() => import("@/pages/common/ActivityLogs"));
 
 // Owner
 const OwnerDashboard = lazy(() => import("@/pages/owner/ReportsDashboard"));
-const HRManagement = lazy(() => import("@/pages/owner/HRManagement"));
-const EmployeeArchive = lazy(() => import("@/pages/owner/EmployeeArchive"));
+const HRManagement = lazy(() => import("@/pages/manager/HRManagement"));
+const EmployeeArchive = lazy(() => import("@/pages/manager/EmployeeArchive"));
 const PermissionsManagement = lazy(
   () => import("@/pages/owner/PermissionsManagement"),
 );
@@ -192,9 +201,7 @@ const Cashbox = lazy(() => import("@/pages/owner/Cashbox"));
 const ServicesManagement = lazy(
   () => import("@/pages/owner/ServicesManagement"),
 );
-const InvoiceAdjustmentRequests = lazy(
-  () => import("@/pages/owner/InvoiceAdjustmentRequests"),
-);
+const ApprovalsPage = lazy(() => import("@/pages/owner/ApprovalsPage"));
 const BusinessSettingsPage = lazy(
   () => import("@/pages/owner/BusinessSettingsPage"),
 );
@@ -213,8 +220,6 @@ const ManagerDashboard = lazy(
 const AttendanceManagement = lazy(
   () => import("@/pages/manager/AttendanceManagement"),
 );
-const ApprovalCenter = lazy(() => import("@/pages/manager/ApprovalCenter"));
-
 // Cashier / front desk
 const POS = lazy(() => import("@/pages/cashier/POS/index"));
 const Bookings = lazy(() => import("@/pages/cashier/Bookings"));
@@ -431,32 +436,20 @@ export const APP_ROUTES: readonly AppRoute[] = [
   },
   {
     path: "/owner/adjustment-requests",
-    component: InvoiceAdjustmentRequests,
+    redirectTo: "/approvals",
     roles: ROLES.FINANCE_MGMT,
     title: "طلبات التعديل",
-    nav: {
-      label: "مركز القيادة والتحكم",
-      icon: ShieldCheck,
-      group: "operations",
-      order: 11,
-      roles: ["OWNER", "ADMIN", "ACCOUNTANT", "MANAGER"],
-      searchCategory: "المالية",
-    },
   },
   {
     path: "/approvals",
-    component: ApprovalCenter,
-    // CASHIER removed: every action inside is manager+ (discount/expense
-    // approve, payroll audit/delete — all owner_or_manager on the backend),
-    // and the page's payroll fetch 403'd for cashiers on load. An approval
-    // center you cannot approve anything in is not a cashier surface.
+    component: ApprovalsPage,
     roles: [...ROLES.MANAGEMENT, "ACCOUNTANT"],
     title: "مركز الموافقات",
     nav: {
       label: "مركز الموافقات",
       icon: ShieldCheck,
       group: "operations",
-      order: 12,
+      order: 11,
     },
   },
 
@@ -556,12 +549,12 @@ export const APP_ROUTES: readonly AppRoute[] = [
 
   /* ------------------------------ management ------------------------------ */
   {
-    path: "/owner/hr",
+    path: "/manager/hr",
     component: HRManagement,
     roles: [...ROLES.OWNER, "MANAGER"],
     title: "إدارة الموارد البشرية",
     nav: {
-      label: "إدارة الموظفين",
+      label: "إدارة الموارد البشرية",
       icon: UserPlus,
       group: "management",
       order: 1,
@@ -934,10 +927,10 @@ export const APP_ROUTES: readonly AppRoute[] = [
     title: "أرشيف المصروفات",
   },
   {
-    path: "/owner/hr/archive",
+    path: "/manager/hr/archive",
     component: EmployeeArchive,
     roles: [...ROLES.OWNER, "MANAGER"],
-    title: "أرشيف الموظفين",
+    title: "أرشيف الموارد البشرية",
     permissionCategory: "إدارة",
   },
   {
@@ -1080,14 +1073,31 @@ export function permissionKeyForPath(pathname: string): string {
   return route ? permissionKeyFor(route) : pathname;
 }
 
+/**
+ * Stable, i18next-safe key for a route pattern.
+ *
+ * Params are stripped rather than escaped: `/customers/:id` becomes
+ * `customers-id`, so the key never contains `:` (i18next's namespace
+ * separator) or `.` (its key separator).
+ */
+export function routeKey(path: string): string {
+  if (path === "/") return "root";
+  return path
+    .replace(/^\//, "")
+    .replace(/[:*]/g, "")
+    .replace(/\//g, "-")
+    .replace(/-+/g, "-");
+}
+
 export function resolvePageMeta(
   pathname: string,
-): { title: string; subtitle?: string } {
+): { title: string; subtitle?: string; key: string } {
   const route = matchRoute(pathname);
-  if (!route) return { title: "النظام الإداري المتكامل" };
+  if (!route) return { title: "النظام الإداري المتكامل", key: "root" };
   return {
     title: route.title,
     subtitle: route.subtitle,
+    key: routeKey(route.path),
   };
 }
 

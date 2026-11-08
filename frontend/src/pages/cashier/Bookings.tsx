@@ -1,4 +1,5 @@
 import { Calendar } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";
 import { PageShell } from "@/components/shared/PageShell";
 
@@ -104,15 +105,16 @@ export default function Bookings() {
     openCreate,
     openEdit,
   } = useBookingsData();
+  const { t } = useTranslation("bookings");
 
   return (
     <PageShell className="overflow-x-hidden">
       {/* ── HEADER WITH ALL ACTION TEXTS ALWAYS VISIBLE ── */}
       <PageHeader
         className={undefined}
-        title="إدارة الحجوزات"
-        subtitle="منظومة الحجوزات الشاملة المربوطة بنقطة البيع، لوحة الاستقبال، وسجل العملاء."
-        badge={connected ? "متصل مباشر" : "غير متصل"}
+        title={t("page.title")}
+        subtitle={t("page.subtitle")}
+        badge={connected ? t("page.badgeOn") : t("page.badgeOff")}
         icon={Calendar}
         actions={
           <BookingsHeaderActions

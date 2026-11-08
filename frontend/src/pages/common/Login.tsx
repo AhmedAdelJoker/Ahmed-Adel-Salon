@@ -104,7 +104,7 @@ export default function Login() {
             </div>
             <div>
               <div className="text-2xl font-black tracking-tighter text-main leading-tight">
-                Barber Luxe
+                Salon Pro
               </div>
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-accent/70">
                 Premium Management Suite
@@ -159,7 +159,7 @@ export default function Login() {
           <div className="flex items-center gap-6">
             <div className="h-[1px] w-12 bg-accent/20" />
             <div className="text-[11px] font-black text-muted/40 uppercase tracking-[0.4em]">
-              Barber Luxe Elite · MMXXVI
+              Salon Pro Elite · MMXXVI
             </div>
           </div>
         </section>
@@ -177,7 +177,7 @@ export default function Login() {
                 <Scissors size={32} strokeWidth={2.5} />
               </div>
               <div className="text-2xl font-black tracking-tighter text-main">
-                Barber Luxe
+                Salon Pro
               </div>
               <div className="text-[9px] font-black uppercase tracking-[0.3em] text-accent/70 mt-1">
                 Premium Suite
@@ -306,7 +306,7 @@ export default function Login() {
 
             <div className="mt-8 text-center">
               <p className="text-[10px] font-bold text-muted/40 uppercase tracking-[0.2em]">
-                Powered by Barber Luxe Digital Architecture
+                Powered by Salon Pro Digital Architecture
               </p>
             </div>
           </motion.div>

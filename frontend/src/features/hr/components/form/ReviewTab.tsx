@@ -2,27 +2,27 @@
 import type { EmployeeRecord } from "@/types/employee";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/core/utils";
 import { cn } from "@/lib/core/utils";
 import { CheckCircle2, ShieldCheck, ShieldAlert } from "lucide-react";
-import { isCustomJobTitleValue, EMPLOYMENT_TYPES } from "@/features/hr";
+import {
+  formatEmployeeMoney,
+  jobTitleLabel,
+  employmentTypeLabel,
+} from "@/features/hr/utils/helpers";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "@/lib/format/locale";
 
 /** `yyyy-mm-dd` (or an ISO datetime) as a short readable date, local time. */
-function formatReviewDate(value: unknown): string {
+function formatReviewDate(value: unknown, locale: string = "ar"): string {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
   const parsed = new Date(raw.length <= 10 ? `${raw}T00:00:00` : raw);
   if (Number.isNaN(parsed.getTime())) return raw;
-  return parsed.toLocaleDateString("ar-EG", {
+  return parsed.toLocaleDateString(locale, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
-}
-
-function employmentTypeLabel(value: unknown): string {
-  const found = EMPLOYMENT_TYPES.find((t) => t.value === String(value ?? ""));
-  return found?.label ?? String(value ?? "—");
 }
 
 /**
@@ -32,7 +32,7 @@ function employmentTypeLabel(value: unknown): string {
  * silently corrected: the most likely causes are a contract already renewed, or
  * a typo the owner should see now rather than discover at payroll.
  */
-function contractEndSummary(value: unknown): { text: string; imminent: boolean } | null {
+function contractEndSummary(value: unknown, t: (key: string, opts?: any) => string, locale: string = "ar"): { text: string; imminent: boolean } | null {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
   const parsed = new Date(`${raw.slice(0, 10)}T00:00:00`);
@@ -42,9 +42,9 @@ function contractEndSummary(value: unknown): { text: string; imminent: boolean }
   today.setHours(0, 0, 0, 0);
   const days = Math.round((parsed.getTime() - today.getTime()) / 86_400_000);
 
-  if (days < 0) return { text: `${formatReviewDate(raw)} (منتهٍ)`, imminent: true };
-  if (days <= 30) return { text: `${formatReviewDate(raw)} (${days} يوم)`, imminent: true };
-  return { text: formatReviewDate(raw), imminent: false };
+  if (days < 0) return { text: `${formatReviewDate(raw, locale)} (${t("hr.expired")})`, imminent: true };
+  if (days <= 30) return { text: `${formatReviewDate(raw, locale)} (${days} ${t("hr.days")})`, imminent: true };
+  return { text: formatReviewDate(raw, locale), imminent: false };
 }
 
 export default function ReviewTab({
@@ -67,6 +67,8 @@ export default function ReviewTab({
     the record has been loaded, so both are read and the count falls back to the
     ids when there are no names to show.
   */
+  const { t, i18n } = useTranslation("owner");
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
   const serviceIds = Array.isArray(formData.serviceIds) ? formData.serviceIds : [];
   const serviceObjects = Array.isArray(formData.services) ? formData.services : [];
   const serviceSummary =
@@ -108,7 +110,7 @@ export default function ReviewTab({
     )
     .filter(Boolean);
 
-  const contractEnd = contractEndSummary(formData.contractEndDate);
+  const contractEnd = contractEndSummary(formData.contractEndDate, t, locale);
 
   return (
           <div className="space-y-8 animate-in fade-in duration-500">
@@ -121,41 +123,39 @@ export default function ReviewTab({
                 />
               </div>
               <h3 className="text-2xl font-black text-main">
-                مراجعة البيانات النهائية
+                 {t("hr.reviewTitle")}
               </h3>
               <p className="text-sm font-bold text-muted">
-                يرجى التدقيق في بيانات الكادر قبل الاعتماد النهائي.
+                 {t("hr.reviewDesc")}
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-3xl border border-border bg-soft/30 p-6 space-y-4">
                 <h4 className="text-xs font-black text-muted uppercase tracking-[0.2em] border-b border-border pb-2">
-                  الهوية والعمل
+                   {t("hr.identityWork")}
                 </h4>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-xs font-bold text-muted">الاسم:</span>
+                    <span className="text-xs font-bold text-muted">{t("hr.nameLabel")}</span>
                     <span className="text-xs font-black text-main">
                       {formData.fullName}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-xs font-bold text-muted">
-                      المسمى:
+                       {t("hr.jobTitleLabel")}
                     </span>
                     <Badge
                       variant="outline"
                       className="text-xs font-black uppercase"
                     >
-                      {isCustomJobTitleValue(formData.jobTitle) && formData.jobTitle
-                        ? formData.jobTitle
-                        : blueprint.title}
+                      {jobTitleLabel(formData.jobTitle, t)}
                     </Badge>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-xs font-bold text-muted">
-                      الجوال:
+                       {t("hr.phoneLabel")}
                     </span>
                     <span className="text-xs font-black text-main" dir="ltr">
                       {formData.phonePrimary}
@@ -164,7 +164,7 @@ export default function ReviewTab({
                   {formData.email ? (
                     <div className="flex justify-between gap-4">
                       <span className="text-xs font-bold text-muted shrink-0">
-                        البريد:
+                         {t("hr.emailLabel")}
                       </span>
                       <span
                         className="text-xs font-black text-main truncate"
@@ -184,7 +184,7 @@ export default function ReviewTab({
                   {formData.nationalId ? (
                     <div className="flex justify-between gap-4">
                       <span className="text-xs font-bold text-muted shrink-0">
-                        رقم الهوية:
+                         {t("hr.nationalIdLabel")}
                       </span>
                       <span className="text-xs font-black text-main" dir="ltr">
                         {String(formData.nationalId)}
@@ -194,27 +194,27 @@ export default function ReviewTab({
                   {formData.birthDate ? (
                     <div className="flex justify-between gap-4">
                       <span className="text-xs font-bold text-muted shrink-0">
-                        تاريخ الميلاد:
+                         {t("hr.birthDateLabel")}
                       </span>
                       <span className="text-xs font-black text-main">
-                        {formatReviewDate(formData.birthDate)}
+                        {formatReviewDate(formData.birthDate, locale)}
                       </span>
                     </div>
                   ) : null}
                   <div className="flex justify-between gap-4">
                     <span className="text-xs font-bold text-muted shrink-0">
-                      تاريخ الالتحاق:
+                       {t("hr.hireDateLabel")}
                     </span>
                     <span className="text-xs font-black text-main">
-                      {formatReviewDate(formData.hireDate) || "—"}
+                      {formatReviewDate(formData.hireDate, locale) || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-xs font-bold text-muted">
-                      نظام التعاقد:
+                       {t("hr.contractTypeLabel")}
                     </span>
                     <span className="text-xs font-black text-main">
-                      {employmentTypeLabel(formData.employmentType)}
+                      {employmentTypeLabel(formData.employmentType, t)}
                     </span>
                   </div>
                   {/*
@@ -225,7 +225,7 @@ export default function ReviewTab({
                   {contractEnd && contractEnd.imminent && (
                     <div className="flex justify-between gap-4">
                       <span className="text-xs font-bold text-muted shrink-0">
-                        انتهاء العقد:
+                         {t("hr.contractEndLabel")}
                       </span>
                       <span
                         className={cn(
@@ -240,7 +240,7 @@ export default function ReviewTab({
                   {formData.department ? (
                     <div className="flex justify-between gap-4">
                       <span className="text-xs font-bold text-muted shrink-0">
-                        القسم:
+                         {t("hr.departmentLabel")}
                       </span>
                       <span className="text-xs font-black text-main truncate">
                         {formData.department}
@@ -252,20 +252,24 @@ export default function ReviewTab({
 
               <div className="rounded-3xl border border-border bg-soft/30 p-6 space-y-4">
                 <h4 className="text-xs font-black text-muted uppercase tracking-[0.2em] border-b border-border pb-2">
-                  الهيكل المالي
+                   {t("hr.financialStructure")}
                 </h4>
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-xs font-bold text-muted">
-                      الراتب الأساسي:
+                       {t("hr.baseSalaryLabel")}
                     </span>
                     <span className="text-xs font-black text-success">
-                      {formatCurrency(formData.baseSalary ?? 0)}
+                      {formatEmployeeMoney(
+                        formData.baseSalary ?? 0,
+                        locale,
+                        i18n.resolvedLanguage || i18n.language,
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-xs font-bold text-muted">
-                      العمولة:
+                       {t("hr.commissionLabel2")}
                     </span>
                     <span className="text-xs font-black text-main">
                       {formData.commissionRate}%
@@ -273,7 +277,7 @@ export default function ReviewTab({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-xs font-bold text-muted">
-                      طريقة الصرف:
+                       {t("hr.paymentMethodLabel")}
                     </span>
                     <span className="text-xs font-black text-main uppercase">
                       {formData.paymentMethod}
@@ -283,7 +287,7 @@ export default function ReviewTab({
                   formData.walletNumber ? (
                     <div className="flex justify-between gap-4">
                       <span className="text-xs font-bold text-muted shrink-0">
-                        رقم المحفظة:
+                         {t("hr.walletNumberLabel")}
                       </span>
                       <span className="text-xs font-black text-main" dir="ltr">
                         {String(formData.walletNumber)}
@@ -294,7 +298,7 @@ export default function ReviewTab({
                   formData.bankAccount ? (
                     <div className="flex justify-between gap-4">
                       <span className="text-xs font-bold text-muted shrink-0">
-                        الحساب البنكي:
+                         {t("hr.bankAccountLabel")}
                       </span>
                       <span
                         className="text-xs font-black text-main truncate"
@@ -319,20 +323,20 @@ export default function ReviewTab({
               {serviceSummary && (
                 <div className="rounded-3xl border border-border bg-soft/30 p-6 space-y-4">
                   <h4 className="text-xs font-black text-muted uppercase tracking-[0.2em] border-b border-border pb-2">
-                    المؤهلات والخدمات
+                     {t("hr.qualifications")}
                   </h4>
                   <div className="space-y-3">
                     <div className="flex justify-between gap-4">
                       <span className="text-xs font-bold text-muted shrink-0">
-                        الخدمات المسجلة:
+                         {t("hr.registeredServices")}
                       </span>
                       <span className="text-xs font-black text-main">
-                        {serviceSummary.count} خدمة
+                         {t("hr.servicesCount", {"count": serviceSummary.count})}
                       </span>
                     </div>
                     {serviceSummary.names.length > 0 && (
                       <p className="text-[11px] font-bold leading-relaxed text-muted">
-                        {serviceSummary.names.join("، ")}
+                        {serviceSummary.names.join(", ")}
                       </p>
                     )}
                   </div>
@@ -342,12 +346,12 @@ export default function ReviewTab({
               {formData.assistantOfBarberId ? (
                 <div className="rounded-3xl border border-border bg-soft/30 p-6 space-y-4">
                   <h4 className="text-xs font-black text-muted uppercase tracking-[0.2em] border-b border-border pb-2">
-                    نظام المساعدين
+                     {t("hr.assistantSystem")}
                   </h4>
                   <div className="space-y-3">
                     <div className="flex justify-between gap-4">
                       <span className="text-xs font-bold text-muted shrink-0">
-                        مرتبط بالحلاق رقم:
+                         {t("hr.assistantLinkedTo")}
                       </span>
                       <span className="text-xs font-black text-main" dir="ltr">
                         {formData.assistantOfBarberId}
@@ -355,15 +359,15 @@ export default function ReviewTab({
                     </div>
                     <div className="flex justify-between gap-4">
                       <span className="text-xs font-bold text-muted shrink-0">
-                        يستحق عمولة:
+                         {t("hr.receivesCommission")}
                       </span>
                       <span className="text-xs font-black text-main">
-                        {formData.receivesCommission ? "نعم" : "لا"}
+                         {formData.receivesCommission ? t("hr.yes") : t("hr.no")}
                       </span>
                     </div>
                     {assistantTaskNames.length > 0 && (
                       <p className="text-[11px] font-bold leading-relaxed text-muted">
-                        المهام: {assistantTaskNames.join("، ")}
+                         {t("hr.tasks")} {assistantTaskNames.join(", ")}
                       </p>
                     )}
                   </div>
@@ -376,28 +380,28 @@ export default function ReviewTab({
               */}
               <div className="rounded-3xl border border-border bg-soft/30 p-6 space-y-4">
                 <h4 className="text-xs font-black text-muted uppercase tracking-[0.2em] border-b border-border pb-2">
-                  الظهور والحالة
+                   {t("hr.visibilityStatus")}
                 </h4>
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-xs font-bold text-muted">
-                      في نقاط البيع:
+                       {t("hr.inPos")}
                     </span>
                     <span className="text-xs font-black text-main">
-                      {formData.showInPos === false ? "مخفي" : "ظاهر"}
+                       {formData.showInPos === false ? t("hr.hidden") : t("hr.visible")}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-xs font-bold text-muted">
-                      في الحجز الإلكتروني:
+                       {t("hr.inBooking")}
                     </span>
                     <span className="text-xs font-black text-main">
-                      {formData.showInBooking === false ? "مخفي" : "ظاهر"}
+                       {formData.showInBooking === false ? t("hr.hidden") : t("hr.visible")}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-xs font-bold text-muted">
-                      الحالة:
+                       {t("hr.status")}
                     </span>
                     <span className="text-xs font-black text-main">
                       {formData.status || "active"}
@@ -414,10 +418,10 @@ export default function ReviewTab({
                     </div>
                     <div>
                       <h4 className="text-sm font-black text-main">
-                        حساب النظام جاهز
+                         {t("hr.systemAccountReady")}
                       </h4>
                       <p className="text-xs font-bold text-muted">
-                        اسم المستخدم:{" "}
+                         {t("hr.usernameLabel")}{" "}
                         <span className="font-black text-accent">
                           {formData.username}
                         </span>
@@ -438,8 +442,8 @@ export default function ReviewTab({
                 <div className="p-4 rounded-2xl bg-warning-soft border border-warning/20 flex items-start gap-3 text-warning">
                   <ShieldAlert size={20} />
                   <p className="text-sm font-bold leading-relaxed">
-                    تحذير: لا يمكن لهذا الدور العمل بدون حساب نظام. يرجى العودة
-                    لخطوة "بوابة النظام".
+                     {t("hr.warningNoAccount")}
+
                   </p>
                 </div>
               )}
@@ -459,13 +463,14 @@ export default function ReviewTab({
             >
               <CheckCircle2 size={18} className="ms-2" aria-hidden="true" />
               {isActionLoading
-                ? "جاري الاعتماد..."
+                ? t("hr.submitting")
                 : isEditing
-                  ? "قبول التعديلات"
-                  : "قبول الموظف الجديد"}
+                  ? t("hr.approveChanges")
+                  : t("hr.approveNew")
+              }
             </Button>
             <p className="mt-3 text-center text-[11px] font-bold leading-relaxed text-muted">
-              بالضغط على "قبول" يتم اعتماد البيانات وحفظها في المنظومة.
+               {t("hr.approveNote")}
             </p>
           </div>
           </div>

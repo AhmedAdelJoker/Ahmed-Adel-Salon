@@ -37,8 +37,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { formatNumber } from "@/lib/core/utils";
 import { Pagination } from "@/components/shared/Pagination";
+import { useTranslation } from "react-i18next";
 
 export default function Inventory() {
+  const { t, i18n } = useTranslation("owner");
+  const lang: "ar" | "en" = (i18n.resolvedLanguage || i18n.language || "ar").startsWith("en") ? "en" : "ar";
   const navigate = useNavigate();
   const { user } = useAuth();
   const isOwner = ["OWNER", "ADMIN"].includes(
@@ -108,7 +111,7 @@ export default function Inventory() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-primary">
           <Activity className="h-8 w-8 animate-pulse" />
-          <p className="text-xs font-bold text-muted">جاري تحميل المخزون...</p>
+          <p className="text-xs font-bold text-muted">{t("inventory.loading")}</p>
         </div>
       </div>
     );
@@ -118,9 +121,9 @@ export default function Inventory() {
     <div>
       <PageShell contained>
         <PageHeader className={undefined}
-          title="إدارة المستودع"
-          subtitle="نظام أتمتة المخزون والربط المالي الكامل"
-          badge="لوحة المستودع"
+          title={t("inventory.title")}
+          subtitle={t("inventory.subtitle")}
+          badge={t("inventory.badge")}
           icon={Package}
           actions={
             <div className="flex flex-wrap items-center gap-2">
@@ -130,7 +133,7 @@ export default function Inventory() {
                 onClick={() => navigate("/inventory/bundles")}
               >
                 <Gift size={14} className="ms-1.5" />{" "}
-                <span className="hidden sm:inline">حزم</span>
+                <span className="hidden sm:inline">{t("inventory.bundles")}</span>
               </Button>
               <Button
                 variant="outline"
@@ -138,7 +141,7 @@ export default function Inventory() {
                 onClick={() => navigate("/inventory/archive")}
               >
                 <History size={14} className="ms-1.5" />{" "}
-                <span className="hidden sm:inline">أرشيف</span>
+                <span className="hidden sm:inline">{t("inventory.archive")}</span>
               </Button>
               <Button
                 variant="outline"
@@ -146,13 +149,13 @@ export default function Inventory() {
                 onClick={() => handleExport("excel")}
               >
                 <FileDown size={14} className="ms-1.5" />{" "}
-                <span className="hidden sm:inline">تصدير</span>
+                <span className="hidden sm:inline">{t("inventory.export")}</span>
               </Button>
               <Button
                 onClick={openCreate}
                 className="h-10 rounded-xl px-4 text-xs"
               >
-                <Plus size={14} className="ms-1.5" /> إضافة
+                <Plus size={14} className="ms-1.5" /> {t("inventory.addProduct")}
               </Button>
             </div>
           }
@@ -166,7 +169,7 @@ export default function Inventory() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[8px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  إجمالي القيمة
+                  {t("inventory.totalValue")}
                 </p>
                 <p className="truncate text-sm font-black text-main sm:text-lg">
                   {formatCurrency(stats.value)}
@@ -181,7 +184,7 @@ export default function Inventory() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[8px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  تكلفة المخزون
+                  {t("inventory.stockCost")}
                 </p>
                 <p className="truncate text-sm font-black text-main sm:text-lg">
                   {formatCurrency(stats.cost)}
@@ -206,7 +209,7 @@ export default function Inventory() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[8px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  نواقص
+                  {t("inventory.lowStock")}
                 </p>
                 <p className="text-sm font-black text-main sm:text-lg">
                   {stats.lowStock}
@@ -221,7 +224,7 @@ export default function Inventory() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[8px] font-bold uppercase tracking-widest text-muted sm:text-[10px]">
-                  إجمالي الأصناف
+                  {t("inventory.totalItems")}
                 </p>
                 <p className="text-sm font-black text-main sm:text-lg">
                   {stats.total}
@@ -242,18 +245,17 @@ export default function Inventory() {
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-black text-main sm:text-base">
-                  سجل حركات المخزون
+                  {t("inventory.movementLog")}
                 </h3>
                 <p className="mt-0.5 text-[11px] font-bold leading-relaxed text-muted sm:text-xs">
-                  كل عمليات التوريد والصرف والتعديلات — بالرصيد قبل وبعد واسم
-                  المنشئ. للمراجعة والتدقيق فقط.
+                  {t("inventory.movementDesc")}
                 </p>
               </div>
               <Button
                 onClick={() => navigate("/inventory/archive")}
                 className="h-11 shrink-0 gap-2 rounded-xl px-6 text-xs font-black"
               >
-                <History size={15} /> فتح سجل الحركات
+                <History size={15} /> {t("inventory.openMovementLog")}
               </Button>
             </div>
           </PremiumCard>
@@ -268,17 +270,17 @@ export default function Inventory() {
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-black text-main sm:text-base">
-                  باقات المنتجات
+                  {t("inventory.productBundles")}
                 </h3>
                 <p className="mt-0.5 text-[11px] font-bold leading-relaxed text-muted sm:text-xs">
-                  تجميع أصناف في عروض وحزم جاهزة للبيع المباشر.
+                  {t("inventory.bundlesDesc")}
                 </p>
               </div>
               <Button
                 onClick={() => navigate("/inventory/bundles")}
                 className="h-11 shrink-0 gap-2 rounded-xl px-6 text-xs font-black bg-amber-500 hover:bg-amber-600 text-white"
               >
-                <Gift size={15} /> إدارة الباقات
+                <Gift size={15} /> {t("inventory.manageBundles")}
               </Button>
             </div>
           </PremiumCard>
@@ -292,7 +294,7 @@ export default function Inventory() {
                 <Input
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="ابحث بالاسم أو التصنيف أو الكود..."
+                  placeholder={t("inventory.searchPlaceholder")}
                   className="h-10 w-full rounded-xl bg-soft border-border pe-9 text-xs font-bold sm:h-12 sm:rounded-xl sm:text-sm"
                 />
               </div>
@@ -302,13 +304,13 @@ export default function Inventory() {
                     value="active"
                     className="h-full rounded-lg px-3 text-[10px] font-black sm:px-5 sm:text-xs"
                   >
-                    النشط ({stats.active})
+                    {t("inventory.activeCount", { count: stats.active })}
                   </TabsTrigger>
                   <TabsTrigger
                     value="archived"
                     className="h-full rounded-lg px-3 text-[10px] font-black sm:px-5 sm:text-xs"
                   >
-                    الأرشيف ({stats.archived})
+                    {t("inventory.archivedCount", { count: stats.archived })}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -319,7 +321,7 @@ export default function Inventory() {
             <div className="flex items-center gap-3 border-b border-danger/10 bg-danger/5 px-3 py-2.5 sm:px-5 sm:py-3">
               <AlertTriangle size={14} className="shrink-0 text-danger" />
               <p className="text-[10px] font-bold text-danger sm:text-xs">
-                يوجد {stats.lowStock} أصناف قاربت على النفاد
+                {t("inventory.lowStockAlert", { count: stats.lowStock })}
               </p>
             </div>
           )}
@@ -387,7 +389,7 @@ alt={product.name}
                               {product.company_name
                                 ? `${product.company_name} • `
                                 : ""}
-                              {product.category || "عام"}
+                              {product.category || t("inventory.categoryFallback")}
                             </p>
                           </div>
                         </div>
@@ -402,21 +404,21 @@ alt={product.name}
                           className="shrink-0 rounded-md px-1.5 py-0.5 text-[7px] font-black uppercase sm:px-2 sm:py-0.5 sm:text-[8px]"
                         >
                           {product.is_archived
-                            ? "مؤرشف"
+                            ? t("inventory.archived")
                             : isLow
-                              ? "منخفض"
-                              : "مستقر"}
+                              ? t("inventory.low")
+                              : t("inventory.stable")}
                         </Badge>
                       </div>
 
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <div className="rounded-lg bg-soft p-2 sm:p-3">
                           <p className="text-[8px] font-bold uppercase tracking-wider text-muted sm:text-[9px]">
-                            الرصيد
+                            {t("inventory.stock")}
                           </p>
                           <p className="mt-0.5 truncate text-[10px] font-black text-primary sm:text-xs">
                             {product.weight
-                              ? `${formatNumber(availablePacks)} عبوة`
+                              ? `${formatNumber(availablePacks)} ${t("inventory.packs")}`
                               : formatQuantity(
                                   product.quantity || 0,
                                   product.unit,
@@ -425,7 +427,7 @@ alt={product.name}
                         </div>
                         <div className="rounded-lg bg-soft p-2 sm:p-3">
                           <p className="text-[8px] font-bold uppercase tracking-wider text-muted sm:text-[9px]">
-                            البيع
+                            {t("inventory.sell")}
                           </p>
                           <p className="mt-0.5 truncate text-[10px] font-black text-success sm:text-xs">
                             {formatCurrency(product.sell_price ?? 0)}
@@ -436,7 +438,7 @@ alt={product.name}
                       <div className="mt-3 flex items-center justify-between rounded-lg border border-border bg-soft/50 p-2 sm:p-3">
                         <div>
                           <p className="text-[8px] font-bold uppercase text-muted">
-                            إجمالي الكمية
+                            {t("inventory.totalQty")}
                           </p>
                           <p className="text-xs font-black text-main sm:text-sm">
                             {formatQuantity(
@@ -450,7 +452,7 @@ alt={product.name}
                           size="icon"
                           className="h-7 w-7 sm:h-8 sm:w-8"
                           onClick={() => openHistory(product)}
-                          title="سجل الحركات"
+                          title={t("inventory.movementTitle")}
                         >
                           <History size={13} className="text-muted" />
                         </Button>
@@ -462,7 +464,7 @@ alt={product.name}
                           size="icon"
                           className="h-8 w-8 rounded-lg border border-border bg-card text-muted hover:bg-slate-900 hover:text-white hover:border-slate-900 shrink-0 sm:h-10 sm:w-10"
                           onClick={() => openView(product)}
-                          title="عرض التفاصيل (قراءة فقط)"
+                          title={t("inventory.viewDetails")}
                         >
                           <Eye size={14} />
                         </Button>
@@ -471,14 +473,14 @@ alt={product.name}
                           className="h-8 flex-1 rounded-lg text-[10px] font-black sm:h-10 sm:text-xs"
                           onClick={() => openEdit(product)}
                         >
-                          تعديل
+                          {t("inventory.edit")}
                         </Button>
                         <Button
                           variant="primary"
                           className="h-8 flex-1 rounded-lg text-[10px] font-black sm:h-10 sm:text-xs"
                           onClick={() => openStockModal(product)}
                         >
-                          <Plus size={12} className="ms-1" /> توريد
+                          <Plus size={12} className="ms-1" /> {t("inventory.supply")}
                         </Button>
                       </div>
                     </PremiumCard>
@@ -487,15 +489,15 @@ alt={product.name}
               </div>
             ) : (
               <EmptyState
-                title="لا توجد نتائج"
-                message="لم نجد أي أصناف في هذا القسم حالياً."
+                title={t("inventory.noResults")}
+                message={t("inventory.noResultsHint")}
                 icon={Package}
                 action={
                   <Button
                     onClick={openCreate}
                     className="h-10 rounded-xl px-5 text-xs font-black"
                   >
-                    إضافة صنف جديد
+                    {t("inventory.addProductBtn")}
                   </Button>
                 }
               />
@@ -532,7 +534,7 @@ alt={product.name}
               paginator={paginator}
               onPageChange={setPage}
               showSizeChanger={false}
-              locale="ar"
+              locale={lang}
             />
           </div>
         )}

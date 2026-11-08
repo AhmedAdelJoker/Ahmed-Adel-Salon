@@ -25,8 +25,8 @@ export const PERMISSION_PAGES = getPermissionPages();
  * still resolves to a real route. The policy stays hand-written; what is
  * machine-checked is that none of it has gone stale.
  *
- * Prefix matching is deliberate and load-bearing: `/owner/hr` covers
- * `/owner/hr/archive`, and `/inventory` covers `/inventory/bundles`. That is why
+ * Prefix matching is deliberate and load-bearing: `/manager/hr` covers
+ * `/manager/hr/archive`, and `/inventory` covers `/inventory/bundles`. That is why
  * these are prefixes and not exact keys.
  */
 export const DEFAULT_ROLE_PERMISSION_PATHS: Record<string, string[]> = {
@@ -51,8 +51,8 @@ export const DEFAULT_ROLE_PERMISSION_PATHS: Record<string, string[]> = {
     "/expenses",
     "/activity-logs",
     "/owner/security-access",
-    "/owner/hr",
-    "/owner/hr/archive",
+    "/manager/hr",
+    "/manager/hr/archive",
     "/owner/working-hours",
     "/owner/loyalty-settings",
     "/owner/reports",
@@ -100,6 +100,7 @@ export const DEFAULT_ROLE_PERMISSION_PATHS: Record<string, string[]> = {
     "/owner/payroll/archive",
     "/owner/cashbox",
     "/owner/adjustment-requests",
+    "/approvals",
     "/activity-logs",
     "/profile",
     "/settings",

@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
   Clock,
@@ -64,6 +65,7 @@ export default function BookingFormDialog({
   saving,
   phoneInputRef,
 }: any) {
+  const { t } = useTranslation("bookings");
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -77,11 +79,13 @@ export default function BookingFormDialog({
               <Zap size={20} fill="currentColor" />
             </div>
             <span>
-              {editingBooking ? "تعديل بيانات الحجز" : "تسجيل حجز جديد"}
+              {editingBooking
+                ? t("form.editTitle")
+                : t("form.newTitle")}
             </span>
           </DialogTitle>
           <DialogDescription className="text-white/70 font-medium text-xs sm:text-sm mt-1.5">
-            منظومة الحجز الذكية: بحث بالرقم، كشف تضارب، وتنظيم الخدمات بحرفية.
+            {t("form.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -92,13 +96,15 @@ export default function BookingFormDialog({
             {/* Customer Phone Search */}
             <div className="space-y-3">
               <label className="text-xs font-black text-muted uppercase tracking-wider block">
-                رقم هاتف العميل
+                {t("form.phoneLabel")}
               </label>
               <div className="relative w-full">
                 <Input
                   ref={phoneInputRef}
                   type="tel"
+                  inputMode="numeric"
                   placeholder="01xxxxxxxxx"
+                  maxLength={11}
                   dir="ltr"
                   className="h-12 sm:h-14 rounded-2xl bg-soft border-border focus:bg-card font-black text-lg text-center"
                   value={formData.customerPhone}
@@ -136,7 +142,7 @@ export default function BookingFormDialog({
               </div>
 
               {/* Customer Found State */}
-              <AnimatePresence mode="wait">
+              <AnimatePresence>
                 {customerMode === "found" && foundCustomer && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -154,7 +160,7 @@ export default function BookingFormDialog({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-                          العميل المسجل
+                          {t("form.registeredCustomer")}
                         </p>
                         {foundCustomer.visit_count > 10 && (
                           <Badge className="bg-amber-500 text-white text-[10px] font-black px-1.5 h-4 border-none">
@@ -179,11 +185,11 @@ export default function BookingFormDialog({
                     className="p-4 rounded-2xl bg-accent/5 border-2 border-dashed border-accent/30 space-y-3"
                   >
                     <p className="text-xs font-black text-accent flex items-center gap-2">
-                      <Sparkles size={14} /> عميل جديد! أدخل البيانات الأساسية:
+                      <Sparkles size={14} /> {t("form.newCustomer")}
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Input
-                        placeholder="الاسم الأول..."
+                        placeholder={t("form.firstNamePlaceholder")}
                         className="h-11 rounded-xl bg-card border-border font-bold text-xs"
                         value={formData.customerName}
                         onChange={(e) =>
@@ -194,7 +200,7 @@ export default function BookingFormDialog({
                         }
                       />
                       <Input
-                        placeholder="اسم العائلة..."
+                        placeholder={t("form.lastNamePlaceholder")}
                         className="h-11 rounded-xl bg-card border-border font-bold text-xs"
                         value={formData.customerLastName}
                         onChange={(e) =>
@@ -224,7 +230,7 @@ export default function BookingFormDialog({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-black text-muted uppercase">
-                    التاريخ
+                    {t("form.dateLabel")}
                   </label>
                   <Input
                     type="date"
@@ -252,7 +258,7 @@ export default function BookingFormDialog({
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-black text-muted uppercase">
-                      تحديد الموعد
+                      {t("form.timeLabel")}
                     </label>
                     {formData.appointmentTime && (
                       <div className="flex items-center gap-1">
@@ -277,7 +283,7 @@ export default function BookingFormDialog({
                           }}
                           className="h-6 px-2 rounded-md bg-soft text-main hover:text-accent text-[11px] font-black border border-border"
                         >
-                          -15 دقيقة
+                          {t("form.minus15")}
                         </button>
                         <button
                           type="button"
@@ -300,7 +306,7 @@ export default function BookingFormDialog({
                           }}
                           className="h-6 px-2 rounded-md bg-soft text-main hover:text-accent text-[11px] font-black border border-border"
                         >
-                          +15 دقيقة
+                          {t("form.plus15")}
                         </button>
                       </div>
                     )}
@@ -334,9 +340,19 @@ export default function BookingFormDialog({
                               ? "bg-accent border-accent text-white shadow-sm"
                               : slot.available
                                 ? "bg-card border-border text-main hover:border-accent"
-                                : "bg-soft text-muted border-transparent opacity-40 cursor-not-allowed",
+                                : "bg-soft text-muted border-transparent opacity-40 cursor-not-allowed line-through decoration-rose-500/70",
                           )}
                           disabled={!slot.available}
+                          title={
+                            slot.available
+                              ? t("form.pickSlot")
+                              : t("form.slotTaken")
+                          }
+                          aria-label={
+                            slot.available
+                              ? t("form.pickSlotAria", { time: slot.time })
+                              : t("form.slotTakenAria", { time: slot.time })
+                          }
                         >
                           {slot.time}
                         </button>
@@ -366,10 +382,10 @@ export default function BookingFormDialog({
               {formData.appointmentTime && (
                 <div className="p-3 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-between text-xs font-bold text-main">
                   <span className="flex items-center gap-1.5 text-accent font-black">
-                    <Clock size={14} /> النهاية المتوقعة:
+                    <Clock size={14} /> {t("form.expectedEnd")}
                   </span>
                   <span className="font-black text-accent dir-ltr">
-                    {calculateEndTime() || "جاري الحساب..."}
+                    {calculateEndTime() || t("form.calculating")}
                   </span>
                 </div>
               )}
@@ -377,7 +393,7 @@ export default function BookingFormDialog({
               {/* Barber Select */}
               <div className="space-y-2">
                 <label className="text-xs font-black text-muted uppercase">
-                  الخبير المسؤول
+                  {t("reschedule.barber")}
                 </label>
                 <Select
                   value={formData.employeeId}
@@ -398,7 +414,7 @@ export default function BookingFormDialog({
                         "border-rose-500 bg-rose-50 dark:bg-rose-950/20",
                     )}
                   >
-                    <SelectValue placeholder="اختر الخبير..." />
+                    <SelectValue placeholder={t("reschedule.barberPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-border shadow-premium">
                     {employees.map((e: any) => (
@@ -426,7 +442,7 @@ export default function BookingFormDialog({
           <div className="space-y-6">
             <div className="space-y-3">
               <label className="text-xs font-black text-muted uppercase tracking-wider block">
-                اختيار الخدمات
+                {t("form.servicesLabel")}
               </label>
 
               {/* Category Tabs */}
@@ -440,7 +456,7 @@ export default function BookingFormDialog({
                     value="all"
                     className="rounded-lg px-3 py-1.5 text-xs font-black data-[state=active]:bg-card data-[state=active]:text-primary"
                   >
-                    الكل
+                    {t("chips.all")}
                   </TabsTrigger>
                   {categories.map((c: any) => (
                     <TabsTrigger
@@ -509,7 +525,7 @@ export default function BookingFormDialog({
                   <div className="pt-3 border-t border-border/40 flex justify-between items-center">
                     <div>
                       <p className="text-[11px] font-black text-muted uppercase">
-                        المبلغ المتوقع
+                        {t("form.expectedAmount")}
                       </p>
                       <p className="text-2xl font-black text-accent tabular-nums">
                         {formData.services.reduce((sum: number, item: any) => {
@@ -532,10 +548,10 @@ export default function BookingFormDialog({
             {/* Special Notes */}
             <div className="space-y-2">
               <label className="text-xs font-black text-muted uppercase tracking-wider block">
-                ملاحظات خاصة
+                {t("form.notesLabel")}
               </label>
               <textarea
-                placeholder="أي رغبات إضافية للعميل..."
+                placeholder={t("form.notesPlaceholder")}
                 className="w-full h-20 rounded-xl bg-soft border border-border p-3 font-bold text-xs focus:bg-card focus:border-accent outline-none resize-none transition-all"
                 value={formData.notes}
                 onChange={(e) =>
@@ -553,7 +569,7 @@ export default function BookingFormDialog({
             onClick={() => onOpenChange(false)}
             className="rounded-xl font-black px-6 h-11 text-xs"
           >
-            إلغاء الأمر
+            {t("form.cancel")}
           </Button>
           <Button
             onClick={onSave}
@@ -563,7 +579,9 @@ export default function BookingFormDialog({
           >
             <Save size={16} />
             <span>
-              {editingBooking ? "حفظ التعديلات" : "تأكيد وتسجيل الحجز"}
+              {editingBooking
+                ? t("form.saveEdit")
+                : t("form.confirmCreate")}
             </span>
           </Button>
         </DialogFooter>

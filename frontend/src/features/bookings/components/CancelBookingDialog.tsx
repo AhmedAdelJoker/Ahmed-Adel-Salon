@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,6 +23,17 @@ export default function CancelBookingDialog({
   onConfirm,
   saving,
 }: any) {
+  const { t } = useTranslation("bookings");
+  // Reasons are stored by their (translated) label — same shape the API
+  // received before i18n, while the bilingual UI stays fully translatable.
+  const otherReasonLabel = t("cancel.reasonOther");
+  const reasonOptions = [
+    t("cancel.reasonReschedule"),
+    t("cancel.reasonEmergency"),
+    t("cancel.reasonNoAnswer"),
+    otherReasonLabel,
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -33,17 +45,17 @@ export default function CancelBookingDialog({
             <AlertTriangle size={28} className="text-white" />
           </div>
           <DialogTitle className="text-lg font-black relative z-10 mb-1">
-            تأكيد إلغاء الحجز
+            {t("cancel.title")}
           </DialogTitle>
           <p className="text-white/80 text-xs font-medium relative z-10">
-            يرجى تحديد سبب الإلغاء لضمان دقة البيانات والتحليلات.
+            {t("cancel.description")}
           </p>
         </div>
 
         <div className="p-6 space-y-4">
           <div className="p-3.5 rounded-xl bg-soft border border-border/50">
             <p className="text-[11px] font-black text-muted uppercase mb-0.5">
-              العميل
+              {t("cancel.customer")}
             </p>
             <p className="font-bold text-xs text-main break-words">
               {getBookingCustomerName(bookingToCancel)}
@@ -53,7 +65,7 @@ export default function CancelBookingDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-xl bg-soft border border-border/50">
               <p className="text-[11px] font-black text-muted uppercase mb-0.5">
-                التاريخ
+                {t("cancel.date")}
               </p>
               <p className="font-bold text-xs text-main">
                 {bookingToCancel?.appointment_date}
@@ -61,7 +73,7 @@ export default function CancelBookingDialog({
             </div>
             <div className="p-3 rounded-xl bg-soft border border-border/50">
               <p className="text-[11px] font-black text-muted uppercase mb-0.5">
-                الوقت
+                {t("cancel.time")}
               </p>
               <p className="font-bold text-xs text-main dir-ltr text-right">
                 {formatTime12h(timeOnly(bookingToCancel?.appointment_time))}
@@ -71,10 +83,10 @@ export default function CancelBookingDialog({
 
           <div className="space-y-2">
             <label className="text-xs font-black text-muted uppercase block">
-              سبب الإلغاء
+              {t("cancel.reasonLabel")}
             </label>
             <div className="grid grid-cols-2 gap-2">
-              {["تغيير الموعد", "حالة طارئة", "عدم الرد", "أخرى"].map(
+              {reasonOptions.map(
                 (reason) => (
                   <button
                     key={reason}
@@ -91,11 +103,15 @@ export default function CancelBookingDialog({
                 ),
               )}
             </div>
-            {cancellationReason === "أخرى" && (
+            {cancellationReason === otherReasonLabel && (
               <Input
-                placeholder="يرجى كتابة السبب..."
+                placeholder={t("cancel.otherPlaceholder")}
                 className="h-10 rounded-xl bg-soft border-border text-xs mt-2"
-                value={cancellationReason === "أخرى" ? "" : cancellationReason}
+                value={
+                  cancellationReason === otherReasonLabel
+                    ? ""
+                    : cancellationReason
+                }
                 onChange={(e) => setCancellationReason(e.target.value)}
                 onFocus={() => setCancellationReason("")}
               />
@@ -109,7 +125,7 @@ export default function CancelBookingDialog({
             onClick={() => onOpenChange(false)}
             className="flex-1 rounded-xl font-black text-xs h-11"
           >
-            تراجع
+            {t("cancel.back")}
           </Button>
           <Button
             onClick={onConfirm}
@@ -122,7 +138,7 @@ export default function CancelBookingDialog({
                 : "bg-muted text-muted-foreground",
             )}
           >
-            تأكيد الإلغاء
+            {t("cancel.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

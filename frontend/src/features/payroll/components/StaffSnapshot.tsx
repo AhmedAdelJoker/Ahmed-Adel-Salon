@@ -6,10 +6,12 @@ import { Users } from "lucide-react";
 import api from "@/services/api";
 import type { EmployeeRecord } from "@/types/employee";
 import type { PayrollRecord } from "@/types/payroll";
+import { useTranslation } from "react-i18next";
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg: Record<string, { label: string; variant: "success" | "danger" | "info" | "secondary" | "warning" }> = { paid: { label: "تم الصرف", variant: "success" }, cancelled: { label: "ملغي", variant: "danger" }, audited: { label: "مدقق", variant: "info" }, calculated: { label: "محسوب", variant: "secondary" } };
-  const cur = cfg[status] || { label: status || "غير معروف", variant: "secondary" as const };
+  const { t } = useTranslation("owner");
+  const cfg: Record<string, { label: string; variant: "success" | "danger" | "info" | "secondary" | "warning" }> = { paid: { label: t("payroll.statusPaidLong"), variant: "success" }, cancelled: { label: t("payroll.statusCancelledShort"), variant: "danger" }, audited: { label: t("payroll.statusAuditedLong"), variant: "info" }, calculated: { label: t("payroll.statusCalculatedBadge"), variant: "secondary" } };
+  const cur = cfg[status] || { label: status || t("payroll.unknownStatus"), variant: "secondary" as const };
   return <Badge variant={cur.variant} className="h-6 px-3 rounded-full font-black text-[10px]">{cur.label}</Badge>;
 }
 
@@ -30,15 +32,16 @@ export default function StaffSnapshot({
   setShowAllStaff,
   navigate,
 }: StaffSnapshotProps) {
+  const { t } = useTranslation("owner");
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-sm font-black"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-soft text-primary"><Users size={14} /></span> الكادر الحالي</h2>
+        <h2 className="flex items-center gap-2 text-sm font-black"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-soft text-primary"><Users size={14} /></span> {t("payroll.staffTitle")}</h2>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold text-muted hidden sm:inline">{employees.length} موظف • اضغط للفلترة</span>
+          <span className="text-[11px] font-bold text-muted hidden sm:inline">{t("payroll.staffHint", { count: employees.length })}</span>
           {employees.length > 10 && (
             <Button variant="outline" size="sm" onClick={() => setShowAllStaff((v) => !v)} className="h-8 rounded-xl text-[11px] font-black">
-              {showAllStaff ? "عرض أقل" : `عرض الكل (+${employees.length - 10})`}
+              {showAllStaff ? t("payroll.showLess") : t("payroll.showAll", { count: employees.length - 10 })}
             </Button>
           )}
         </div>
@@ -56,13 +59,13 @@ export default function StaffSnapshot({
                 </div>
                 <div className="space-y-0.5 w-full">
                   <div className="text-xs font-black text-main truncate">{String(emp.full_name || emp.fullName || "—")}</div>
-                  <div className="truncate text-[10px] font-bold uppercase text-muted">{String(emp.job_title || emp.jobTitle || "موظف")}</div>
+                  <div className="truncate text-[10px] font-bold uppercase text-muted">{String(emp.job_title || emp.jobTitle || t("payroll.employeeShort"))}</div>
                 </div>
                 <div className="w-full pt-2 border-t border-border/40 flex justify-between text-[11px]">
-                  <span className="text-muted font-bold">الأساسي</span><span className="font-black text-main tabular-nums">{formatCurrency(emp.base_salary)}</span>
+                  <span className="text-muted font-bold">{t("payroll.baseLabel")}</span><span className="font-black text-main tabular-nums">{formatCurrency(emp.base_salary)}</span>
                 </div>
                 <div className="w-full flex justify-between text-[11px]">
-                  <span className="text-muted font-bold">الصافي</span><span className="font-black text-primary tabular-nums">{formatCurrency(row?.net_salary || 0)}</span>
+                  <span className="text-muted font-bold">{t("payroll.netLabel")}</span><span className="font-black text-primary tabular-nums">{formatCurrency(row?.net_salary || 0)}</span>
                 </div>
                 {row && <StatusBadge status={String(row.status || "")} />}
               </div>
