@@ -60,6 +60,29 @@ def test_list_invoices_summary_covers_full_period_not_page(client, db_session):
     }
 
 
+def test_list_invoices_summary_excludes_closed(client, db_session):
+    invoices = _seed_three_invoices(client, db_session)
+    invoices[0].is_closed = True
+    db_session.commit()
+
+    resp = client.get("/api/v1/invoices", headers=auth_headers(client))
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # Voided invoices are not revenue: sales figures exclude them, the
+    # cancelled count is reported separately, and the row still appears in
+    # the listing (flagged), so the ledger stays complete.
+    assert body["summary"] == {
+        "count": 2,
+        "total": 500.0,
+        "average": 250.0,
+        "closed": 1,
+    }
+    assert body["total"] == 3
+    rows = {row["invoice_no"]: row for row in body["items"]}
+    assert rows["INV-TEST-1"]["status"] == "closed"
+    assert rows["INV-TEST-1"]["is_closed"] is True
+
+
 def test_list_invoices_status_filter_uses_is_closed(client, db_session):
     invoices = _seed_three_invoices(client, db_session)
     invoices[0].is_closed = True

@@ -120,7 +120,11 @@ def test_voided_invoice_is_excluded_from_the_month_figure(client, db_session):
     assert float(body["month"]) == 225.0
     assert float(body["total_sales"]) == 1500.0
     # The cash bucket is today's live sales only: the voided invoice is out.
-    assert float(body["cash"]) == 500.0
+    # On the first of the month the "month-only" rows above are also dated
+    # today, because the month window has no earlier day — the expectation has
+    # to follow the calendar rather than assume the suite never runs on the 1st.
+    expected_cash = 500.0 if now.day > 1 else 1500.0
+    assert float(body["cash"]) == expected_cash
 
 
 def test_a_voided_commission_row_carries_no_commission(client, db_session):

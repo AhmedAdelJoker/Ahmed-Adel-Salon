@@ -320,6 +320,17 @@ def _invoice_status_label(invoice: Invoice) -> str:
     return "صادرة"
 
 
+def _invoice_customer_name(invoice: Invoice) -> str:
+    """Name the invoice was issued under, not the customer's current name."""
+    snapshot = _clean_text(getattr(invoice, "customer_name_snapshot", ""))
+    if snapshot:
+        return snapshot
+    if invoice.customer:
+        return f"{invoice.customer.first_name} {invoice.customer.last_name}".strip()
+    return ""
+
+
+
 def _query_employees(
     db: Session,
     *,
@@ -500,9 +511,7 @@ def _query_invoices(
             if raw_status != status_filter.lower():
                 continue
 
-        customer_name = ""
-        if invoice.customer:
-            customer_name = f"{invoice.customer.first_name} {invoice.customer.last_name}".strip()
+        customer_name = _invoice_customer_name(invoice)
         employee_name = (
             _clean_text(getattr(invoice.employee, "display_name", ""))
             or _clean_text(getattr(invoice.created_by_user, "full_name", ""))
@@ -524,9 +533,7 @@ def _query_invoices(
 def _invoice_rows(invoices: list[Invoice]) -> list[list]:
     rows = []
     for invoice in invoices:
-        customer_name = ""
-        if invoice.customer:
-            customer_name = f"{invoice.customer.first_name} {invoice.customer.last_name}".strip()
+        customer_name = _invoice_customer_name(invoice)
         employee_name = (
             _clean_text(getattr(invoice.employee, "display_name", ""))
             or _clean_text(getattr(invoice.created_by_user, "full_name", ""))

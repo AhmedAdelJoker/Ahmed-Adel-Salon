@@ -11,6 +11,10 @@ from app.schemas.expense import ExpenseRead
 
 class PosShiftOpen(BaseModel):
     opening_cash: Decimal = Field(default=Decimal("0.00"), ge=0)
+    opening_note: Optional[str] = None
+    # Opening outside official hours: a supervisor may override, with a reason.
+    override_hours: bool = False
+    override_reason: Optional[str] = None
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -20,9 +24,14 @@ class PosShiftOpen(BaseModel):
 
 class PosShiftClose(BaseModel):
     counted_cash: Decimal = Field(..., ge=0)
+    closing_note: Optional[str] = None
     manager_review_note: Optional[str] = None
     denominations_json: Optional[str] = None
     discrepancy_note: Optional[str] = None
+    # Manager co-signature, required only for a close over the variance limit
+    # by someone without the role to sign it off alone.
+    approver_username: Optional[str] = None
+    approver_password: Optional[str] = None
 
     model_config = ConfigDict(
         alias_generator=to_camel,

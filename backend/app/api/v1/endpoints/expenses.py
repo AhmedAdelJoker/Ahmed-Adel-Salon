@@ -8,7 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
-from app.api.deps import require_cashier_manager_owner, require_owner_or_manager
+from app.api.deps import require_cashier_manager_owner, require_owner_or_admin, require_owner_or_manager
 from app.models.user import User
 from app.models.expense import Expense
 from app.schemas.expense import ExpenseCreate, ExpenseRead, ExpenseSummary, ExpenseArchiveResponse
@@ -332,7 +332,7 @@ def approve_expense(
     expense_id: int,
     request: Request = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner_or_manager),
+    current_user: User = Depends(require_owner_or_admin),
 ):
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not expense:
@@ -398,7 +398,7 @@ def reject_expense(
     expense_id: int,
     request: Request = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner_or_manager),
+    current_user: User = Depends(require_owner_or_admin),
 ):
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not expense:

@@ -58,8 +58,17 @@ def generate_invoice_pdf(invoice, items, customer, barber=None, shop_name="Salon
     c.drawRightString(width - 20 * mm, y, fix_arabic(f"التاريخ: {invoice.created_at.strftime('%Y-%m-%d %H:%M')}"))
     y -= 10 * mm
 
-    # Customer info
-    customer_name = f"{customer.first_name or ''} {customer.last_name or ''}".strip()
+    # Customer info. Prefer the name snapshotted on the invoice: the customer
+    # row may have been renamed (or shared by a family) since the sale.
+    customer_name = (
+        (getattr(invoice, "customer_name_snapshot", None) or "").strip()
+        or (
+            f"{customer.first_name or ''} {customer.last_name or ''}".strip()
+            if customer
+            else ""
+        )
+        or "عميلنا"
+    )
     c.setFont(font_name, 12)
     c.drawRightString(width - 20 * mm, y, fix_arabic("بيانات العميل"))
     y -= 6 * mm
@@ -67,7 +76,8 @@ def generate_invoice_pdf(invoice, items, customer, barber=None, shop_name="Salon
     c.setFont(font_name, 11)
     c.drawRightString(width - 20 * mm, y, fix_arabic(f"الاسم: {customer_name}"))
     y -= 6 * mm
-    c.drawRightString(width - 20 * mm, y, fix_arabic(f"الهاتف: {customer.phone or '-'}"))
+    customer_phone = getattr(customer, "phone", None) if customer else None
+    c.drawRightString(width - 20 * mm, y, fix_arabic(f"الهاتف: {customer_phone or '-'}"))
     y -= 6 * mm
 
     if barber:

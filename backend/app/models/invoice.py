@@ -24,6 +24,11 @@ class Invoice(Base):
     id = Column(Integer, primary_key=True, index=True)
     invoice_no = Column(String(50), unique=True, nullable=False, index=True)
 
+    # Shift this invoice was raised on. Null for rows predating the link — the
+    # shift totals still work off the (user_id, window) fallback, so existing
+    # reports are unaffected.
+    shift_id = Column(Integer, ForeignKey("pos_shifts.id"), nullable=True, index=True)
+
     # One invoice per appointment. `index=True` alone cannot express this: it
     # answers "which invoices point here" and not "at most one may", and the two
     # look identical in a model file. Without the unique part, two concurrent
@@ -40,11 +45,21 @@ class Invoice(Base):
     # configured rather than guaranteed.
     appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True, unique=True)
     customer_id = Column(Integer, ForeignKey("customers.customer_id"), nullable=False, index=True)
+    # Name as typed at the till for this sale. The customer row stays the
+    # loyalty/contact record; the snapshot is what this invoice printed, so a
+    # later rename (or a family member using the same phone) cannot rewrite an
+    # old receipt.
+    customer_name_snapshot = Column(String(200), nullable=True)
     barber_id = Column(Integer, ForeignKey("employees.id"), nullable=True, index=True)
 
     payment_method = Column(String(30), nullable=False, default="cash")
     subtotal_amount = Column(Numeric(10, 2), nullable=False, default=0)
     discount_amount = Column(Numeric(10, 2), nullable=False, default=0)
+    # Snapshot of the settings' tax_rate at the time of sale, and the amount it
+    # added. Storing both (rather than recomputing from today's rate) is what
+    # keeps a year-old invoice reconciling after the owner changes the rate.
+    tax_rate = Column(Numeric(5, 2), nullable=False, default=0, server_default="0")
+    tax_amount = Column(Numeric(10, 2), nullable=False, default=0, server_default="0")
     total_amount = Column(Numeric(10, 2), nullable=False, default=0)
 
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

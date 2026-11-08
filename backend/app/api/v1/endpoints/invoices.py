@@ -4,11 +4,11 @@ from pathlib import Path
 from datetime import date, datetime
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
-from sqlalchemy import case, extract, func
+from sqlalchemy import case, extract, func, or_
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db.session import get_db
 from app.api.deps import require_archive_manager, require_cashier_manager_owner
@@ -23,6 +23,7 @@ from app.models.service import Service
 from app.models.product import Product
 from app.models.offer import Offer
 from app.models.invoice_payment import InvoicePayment
+from app.models.pos_shift import PosShift
 from app.models.appointment import Appointment
 from app.schemas.invoice import InvoiceItemManualCreate, InvoiceRead, InvoiceManualCreate
 from app.services.activity_service import log_activity
@@ -30,6 +31,8 @@ from app.services.meta_whatsapp_service import upload_and_send_pdf
 from app.services.pdf_service import generate_invoice_pdf
 from app.services.inventory_service import deduct_stock_for_invoice
 from app.core.audit import audit_log
+from app.core.pos import cashier_discount_limit
+from app.core.employee_rules import is_service_provider_job_title, normalize_phone
 from app.models.business_settings import BusinessSettings
 import hashlib
 import json
@@ -46,7 +49,11 @@ router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
 
 def _generate_invoice_no(db: Session) -> str:
-    counter_date = datetime.now().date()
+    # Salon wall-clock, not the server's: the rest of the ledger (shift windows,
+    # daily summary, the invoice's own `created_at`) is evaluated in the salon's
+    # timezone, so a server on UTC numbered invoices under a different business
+    # day than the one the report they belong to opens with.
+    counter_date = salon_now().date()
     today_prefix = f"INV-{counter_date:%Y%m%d}"
     existing_numbers = db.query(Invoice.invoice_no).filter(
         Invoice.invoice_no.like(f"{today_prefix}-%")
@@ -135,6 +142,39 @@ def _invoice_request_hash(payload: InvoiceManualCreate) -> str:
     return hashlib.sha256(serialized).hexdigest()
 
 
+def _clean_customer_name(value: str | None) -> str:
+    return " ".join((value or "").split())
+
+
+def _payload_customer_name(payload: InvoiceManualCreate) -> str:
+    """The full name the cashier typed, from either payload shape.
+
+    `customer_name` is the current field. The first/last pair is kept for
+    offline queues written before this field existed.
+    """
+    full = _clean_customer_name(payload.customer_name)
+    if full:
+        return full
+    parts = [
+        _clean_customer_name(payload.customer_first_name),
+        _clean_customer_name(payload.customer_last_name),
+    ]
+    return _clean_customer_name(" ".join(part for part in parts if part))
+
+
+def _customer_record_name(customer: Customer | None) -> str:
+    if customer is None:
+        return ""
+    return _clean_customer_name(f"{customer.first_name or ''} {customer.last_name or ''}")
+
+
+def _split_customer_name(full_name: str) -> tuple[str, str]:
+    parts = full_name.split()
+    if not parts:
+        return "", ""
+    return parts[0], " ".join(parts[1:])
+
+
 def _validate_idempotency_key(value: str | None) -> str | None:
     if value is None:
         return None
@@ -190,15 +230,90 @@ def _resolve_invoice_item(
     return None, None, offer.id, offer.name_ar or offer.name, _normalize_money(offer.offer_price)
 
 
+def _validate_line_employee(
+    db: Session,
+    employee_id: int | None,
+    *,
+    item_type: str,
+) -> Employee | None:
+    """Resolves the staff member a service/offer line is attributed to.
+
+    A service is a person's time, so it must be attributable to someone who
+    actually provides services. Before this check, any id at all was accepted —
+    a deleted employee, a cashier, an accountant — and every downstream
+    commission and revenue report silently inherited it.
+    """
+    if employee_id is None:
+        return None
+
+    employee = (
+        db.query(Employee)
+        .filter(Employee.id == employee_id, Employee.is_active.is_(True))
+        .first()
+    )
+    if employee is None:
+        raise HTTPException(status_code=400, detail="الموظف المحدد غير موجود أو غير نشط")
+    if item_type in ("service", "offer") and not (
+        is_service_provider_job_title(employee.job_title)
+        or employee.job_title == "barber_assistant"
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="الموظف المحدد لا يمكنه تقديم الخدمات",
+        )
+    return employee
+
+
+def _line_commission_amount(employee: Employee | None, line_total: Decimal) -> Decimal:
+    """Commission for one invoice line, or zero when it does not apply.
+
+    Same eligibility rule the payroll service applies to an invoice total —
+    a service provider earning a commission, or an assistant earning the
+    assistant rate — evaluated per line so the two can no longer disagree.
+    Products carry no commission: no one "performed" a bottle of wax.
+    """
+    if employee is None:
+        return Decimal("0.00")
+
+    if is_service_provider_job_title(employee.job_title):
+        rate = Decimal(str(employee.commission_rate if employee.receives_commission else 0))
+    elif employee.job_title == "barber_assistant" and employee.receives_commission:
+        rate = Decimal(str(employee.assistant_commission_rate or 0))
+    else:
+        rate = Decimal("0")
+
+    if rate <= 0:
+        return Decimal("0.00")
+
+    return (line_total * rate / Decimal("100")).quantize(Decimal("0.01"))
+
+
+def _current_shift_for(db: Session, current_user: User) -> PosShift | None:
+    """The open shift this sale belongs to, if any.
+
+    Only used to stamp the invoice. The legacy (user, window) aggregation is
+    left intact: it is still what older rows and databases without the link
+    reconcile against.
+    """
+    return (
+        db.query(PosShift)
+        .filter(PosShift.user_id == current_user.id, PosShift.status == "open")
+        .order_by(PosShift.id.desc())
+        .first()
+    )
+
+
 def _ensure_invoice_pdf_path(db: Session, invoice: Invoice) -> Path | None:
     if invoice.pdf_path:
         existing_path = Path(str(invoice.pdf_path))
         if existing_path.exists():
             return existing_path
 
-    customer = db.query(Customer).filter(Customer.customer_id == invoice.customer_id).first()
-    if not customer:
-        return None
+    customer = (
+        db.query(Customer).filter(Customer.customer_id == invoice.customer_id).first()
+        if invoice.customer_id
+        else None
+    )
 
     barber = db.query(Employee).filter(Employee.id == invoice.barber_id).first()
     items = db.query(InvoiceItem).filter(InvoiceItem.invoice_id == invoice.id).all()
@@ -288,52 +403,112 @@ def create_manual_invoice(
             ).first()
             return _serialize_invoice(existing_invoice, existing_customer, existing_barber)
 
-    # 1. Handle Customer
+    # 1. Resolve the customer and the exact name this invoice prints.
+    entered_name = _payload_customer_name(payload)
+    customer: Customer | None = None
     customer_id = payload.customer_id
-    
-    # If appointment_id is provided, try to get customer from it if not specified
-    if not customer_id and payload.appointment_id:
-        appt = db.query(Appointment).filter(Appointment.id == payload.appointment_id).first()
-        if appt:
-            customer_id = appt.customer_id
 
-    # If we have name and phone, prioritize finding or creating a real customer record
-    if not customer_id and payload.customer_phone:
-        # Check if customer already exists by phone
-        existing = db.query(Customer).filter(Customer.phone == payload.customer_phone).first()
-        if existing:
-            customer_id = existing.customer_id
-            # Update name if provided and different
-            if payload.customer_first_name and existing.first_name != payload.customer_first_name:
-                existing.first_name = payload.customer_first_name
-        elif payload.customer_first_name:
-            # Create new customer
-            new_customer = Customer(
-                first_name=payload.customer_first_name,
-                last_name=payload.customer_last_name or "",
-                phone=payload.customer_phone,
+    if customer_id:
+        customer = (
+            db.query(Customer)
+            .filter(
+                Customer.customer_id == customer_id,
+                Customer.is_deleted.is_(False),
             )
-            db.add(new_customer)
-            db.flush()
-            customer_id = new_customer.customer_id
+            .first()
+        )
+        if customer is None:
+            raise HTTPException(status_code=404, detail="العميل غير موجود")
 
-    # Final fallback to Walk-in
-    if not customer_id:
-        walk_in = db.query(Customer).filter(Customer.first_name == "Walk-in").first()
-        if not walk_in:
-            walk_in = Customer(
-                first_name="Walk-in",
-                last_name="Customer",
-                phone="0000000000",
+    # An appointment already identifies the buyer; derive the record from it
+    # when the till did not send one explicitly.
+    if customer is None and payload.appointment_id:
+        appt = (
+            db.query(Appointment)
+            .filter(Appointment.id == payload.appointment_id)
+            .first()
+        )
+        if appt and appt.customer_id:
+            customer = (
+                db.query(Customer)
+                .filter(Customer.customer_id == appt.customer_id)
+                .first()
             )
-            db.add(walk_in)
+            if customer is not None:
+                customer_id = customer.customer_id
+
+    # The phone number is the till's identity key: resolve it before creating
+    # anything, so a returning customer keeps their history and loyalty tier.
+    # Normalised to digits first: customers are stored as digits, and the till
+    # accepts spaced/dashed input, so comparing the raw string would miss the
+    # very record the cashier just looked up and create a duplicate.
+    phone = normalize_phone(payload.customer_phone)
+    if customer is None and phone:
+        customer = (
+            db.query(Customer)
+            .filter(
+                Customer.is_deleted.is_(False),
+                or_(
+                    Customer.phone == phone,
+                    Customer.second_phone == phone,
+                ),
+            )
+            .first()
+        )
+        if customer is not None:
+            customer_id = customer.customer_id
+
+    if customer is None:
+        # No existing record: this is a new buyer. The name is mandatory and
+        # must carry at least three segments (first / father / family), which
+        # is what the invoice snapshot prints and what the POS enforces.
+        if not entered_name:
+            raise HTTPException(status_code=422, detail="اسم العميل مطلوب")
+        if len(entered_name.split()) < 3:
+            raise HTTPException(
+                status_code=422,
+                detail="اسم العميل يجب أن يتكوّن من 3 مقاطع على الأقل",
+            )
+
+        if phone:
+            first_name, last_name = _split_customer_name(entered_name)
+            customer = Customer(
+                first_name=first_name,
+                last_name=last_name,
+                phone=phone,
+            )
+            db.add(customer)
             db.flush()
-        customer_id = walk_in.customer_id
+            customer_id = customer.customer_id
+        else:
+            # A guest sale with no phone still needs a customer row for the
+            # invoice FK; the typed name lives in the snapshot.
+            customer = (
+                db.query(Customer)
+                .filter(Customer.first_name == "Walk-in")
+                .first()
+            )
+            if customer is None:
+                customer = Customer(
+                    first_name="Walk-in",
+                    last_name="Customer",
+                    phone="0000000000",
+                )
+                db.add(customer)
+                db.flush()
+            customer_id = customer.customer_id
+
+    customer_name_snapshot = (
+        entered_name or _customer_record_name(customer) or "Walk-in"
+    )
 
     # 2. Calculate Total and Prepare Items
     total_amount = Decimal("0.00")
     invoice_items_to_add = []
     main_barber_id = None
+
+    shift = _current_shift_for(db, current_user)
+    resolved_lines = []
 
     for item_data in payload.items:
         service_id, product_id, offer_id, item_name, price = _resolve_invoice_item(
@@ -343,21 +518,37 @@ def create_manual_invoice(
         line_total = price * qty
         total_amount += line_total
 
-        if not main_barber_id and item_data.employee_id:
-            main_barber_id = item_data.employee_id
+        # Per-line attribution: who did this, and what they earned for it.
+        # Products get no employee (nothing was "performed") and no commission.
+        if item_data.item_type == "product":
+            employee = None
+        else:
+            employee = _validate_line_employee(
+                db, item_data.employee_id, item_type=item_data.item_type
+            )
 
-        invoice_items_to_add.append(
-            InvoiceItem(
-                service_id=service_id,
-                product_id=product_id,
-                offer_id=offer_id,
-                service_name=item_name,
-                quantity=qty,
-                unit_price=price,
-                total_price=line_total,
+        if not main_barber_id and employee is not None:
+            main_barber_id = employee.id
+
+        resolved_lines.append(
+            (
+                item_data,
+                employee,
+                InvoiceItem(
+                    service_id=service_id,
+                    product_id=product_id,
+                    offer_id=offer_id,
+                    service_name=item_name,
+                    quantity=qty,
+                    unit_price=price,
+                    total_price=line_total,
+                    employee_id=employee.id if employee else None,
+                    commission_amount=_line_commission_amount(employee, line_total),
+                ),
             )
         )
 
+    invoice_items_to_add = [line[2] for line in resolved_lines]
     total_amount = total_amount.quantize(Decimal("0.01"))
 
     loyalty_discount = calculate_loyalty_discount(db, customer_id, total_amount)
@@ -369,16 +560,10 @@ def create_manual_invoice(
         and business_settings
         and manual_discount > 0
     ):
-        limit_type = str(
-            business_settings.cashier_discount_limit_type or "percentage"
-        ).lower()
-        limit_value = Decimal(
-            str(business_settings.cashier_discount_limit_value or 0)
-        )
-        if limit_type == "percentage" and total_amount > 0:
-            allowed = total_amount * limit_value / Decimal("100")
-        else:
-            allowed = limit_value
+        # The limit is the owner's setting (`cashier_discount_limit_*`), and
+        # the rule lives in `app.core.pos.cashier_discount_limit` so the POS
+        # and this endpoint cannot disagree about what a cashier may apply.
+        allowed = cashier_discount_limit(business_settings, total_amount)
         if manual_discount > allowed:
             raise HTTPException(
                 status_code=403,
@@ -387,7 +572,16 @@ def create_manual_invoice(
     total_manual_discount = manual_discount + loyalty_discount
     if total_manual_discount > total_amount:
         raise HTTPException(status_code=400, detail="الخصم لا يمكن أن يتجاوز إجمالي الفاتورة")
-    final_amount = (total_amount - total_manual_discount).quantize(Decimal("0.01"))
+    taxable_amount = (total_amount - total_manual_discount).quantize(Decimal("0.01"))
+
+    # VAT on the net amount, at the rate that was in force at sale time. The
+    # rate is snapshotted on the invoice so a later settings change does not
+    # rewrite what this sale owed.
+    tax_rate = Decimal(str(business_settings.tax_rate or 0)) if business_settings else Decimal("0")
+    if tax_rate < 0:
+        tax_rate = Decimal("0")
+    tax_amount = (taxable_amount * tax_rate / Decimal("100")).quantize(Decimal("0.01"))
+    final_amount = (taxable_amount + tax_amount).quantize(Decimal("0.01"))
 
     if payload.payment_method == "split":
         split_total = sum(
@@ -402,12 +596,16 @@ def create_manual_invoice(
         invoice_no=_generate_invoice_no(db),
         appointment_id=payload.appointment_id,
         customer_id=customer_id,
+        customer_name_snapshot=customer_name_snapshot,
         barber_id=main_barber_id,
         payment_method=payload.payment_method,
         subtotal_amount=total_amount,
         discount_amount=total_manual_discount,
+        tax_rate=tax_rate,
+        tax_amount=tax_amount,
         total_amount=final_amount,
         created_by_user_id=current_user.id,
+        shift_id=shift.id if shift else None,
         idempotency_key=idempotency_key,
         request_hash=request_hash,
     )
@@ -451,6 +649,7 @@ def create_manual_invoice(
                 amount=amount,
                 reference_no=reference_no,
                 received_by_user_id=current_user.id,
+                shift_id=shift.id if shift else None,
             )
         )
         create_cash_transaction(
@@ -545,16 +744,26 @@ def create_manual_invoice(
     # the only trace was a warning in the log.
     #
     # `publish` is synchronous and hands the work to the app's loop itself, so
-    # it works from a worker thread and cannot be lost silently. Delivery errors
-    # surface instead of disappearing.
+    # it works from a worker thread. The invoice is already committed by now:
+    # a notification failure must not turn a paid sale into a 500 that the
+    # cashier retries. It is logged at warning level so the misconfiguration
+    # (no bound loop and no Redis) is still visible to operators.
     if payload.appointment_id:
-        manager.publish(
-            {
-                "event": "appointment_status_changed",
-                "appointment_id": payload.appointment_id,
-                "status": "completed",
-            }
-        )
+        try:
+            manager.publish(
+                {
+                    "event": "appointment_status_changed",
+                    "appointment_id": payload.appointment_id,
+                    "status": "completed",
+                }
+            )
+        except RuntimeError:
+            logger.warning(
+                "Invoice %s committed but the POS refresh event could not be "
+                "published (no event loop bound and no Redis).",
+                invoice.invoice_no,
+                exc_info=True,
+            )
     
     return _serialize_invoice(invoice, customer, barber)
 
@@ -570,12 +779,30 @@ def _serialize_invoice(invoice: Invoice, customer: Customer | None, barber: Empl
         "appointment_id": invoice.appointment_id,
         "customer_id": invoice.customer_id,
         "barber_id": invoice.barber_id,
-        "customer_name": f"{customer.first_name} {customer.last_name}" if customer else "N/A",
+        "customer_name": (
+            (invoice.customer_name_snapshot or "").strip()
+            or (f"{customer.first_name} {customer.last_name}".strip() if customer else "N/A")
+        ),
+        "customer_name_snapshot": invoice.customer_name_snapshot,
         "barber_name": barber_name,
         "payment_method": invoice.payment_method,
         "subtotal_amount": float(invoice.subtotal_amount or 0),
         "discount_amount": float(invoice.discount_amount or 0),
+        "tax_rate": float(invoice.tax_rate or 0),
+        "tax_amount": float(invoice.tax_amount or 0),
         "total_amount": float(invoice.total_amount or 0),
+        "shift_id": invoice.shift_id,
+        # Split breakdown (empty for single-method invoices). Each row is
+        # shift-stamped like the invoice, so the shift's cash count can
+        # reconcile against exactly these rows.
+        "payments": [
+            {
+                "payment_method": p.payment_method,
+                "amount": float(p.amount or 0),
+                "shift_id": p.shift_id,
+            }
+            for p in (invoice.payments or [])
+        ],
         "pdf_path": invoice.pdf_path,
         "is_closed": bool(invoice.is_closed),
         "closed_at": invoice.closed_at,
@@ -591,6 +818,8 @@ def _serialize_invoice(invoice: Invoice, customer: Customer | None, barber: Empl
                 "quantity": item.quantity,
                 "unit_price": float(item.unit_price or 0),
                 "total_price": float(item.total_price or 0),
+                "employee_id": item.employee_id,
+                "commission_amount": float(item.commission_amount or 0),
             }
             for item in (invoice.items or [])
         ]
@@ -610,11 +839,12 @@ def list_today_invoices(
     # the wrong window here.
     today_start, today_end = salon_day_bounds_utc()
 
-    # Eager-load customer + barber (was N+1: 2 extra queries per invoice)
+    # Eager-load customer + barber + payments (was N+1: 2 extra queries per invoice)
     query = db.query(Invoice).options(
         joinedload(Invoice.items),
         joinedload(Invoice.customer),
         joinedload(Invoice.barber),
+        selectinload(Invoice.payments),
     ).filter(
         Invoice.created_at >= today_start,
         Invoice.created_at <= today_end
@@ -897,7 +1127,7 @@ def list_archive_month_drafts(
 
     rows = (
         db.query(Invoice)
-        .options(joinedload(Invoice.items))
+        .options(joinedload(Invoice.items), selectinload(Invoice.payments))
         .filter(
             Invoice.is_draft.is_(True),
             Invoice.created_at >= start,
@@ -968,7 +1198,7 @@ def list_invoices(
         skip = (page - 1) * page_size
         limit = page_size
     q = q or search
-    query = db.query(Invoice).options(joinedload(Invoice.items)).filter(Invoice.is_draft == False)
+    query = db.query(Invoice).options(joinedload(Invoice.items), selectinload(Invoice.payments)).filter(Invoice.is_draft == False)
 
     if month:
         try:
@@ -1026,9 +1256,14 @@ def list_invoices(
 
     # Totals must describe the whole filtered period, not the current page:
     # the page header cards used to add up only the 20 rows on screen.
+    # Voided invoices are excluded from the sales figures: they are not
+    # revenue, the barber commission math already excludes them, and the
+    # adjustment dialog tells the user a void "will not count towards
+    # period sales". The cancelled count is reported separately.
+    active = Invoice.is_closed.is_(False)
     summary_count, summary_total, summary_closed = query.with_entities(
-        func.count(Invoice.id),
-        func.coalesce(func.sum(Invoice.total_amount), 0),
+        func.coalesce(func.sum(case((active, 1), else_=0)), 0),
+        func.coalesce(func.sum(case((active, Invoice.total_amount), else_=0)), 0),
         func.coalesce(
             func.sum(case((Invoice.is_closed.is_(True), 1), else_=0)), 0
         ),
@@ -1090,7 +1325,7 @@ def list_draft_invoices(
     """قائمة الفواتير المسودة"""
     rows = (
         db.query(Invoice)
-        .options(joinedload(Invoice.items))
+        .options(joinedload(Invoice.items), selectinload(Invoice.payments))
         .filter(Invoice.is_draft == True)
         .order_by(Invoice.created_at.desc())
         .all()
@@ -1127,11 +1362,10 @@ def get_invoice_pdf(invoice_id: int, inline: bool = False, db: Session = Depends
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="الفاتورة غير موجودة")
-    if not invoice.pdf_path:
+    pdf_path = _ensure_invoice_pdf_path(db, invoice)
+    if pdf_path is None:
         raise HTTPException(status_code=404, detail="لا يوجد PDF لهذه الفاتورة")
-    file_path = Path(invoice.pdf_path)
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="ملف PDF غير موجود على القرص")
+    file_path = pdf_path
     filename = file_path.name
     if inline:
         return FileResponse(path=str(file_path), media_type="application/pdf", filename=filename, headers={"Content-Disposition": f'inline; filename="{filename}"'})
@@ -1147,7 +1381,11 @@ def send_invoice_pdf_to_whatsapp(invoice_id: int, db: Session = Depends(get_db),
     customer = db.query(Customer).filter(Customer.customer_id == invoice.customer_id).first()
     if not customer or not customer.phone:
         raise HTTPException(status_code=400, detail="رقم العميل غير متوفر")
-    customer_name = f"{customer.first_name or ''} {customer.last_name or ''}".strip() or "عميلنا"
+    customer_name = (
+        (invoice.customer_name_snapshot or "").strip()
+        or f"{customer.first_name or ''} {customer.last_name or ''}".strip()
+        or "عميلنا"
+    )
     filename = Path(invoice.pdf_path).name
     caption = f"مرحبًا {customer_name}، مرفق فاتورتك رقم {invoice.invoice_no}"
     upload_and_send_pdf(db, to_phone=customer.phone, pdf_path=invoice.pdf_path, filename=filename, caption=caption, appointment_id=invoice.appointment_id, invoice_id=invoice.id, created_by_user_id=getattr(current_user, "id", None))
@@ -1210,6 +1448,9 @@ def update_draft_invoice(
         raise HTTPException(status_code=400, detail="الدفع المقسوم غير متاح في المسودات")
 
     draft.customer_id = payload.customer_id or draft.customer_id
+    draft.customer_name_snapshot = (
+        _payload_customer_name(payload) or draft.customer_name_snapshot
+    )
     # NOTE: InvoiceManualCreate has no barber_id field; barber comes from
     # the first item's employee_id (same as manual create).
     first_employee = next(

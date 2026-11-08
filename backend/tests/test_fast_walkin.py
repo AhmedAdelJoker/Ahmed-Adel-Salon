@@ -23,6 +23,12 @@ def test_fast_walkin_creates_customer_and_booking(client, db_session):
     body = resp.json()
     assert body["customer_id"]
     assert body["barber_id"] == barber.id
+    # Regression: SessionLocal(autoflush=False) used to make this read the
+    # still-pending service rows as an empty table, so the session was created
+    # with 0.00 and no visible services.
+    assert len(body["services"]) == 1
+    assert float(body["total_estimated_price"]) == 100
+    assert body["total_estimated_duration_minutes"] == 30
 
 
 def test_fast_walkin_reuses_existing_customer(client, db_session):

@@ -217,7 +217,9 @@ def test_barber_day_view_does_not_query_per_appointment(db_session, barbers_and_
                 customer_id=customers[i % len(customers)].customer_id,
                 barber_id=barbers[i % 2].id,
                 appointment_date=date(2026, 3, 1),
-                appointment_time=time(10, 0),
+                # Staggered so the fifteen rows are fifteen slots, not fifteen
+                # claims on one slot — see `uq_appointments_barber_slot`.
+                appointment_time=time(10 + (i * 30) // 60, (i * 30) % 60),
                 status="completed",
             )
         )
@@ -257,7 +259,7 @@ def test_barber_day_view_invoiced_count_survives_a_second_invoice(db_session, ba
             customer_id=customers[i].customer_id,
             barber_id=barbers[0].id,
             appointment_date=date(2026, 3, 1),
-            appointment_time=time(10, 0),
+            appointment_time=time(10 + (i * 30) // 60, (i * 30) % 60),
             status="completed",
         )
         db_session.add(appointment)
@@ -365,13 +367,13 @@ def test_related_counts_do_not_scale_with_customers(db_session, barbers_and_cust
     target_ids = [c.customer_id for c in customers]
     assert len(target_ids) == 4
 
-    for customer in customers:
+    for index, customer in enumerate(customers):
         db_session.add(
             Appointment(
                 customer_id=customer.customer_id,
                 barber_id=1,
                 appointment_date=date(2026, 3, 1),
-                appointment_time=time(10, 0),
+                appointment_time=time(10 + (index * 30) // 60, (index * 30) % 60),
                 status="confirmed",
             )
         )

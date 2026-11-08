@@ -10,6 +10,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    text,
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -22,6 +23,30 @@ class Appointment(Base):
     __table_args__ = (
         Index("ix_appointments_barber_date", "barber_id", "appointment_date"),
         Index("ix_appointments_barber_date_status", "barber_id", "appointment_date", "status"),
+        # A barber cannot be in two chairs at once, and until now the only thing
+        # standing between two simultaneous `POST /public/booking` calls and a
+        # double booking was a Python query that read the busy list, decided the
+        # slot was free, and then inserted. Both requests read, both decided
+        # "free", both inserted.
+        #
+        # Partial, over exactly the statuses `holds_barber_time()` counts as
+        # busy, so a cancelled booking does not keep occupying the index it
+        # freed — and so the constraint and the availability query can never
+        # disagree about which rows they cover.
+        #
+        # This catches the same-start-time collision on both engines. It cannot
+        # express "these two intervals overlap", which needs an exclusion
+        # constraint with a gist index; the overlap case stays with the
+        # scheduler plus the row lock taken before it.
+        Index(
+            "uq_appointments_barber_slot",
+            "barber_id",
+            "appointment_date",
+            "appointment_time",
+            unique=True,
+            sqlite_where=text("status NOT IN ('cancelled', 'auto_cancelled', 'no_show')"),
+            postgresql_where=text("status NOT IN ('cancelled', 'auto_cancelled', 'no_show')"),
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)

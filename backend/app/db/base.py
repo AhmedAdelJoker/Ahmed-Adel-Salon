@@ -62,7 +62,6 @@ from app.models.notification import Notification  # noqa
 from app.models.report_schedule import ReportSchedule  # noqa
 
 # Supporting / approval models
-from app.models.discount_approval_request import DiscountApprovalRequest  # noqa
 from app.models.invoice_adjustment_request import InvoiceAdjustmentRequest  # noqa
 from app.models.invoice_payment import InvoicePayment  # noqa
 from app.models.shop_settings import ShopSettings  # noqa

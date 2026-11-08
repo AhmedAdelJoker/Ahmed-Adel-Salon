@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from datetime import date, datetime, timedelta
 from typing import Any, List, Optional
 from decimal import Decimal, ROUND_HALF_UP
@@ -554,6 +554,30 @@ async def update_service_status(
                 f"المسموح: {', '.join(sorted(KNOWN_APPOINTMENT_STATUSES))}"
             ),
         )
+
+    # A session with no active service line cannot be paid: the POS would load
+    # an empty cart. Refuse the transition here (the queue also repairs legacy
+    # rows) so an empty "ready for payment" card can never be created again.
+    if new_status == "ready_for_payment":
+        has_active_service = (
+            db.query(AppointmentService.id)
+            .filter(
+                AppointmentService.appointment_id == appointment.id,
+                or_(
+                    AppointmentService.is_active.is_(True),
+                    AppointmentService.is_active.is_(None),
+                ),
+            )
+            .first()
+        )
+        if has_active_service is None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "لا يمكن إرسال جلسة بدون خدمات إلى الدفع — "
+                    "أضف الخدمات أو أعد الجلسة إلى الاستقبال أو ألغها"
+                ),
+            )
 
     current = (appointment.status or "").strip()
 

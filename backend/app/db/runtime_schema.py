@@ -143,6 +143,12 @@ def ensure_runtime_schema() -> None:
             "draft_saved_at",
             "ALTER TABLE invoices ADD COLUMN draft_saved_at DATETIME",
         )
+        _ensure_column(
+            connection,
+            "invoices",
+            "customer_name_snapshot",
+            "ALTER TABLE invoices ADD COLUMN customer_name_snapshot VARCHAR(200)",
+        )
 
         # Add user_id to notifications table
         _ensure_column(
@@ -271,6 +277,29 @@ def ensure_runtime_schema() -> None:
             "contract_end_date",
             "ALTER TABLE employees ADD COLUMN contract_end_date DATE",
         )
+        # Archive trail: when someone left, why, and who decided. `status` alone
+        # could not answer any of the three, so the archive page printed a hire
+        # date and no departure date. Nullable with no backfill — a row that was
+        # already `resigned` never had an agreed leaving date to carry over.
+        _ensure_column(
+            connection,
+            "employees",
+            "archived_at",
+            "ALTER TABLE employees ADD COLUMN archived_at DATETIME",
+        )
+        _ensure_column(
+            connection,
+            "employees",
+            "archive_reason",
+            "ALTER TABLE employees ADD COLUMN archive_reason VARCHAR(500)",
+        )
+        _ensure_column(
+            connection,
+            "employees",
+            "archived_by_user_id",
+            "ALTER TABLE employees ADD COLUMN archived_by_user_id INTEGER "
+            "REFERENCES users(id)",
+        )
 
         _ensure_index(connection, "ix_invoices_created_at", "CREATE INDEX ix_invoices_created_at ON invoices (created_at)")
         _ensure_index(connection, "ix_invoices_barber_created", "CREATE INDEX ix_invoices_barber_created ON invoices (barber_id, created_at)")
@@ -280,6 +309,79 @@ def ensure_runtime_schema() -> None:
         _ensure_index(connection, "ix_customers_is_deleted", "CREATE INDEX ix_customers_is_deleted ON customers (is_deleted)")
         _ensure_index(connection, "ix_invoice_items_invoice_id", "CREATE INDEX ix_invoice_items_invoice_id ON invoice_items (invoice_id)")
         _ensure_index(connection, "ix_cash_transactions_date", "CREATE INDEX ix_cash_transactions_date ON cash_transactions (transaction_date)")
+
+        # ── POS attribution + tax (Phase 1) ────────────────────────────────
+        #
+        # New columns on an existing SQLite database. `create_all` covers a
+        # fresh one; these ALTERs bring an old database up to the models.
+        _ensure_column(
+            connection,
+            "invoice_items",
+            "employee_id",
+            "ALTER TABLE invoice_items ADD COLUMN employee_id INTEGER REFERENCES employees(id)",
+        )
+        _ensure_column(
+            connection,
+            "invoices",
+            "shift_id",
+            "ALTER TABLE invoices ADD COLUMN shift_id INTEGER REFERENCES pos_shifts(id)",
+        )
+        _ensure_column(
+            connection,
+            "invoices",
+            "tax_rate",
+            "ALTER TABLE invoices ADD COLUMN tax_rate NUMERIC(5,2) DEFAULT 0 NOT NULL",
+        )
+        _ensure_column(
+            connection,
+            "invoices",
+            "tax_amount",
+            "ALTER TABLE invoices ADD COLUMN tax_amount NUMERIC(10,2) DEFAULT 0 NOT NULL",
+        )
+        _ensure_column(
+            connection,
+            "business_settings",
+            "tax_rate",
+            "ALTER TABLE business_settings ADD COLUMN tax_rate NUMERIC(5,2) DEFAULT 0 NOT NULL",
+        )
+        _ensure_column(
+            connection,
+            "appointments",
+            "total_estimated_price",
+            "ALTER TABLE appointments ADD COLUMN total_estimated_price NUMERIC(10,2) DEFAULT 0 NOT NULL",
+        )
+        _ensure_column(
+            connection,
+            "appointments",
+            "total_estimated_duration_minutes",
+            "ALTER TABLE appointments ADD COLUMN total_estimated_duration_minutes INTEGER DEFAULT 30 NOT NULL",
+        )
+
+        _ensure_index(
+            connection,
+            "ix_pos_shifts_status",
+            "CREATE INDEX ix_pos_shifts_status ON pos_shifts (status)",
+        )
+        _ensure_index(
+            connection,
+            "ix_pos_shifts_user_id_opened_at",
+            "CREATE INDEX ix_pos_shifts_user_id_opened_at ON pos_shifts (user_id, opened_at)",
+        )
+        _ensure_index(
+            connection,
+            "ix_invoice_items_employee_id",
+            "CREATE INDEX ix_invoice_items_employee_id ON invoice_items (employee_id)",
+        )
+        _ensure_index(
+            connection,
+            "ix_invoices_shift_id",
+            "CREATE INDEX ix_invoices_shift_id ON invoices (shift_id)",
+        )
+        _ensure_index(
+            connection,
+            "ix_invoice_payments_shift_id",
+            "CREATE INDEX ix_invoice_payments_shift_id ON invoice_payments (shift_id)",
+        )
 
         # ── Barber earnings queries ────────────────────────────────────────
         #

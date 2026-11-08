@@ -368,7 +368,11 @@ class EmployeeRead(EmployeeBase):
     id: int
     created_at: datetime
     updated_at: datetime
-    
+    # The archive trail, so opening a leaver's profile says when they left,
+    # why, and that it was recorded -- not just "resigned".
+    archived_at: Optional[datetime] = None
+    archive_reason: Optional[str] = None
+
     # Computed or linked fields
     assistant_of_name: Optional[str] = None
     services: List[ServiceRead] = []
@@ -393,10 +397,64 @@ class EmployeeListItem(BaseModel):
     assistant_of_name: Optional[str] = None
     profile_image_url: Optional[str] = None
     service_ids: List[int] = []
+    # The roster and the archive are read as rows of decisions, and none of
+    # these were on the wire: the archive page asked for a hire date and got an
+    # empty cell (`hire_date` was never serialized), could not say when someone
+    # left, and could not show that a returned employee was still switched off
+    # in POS. All optional, so a legacy row that predates the archive columns
+    # reads as null instead of failing the whole list.
+    hire_date: Optional[datetime] = None
+    archived_at: Optional[datetime] = None
+    # The departure day in the shop's calendar, derived next to `archived_at`.
+    # A browser handed an instant prints its own day, and a Cairo archive read
+    # from another zone lands a day early — so the page gets a date, not a
+    # timestamp it has to guess the timezone of.
+    archived_on: Optional[date] = None
+    archive_reason: Optional[str] = None
+    show_in_pos: Optional[bool] = None
+    show_in_booking: Optional[bool] = None
 
     model_config = ConfigDict(
         from_attributes=True
     )
+
+
+class EmployeeArchiveRequest(BaseModel):
+    """Body of `POST /employees/{id}/archive`.
+
+    `reason` is a short code (`resignation`, `termination`, `contract_end`,
+    ...) so the archive reads the same in Arabic and English; free text is
+    stored as it arrives and shown as it was written. `effective_date` is the
+    last working day, and only ever moves `archived_at` backwards to a date the
+    owner actually agreed — leaving is a fact about the past, not a plan.
+    """
+
+    reason: Optional[str] = None
+    effective_date: Optional[date] = None
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        alias_generator=to_camel,
+        extra="ignore",
+    )
+
+
+class EmployeeStats(BaseModel):
+    """Counts for the whole roster, not for one page of it.
+
+    The HR board used to derive these from whatever 50 rows it happened to be
+    showing, so "total staff" changed when the owner turned the page.
+    """
+
+    total: int
+    active: int
+    suspended: int
+    resigned: int
+    barbers: int
+    assistants: int
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EmployeePOSItem(BaseModel):

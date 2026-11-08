@@ -241,7 +241,7 @@ def list_owner_alerts(
             "priority": "medium",
             "occurred_at": None,
             "_sort_at": None,
-            "destination": "/discount-approvals",
+            "destination": "/approvals",
         }
         for r, invoice_no in discounts
     ]

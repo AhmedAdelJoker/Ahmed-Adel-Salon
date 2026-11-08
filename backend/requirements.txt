@@ -61,3 +61,9 @@ Pillow==12.3.0
 apscheduler==3.11.2
 pytest==9.1.1
 httpx==0.28.1
+# `run_backend.port_owner` imports psutil to name the process that already
+# holds the port, and falls back to the string "another process" without it.
+# It was never declared here, so every fresh install lost the diagnostic the
+# function exists to provide -- and `tests/test_backend_launcher.py::
+# test_reports_the_process_that_holds_the_port` asserted the PID and failed.
+psutil==7.0.0

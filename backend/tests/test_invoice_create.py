@@ -1,5 +1,7 @@
 from decimal import Decimal
+from datetime import date, time
 
+from app.models.appointment import Appointment
 from app.models.cash_transaction import CashTransaction
 from app.models.invoice import Invoice
 from app.models.customer import Customer
@@ -119,6 +121,7 @@ def test_create_invoice_walkin_fallback(client, db_session):
     resp = client.post(
         "/api/v1/invoices/manual",
         json={
+            "customer_name": "أحمد محمد علي",
             "payment_method": "cash",
             "items": [_item(service.id, barber.id, qty=1)],
         },
@@ -130,6 +133,173 @@ def test_create_invoice_walkin_fallback(client, db_session):
     walkin = db_session.query(Customer).filter(Customer.first_name == "Walk-in").first()
     assert walkin is not None
     assert body["customer_id"] == walkin.customer_id
+    # The guest name is printed from the snapshot, not from the shared
+    # Walk-in row.
+    assert body["customer_name"] == "أحمد محمد علي"
+    assert body["customer_name_snapshot"] == "أحمد محمد علي"
+
+
+def test_manual_invoice_requires_three_part_name_for_new_customer(client, db_session):
+    make_user(db_session)
+    service = _seed_service(db_session)
+    barber = _seed_barber(db_session)
+    headers = auth_headers(client)
+
+    missing = client.post(
+        "/api/v1/invoices/manual",
+        json={
+            "payment_method": "cash",
+            "items": [_item(service.id, barber.id)],
+        },
+        headers=headers,
+    )
+    assert missing.status_code == 422, missing.text
+
+    two_parts = client.post(
+        "/api/v1/invoices/manual",
+        json={
+            "customer_name": "أحمد محمد",
+            "customer_phone": "01012345678",
+            "payment_method": "cash",
+            "items": [_item(service.id, barber.id)],
+        },
+        headers=headers,
+    )
+    assert two_parts.status_code == 422, two_parts.text
+    assert db_session.query(Customer).filter(Customer.phone == "01012345678").count() == 0
+
+
+def test_manual_invoice_creates_customer_from_three_part_name_and_phone(
+    client, db_session
+):
+    make_user(db_session)
+    service = _seed_service(db_session)
+    barber = _seed_barber(db_session)
+
+    resp = client.post(
+        "/api/v1/invoices/manual",
+        json={
+            "customer_name": "منى سعيد حسن",
+            "customer_phone": "01098765432",
+            "payment_method": "cash",
+            "items": [_item(service.id, barber.id)],
+        },
+        headers=auth_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    created = (
+        db_session.query(Customer)
+        .filter(Customer.phone == "01098765432")
+        .one()
+    )
+    assert created.first_name == "منى"
+    assert created.last_name == "سعيد حسن"
+    assert body["customer_id"] == created.customer_id
+    assert body["customer_name_snapshot"] == "منى سعيد حسن"
+
+
+def test_manual_invoice_existing_phone_keeps_the_same_customer(client, db_session):
+    make_user(db_session)
+    customer = _seed_customer(db_session, phone="01011112222")
+    service = _seed_service(db_session)
+    barber = _seed_barber(db_session)
+
+    resp = client.post(
+        "/api/v1/invoices/manual",
+        json={
+            "customer_name": "اسم مختلف تماماً",
+            "customer_phone": "01011112222",
+            "payment_method": "cash",
+            "items": [_item(service.id, barber.id)],
+        },
+        headers=auth_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["customer_id"] == customer.customer_id
+    assert body["customer_name_snapshot"] == "اسم مختلف تماماً"
+    assert (
+        db_session.query(Customer).filter(Customer.phone == "01011112222").count() == 1
+    )
+
+
+def test_manual_invoice_normalizes_formatted_phone_before_matching(
+    client, db_session
+):
+    make_user(db_session)
+    customer = _seed_customer(db_session, phone="01011112222")
+    service = _seed_service(db_session)
+    barber = _seed_barber(db_session)
+
+    resp = client.post(
+        "/api/v1/invoices/manual",
+        json={
+            "customer_name": "اسم مختلف تماماً",
+            "customer_phone": "010 1111 2222",
+            "payment_method": "cash",
+            "items": [_item(service.id, barber.id)],
+        },
+        headers=auth_headers(client),
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["customer_id"] == customer.customer_id
+    assert db_session.query(Customer).filter(Customer.phone == "01011112222").count() == 1
+
+
+def test_manual_invoice_stores_new_customer_phone_as_digits(client, db_session):
+    make_user(db_session)
+    service = _seed_service(db_session)
+    barber = _seed_barber(db_session)
+
+    resp = client.post(
+        "/api/v1/invoices/manual",
+        json={
+            "customer_name": "هدى محمد كمال",
+            "customer_phone": "010-9876-5432",
+            "payment_method": "cash",
+            "items": [_item(service.id, barber.id)],
+        },
+        headers=auth_headers(client),
+    )
+
+    assert resp.status_code == 200, resp.text
+    created = db_session.query(Customer).filter(Customer.phone == "01098765432").one()
+    assert resp.json()["customer_id"] == created.customer_id
+
+
+def test_manual_invoice_appointment_customer_does_not_need_three_part_name(
+    client, db_session
+):
+    make_user(db_session)
+    customer = _seed_customer(db_session, first_name="Sara", phone="01033334444")
+    service = _seed_service(db_session)
+    barber = _seed_barber(db_session)
+    appointment = Appointment(
+        customer_id=customer.customer_id,
+        barber_id=barber.id,
+        appointment_date=date.today(),
+        appointment_time=time(12, 0),
+        status="ready_for_payment",
+    )
+    db_session.add(appointment)
+    db_session.commit()
+    db_session.refresh(appointment)
+
+    resp = client.post(
+        "/api/v1/invoices/manual",
+        json={
+            "customer_name": "Sara Ali",
+            "appointment_id": appointment.id,
+            "payment_method": "cash",
+            "items": [_item(service.id, barber.id)],
+        },
+        headers=auth_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["customer_id"] == customer.customer_id
+    assert resp.json()["customer_name_snapshot"] == "Sara Ali"
 
 
 def test_create_invoice_deducts_product_stock(client, db_session):
@@ -259,6 +429,53 @@ def test_manual_offer_uses_offer_price_and_deducts_products(client, db_session):
     assert body["items"][0]["offer_id"] == offer.id
     db_session.refresh(product)
     assert float(product.quantity) == 8
+
+
+def test_manual_product_offer_without_employee_is_allowed(client, db_session):
+    """A product-only offer is retail stock: no performer, no commission.
+
+    The POS sends `employee_id: null` for these lines. The invoice must still
+    issue normally and deduct every bundled product from inventory.
+    """
+    make_user(db_session)
+    customer = _seed_customer(db_session, phone="01006667778")
+    product = Product(
+        name="Offer Shampoo", quantity=Decimal("6"), sell_price=Decimal("40")
+    )
+    offer = Offer(name="Shampoo Duo", offer_price=Decimal("65"), is_active=True)
+    db_session.add_all([product, offer])
+    db_session.flush()
+    db_session.add(OfferProduct(offer_id=offer.id, product_id=product.id, quantity=2))
+    db_session.commit()
+    db_session.refresh(product)
+
+    resp = client.post(
+        "/api/v1/invoices/manual",
+        json={
+            "customer_id": customer.customer_id,
+            "payment_method": "cash",
+            "items": [
+                {
+                    "item_type": "offer",
+                    "offer_id": offer.id,
+                    "quantity": 2,
+                    "employee_id": None,
+                    "unit_price": "1",
+                }
+            ],
+        },
+        headers=auth_headers(client),
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert float(body["total_amount"]) == 130
+    assert body["items"][0]["offer_id"] == offer.id
+    assert body["items"][0]["employee_id"] is None
+    assert float(body["items"][0]["commission_amount"]) == 0
+    db_session.refresh(product)
+    # Two bundles × two units each.
+    assert float(product.quantity) == 2
 
 
 def test_manual_invoice_rejects_non_positive_quantity(client, db_session):

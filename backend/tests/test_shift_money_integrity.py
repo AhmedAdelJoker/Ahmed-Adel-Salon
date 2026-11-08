@@ -104,7 +104,12 @@ def _invoice(db, user, shift, *, amount, minutes_after_open, method="CASH"):
         db.commit()
         db.refresh(customer)
 
-    stamp = salon_now() - timedelta(minutes=180) + timedelta(minutes=minutes_after_open)
+    # Stored timestamps are UTC per the storage convention, so the invoice is
+    # stamped on the UTC wall — the same wall `opened_at` is on. Stamping with
+    # the salon clock placed it three hours ahead of the shift's window and
+    # only "worked" while the auto-closer bounded its window with the salon
+    # wall too.
+    stamp = utc_now_naive() - timedelta(minutes=180) + timedelta(minutes=minutes_after_open)
     row = Invoice(
         invoice_no=f"INV-TEST-{shift.id}-{minutes_after_open}",
         customer_id=customer.customer_id,

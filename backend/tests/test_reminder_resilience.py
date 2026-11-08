@@ -105,8 +105,15 @@ def test_a_failed_send_skips_that_appointment_and_carries_on(client, db_session,
     """
     employee = _employee(db_session, "fail_mid")
     one = _appointment(db_session, _customer(db_session, "fm1"), employee, hours_from_now=24)
-    two = _appointment(db_session, _customer(db_session, "fm2"), employee, hours_from_now=24)
-    three = _appointment(db_session, _customer(db_session, "fm3"), employee, hours_from_now=24)
+    # One barber, one chair: three appointments in one slot is exactly what the
+    # partial unique index on `appointments` now rejects. This test is about the
+    # sender loop visiting three rows, so the rows go to three barbers.
+    two = _appointment(
+        db_session, _customer(db_session, "fm2"), _employee(db_session, "fail_mid_b"), hours_from_now=24
+    )
+    three = _appointment(
+        db_session, _customer(db_session, "fm3"), _employee(db_session, "fail_mid_c"), hours_from_now=24
+    )
 
     state = {"n": 0}
 
@@ -143,7 +150,11 @@ def test_a_late_crash_cannot_unsend_earlier_messages(client, db_session, sent, m
     """
     employee = _employee(db_session, "late_crash")
     first = _appointment(db_session, _customer(db_session, "lc1"), employee, hours_from_now=24)
-    _second = _appointment(db_session, _customer(db_session, "lc2"), employee, hours_from_now=24)
+    # A second barber, for the reason given in the test above: two live
+    # appointments cannot share one slot any more.
+    _second = _appointment(
+        db_session, _customer(db_session, "lc2"), _employee(db_session, "late_crash_b"), hours_from_now=24
+    )
 
     def dies_outside_the_first(db, **kwargs):
         if kwargs["appointment_id"] != first.id:

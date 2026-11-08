@@ -19,6 +19,83 @@ from app.core.clock import utc_now_naive
 
 router = APIRouter(prefix="/business-settings", tags=["Business Settings"])
 
+
+# The fields `publish-site` copies into `public_site_snapshot`, and therefore
+# the only fields the public site can ever see.
+#
+# Lifted to module scope because the staleness flag has to know this list to be
+# honest. It used to compare `version` against `public_site_published_version`,
+# which is correct only while every write that can change one of these fields
+# also bumps `version`. A deployment where the two agree while the snapshot and
+# the row disagree -- a field added to this list after a publish, a value
+# written by anything other than the versioned PUT -- reports "published" and
+# the owner's change never reaches the site. `landing_theme_id` is exactly that
+# case in at least one database this branch has been run against: the row says
+# `moss`, the snapshot says `gold`, and both version counters say 20.
+PUBLIC_SNAPSHOT_FIELDS: tuple[str, ...] = (
+    "salon_name", "shop_phone", "shop_whatsapp", "address", "logo_url",
+    "public_slug", "working_hours",
+    # Read by `booking_public` as `public_settings.get("currency")`, but never
+    # snapshotted - so the public site always received `None` and fell back to
+    # its own default no matter what the salon chose.
+    "currency",
+    "landing_hero_title", "landing_hero_subtitle", "landing_hero_badge",
+    "landing_about_title", "landing_about_content",
+    "landing_services_eyebrow", "landing_services_title", "landing_services_subtitle",
+    "landing_portfolio_eyebrow", "landing_portfolio_title",
+    "landing_booking_eyebrow", "landing_booking_title", "landing_booking_subtitle",
+    "landing_location_eyebrow", "landing_location_title", "landing_location_description",
+    # These three were on the model, in the pydantic schema, and rendered by the
+    # public site - but missing from this list, so they never reached the
+    # snapshot and the salon could not change a single word of them.
+    "landing_location_open_label", "landing_location_closed_label",
+    "landing_location_status_text",
+    "landing_contact_eyebrow", "landing_contact_title", "landing_contact_subtitle",
+    "landing_quick_actions_eyebrow", "landing_quick_actions_title", "landing_quick_actions_subtitle",
+    "landing_final_title", "landing_final_subtitle", "landing_final_button_label",
+    "landing_hero_highlight_title", "landing_hero_highlight_subtitle", "landing_hero_highlight_badge",
+    "landing_public_header_badge",
+    "landing_testimonials_eyebrow", "landing_testimonials_title", "landing_testimonials_subtitle",
+    "landing_cover_image_url", "landing_theme_id",
+    # Hero video + the motion master switch. Same trap as the fields above:
+    # without these the owner could upload a clip, see it saved, and the public
+    # site would never learn it existed.
+    "landing_hero_video_url", "landing_video_poster_url",
+    "landing_video_autoplay", "landing_video_muted", "landing_motion_enabled",
+    "landing_show_staff", "landing_show_staff_bio",
+    "landing_stats", "landing_features", "landing_trust_badges",
+    "landing_testimonials", "landing_portfolio",
+    "social_facebook", "social_instagram", "social_tiktok", "social_youtube",
+)
+
+
+def _snapshot_of(row: BusinessSettings) -> dict:
+    """The snapshot the row would produce if it were published right now."""
+    return {name: getattr(row, name, None) for name in PUBLIC_SNAPSHOT_FIELDS}
+
+
+def _public_site_is_stale(row: BusinessSettings) -> bool:
+    """Whether the live public site differs from what the owner has saved.
+
+    Never-published is stale by definition. Beyond that, the version counters
+    are only a fast path: if they match, the stored snapshot is still compared
+    field by field, because that is the difference between "the owner pressed
+    publish at the right moment" and "the public site actually shows what the
+    settings row says".
+    """
+    published_version = getattr(row, "public_site_published_version", None)
+    if published_version is None:
+        return True
+    stored = row.public_site_snapshot
+    if not stored:
+        return True
+    if int(published_version) != int(getattr(row, "version", 1) or 1):
+        return True
+    return stored != _snapshot_of(row)
+
+
+
+
 # uploads/business now resolved lazily via get_upload_path("business") (SOT §5.2)
 
 def _get_or_create_business_settings(db: Session) -> BusinessSettings:
@@ -50,15 +127,11 @@ def _get_or_create_business_settings(db: Session) -> BusinessSettings:
 def _row_to_response(row: BusinessSettings, etag: bool = False):
     """Serialize the ORM row using camelCase aliases for the React frontend."""
     schema = BusinessSettingsRead.model_validate(row)
-    published_version = getattr(row, "public_site_published_version", None)
     payload = schema.model_dump(by_alias=True, mode="json")
-    # Never-published is stale by definition: without this the publish button
-    # stays disabled on a fresh install and nothing can ever make the site
-    # public, because the flag is the only thing that enables the button.
-    payload["publicSiteStale"] = bool(
-        published_version is None
-        or int(published_version) != int(getattr(row, "version", 1) or 1)
-    )
+    # Without this the publish button stays disabled on a fresh install and
+    # nothing can ever make the site public, because the flag is the only thing
+    # that enables the button.
+    payload["publicSiteStale"] = _public_site_is_stale(row)
     out = JSONResponse(content=payload)
     if etag:
         # Returning a Response drops FastAPI's `response.headers` merge, so the
@@ -251,43 +324,7 @@ def publish_site(
     row.public_site_published_at = utc_now_naive()
 
     # Snapshot: نسخ الإعدادات العامة الحالية لاستخدامها في الصفحة العامة
-    snapshot_fields = [
-        "salon_name", "shop_phone", "shop_whatsapp", "address", "logo_url",
-        "public_slug", "working_hours",
-        # Read by `booking_public` as `public_settings.get("currency")`, but never
-        # snapshotted — so the public site always received `None` and fell back
-        # to its own default no matter what the salon chose.
-        "currency",
-        "landing_hero_title", "landing_hero_subtitle", "landing_hero_badge",
-        "landing_about_title", "landing_about_content",
-        "landing_services_eyebrow", "landing_services_title", "landing_services_subtitle",
-        "landing_portfolio_eyebrow", "landing_portfolio_title",
-        "landing_booking_eyebrow", "landing_booking_title", "landing_booking_subtitle",
-        "landing_location_eyebrow", "landing_location_title", "landing_location_description",
-        # These three were on the model, in the pydantic schema, and rendered by
-        # the public site — but missing from this list, so they never reached the
-        # snapshot and the salon could not change a single word of them.
-        "landing_location_open_label", "landing_location_closed_label",
-        "landing_location_status_text",
-        "landing_contact_eyebrow", "landing_contact_title", "landing_contact_subtitle",
-        "landing_quick_actions_eyebrow", "landing_quick_actions_title", "landing_quick_actions_subtitle",
-        "landing_final_title", "landing_final_subtitle", "landing_final_button_label",
-        "landing_hero_highlight_title", "landing_hero_highlight_subtitle", "landing_hero_highlight_badge",
-        "landing_public_header_badge",
-        "landing_testimonials_eyebrow", "landing_testimonials_title", "landing_testimonials_subtitle",
-        "landing_cover_image_url", "landing_theme_id",
-        # Hero video + the motion master switch. Same trap as the fields above:
-        # without these four the owner could upload a clip, see it saved, and
-        # the public site would never learn it existed.
-        "landing_hero_video_url", "landing_video_poster_url",
-        "landing_video_autoplay", "landing_video_muted", "landing_motion_enabled",
-        "landing_show_staff", "landing_show_staff_bio",
-        "landing_stats", "landing_features", "landing_trust_badges",
-        "landing_testimonials", "landing_portfolio",
-        "social_facebook", "social_instagram", "social_tiktok", "social_youtube",
-    ]
-    snapshot = {name: getattr(row, name, None) for name in snapshot_fields}
-    row.public_site_snapshot = snapshot
+    row.public_site_snapshot = _snapshot_of(row)
     row.public_site_published_version = int(getattr(row, "version", 1) or 1)
 
     log_activity(

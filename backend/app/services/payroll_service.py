@@ -1,7 +1,7 @@
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, and_, or_
 from typing import Dict, Any
 
 from app.models.employee import Employee
@@ -90,12 +90,24 @@ def calculate_expected_net_salary(
         # Every service-providing title earns commission on the invoices
         # attributed to them. Previously only exactly "barber" did, so a
         # colourist or esthetician with a commission rate was silently paid
-        # none of it.
-        comm_sum = db.query(func.sum(InvoiceItem.commission_amount)).join(Invoice).filter(
-            Invoice.barber_id == emp.id,
-            Invoice.created_at >= start_date,
-            Invoice.created_at < end_date
-        ).scalar()
+        # none of it. Attribution is now per line (InvoiceItem.employee_id);
+        # lines written before the link keep falling back to Invoice.barber_id.
+        comm_sum = (
+            db.query(func.sum(InvoiceItem.commission_amount))
+            .join(Invoice)
+            .filter(
+                Invoice.created_at >= start_date,
+                Invoice.created_at < end_date,
+                or_(
+                    InvoiceItem.employee_id == emp.id,
+                    and_(
+                        InvoiceItem.employee_id.is_(None),
+                        Invoice.barber_id == emp.id,
+                    ),
+                ),
+            )
+            .scalar()
+        )
         commission_amount = Decimal(str(comm_sum or 0))
     elif emp.job_title == "barber_assistant" and emp.receives_commission:
         if emp.assistant_of_barber_id:

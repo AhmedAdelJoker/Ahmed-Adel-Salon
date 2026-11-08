@@ -69,11 +69,14 @@ EXPECTED_PUBLIC_RAW = {
     ("POST", "/api/v1/public/booking"),
     ("GET", "/api/v1/public/booking-catalog"),
     ("GET", "/api/v1/public/time-slots"),
-    # The slug is the capability. There is no session to check, and that is the
-    # design: a customer who has the link can watch their own booking. The risk
-    # here is slug entropy, not authentication, so it is noted rather than gated.
-    ("GET", "/api/v1/public/realtime/booking/{slug}"),
-    ("GET", "/api/v1/public/realtime/booking/{slug}/poll"),
+    # `GET /public/realtime/booking/{slug}` and its `/poll` twin were registered
+    # here as "the slug is the capability" streaming endpoints. Removed with the
+    # endpoints: no client in `public-site` or `frontend` ever called them, and
+    # their event store is a `deque` inside one process, so the guarantee the
+    # comment claimed did not survive a second worker or a restart. The app
+    # already has a Redis-backed websocket bus (`services/websocket.py`) — if a
+    # public booking feed is built again, it should go through that, and be
+    # re-registered here with a fresh reason.
     # --- member self-service on the public site ------------------------------
     ("POST", "/api/v1/public/member/register"),
     ("POST", "/api/v1/public/member/login"),

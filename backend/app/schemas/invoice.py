@@ -40,6 +40,10 @@ class SplitPaymentItem(BaseModel):
 
 class InvoiceManualCreate(BaseModel):
     customer_id: Optional[int] = None
+    # Full name as typed at the till. The split first/last fields are kept for
+    # older clients; new clients send the whole name in one field (three
+    # segments minimum for a walk-in sale).
+    customer_name: Optional[str] = Field(default=None, max_length=200)
     customer_first_name: Optional[str] = None
     customer_last_name: Optional[str] = None
     customer_phone: Optional[str] = None
@@ -69,6 +73,11 @@ class InvoiceItemRead(BaseModel):
     quantity: int
     unit_price: Decimal
     total_price: Decimal
+    # Who performed the service / ran the offer, and what they earned on this
+    # line. Null + 0 for products (no service attribution, no commission) and
+    # for rows written before per-line attribution existed.
+    employee_id: Optional[int] = None
+    commission_amount: Decimal = Decimal("0.00")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -80,11 +89,18 @@ class InvoiceRead(BaseModel):
     customer_id: int
     barber_id: Optional[int] = None
     customer_name: Optional[str] = None
+    customer_name_snapshot: Optional[str] = None
     barber_name: Optional[str] = None
     payment_method: str
     subtotal_amount: Decimal = Decimal("0.00")
     discount_amount: Decimal = Decimal("0.00")
+    # Snapshotted at sale time (see the manual-invoice endpoint): the rate the
+    # VAT was applied at, and the amount it added. Changing the settings today
+    # must not rewrite a year-old invoice's figures.
+    tax_rate: Decimal = Decimal("0.00")
+    tax_amount: Decimal = Decimal("0.00")
     total_amount: Decimal
+    shift_id: Optional[int] = None
     pdf_path: Optional[str] = None
     created_at: datetime
 

@@ -75,7 +75,10 @@ def dataset(db_session):
             customer_id=customers[i % len(customers)].customer_id,
             barber_id=barbers[i % len(barbers)].id,
             appointment_date=date(2026, 3, 1),
-            appointment_time=time(10, 0),
+            # Staggered, not all at 10:00: `uq_appointments_barber_slot` makes
+            # one barber's minute exclusive, and these rows are here to give the
+            # serializer a dozen of them to walk, not to model a collision.
+            appointment_time=time(10 + (i * 30) // 60, (i * 30) % 60),
             status="confirmed",
         )
         db_session.add(appointment)

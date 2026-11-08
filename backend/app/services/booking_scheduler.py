@@ -5,13 +5,12 @@ from typing import Sequence
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.booking_status import holds_barber_time
 from app.models.appointment import Appointment
 from app.models.employee import Employee
 from app.models.employee_time_off import EmployeeTimeOff
 from app.models.employee_working_hour import EmployeeWorkingHour
 from app.models.service import Service
-
-ACTIVE_BOOKING_STATUSES = ("pending", "confirmed", "waiting")
 
 
 @dataclass
@@ -88,7 +87,7 @@ def _build_busy_intervals(
         .filter(
             Appointment.barber_id == employee_id,
             Appointment.appointment_date == booking_date,
-            Appointment.status.in_(ACTIVE_BOOKING_STATUSES),
+            holds_barber_time(),
         )
         .order_by(Appointment.appointment_time.asc(), Appointment.id.asc())
         .all()

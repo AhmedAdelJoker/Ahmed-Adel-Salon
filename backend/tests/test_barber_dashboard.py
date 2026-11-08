@@ -16,6 +16,7 @@ import pytest
 
 from app.core.clock import salon_now
 from app.models.appointment import Appointment
+from app.models.appointment_service import AppointmentService
 from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.user import User
@@ -137,6 +138,21 @@ def test_legal_transitions_still_work(client, db_session, start, target, expecte
     apt = _appointment(db_session, cust, employee, status=start)
     headers = auth_headers(client, f"ok_{start}")
 
+    # "Ready for payment" requires a real service line now: an empty session
+    # has nothing to charge and is returned to reception by the queue.
+    if target == "completed":
+        db_session.add(
+            AppointmentService(
+                appointment_id=apt.id,
+                service_name_snapshot="Cut",
+                price_snapshot=Decimal("100"),
+                duration_snapshot_minutes=30,
+                quantity=1,
+                is_active=True,
+            )
+        )
+        db_session.commit()
+
     resp = client.post(
         f"/api/v1/barber/update-status/{apt.id}", params={"status": target},
         headers=headers,
@@ -163,6 +179,52 @@ def test_repeating_the_current_status_is_idempotent(client, db_session):
     )
 
     assert resp.status_code == 200, resp.text
+
+
+def test_empty_session_cannot_be_sent_to_payment(client, db_session):
+    """No service row means nothing to charge; the transition is refused."""
+    _user, employee = _barber(db_session, "empty")
+    cust = _customer(db_session)
+    apt = _appointment(db_session, cust, employee, status="in-service")
+    headers = auth_headers(client, "empty")
+
+    resp = client.post(
+        f"/api/v1/barber/update-status/{apt.id}", params={"status": "completed"},
+        headers=headers,
+    )
+
+    assert resp.status_code == 409, resp.text
+    db_session.expire_all()
+    row = db_session.query(Appointment).filter(Appointment.id == apt.id).first()
+    assert row.status == "in-service"
+
+
+def test_ready_payment_queue_returns_legacy_empty_sessions_to_reception(
+    client, db_session
+):
+    """An empty session left over as ready_for_payment is repaired, not shown."""
+    make_user(db_session, username="queue_manager", role="manager")
+    employee = Employee(
+        full_name="Queue Barber",
+        phone_primary="01099990000",
+        job_title="barber",
+    )
+    db_session.add(employee)
+    db_session.commit()
+    db_session.refresh(employee)
+    cust = _customer(db_session, phone="01088881111")
+    apt = _appointment(db_session, cust, employee, status="ready_for_payment")
+
+    resp = client.get(
+        "/api/v1/appointments/ready-for-payment",
+        headers=auth_headers(client, "queue_manager"),
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == []
+    db_session.expire_all()
+    row = db_session.query(Appointment).filter(Appointment.id == apt.id).first()
+    assert row.status == "waiting"
 
 
 # --------------------------------------------------------------------------

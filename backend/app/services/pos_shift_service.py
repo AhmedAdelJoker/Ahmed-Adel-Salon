@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
 from app.models.pos_shift import PosShift
 from app.models.invoice import Invoice
@@ -7,7 +8,7 @@ from app.models.invoice_item import InvoiceItem
 from app.models.expense import Expense
 from app.models.business_settings import BusinessSettings
 from app.models.user import User
-from app.core.clock import coerce_naive, salon_now, utc_now_naive
+from app.core.clock import coerce_naive, salon_now, utc_now_naive, utc_to_salon_naive
 from app.core.working_hours import current_window
 from app.services.activity_log_service import log_activity
 from app.services.notification_service import create_notification
@@ -83,6 +84,7 @@ def shift_window_totals(
     start: datetime,
     end: datetime,
     opening_cash: Decimal | None = None,
+    shift_id: int | None = None,
 ) -> dict:
     """The one implementation of the shift money arithmetic.
 
@@ -98,18 +100,36 @@ def shift_window_totals(
     ".000000", so an invoice created in the same wall-clock second as the
     shift opened (or closed) would otherwise string-compare as outside the
     window and silently drop out of the totals.
+
+    When ``shift_id`` is passed (the Phase-1+ link landed), the shift's own
+    attribution wins. Invoices that predate the link carry ``shift_id = NULL``
+    and fall back to the same (user, window) pairing, so historical shifts keep
+    reconciling exactly as they did before the link existed.
     """
     lower = start - timedelta(seconds=1)
     upper = end + timedelta(seconds=1)
 
+    invoice_conditions = [
+        Invoice.created_at >= lower,
+        Invoice.created_at <= upper,
+        Invoice.is_draft == False,  # noqa: E712  (SQLAlchemy needs the literal)
+    ]
+    if shift_id is not None:
+        invoice_conditions.append(
+            or_(
+                Invoice.shift_id == shift_id,
+                and_(
+                    Invoice.shift_id.is_(None),
+                    Invoice.created_by_user_id == user_id,
+                ),
+            )
+        )
+    else:
+        invoice_conditions.append(Invoice.created_by_user_id == user_id)
+
     invoices = (
         db.query(Invoice)
-        .filter(
-            Invoice.created_by_user_id == user_id,
-            Invoice.created_at >= lower,
-            Invoice.created_at <= upper,
-            Invoice.is_draft == False,  # noqa: E712  (SQLAlchemy needs the literal)
-        )
+        .filter(*invoice_conditions)
         .all()
     )
     expenses = (
@@ -199,13 +219,16 @@ def _shift_totals(db: Session, shift: PosShift, closed_at: datetime) -> dict:
         start=opened_at,
         end=upper,
         opening_cash=shift.opening_cash,
+        shift_id=shift.id,
     )
     return {**totals, "opened_at": opened_at, "closed_at": upper}
 
 
 def recompute_shift_totals(db: Session, shift: PosShift) -> dict:
     """Re-derive a closed shift's figures from its bounded window."""
-    totals = _shift_totals(db, shift, coerce_naive(shift.closed_at) or datetime.now())
+    # A closed shift missing closed_at is a data repair case; "now" is the only
+    # sane bound, and it must be the same clock the stamps hold.
+    totals = _shift_totals(db, shift, coerce_naive(shift.closed_at) or utc_now_naive())
     shift.total_sales = totals["total_sales"]
     shift.invoice_count = totals["invoice_count"]
     shift.discount_total = totals["discount_total"]
@@ -227,9 +250,23 @@ def auto_close_expired_shifts(db: Session):
     any open shift older than that many hours is closed even mid-window or when
     working hours are not configured at all (0 disables the net entirely).
 
-    Shift ages are measured on the UTC wall: every stored timestamp is UTC per
-    the storage convention, so subtracting the salon wall from a fresh stamp
-    would claim a barely-opened shift is three hours old and slam it shut.
+    ## One clock per question
+
+    Two clocks are involved and mixing them is a money bug, so each is used for
+    exactly one thing:
+
+    * ``salon_now()`` answers wall-clock questions — is the shop inside its
+      working hours, has the grace period passed. Never written to a column.
+    * ``utc_now_naive()`` is the clock of stored timestamps (``opened_at`` comes
+      from SQLite's ``CURRENT_TIMESTAMP``, invoices are UTC). It stamps
+      ``closed_at`` and bounds the invoice window.
+
+    ``closed_at`` used to be written with the salon clock while ``opened_at``
+    was UTC, so a closed shift's window sat three hours off the invoices it was
+    supposed to contain: the reprint could pull in sales raised hours after the
+    close. Shift *ages* were already measured in UTC (subtracting the salon
+    wall from a fresh stamp would claim a barely-opened shift was three hours
+    old and slam it shut) — the stamping was the half that leaked.
     """
     settings = db.query(BusinessSettings).first()
     if not _auto_close_enabled():
@@ -265,11 +302,11 @@ def auto_close_expired_shifts(db: Session):
 
     def _close_shift(shift: PosShift, reason_note: str) -> None:
         nonlocal closed_count
-        totals = _shift_totals(db, shift, now)
+        totals = _shift_totals(db, shift, now_utc)
         operator = shift.user.full_name if shift.user else "غير معروف"
 
         shift.status = "closed"
-        shift.closed_at = now
+        shift.closed_at = now_utc
         shift.total_sales = totals["total_sales"]
         shift.invoice_count = totals["invoice_count"]
         shift.discount_total = totals["discount_total"]
@@ -279,8 +316,10 @@ def auto_close_expired_shifts(db: Session):
             - totals["cash_expenses"]
         )
         shift.actual_closing_cash = shift.expected_closing_cash
+        # The note is read by a human, so it carries the salon's wall clock
+        # even though the column it accompanies holds UTC.
         shift.closing_note = (
-            f"{reason_note} (حتى {totals['closed_at'].strftime('%Y-%m-%d %H:%M')})"
+            f"{reason_note} (حتى {utc_to_salon_naive(totals['closed_at']).strftime('%Y-%m-%d %H:%M')})"
         )
 
         log_activity(

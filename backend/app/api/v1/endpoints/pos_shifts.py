@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from datetime import datetime, time, timedelta
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 
@@ -20,6 +20,8 @@ from app.schemas.pos_shift import (
     DailySummaryShiftRead,
     DailySummaryTotals,
     DailySummaryUserRead,
+    PosShiftClose,
+    PosShiftOpen,
 )
 from app.services.pos_shift_service import (
     auto_close_expired_shifts,
@@ -29,7 +31,7 @@ from app.services.pos_shift_service import (
 )
 from app.services.activity_log_service import log_activity
 from app.services.runtime_settings_service import get_runtime_settings
-from app.core.clock import coerce_naive, salon_now
+from app.core.clock import coerce_naive, salon_day_bounds_utc, salon_now, utc_now_naive
 from app.core.security import verify_password
 
 router = APIRouter(prefix="/pos-shifts", tags=["POS Shifts"])
@@ -81,14 +83,20 @@ def get_current_shift_stats(
     if shift is None:
         return {"shift_id": None, "stats": None}
 
+    # Two clocks, one question each: the invoice window is compared against
+    # UTC-stamped created_at, so its "now" is UTC. The closing countdown asks
+    # when the salon's wall clock reaches closing time, so its "now" is the
+    # salon's. Sharing one value between both moved the window by the UTC
+    # offset and mislabelled live sales.
     opened_at = coerce_naive(shift.opened_at)
-    closing_at = salon_now()
+    now_utc = utc_now_naive()
+    now_salon = salon_now()
 
     totals = shift_window_totals(
         db,
         user_id=shift.user_id,
         start=opened_at,
-        end=closing_at,
+        end=now_utc,
         opening_cash=shift.opening_cash,
     )
 
@@ -116,7 +124,7 @@ def get_current_shift_stats(
     next_close = next_closing_moment(db)
     closing_in_minutes = None
     if next_close is not None:
-        closing_in_minutes = max(0.0, (next_close - closing_at).total_seconds() / 60.0)
+        closing_in_minutes = max(0.0, (next_close - now_salon).total_seconds() / 60.0)
 
     return {
         "shift_id": shift.id,
@@ -145,15 +153,16 @@ SHIFT_OVERRIDE_ROLES = ("owner", "admin", "manager", "accountant")
 
 @router.post("/open")
 def open_shift(
-    payload: dict,
+    payload: PosShiftOpen,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_shift_operator)
 ):
+    # Typed body: a negative opening float, a string, or a missing amount now
+    # arrives as a 422 naming the field, instead of a 500 from `Decimal()` or a
+    # negative drawer balance that no report could explain.
     within_hours = is_within_working_hours(db)
-    override = bool(payload.get("override_hours") or payload.get("overrideHours"))
-    override_reason = str(
-        payload.get("override_reason") or payload.get("overrideReason") or ""
-    ).strip()
+    override = bool(payload.override_hours)
+    override_reason = str(payload.override_reason or "").strip()
 
     if not within_hours:
         if not override:
@@ -179,7 +188,7 @@ def open_shift(
     if existing:
         raise HTTPException(status_code=400, detail="لديك وردية مفتوحة بالفعل")
 
-    opening_note = payload.get("opening_note")
+    opening_note = payload.opening_note
     if not within_hours and override:
         opening_note = (
             f"{opening_note or ''} | تجاوز خارج الدوام: {override_reason}"
@@ -187,7 +196,7 @@ def open_shift(
 
     shift = PosShift(
         user_id=current_user.id,
-        opening_cash=Decimal(str(payload.get("opening_cash") or payload.get("openingCash") or 0)),
+        opening_cash=payload.opening_cash,
         opening_note=opening_note,
         status="open"
     )
@@ -232,7 +241,7 @@ def open_shift(
 @router.post("/{shift_id}/close")
 def close_shift(
     shift_id: int,
-    payload: dict,
+    payload: PosShiftClose,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_shift_operator)
 ):
@@ -257,7 +266,12 @@ def close_shift(
     # The arithmetic itself lives in `shift_window_totals`, shared with the
     # live tiles, the archived reprint and the auto-closer, so the figure the
     # cashier counted against is the figure the server stamps.
-    closing_at = salon_now()
+    # `closing_at` is stamped into `closed_at`, a UTC column sitting next to the
+    # UTC `opened_at` written by SQLite's CURRENT_TIMESTAMP. It used to carry
+    # the salon clock, so a closed shift's window sat three hours ahead of the
+    # UTC invoices it was meant to contain and its reprint could pull in sales
+    # raised long after the close.
+    closing_at = utc_now_naive()
     opened_at = coerce_naive(shift.opened_at) or closing_at
     totals = shift_window_totals(
         db,
@@ -265,6 +279,7 @@ def close_shift(
         start=opened_at,
         end=closing_at,
         opening_cash=shift.opening_cash,
+        shift_id=shift.id,
     )
     total_sales = totals["total_sales"]
     cash_sales = totals["cash_sales"]
@@ -273,7 +288,7 @@ def close_shift(
     service_count = totals["service_count"]
     product_count = totals["product_count"]
 
-    actual_closing_cash = Decimal(str(payload.get("countedCash") or payload.get("closing_cash") or 0))
+    actual_closing_cash = payload.counted_cash
     expected_closing_cash = totals["expected_closing_cash"]
 
     # Owner-configured cash discrepancy policy (financial_rules.maxCashDiscrepancyWithoutNote):
@@ -291,15 +306,15 @@ def close_shift(
     )
     variance = actual_closing_cash - expected_closing_cash
     if discrepancy_limit > 0 and abs(variance) > discrepancy_limit:
-        closing_note = str(payload.get("closing_note") or payload.get("closingNote") or "").strip()
+        closing_note = str(payload.closing_note or "").strip()
         if not closing_note:
             raise HTTPException(
                 status_code=400,
                 detail="العجز/الزيادة تجاوزت الحد المسموح — اذكر السبب في ملاحظة الإغلاق",
             )
         if str(current_user.role or "").lower() not in managed_roles:
-            approver_username = str(payload.get("approver_username") or payload.get("approverUsername") or "").strip()
-            approver_password = str(payload.get("approver_password") or payload.get("approverPassword") or "")
+            approver_username = str(payload.approver_username or "").strip()
+            approver_password = str(payload.approver_password or "")
             approver = (
                 db.query(User).filter(User.username == approver_username).first()
                 if approver_username
@@ -345,7 +360,7 @@ def close_shift(
                 PosShift.total_sales: total_sales,
                 PosShift.invoice_count: invoice_count,
                 PosShift.discount_total: discount_total,
-                PosShift.closing_note: payload.get("closing_note"),
+                PosShift.closing_note: payload.closing_note,
             },
             synchronize_session=False,
         )
@@ -396,7 +411,9 @@ def get_shift_stats(
         raise HTTPException(status_code=400, detail="الوردية بلا وقت افتتاح")
 
     closed_at = coerce_naive(shift.closed_at)
-    end = closed_at if shift.status == "closed" and closed_at else salon_now()
+    # Stored stamps are UTC and so is the live window end they are compared
+    # against; the salon clock here would shift the reprint by the UTC offset.
+    end = closed_at if shift.status == "closed" and closed_at else utc_now_naive()
 
     totals = shift_window_totals(
         db,
@@ -442,8 +459,11 @@ def get_daily_summary(
     else:
         target_date = salon_now().date()
         
-    start_of_day = datetime.combine(target_date, time.min)
-    end_of_day = datetime.combine(target_date, time.max)
+    # The reported day is the salon's calendar day, but every column the window
+    # is compared against holds UTC. `salon_day_bounds_utc` expresses the shop's
+    # [00:00, 23:59:59] in the storage clock; building it with `combine`
+    # silently trimmed the first/last UTC-offset hours off the report.
+    start_of_day, end_of_day = salon_day_bounds_utc(target_date)
     
     shifts = db.query(PosShift).options(joinedload(PosShift.user)).filter(
         PosShift.opened_at >= start_of_day,
@@ -533,14 +553,16 @@ def get_total_cash_balance(
         total_opening = sum(Decimal(str(s.opening_cash)) for s in open_shifts)
     
     # Calculate sales for these shifts (drafts excluded; the shared window and
-    # arithmetic, so the drawer figure agrees with the shift that is counted)
+    # arithmetic, so the drawer figure agrees with the shift that is counted).
+    # Both bounds must be UTC to line up with the invoice stamps.
+    now_utc = utc_now_naive()
     total_sales = Decimal("0.00")
     for s in open_shifts:
         totals = shift_window_totals(
             db,
             user_id=s.user_id,
-            start=coerce_naive(s.opened_at) or salon_now(),
-            end=salon_now(),
+            start=coerce_naive(s.opened_at) or now_utc,
+            end=now_utc,
         )
         # Only cash sales affect the physical drawer
         total_sales += totals["cash_sales"]

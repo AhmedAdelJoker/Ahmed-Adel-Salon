@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import date as _date, datetime
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import os
@@ -9,18 +10,27 @@ import shutil
 
 from app.db.session import get_db
 from app.api.deps import require_manage_employees, require_any_staff, require_view_employees
+from app.core.booking_status import holds_barber_time
+from app.core.clock import salon_day_bounds_utc, salon_now, utc_now_naive, utc_to_salon_naive
+from app.models.appointment import Appointment
 from app.models.employee import Employee
 from app.models.service import Service
 from app.models.user import User
 from app.schemas.employee import (
+    EmployeeArchiveRequest,
     EmployeeCreate,
+    EmployeeStats,
     EmployeeUpdate,
     EmployeeRead,
     EmployeeListItem,
     EmployeePOSItem,
 )
 from app.utils.media import process_image_content, get_upload_path
-from app.core.employee_rules import digits_only, is_service_provider_job_title
+from app.core.employee_rules import (
+    SERVICE_PROVIDER_JOB_TITLES,
+    digits_only,
+    is_service_provider_job_title,
+)
 from app.core.security import get_password_hash, validate_password_strength
 from app.core.rbac import can_access
 from app.core.roles import UserRole, normalize_role
@@ -130,6 +140,11 @@ def list_employees(
     current_user: User = Depends(require_view_employees),
     job_title: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    # The team list wants "everyone except the people who left", and a single
+    # `status` value cannot say that. Filtering `resigned` out client-side while
+    # paging server-side means a page of 50 rows arrives with some of them
+    # dropped and the count above it disagrees with the list below it.
+    exclude_status: Optional[str] = Query(None, alias="excludeStatus"),
     q: Optional[str] = Query(None),
     limit: int = Query(2000, ge=1, le=2000),
     offset: int = Query(0, ge=0),
@@ -142,6 +157,8 @@ def list_employees(
         query = query.filter(Employee.job_title == job_title)
     if status:
         query = query.filter(Employee.status == status)
+    if exclude_status:
+        query = query.filter(Employee.status != exclude_status)
     # Free-text over name/phone/national id. Mirrors /employees/archive so the
     # two rosters answer the same "who is this number?" question; the
     # add-employee form uses it to catch a phone or a national id that is
@@ -184,10 +201,12 @@ def list_employees(
 
 @router.get("/archive", response_model=List[EmployeeListItem])
 def list_archived_employees(
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_view_employees),
     q: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    reason: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(1000, ge=1, le=2000),
 ):
@@ -196,6 +215,11 @@ def list_archived_employees(
     An employee on leave (`suspended`) is NOT archived: the salon keeps them in
     the team list with a "في إجازة" badge, one tap away from coming back. The
     archive is for people who left (`resigned`).
+
+    Most recent departure first. Rows that left before the archive kept a date
+    sort after every dated one rather than posing as the newest leaver, and the
+    total goes out as `X-Total-Count` so the page can page without pulling a
+    thousand rows to find out how many there are.
     """
     archived_statuses = ["resigned"]
     query = db.query(Employee).options(
@@ -204,20 +228,130 @@ def list_archived_employees(
 
     if status and status in archived_statuses:
         query = query.filter(Employee.status == status)
+    if reason:
+        query = query.filter(Employee.archive_reason == reason)
     if q:
         like = f"%{q}%"
         query = query.filter(
-            (Employee.full_name.ilike(like)) | (Employee.phone_primary.ilike(like))
+            (Employee.full_name.ilike(like))
+            | (Employee.phone_primary.ilike(like))
+            | (Employee.archive_reason.ilike(like))
         )
 
-    employees = query.order_by(Employee.id.desc()).offset(skip).limit(limit).all()
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+
+    employees = (
+        query.order_by(
+            case((Employee.archived_at.is_(None), 1), else_=0).asc(),
+            Employee.archived_at.desc(),
+            Employee.id.desc(),
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
     for emp in employees:
         if emp.assistant_of:
             emp.assistant_of_name = emp.assistant_of.full_name
         emp.service_ids = [s.id for s in emp.services]
+        # The day they left, in the shop's own calendar. `archived_at` is a UTC
+        # instant -- Cairo midnight is 21:00 or 22:00 UTC the day before -- and a
+        # browser asked to print one prints *its* day, so a raw timestamp lands
+        # a day early for a reader in another zone. The page shows a date, so it
+        # gets the shop's date.
+        emp.archived_on = (
+            utc_to_salon_naive(emp.archived_at).date() if emp.archived_at else None
+        )
 
     return employees
+
+
+@router.get("/stats", response_model=EmployeeStats)
+def employee_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_view_employees),
+):
+    """Roster counts for the whole team, not for one page of it.
+
+    The HR board computed "total staff" from the 50 rows it was showing, so the
+    headline moved when the owner turned the page. One grouped query per number,
+    over the whole table, so the board and the pagination agree.
+    """
+    by_status = dict(
+        db.query(Employee.status, func.count(Employee.id)).group_by(Employee.status).all()
+    )
+    service_providers = list(SERVICE_PROVIDER_JOB_TITLES)
+
+    def _count(*conditions):
+        return (
+            db.query(func.count(Employee.id)).filter(*conditions).scalar() or 0
+        )
+
+    return EmployeeStats(
+        total=_count(),
+        active=by_status.get("active", 0),
+        suspended=by_status.get("suspended", 0),
+        resigned=by_status.get("resigned", 0),
+        barbers=_count(
+            Employee.job_title.in_(service_providers), Employee.status == "active"
+        ),
+        assistants=_count(
+            Employee.job_title == "barber_assistant", Employee.status == "active"
+        ),
+    )
+
+
+@router.get("/{employee_id}/archive-impact")
+def employee_archive_impact(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_view_employees),
+):
+    """What archiving this person would touch, before anyone decides to do it.
+
+    The archive is the one HR action that can strand a customer: a leaver with
+    bookings still holding their chair does not disappear just because the row
+    moved. The count is read here so the dialog can say it out loud *before*
+    the owner presses archive, rather than after someone calls to ask where
+    their appointment went.
+    """
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+
+    day = salon_now().date()
+    future_appointments = (
+        db.query(func.count(Appointment.id))
+        .filter(
+            Appointment.barber_id == employee_id,
+            Appointment.appointment_date >= day,
+            holds_barber_time(),
+        )
+        .scalar()
+        or 0
+    )
+
+    linked_role = None
+    if employee.user_id:
+        usr = db.query(User).filter(User.id == employee.user_id).first()
+        if usr:
+            linked_role = usr.role
+
+    return {
+        "id": employee.id,
+        "fullName": employee.full_name,
+        "status": employee.status,
+        "futureAppointments": future_appointments,
+        "hasLoginAccount": bool(employee.user_id),
+        "linkedUserRole": linked_role,
+        "showInPos": bool(employee.show_in_pos),
+        "showInBooking": bool(employee.show_in_booking),
+        "archivedAt": employee.archived_at,
+        "archiveReason": employee.archive_reason,
+    }
 
 
 def _slim_active_staff(db: Session, limit: int, *, pos_visible_only: bool) -> list:
@@ -428,6 +562,17 @@ def update_employee(
 
     update_data = raw
 
+    # Leaving is an event with a date, a reason and a person who decided, and
+    # `POST /employees/{id}/archive` is the only path that records all three.
+    # Letting a plain field write flip `resigned` would keep producing archive
+    # rows with no departure date -- the exact blank this migration added the
+    # columns to fill.
+    if update_data.get("status") == "resigned":
+        raise HTTPException(
+            status_code=400,
+            detail="الأرشفة تتم من إجراء أرشفة الموظف حتى يسجل تاريخ الخروج والسبب ومن قرر",
+        )
+
     # An update must not be the side door around the create path's uniqueness —
     # and a number may collide with someone *other* than the row being edited,
     # hence the exclusion.
@@ -538,6 +683,163 @@ def update_employee(
     db.commit()
     db.refresh(employee)
     return employee
+
+def _set_staff_login_enabled(db: Session, employee: Employee, *, enabled: bool) -> bool:
+    """Open or close the staff login that travels with an employee row.
+
+    Archiving used to leave it standing: the person had left the salon, their
+    `users` row kept `is_active`, and every token they had already minted stayed
+    usable. Rotation on the way out kills those sessions; restoring re-opens the
+    account only because an owner asked for the person back by name.
+    """
+    if not employee.user_id:
+        return False
+    usr = db.query(User).filter(User.id == employee.user_id).first()
+    if not usr:
+        return False
+    usr.is_active = enabled
+    if not enabled:
+        usr.token_version = int(usr.token_version or 0) + 1
+    db.add(usr)
+    return True
+
+
+def _archive_instant(effective_date: Optional[_date], hire_date: Optional[datetime]) -> datetime:
+    """The instant to store as `archived_at` for an agreed last working day.
+
+    Kept as the shop's own midnight expressed in UTC, which is what every other
+    boundary in this codebase stores. A future date is rejected rather than
+    stored: leaving is a fact about a day that has happened, and a `resigned`
+    row with a future date silently hides the employee from today's schedule
+    while the owner believes they still have a shift to cover.
+    """
+    if effective_date is None:
+        return utc_now_naive()
+    today = salon_now().date()
+    if effective_date > today:
+        raise HTTPException(
+            status_code=400,
+            detail="تاريخ آخر يوم عمل لا يمكن أن يكون في المستقبل",
+        )
+    if hire_date is not None and effective_date < hire_date.date():
+        raise HTTPException(
+            status_code=400,
+            detail="تاريخ آخر يوم عمل لا يمكن أن يسبق تاريخ التعيين",
+        )
+    return salon_day_bounds_utc(effective_date)[0]
+
+
+@router.post("/{employee_id}/archive", response_model=EmployeeRead)
+def archive_employee(
+    employee_id: int,
+    payload: EmployeeArchiveRequest = EmployeeArchiveRequest(),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manage_employees),
+):
+    """Move an employee to the archive: they left the salon.
+
+    Deliberately does **not** touch `show_in_pos` / `show_in_booking`. The old
+    flow switched both off "so a return starts clean", but every operational
+    surface already filters on `status == 'active'` and `is_active`, so the wipe
+    hid nothing extra -- and restore never switched them back, so an employee
+    who came back was invisible at the till and on the booking site until
+    someone found the two switches again. The switches stay what the owner set
+    them, because they describe a role, not an employment period.
+
+    The row is never deleted: payroll, invoices and attendance history all
+    point at it, and the archive is the record of who worked here.
+    """
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    _ensure_employee_mutable(db, employee, current_user)
+
+    if employee.status == "resigned":
+        raise HTTPException(status_code=400, detail="الموظف مؤرشف بالفعل")
+
+    archived_at = _archive_instant(payload.effective_date, employee.hire_date)
+    reason = (payload.reason or "").strip()[:500] or None
+
+    employee.status = "resigned"
+    employee.is_active = False
+    employee.archived_at = archived_at
+    employee.archive_reason = reason
+    employee.archived_by_user_id = current_user.id
+    login_closed = _set_staff_login_enabled(db, employee, enabled=False)
+
+    db.commit()
+    db.refresh(employee)
+    audit_log(
+        db, request, current_user,
+        action="archive_employee",
+        entity_type="employee",
+        entity_id=employee_id,
+        description={
+            "archived_on": archived_at.isoformat(),
+            "reason": reason,
+            "login_closed": login_closed,
+            "visibility_preserved": {
+                "show_in_pos": bool(employee.show_in_pos),
+                "show_in_booking": bool(employee.show_in_booking),
+            },
+        },
+    )
+    return employee
+
+
+@router.post("/{employee_id}/restore", response_model=EmployeeRead)
+def restore_employee(
+    employee_id: int,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manage_employees),
+):
+    """Bring an archived employee back to the team.
+
+    Only the employment decision is reversed. The visibility switches are left
+    exactly as the owner set them before the person left -- which is the whole
+    point of not wiping them on the way out -- and the login reopens with the
+    account it belonged to.
+    """
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    _ensure_employee_mutable(db, employee, current_user)
+
+    if employee.status != "resigned":
+        raise HTTPException(status_code=400, detail="الموظف ليس في الأرشيف")
+
+    restored_from = {
+        "archived_on": employee.archived_at.isoformat() if employee.archived_at else None,
+        "reason": employee.archive_reason,
+    }
+
+    employee.status = "active"
+    employee.is_active = True
+    employee.archived_at = None
+    employee.archive_reason = None
+    employee.archived_by_user_id = None
+    login_opened = _set_staff_login_enabled(db, employee, enabled=True)
+
+    db.commit()
+    db.refresh(employee)
+    audit_log(
+        db, request, current_user,
+        action="restore_employee",
+        entity_type="employee",
+        entity_id=employee_id,
+        description={
+            "restored_from": restored_from,
+            "login_reopened": login_opened,
+            "visibility": {
+                "show_in_pos": bool(employee.show_in_pos),
+                "show_in_booking": bool(employee.show_in_booking),
+            },
+        },
+    )
+    return employee
+
 
 @router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_employee(

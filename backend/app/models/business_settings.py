@@ -29,6 +29,8 @@ class BusinessSettings(Base):
     allow_vodafone_cash = Column(Boolean, nullable=False, default=True)
     allow_instapay = Column(Boolean, nullable=False, default=True)
     allow_bank_card = Column(Boolean, nullable=False, default=True)
+    # VAT percentage applied to invoices, e.g. 5 (means 5%). 0 disables tax.
+    tax_rate = Column(Numeric(5, 2), nullable=False, default=0, server_default="0")
     working_hours = Column(JSON, nullable=True)
     shift_auto_close_grace_period = Column(Integer, nullable=False, default=30)  # Minutes after closing time before auto-close
     landing_hero_title = Column(String(500), nullable=True)

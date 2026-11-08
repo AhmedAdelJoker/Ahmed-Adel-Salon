@@ -4,11 +4,13 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import require_cashier_manager_owner
 from app.db.session import get_db
 from app.models.appointment import Appointment
+from app.models.appointment_service import AppointmentService
 from app.models.invoice import Invoice
 from app.models.invoice_payment import InvoicePayment
 from app.models.user import User
@@ -109,6 +111,22 @@ def complete_service(
     appointment = _get_booking(db, booking_id, current_user)
     if appointment.status not in {"in-service", "in_service"}:
         raise HTTPException(status_code=409, detail="يجب بدء الخدمة قبل إكمالها")
+    has_active_service = (
+        db.query(AppointmentService.id)
+        .filter(
+            AppointmentService.appointment_id == appointment.id,
+            or_(
+                AppointmentService.is_active.is_(True),
+                AppointmentService.is_active.is_(None),
+            ),
+        )
+        .first()
+    )
+    if has_active_service is None:
+        raise HTTPException(
+            status_code=409,
+            detail="لا يمكن إكمال جلسة بدون خدمات — أضف الخدمات أو أعدها للاستقبال",
+        )
     appointment.status = "ready_for_payment"
     db.commit()
     return {"status": "success"}

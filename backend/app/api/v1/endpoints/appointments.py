@@ -3,13 +3,18 @@ from pathlib import Path
 from datetime import date, datetime, timedelta, time
 from decimal import Decimal
 from typing import List, Optional
+import io
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db.session import get_db
+from app.core.booking_status import holds_barber_time
 from app.models.user import User
 from app.models.employee import Employee
 from app.models.customer import Customer
@@ -24,6 +29,7 @@ from app.core.clock import salon_now
 from app.core.employee_rules import SERVICE_PROVIDER_JOB_TITLES
 from app.core.working_hours import resolve_window
 from app.models.service_session import ServiceSession
+from app.utils.arabic_pdf import fix_arabic, ensure_pdf_font
 
 from app.schemas.appointment import (
     AppointmentAssignBarberPayload,
@@ -83,7 +89,6 @@ def log_booking_change(db: Session, appointment_id: int, user_id: int | None, ac
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
-ACTIVE_BOOKING_STATUSES = {"pending", "confirmed", "waiting"}
 APPOINTMENT_STATUSES = {
     "pending",
     "confirmed",
@@ -293,7 +298,7 @@ def _ensure_available_slot(
     query = db.query(Appointment).filter(
         Appointment.barber_id == barber_id,
         Appointment.appointment_date == appointment_date,
-        Appointment.status.in_(ACTIVE_BOOKING_STATUSES),
+        holds_barber_time(),
     )
     if exclude_appointment_id is not None:
         query = query.filter(Appointment.id != exclude_appointment_id)
@@ -394,6 +399,100 @@ def list_appointments(
     rows = query.offset(eff_skip).limit(eff_limit).all()
     return [_appointment_to_read(db, row) for row in rows]
 
+
+@router.get("/export/pdf")
+def export_schedule_pdf(
+    date: str = Query(..., description="Date YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_staff),
+):
+    rows = (
+        db.query(Appointment)
+        .options(
+            joinedload(Appointment.customer),
+            joinedload(Appointment.barber),
+            selectinload(Appointment.services).joinedload(AppointmentService.service),
+        )
+        .filter(Appointment.appointment_date == date)
+        .order_by(Appointment.appointment_time.asc())
+        .all()
+    )
+
+    buffer = io.BytesIO()
+    font_name = ensure_pdf_font()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    page_width, page_height = A4
+
+    pdf.setFont(font_name, 16)
+    pdf.drawRightString(
+        page_width - 18 * mm, page_height - 20 * mm, fix_arabic("مخطط المواعيد اليومي")
+    )
+    pdf.setFont(font_name, 10)
+    pdf.drawRightString(
+        page_width - 18 * mm, page_height - 35 * mm, fix_arabic(f"التاريخ: {date}")
+    )
+
+    y = page_height - 60 * mm
+    headers = ["الوقت", "اسم العميل", "الهاتف", "الموظف", "الحالة", "ملاحظات"]
+    col_x = [
+        page_width - 18 * mm,
+        page_width - 50 * mm,
+        page_width - 95 * mm,
+        page_width - 135 * mm,
+        page_width - 170 * mm,
+        page_width - 200 * mm,
+    ]
+    pdf.setFont(font_name, 10)
+    for h, x in zip(headers, col_x):
+        pdf.drawRightString(x, y, fix_arabic(h))
+    pdf.line(15 * mm, y - 4 * mm, page_width - 15 * mm, y - 4 * mm)
+
+    status_labels_ar = {
+        "WAITING": "قادم",
+        "CONFIRMED": "مؤكد",
+        "IN_PROGRESS": "قيد التنفيذ",
+        "AT_RECEPTION": "عند الاستقبال",
+        "AT_CASHIER": "عند الكاشير",
+        "DONE": "مكتمل",
+        "CANCELLED": "ملغي",
+        "NO_SHOW": "لم يحضر",
+        "LATE": "متأخر",
+    }
+
+    y -= 10 * mm
+    for row in rows:
+        if y < 40 * mm:
+            pdf.showPage()
+            pdf.setFont(font_name, 10)
+            y = page_height - 40 * mm
+        status_label = status_labels_ar.get(
+            (row.status or "WAITING").upper(), row.status
+        )
+        services = ", ".join(
+            (s.service_name or s.name or "خدمة") for s in (row.services or [])
+        )[:30]
+        values = [
+            str(row.appointment_time or ""),
+            row.customer_name or "—",
+            row.customer_phone or "—",
+            row.barber_name or row.employee_name or "—",
+            status_label,
+            row.notes or services or "—",
+        ]
+        for v, x in zip(values, col_x):
+            pdf.drawRightString(x, y, fix_arabic(str(v)[:28]))
+        y -= 7 * mm
+
+    pdf.save()
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="schedule-{date}.pdf"'
+        },
+    )
+
 @router.get("/upcoming", response_model=list[AppointmentRead])
 def list_upcoming_appointments(
     db: Session = Depends(get_db),
@@ -430,8 +529,29 @@ def list_ready_appointments(db: Session = Depends(get_db), current_user: User = 
         if not barber_id:
             return []
         query = query.filter(Appointment.barber_id == barber_id)
-        
-    return [_appointment_to_read(db, row) for row in query.all()]
+
+    # Repair legacy empty sessions instead of showing them as payable. A
+    # session with no active service rows cannot produce an invoice: the POS
+    # loads an empty cart and the cashier is stuck on a "ready" card that has
+    # nothing to charge. Returning it to the reception queue is the safe repair
+    # (the appointment and its customer are preserved), and `waiting` puts it
+    # back in front of reception where the services can be added.
+    rows = query.all()
+    repaired = False
+    payable = []
+    for row in rows:
+        has_active_service = any(
+            svc.is_active is not False for svc in (row.services or [])
+        )
+        if has_active_service:
+            payable.append(row)
+            continue
+        row.status = "waiting"
+        repaired = True
+    if repaired:
+        db.commit()
+
+    return [_appointment_to_read(db, row) for row in payable]
 
 @router.get("/by-barber", response_model=List[BarberAppointmentsResponse])
 def get_appointments_by_barber(
@@ -547,7 +667,7 @@ def check_appointment_conflict(
     query = db.query(Appointment).filter(
         Appointment.barber_id == barber_id,
         Appointment.appointment_date == date,
-        Appointment.status.in_(ACTIVE_BOOKING_STATUSES),
+        holds_barber_time(),
     )
     if exclude_id:
         query = query.filter(Appointment.id != exclude_id)
@@ -579,7 +699,7 @@ def check_customer_duplicate(
     query = db.query(Appointment).filter(
         Appointment.customer_id == customer_id,
         Appointment.appointment_date == date,
-        Appointment.status.in_(ACTIVE_BOOKING_STATUSES),
+        holds_barber_time(),
     )
     if exclude_id:
         query = query.filter(Appointment.id != exclude_id)
@@ -802,12 +922,20 @@ def create_fast_walkin(payload: AppointmentFastWalkinCreate, db: Session = Depen
         appt_time = salon_now().time()
     
     # For fast walk-in, we still check availability if a barber is selected
+    # The schema accepts both spellings; the singular `service_id` used to be
+    # accepted and then ignored by creation entirely — the appointment came out
+    # with no service rows and a 0.00 estimate on the session card.
+    walkin_service_ids = list(payload.service_ids or [])
+    if not walkin_service_ids and payload.service_id:
+        walkin_service_ids = [payload.service_id]
+
     total_duration = 0
-    if payload.service_ids:
-        for sid in payload.service_ids:
-            srv = db.query(Service).filter(Service.id == sid).first()
-            if srv: total_duration += (srv.duration_minutes or 30)
-    if total_duration == 0: total_duration = 30
+    for sid in walkin_service_ids:
+        srv = db.query(Service).filter(Service.id == sid).first()
+        if srv:
+            total_duration += (srv.duration_minutes or 30)
+    if total_duration == 0:
+        total_duration = 30
 
     assigned_barber_id = payload.employee_id
     
@@ -868,12 +996,25 @@ def create_fast_walkin(payload: AppointmentFastWalkinCreate, db: Session = Depen
     db.add(appointment)
     db.flush()
     
-    if payload.service_ids:
-        for sid in payload.service_ids:
-            srv = db.query(Service).filter(Service.id == sid).first()
-            if srv:
-                db.add(AppointmentService(appointment_id=appointment.id, service_id=srv.id, service_name_snapshot=srv.name, price_snapshot=srv.price, duration_snapshot_minutes=getattr(srv, "duration_minutes", 30), quantity=1, is_active=True))
-    
+    for sid in walkin_service_ids:
+        srv = db.query(Service).filter(Service.id == sid).first()
+        if srv:
+            db.add(AppointmentService(appointment_id=appointment.id, service_id=srv.id, service_name_snapshot=srv.name, price_snapshot=srv.price, duration_snapshot_minutes=getattr(srv, "duration_minutes", 30), quantity=1, is_active=True))
+
+    # SessionLocal runs with autoflush=False, so the rows above are still
+    # pending in the identity map. Without this flush the query below reads an
+    # empty table and the new session is born with total_estimated_price=0.00
+    # and no services -- a card that looks payable but has nothing on it.
+    db.flush()
+
+    # Compute totals so the session card / queue shows the right amount.
+    total_price = Decimal("0.00")
+    total_duration = 0
+    for asvc in db.query(AppointmentService).filter(AppointmentService.appointment_id == appointment.id).all():
+        total_price += Decimal(str(asvc.price_snapshot or 0)) * (asvc.quantity or 1)
+        total_duration += (asvc.duration_snapshot_minutes or 0) * (asvc.quantity or 1)
+    appointment.total_estimated_price = total_price
+    appointment.total_estimated_duration_minutes = total_duration if total_duration > 0 else 30
     db.commit()
     db.refresh(appointment)
     return _appointment_to_read(db, appointment)

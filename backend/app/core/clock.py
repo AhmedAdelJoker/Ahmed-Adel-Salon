@@ -157,6 +157,26 @@ def to_salon(moment: datetime) -> datetime:
     return moment
 
 
+def utc_to_salon_naive(moment: datetime) -> datetime:
+    """The salon's wall-clock reading of a naive-UTC stored stamp.
+
+    ``to_salon`` converts *aware* values and passes naive ones through, which
+    is right when the caller already holds a salon-wall value. But the storage
+    convention says a naive column value *is* UTC, so printing one in a
+    human-readable note needs the zone re-attached first -- otherwise the note
+    shows the UTC wall next to a stamp the reader compares against local time.
+
+    Aware values are delegated to ``to_salon`` unchanged.
+    """
+    if moment.tzinfo is not None:
+        return to_salon(moment)
+    return (
+        moment.replace(tzinfo=timezone.utc)
+        .astimezone(salon_timezone())
+        .replace(tzinfo=None)
+    )
+
+
 def coerce_naive(moment: datetime | None) -> datetime | None:
     """Make a value comparable against naive wall-clock stamps."""
     if moment is None:

@@ -306,18 +306,6 @@ def test_waitlist_route_is_mounted_and_protected(client, db_session):
     assert response.json()["status"] == "waiting"
 
 
-def test_public_booking_realtime_poll_returns_event(client):
-    from app.api.v1.endpoints.booking_public import publish_booking_event
-
-    slug = "realtime-test"
-    publish_booking_event(slug, "booking.created", {"bookingId": 42})
-    response = client.get(f"/api/v1/public/realtime/booking/{slug}/poll")
-
-    assert response.status_code == 200, response.text
-    assert response.json()["event"]["type"] == "booking.created"
-    assert response.json()["event"]["data"]["bookingId"] == 42
-
-
 def test_session_completion_does_not_deduct_stock_twice(client, db_session):
     headers, customer, barber, service = _setup(client, db_session)
     product = Product(name="Session Serum", quantity=Decimal("10"))

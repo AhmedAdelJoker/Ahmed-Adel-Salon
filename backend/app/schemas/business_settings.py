@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -102,6 +103,10 @@ class BusinessSettingsUpdate(BaseModel):
     loyalty_settings: Optional[dict[str, Any]] = None
     monthly_revenue_target: Optional[float] = Field(default=None, ge=0)
 
+    # VAT percentage on invoices, 0–100. 0 disables the tax line entirely —
+    # the POS hides it and the invoice endpoint adds nothing.
+    tax_rate: Optional[Decimal] = Field(default=None, ge=0, le=100)
+
     # Snapshot
     public_site_snapshot: Optional[dict[str, Any]] = None
     # Optimistic concurrency: the version the client last read.
@@ -201,6 +206,16 @@ class BusinessSettingsRead(BaseModel):
     social_youtube: Optional[str] = None
     loyalty_settings: Optional[dict[str, Any]] = None
     monthly_revenue_target: float = 500000
+
+    # The discount a cashier may apply without a manager's approval. The POS
+    # needs these to tell the cashier what the limit is BEFORE the server
+    # refuses the invoice — the rule itself lives in `app.core.pos`.
+    cashier_discount_limit_type: Optional[str] = None
+    cashier_discount_limit_value: Optional[float] = None
+
+    # VAT percentage on invoices (0–100), so the POS shows the same tax line
+    # the invoice endpoint will compute. camelCase alias: taxRate.
+    tax_rate: Decimal = Decimal("0")
 
     # Snapshot
     public_site_snapshot: Optional[dict[str, Any]] = None

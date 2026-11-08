@@ -42,6 +42,14 @@ class Employee(Base):
     # agreed, not a number of months counted from the start.
     contract_end_date = Column(Date, nullable=True)
     status = Column(String(30), nullable=False, default="active") # active, suspended, resigned
+    # Archive trail. `status='resigned'` already says *that* someone left; these
+    # three answer the questions the archive page is actually asked — when, why,
+    # and who decided. `archived_at` is written only by the archive endpoint, so
+    # a row flipped to `resigned` by hand or by an older build keeps a NULL
+    # instead of a date nobody agreed to.
+    archived_at = Column(DateTime(timezone=True), nullable=True)
+    archive_reason = Column(String(500), nullable=True)
+    archived_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     work_days_json = Column(JSON, nullable=True)
     work_hours_json = Column(JSON, nullable=True)
     
@@ -87,6 +95,10 @@ class Employee(Base):
         uselist=False,
         post_update=True,
     )
+    # Who pressed archive. Its own foreign key, deliberately not `linked_user`:
+    # the employee's login and the person who archived them are different actors,
+    # and an employee without a login still needs an owner on the audit trail.
+    archived_by = relationship("User", foreign_keys=[archived_by_user_id])
     
     working_hours = relationship("EmployeeWorkingHour", back_populates="employee", cascade="all, delete-orphan")
     services = relationship("Service", secondary=employee_services, back_populates="employees")

@@ -208,3 +208,38 @@ def test_master_toggle_tolerates_a_hand_edited_string_value(db_session):
 
     assert closed == 0
     assert db_session.get(PosShift, shift.id).status == "open"
+
+
+def test_auto_close_stamps_the_utc_wall_not_the_salon_wall(db_session):
+    """closed_at sits in a UTC column next to the UTC opened_at.
+
+    It used to be written with the salon clock, which put a closed shift's
+    window hours off the UTC invoice stamps it was meant to contain — the
+    reprint could pull in sales raised long after the close. A fresh UTC stamp
+    lands inside [before, after]; a salon-wall one is the UTC offset ahead of
+    it and cannot.
+    """
+    from app.core.clock import utc_to_salon_naive
+
+    _settings_row(db_session, working_hours=None)
+    _set_lock_hours(4)
+    user = make_user(db_session, username="autolock_cashier", role="cashier")
+    shift = _shift(db_session, user, opened_hours_ago=5)
+
+    before = utc_now_naive()
+    closed = auto_close_expired_shifts(db_session)
+    after = utc_now_naive()
+
+    assert closed == 1
+    row = db_session.get(PosShift, shift.id)
+    stamped = row.closed_at
+    assert stamped is not None
+    assert before <= stamped <= after, (
+        "closed_at must be a fresh UTC stamp — a salon-wall stamp is the UTC "
+        "offset ahead of utc_now_naive and lands outside [before, after]"
+    )
+    # The human-readable note, meanwhile, carries the salon's wall clock.
+    assert (
+        utc_to_salon_naive(stamped).strftime("%Y-%m-%d %H:%M")
+        in (row.closing_note or "")
+    )

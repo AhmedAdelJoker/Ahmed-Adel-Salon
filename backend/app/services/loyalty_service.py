@@ -121,6 +121,21 @@ def sweep_expired_points(db: Session, customers) -> bool:
     return changed
 
 
+def _tier_for_visits(tiers, visits: int):
+    """The highest tier the visit count reaches — the one ladder rule.
+
+    Three places need this answer (assigning a tier, refreshing one after a
+    merge, and pricing the discount) and they used to compute it separately.
+    Three copies of a ladder are three chances for the badge, the stored tier
+    and the discount to disagree, so they share this function now.
+    """
+    ordered = sorted(tiers, key=lambda t: t.get("min_visits", 0), reverse=True)
+    for tier in ordered:
+        if visits >= tier.get("min_visits", 0):
+            return tier
+    return None
+
+
 def update_customer_loyalty(db: Session, customer_id: int, amount_paid: Decimal):
     customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
     if not customer:
@@ -148,13 +163,9 @@ def update_customer_loyalty(db: Session, customer_id: int, amount_paid: Decimal)
 
     # 3. Update Tier
     tiers = settings.get("tiers", [])
-    # Sort tiers by min_visits descending to find the highest reached
-    sorted_tiers = sorted(tiers, key=lambda x: x.get("min_visits", 0), reverse=True)
-
-    for tier in sorted_tiers:
-        if customer.visits_count >= tier.get("min_visits", 0):
-            customer.current_tier = tier.get("name", "Bronze")
-            break
+    tier = _tier_for_visits(tiers, int(customer.visits_count or 0))
+    if tier is not None:
+        customer.current_tier = tier.get("name", "Bronze")
 
     db.add(customer)
     # Note: We don't commit here, the caller should commit
@@ -169,20 +180,11 @@ def refresh_customer_tier(db: Session, customer: Customer) -> None:
     settings = get_loyalty_settings(db)
     if not settings or not settings.get("enabled"):
         return
-    tiers = sorted(settings.get("tiers", []), key=lambda x: x.get("min_visits", 0), reverse=True)
-    for tier in tiers:
-        if customer.visits_count >= tier.get("min_visits", 0):
-            customer.current_tier = tier.get("name", "Bronze")
-            break
-
-
-def _tier_for_visits(tiers, visits: int):
-    """أعلى مستوى يحققه عدد الزيارات — نفس منطق `update_customer_loyalty`."""
-    ordered = sorted(tiers, key=lambda t: t.get("min_visits", 0), reverse=True)
-    for tier in ordered:
-        if visits >= tier.get("min_visits", 0):
-            return tier
-    return None
+    tier = _tier_for_visits(
+        settings.get("tiers", []), int(customer.visits_count or 0)
+    )
+    if tier is not None:
+        customer.current_tier = tier.get("name", "Bronze")
 
 
 def calculate_loyalty_discount(db: Session, customer_id: int, current_total: Decimal) -> Decimal:
