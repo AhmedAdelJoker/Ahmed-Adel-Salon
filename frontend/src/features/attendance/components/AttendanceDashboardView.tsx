@@ -1,207 +1,172 @@
-import { motion } from "framer-motion";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { Activity, BarChart3, Clock, Coffee } from "lucide-react";
+import { AlertCircle, Clock, Coffee, UserCheck } from "lucide-react";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { AttendanceRecord } from "@/features/attendance/types";
-import { WEEKLY_ATTENDANCE } from "@/features/attendance/utils/attendance";
+import {
+  formatTime,
+  statusLabel,
+  type TranslateFn,
+} from "@/features/attendance/utils/attendance";
+import { cn } from "@/lib/core/utils";
+
+function statusBadgeClass(status?: string) {
+  switch (status) {
+    case "in":
+      return "border-emerald-500/20 bg-emerald-500/10 text-emerald-700";
+    case "break":
+      return "border-amber-500/20 bg-amber-500/10 text-amber-700";
+    case "break_end":
+      return "border-sky-500/20 bg-sky-500/10 text-sky-700";
+    case "out":
+      return "border-slate-500/20 bg-slate-500/10 text-slate-700";
+    default:
+      return "border-border bg-muted/20 text-muted";
+  }
+}
 
 export default function AttendanceDashboardView({
   todayRecords,
+  t,
+  locale,
+  onOpenEmployeeFile,
 }: {
   todayRecords: AttendanceRecord[];
+  t: TranslateFn;
+  locale: string;
+  onOpenEmployeeFile?: (id: string | number) => void;
 }) {
+  const present = todayRecords.filter(
+    (r) => r.status === "in" || r.status === "break" || r.status === "break_end",
+  ).length;
+  const late = todayRecords.filter(
+    (r) => Boolean(r.is_late) || Number(r.stats?.lateMinutes || 0) > 0,
+  ).length;
+  const completed = todayRecords.filter((r) => r.status === "out" || r.isComplete).length;
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="space-y-5"
+    <div
+      className="space-y-4"
+      id="attendance-panel-today"
+      role="tabpanel"
+      aria-labelledby="attendance-tab-today"
     >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Weekly Attendance Chart */}
-        <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <h3 className="text-sm font-black text-main mb-4 flex items-center gap-2">
-            <BarChart3 size={16} className="text-primary" /> الحضور الأسبوعي
-          </h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={WEEKLY_ATTENDANCE}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="currentColor"
-                  className="opacity-10"
-                />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: "12px",
-                    border: "1px solid var(--border)",
-                    fontSize: "12px",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="حضور"
-                  stroke="var(--chart-3)"
-                  fill="var(--chart-3)"
-                  fillOpacity={0.15}
-                  strokeWidth={2}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="تأخير"
-                  stroke="var(--chart-4)"
-                  fill="var(--chart-4)"
-                  fillOpacity={0.15}
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      <p className="text-xs font-semibold text-muted">{t("attendance.todayViewHint")}</p>
 
-        {/* Status Distribution Pie */}
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <h3 className="text-sm font-black text-main mb-4 flex items-center gap-2">
-            <Coffee size={16} className="text-orange-500" /> توزيع الحالات
-          </h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={[
-                    {
-                      name: "متواجد",
-                      value:
-                        todayRecords.filter(
-                          (r) =>
-                            Number(r.stats?.totalHours) > 0 && !r.isComplete,
-                        ).length || 1,
-                      color: "var(--chart-3)",
-                    },
-                    {
-                      name: "مكتمل",
-                      value:
-                        todayRecords.filter((r) => r.isComplete).length || 1,
-                      color: "var(--chart-2)",
-                    },
-                    {
-                      name: "متأخر",
-                      value:
-                        todayRecords.filter((r) => (r.stats?.lateMinutes ?? 0) > 0)
-                          .length || 0,
-                      color: "var(--chart-4)",
-                    },
-                  ].filter((d) => d.value > 0)}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={40}
-                  outerRadius={70}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {[
-                    { name: "متواجد", color: "var(--chart-3)" },
-                    { name: "مكتمل", color: "var(--chart-2)" },
-                    { name: "متأخر", color: "var(--chart-4)" },
-                  ].map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: "12px",
-                    border: "1px solid var(--border)",
-                    fontSize: "12px",
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center gap-4 mt-2">
-            <div className="flex items-center gap-1.5">
-              <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-              <span className="text-[10px] font-bold text-muted">متواجد</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
-              <span className="text-[10px] font-bold text-muted">مكتمل</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-              <span className="text-[10px] font-bold text-muted">متأخر</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-        <h3 className="text-sm font-black text-main mb-4 flex items-center gap-2">
-          <Clock size={16} className="text-primary" /> آخر النشاطات
-        </h3>
-        <div className="space-y-2">
-          {todayRecords.slice(0, 5).map((rec, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="flex items-center justify-between rounded-xl bg-soft/50 p-3 hover:bg-soft transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <EmployeeAvatar
-                  name={rec.employee_name || rec.barber_name}
-                  size="sm"
-                  status={rec.isComplete ? "inactive" : "active"}
-                />
-                <div>
-                  <p className="text-xs font-black text-main">
-                    {rec.employee_name || rec.barber_name}
-                  </p>
-                  <p className="text-[9px] font-bold text-muted">
-                    {new Date(String(rec.created_at || "")).toLocaleTimeString(
-                      "ar-EG",
-                      { hour: "2-digit", minute: "2-digit" },
-                    )}
-                  </p>
-                </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {[
+          { label: t("attendance.kpiPresent"), value: present, icon: UserCheck, cls: "text-primary bg-primary/10" },
+          { label: t("attendance.kpiLate"), value: late, icon: AlertCircle, cls: "text-red-600 bg-red-500/10" },
+          { label: t("attendance.kpiCompleted"), value: completed, icon: Clock, cls: "text-emerald-700 bg-emerald-500/10" },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4">
+              <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", item.cls)}>
+                <Icon size={18} />
               </div>
-              <Badge
-                variant={
-                  (rec.stats?.lateMinutes ?? 0) > 0 ? "danger" : "secondary"
-                }
-                className="text-[9px] font-black"
-              >
-                {(rec.stats?.lateMinutes ?? 0) > 0
-                  ? `متأخر ${rec.stats?.lateMinutes ?? 0}د`
-                  : "طبيعي"}
-              </Badge>
-            </motion.div>
-          ))}
-          {todayRecords.length === 0 && (
-            <div className="text-center py-8">
-              <Activity size={40} className="mx-auto mb-3 text-muted" />
-              <p className="text-base font-black text-main">
-                لا توجد نشاطات اليوم
-              </p>
+              <div>
+                <p className="text-2xl font-black tabular-nums text-main">{item.value}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-muted">{item.label}</p>
+              </div>
             </div>
-          )}
-        </div>
+          );
+        })}
       </div>
-    </motion.div>
+
+      <div className="rounded-2xl border border-border bg-card shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
+          <h3 className="text-sm font-black text-main">{t("attendance.tabToday")}</h3>
+          <span className="rounded-full bg-muted/30 px-2.5 py-1 text-xs font-bold text-muted tabular-nums">
+            {todayRecords.length}
+          </span>
+        </div>
+        {todayRecords.length === 0 ? (
+          <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/20 text-muted">
+              <UserCheck size={24} />
+            </div>
+            <p className="mt-4 text-sm font-black text-main">{t("attendance.noDataToday")}</p>
+            <p className="mt-1 max-w-sm text-xs font-medium text-muted">
+              {t("attendance.noDataTodayHint")}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {todayRecords.map((rec) => {
+              const id = rec.employee_id ?? rec.id;
+              const lateMinutes = Number(rec.stats?.lateMinutes || 0);
+              const isLate = Boolean(rec.is_late) || lateMinutes > 0;
+              return (
+                <div
+                  key={String(id)}
+                  className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <EmployeeAvatar
+                      name={rec.employee_name || rec.full_name || "—"}
+                      imageUrl={(rec.profile_photo as string | undefined) ?? (rec.employee_photo as string | undefined) ?? undefined}
+                      size="sm"
+                      shape="circle"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-main">
+                        {rec.employee_name || rec.full_name || "—"}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-black",
+                            statusBadgeClass(rec.status),
+                          )}
+                        >
+                          {statusLabel(rec.status, t)}
+                        </span>
+                        {isLate && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-black text-red-700">
+                            <AlertCircle size={11} />
+                            {t("attendance.statusLate", { minutes: lateMinutes || "—" })}
+                          </span>
+                        )}
+                        {rec.status === "break" && (
+                          <Badge variant="outline" className="h-5 gap-1 border-amber-500/20 bg-amber-500/10 px-2 text-[10px] font-black text-amber-700">
+                            <Coffee size={10} /> {t("attendance.statusBreak")}
+                          </Badge>
+                        )}
+                      </div>
+                      {rec.late_reason ? (
+                        <p className="mt-1 truncate text-[11px] font-medium text-muted" title={String(rec.late_reason)}>
+                          {t("attendance.lateReason")}: {String(rec.late_reason)}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 sm:justify-end">
+                    <div className="text-start sm:text-end">
+                      <p className="text-xs font-bold text-main tabular-nums">
+                        {formatTime(rec.created_at, locale)}
+                      </p>
+                      <p className="text-[10px] font-semibold text-muted">
+                        {Number(rec.stats?.totalHours || 0).toFixed(1)} {t("attendance.hours")}
+                      </p>
+                    </div>
+                    {onOpenEmployeeFile && id != null && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 rounded-xl text-xs font-bold"
+                        onClick={() => onOpenEmployeeFile(id)}
+                      >
+                        {t("attendance.openFile")}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

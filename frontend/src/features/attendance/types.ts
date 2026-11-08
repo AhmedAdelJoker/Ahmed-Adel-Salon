@@ -21,11 +21,11 @@ export type {
 };
 
 export type AttendanceViewMode =
-  | "dashboard"
-  | "pulse"
-  | "monthly"
+  | "today"
+  | "register"
   | "leaves"
   | "calendar"
+  | "analytics"
   | "archive";
 
 export interface CalendarDay {

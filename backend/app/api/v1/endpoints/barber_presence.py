@@ -646,42 +646,6 @@ def update_leave_status(
 
 # ========== Import/Export ==========
 
-@router.post("/import-biometric")
-async def import_biometric(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner),
-):
-    # Phase 3: validate MIME/size/filename
-    content = await validate_data_sheet(file, max_size=20 * 1024 * 1024)
-    try:
-        decoded = content.decode("utf-8")
-        reader = csv.DictReader(io.StringIO(decoded))
-        imported = 0
-        for row in reader:
-            emp_id = row.get("employee_id") or row.get("emp_id") or row.get("id")
-            if not emp_id:
-                continue
-            status_type = row.get("status") or row.get("type") or "in"
-            timestamp = row.get("timestamp") or row.get("time") or row.get("created_at")
-            log = EmployeePresenceLog(
-                employee_id=int(emp_id),
-                status=status_type,
-                source="biometric",
-            )
-            if timestamp:
-                try:
-                    log.created_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                except Exception:
-                    pass
-            db.add(log)
-            imported += 1
-        db.commit()
-        return {"message": f"تم استيراد {imported} سجل بنجاح", "imported": imported}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"فشل الاستيراد: {str(e)}")
-
-
 @router.post("/import-excel")
 async def import_excel(
     file: UploadFile = File(...),

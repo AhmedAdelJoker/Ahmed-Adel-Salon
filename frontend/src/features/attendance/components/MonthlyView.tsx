@@ -1,299 +1,97 @@
-/** Attendance Monthly view (moved from AttendanceManagement page, no logic changes). */
-import { motion } from "framer-motion";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { BarChart3, TrendingUp } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { Badge } from "@/components/ui/badge";
+import { BarChart3 } from "lucide-react";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
-import { cn } from "@/lib/core/utils";
 import type { AttendanceRecord } from "@/features/attendance/types";
-import { currencyLabel } from "@/lib/core/currency";
+import { type TranslateFn } from "@/features/attendance/utils/attendance";
 
-export default function MonthlyView({ processedData }: { processedData: AttendanceRecord[] }) {
+export default function MonthlyView({
+  processedData,
+  t,
+}: {
+  processedData: AttendanceRecord[];
+  t: TranslateFn;
+}) {
+  const rows = Array.isArray(processedData) ? processedData : [];
+  const totals = rows.reduce<{ hours: number; overtime: number; late: number }>(
+    (acc, r) => {
+      acc.hours += Number(r.stats?.totalHours || 0);
+      acc.overtime += Number(r.stats?.overtime || 0);
+      acc.late += Number(r.stats?.lateMinutes || 0);
+      return acc;
+    },
+    { hours: 0, overtime: 0, late: 0 },
+  );
+
   return (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-5"
-          >
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-5 shadow-soft">
-                <h3 className="text-sm font-black text-main mb-4 flex items-center gap-2">
-                  <BarChart3 size={16} className="text-primary" /> مقارنة
-                  الموظفين
-                </h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={processedData.map((emp) => ({
-                        name: emp.full_name?.split(" ")[0] || "موظف",
-                        ساعات: Number(emp.stats?.totalHours) || 0,
-                        تأخير: emp.stats?.lateMinutes || 0,
-                      }))}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="currentColor"
-                        className="opacity-10"
-                      />
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: "12px",
-                          border: "1px solid var(--border)",
-                          fontSize: "12px",
-                        }}
-                      />
-                      <Legend />
-                      <Bar
-                        dataKey="ساعات"
-                        fill="var(--chart-3)"
-                        radius={[8, 8, 0, 0]}
-                      />
-                      <Bar
-                        dataKey="تأخير"
-                        fill="var(--chart-4)"
-                        radius={[8, 8, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-                <h3 className="text-sm font-black text-main mb-4">
-                  نسبة الحضور
-                </h3>
-                <div className="h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          {
-                            name: "ممتاز (90%+)",
-                            value:
-                              processedData.filter(
-                                (e) =>
-                                  ((Number(e.stats?.totalHours) || 0) / 8) *
-                                    100 >=
-                                  90,
-                              ).length || 1,
-                            color: "var(--chart-3)",
-                          },
-                          {
-                            name: "جيد (70-89%)",
-                            value:
-                              processedData.filter((e) => {
-                                const r =
-                                  ((Number(e.stats?.totalHours) || 0) / 8) *
-                                  100;
-                                return r >= 70 && r < 90;
-                              }).length || 1,
-                            color: "var(--chart-2)",
-                          },
-                          {
-                            name: "متوسط (50-69%)",
-                            value:
-                              processedData.filter((e) => {
-                                const r =
-                                  ((Number(e.stats?.totalHours) || 0) / 8) *
-                                  100;
-                                return r >= 50 && r < 70;
-                              }).length || 0,
-                            color: "var(--chart-4)",
-                          },
-                          {
-                            name: "ضعيف (<50%)",
-                            value:
-                              processedData.filter(
-                                (e) =>
-                                  ((Number(e.stats?.totalHours) || 0) / 8) *
-                                    100 <
-                                  50,
-                              ).length || 0,
-                            color: "var(--chart-7)",
-                          },
-                        ].filter((d) => d.value > 0)}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={60}
-                        dataKey="value"
-                        label={({ name, percent }) =>
-                          `${name} ${(percent * 100).toFixed(0)}%`
-                        }
-                        labelLine={false}
-                      >
-                        {[
-                          { color: "var(--chart-3)" },
-                          { color: "var(--chart-2)" },
-                          { color: "var(--chart-4)" },
-                          { color: "var(--chart-7)" },
-                        ].map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-                <h3 className="text-sm font-black text-main mb-4">الاتجاهات</h3>
-                <div className="h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={[
-                        { week: "الأسبوع 1", حضور: 85 },
-                        { week: "الأسبوع 2", حضور: 78 },
-                        { week: "الأسبوع 3", حضور: 92 },
-                        { week: "الأسبوع 4", حضور: 88 },
-                      ]}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="currentColor"
-                        className="opacity-10"
-                      />
-                      <XAxis dataKey="week" tick={{ fontSize: 10 }} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: "12px",
-                          border: "1px solid var(--border)",
-                          fontSize: "12px",
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="حضور"
-                        stroke="var(--chart-3)"
-                        strokeWidth={3}
-                        dot={{ fill: "var(--chart-3)", r: 5 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
+    <div
+      className="space-y-4"
+      id="attendance-panel-analytics"
+      role="tabpanel"
+      aria-labelledby="attendance-tab-analytics"
+    >
+      <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+        <h3 className="text-sm font-black text-main">{t("attendance.analyticsTitle")}</h3>
+        <p className="mt-1 text-xs font-medium text-muted">{t("attendance.analyticsHint")}</p>
 
-            {/* Employee Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {processedData.length > 0 ? (
-                processedData.map((emp, i) => {
-                  const attendanceRate =
-                    ((Number(emp.stats?.totalHours) || 0) / 8) * 100;
-                  const rateColor =
-                    attendanceRate >= 90
-                      ? "emerald"
-                      : attendanceRate >= 70
-                        ? "blue"
-                        : attendanceRate >= 50
-                          ? "amber"
-                          : "rose";
-                  return (
-                    <motion.div
-                      key={emp.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className={cn(
-                        "rounded-2xl border bg-card p-5 shadow-soft hover:shadow-premium transition-all",
-                        `border-${rateColor}-200 dark:border-${rateColor}-800`,
-                      )}
-                    >
-                      <div className="flex items-center gap-3 mb-4">
-                        <EmployeeAvatar
-                          name={emp.full_name}
-                          size="lg"
-                          status={attendanceRate >= 70 ? "active" : "inactive"}
-                        />
-                        <div className="flex-1">
-                          <h3 className="text-base font-black text-main">
-                            {emp.full_name}
-                          </h3>
-                          <p className="text-[9px] font-bold text-muted uppercase">
-                            ملخص الأداء الشهري
-                          </p>
-                        </div>
-                        <div
-                          className={cn(
-                            "px-3 py-1.5 rounded-xl",
-                            `bg-${rateColor}-50 dark:bg-${rateColor}-900/20`,
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "text-sm font-black",
-                              `text-${rateColor}-500`,
-                            )}
-                          >
-                            {attendanceRate.toFixed(0)}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div className="p-3 rounded-xl bg-soft">
-                          <p className="text-[9px] font-black text-muted uppercase mb-1">
-                            إجمالي الساعات
-                          </p>
-                          <p className="text-xl font-black text-main">
-                            {Number(emp.stats?.totalHours) || 0}
-                            <small className="text-xs"> ساعة</small>
-                          </p>
-                        </div>
-                        <div className="p-3 rounded-xl bg-soft">
-                          <p className="text-[9px] font-black text-muted uppercase mb-1">
-                            صافي المستحق
-                          </p>
-                          <p className="text-xl font-black text-emerald-600">
-                            {emp.payroll?.netSalary || 0}
-                            <small className="text-xs">{currencyLabel()}</small>
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Badge
-                          variant={
-                            (emp.stats?.lateMinutes ?? 0) > 0
-                              ? "danger"
-                              : "secondary"
-                          }
-                          className="text-[9px] font-black"
-                        >
-                          {(emp.stats?.lateMinutes ?? 0) > 0
-                            ? `${emp.stats?.lateMinutes ?? 0} دقيقة تأخير`
-                            : "بدون تأخير"}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className="text-[9px] font-black"
-                        >
-                          {emp.stats?.overtime || 0} ساعة إضافية
-                        </Badge>
-                      </div>
-                    </motion.div>
-                  );
-                })
-              ) : (
-                <EmptyState variant="section" icon={TrendingUp} title="لا توجد بيانات شهرية" message="لم يتم تسجيل أي بيانات حضور لهذا الشهر" />
-              )}
+        {rows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/20 text-muted">
+              <BarChart3 size={24} />
             </div>
-          </motion.div>
+            <p className="mt-4 text-sm font-black text-main">
+              {t("attendance.analyticsUnavailable")}
+            </p>
+            <p className="mt-1 text-xs font-medium text-muted">
+              {t("attendance.analyticsUnavailableHint")}
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-border bg-muted/10 p-3">
+                <p className="text-[11px] font-black uppercase tracking-wide text-muted">{t("attendance.kpiHours")}</p>
+                <p className="mt-1 text-2xl font-black tabular-nums text-main">{totals.hours.toFixed(1)}</p>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/10 p-3">
+                <p className="text-[11px] font-black uppercase tracking-wide text-muted">{t("attendance.lateMinutes")}</p>
+                <p className="mt-1 text-2xl font-black tabular-nums text-main">{Math.round(totals.late)}</p>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/10 p-3">
+                <p className="text-[11px] font-black uppercase tracking-wide text-muted">{t("attendance.overtime")}</p>
+                <p className="mt-1 text-2xl font-black tabular-nums text-main">{totals.overtime.toFixed(1)}</p>
+              </div>
+            </div>
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-start text-[11px] font-black uppercase tracking-wide text-muted">
+                    <th className="px-2 py-2 text-start">{t("attendance.colEmployee")}</th>
+                    <th className="px-2 py-2 text-start">{t("attendance.kpiHours")}</th>
+                    <th className="px-2 py-2 text-start">{t("attendance.lateMinutes")}</th>
+                    <th className="px-2 py-2 text-start">{t("attendance.overtime")}</th>
+                    <th className="px-2 py-2 text-start">{t("attendance.score")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rows.map((r) => (
+                    <tr key={String(r.employee_id ?? r.id)}>
+                      <td className="px-2 py-2">
+                        <div className="flex items-center gap-2">
+                          <EmployeeAvatar name={r.employee_name || r.full_name || "—"} size="xs" shape="circle" />
+                          <span className="font-bold text-main">{r.employee_name || r.full_name || "—"}</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 tabular-nums font-semibold">{Number(r.stats?.totalHours || 0).toFixed(1)}</td>
+                      <td className="px-2 py-2 tabular-nums font-semibold">{Number(r.stats?.lateMinutes || 0)}</td>
+                      <td className="px-2 py-2 tabular-nums font-semibold">{Number(r.stats?.overtime || 0).toFixed(1)}</td>
+                      <td className="px-2 py-2 font-semibold">{r.ai?.score != null ? `${r.ai.score}` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

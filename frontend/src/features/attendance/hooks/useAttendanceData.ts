@@ -1,31 +1,39 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { adaptList } from "@/services/apiAdapter";
 import { loadErrorMessage } from "@/lib/core/asyncError";
 import type {
   AttendanceRecord,
   EmployeeRecord,
+  LeaveRecord,
   WorkingHours,
 } from "@/features/attendance/types";
 import {
   deriveMonthlyData,
   deriveTodayRecords,
   filterArchiveRecords,
+  normalizeCurrentRecords,
+  type TranslateFn,
 } from "@/features/attendance/utils/attendance";
 
-/**
- * Attendance listing data: fetches, filters and derived lists.
- * Mirrors `useBookingsBoard` / `useInventoryData` conventions.
- */
-export function useAttendanceData() {
+const PAGE_SIZE = 25;
+
+export function useAttendanceData(opts?: { t?: TranslateFn }) {
+  const t = opts?.t;
   const [searchParams] = useSearchParams();
   const employeeIdFilter = searchParams.get("employeeId");
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
+  const [workingHours, setWorkingHours] = useState<WorkingHours>({});
+  const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
+
   const [loading, setLoading] = useState(true);
+  const [leavesLoading, setLeavesLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [secondaryError, setSecondaryError] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -36,85 +44,86 @@ export function useAttendanceData() {
     new Date().toISOString().split("T")[0],
   );
   const [calendarMonth, setCalendarMonth] = useState(new Date());
-  const [workingHours, setWorkingHours] = useState<WorkingHours>({});
-  // Non-fatal: the records themselves load fine, but the schedule that decides
-  // who counts as late did not, so the totals need a caveat.
-  const [secondaryError, setSecondaryError] = useState<string | null>(null);
+  const [leaveFilter, setLeaveFilter] = useState("all");
+  const [archivePage, setArchivePage] = useState(1);
+
+  const tt = useCallback(
+    (key: string, fallback: string) => (t ? t(key) : fallback),
+    [t],
+  );
 
   const fetchAttendance = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get("/barber-presence/current");
-      const data = res.data || [];
-      setRecords(
-        data.map((record: any) => ({
-          id: record.employee_id,
-          employee_id: record.employee_id,
-          employee_name:
-            record.employee_name ||
-            record.employee?.full_name ||
-            "موظف غير معروف",
-          status: record.current_status,
-          created_at: record.last_log?.created_at,
-          stats: record.last_log?.stats || {
-            totalHours: 0,
-            lateMinutes: 0,
-            overtime: 0,
-            breakMinutes: 0,
-          },
-          isComplete: record.current_status === "out",
-          is_late: record.is_late,
-          late_reason: record.late_reason,
-          all_logs: record.logs_today || [],
-        })),
-      );
-    } catch (err) {
-      console.error("Attendance fetch error:", err);
-      toast.error("فشل تحميل سجلات الحضور");
+      setLoadError(null);
+      const [curRes, empRes, whRes] = await Promise.allSettled([
+        api.get("/barber-presence/current"),
+        api.get("/employees"),
+        api.get("/barber-presence/working-hours"),
+      ]);
+
+      const empList =
+        empRes.status === "fulfilled"
+          ? adaptList(empRes.value).map((emp: any) => ({
+              ...emp,
+              id: emp.id,
+              full_name: emp.full_name || emp.display_name || emp.name || "—",
+            }))
+          : [];
+      setEmployees(empList);
+
+      if (curRes.status === "fulfilled") {
+        setRecords(normalizeCurrentRecords(curRes.value.data || [], empList));
+      } else {
+        setRecords([]);
+        setLoadError(
+          loadErrorMessage(curRes.reason, tt("attendance.loadFailed", "Attendance")),
+        );
+      }
+
+      if (whRes.status === "fulfilled") {
+        setWorkingHours(whRes.value.data?.working_hours || {});
+      } else {
+        setWorkingHours({});
+      }
+
+      const secondary: string[] = [];
+      if (empRes.status === "rejected") {
+        secondary.push(loadErrorMessage(empRes.reason, "Employees"));
+      }
+      if (whRes.status === "rejected") {
+        secondary.push(loadErrorMessage(whRes.reason, "Working hours"));
+      }
+      setSecondaryError(secondary.length ? secondary.join(" · ") : null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tt]);
 
-  const fetchEmployees = useCallback(async () => {
-    try {
-      const res = await api.get("/employees");
-      setEmployees(
-        adaptList(res).map((emp: any) => ({
-          ...emp,
-          full_name: emp.full_name || emp.display_name || emp.name || "موظف",
-        })),
-      );
-    } catch (err) {
-      // Without the roster the view cannot attribute records to anyone, so the
-      // numbers on screen would be unattributable rather than merely incomplete.
-      console.error("Failed to fetch employees", err);
-      setSecondaryError(
-        loadErrorMessage(err, "قائمة الموظفين") +
-          " قد تظهر سجلات الحضور بدون أسماء.",
-      );
-    }
-  }, []);
-  const fetchWorkingHours = useCallback(async () => {
-    try {
-      const res = await api.get("/barber-presence/working-hours");
-      setWorkingHours(res.data?.working_hours || {});
-    } catch (err) {
-      // Working hours decide which staff are counted late. Failing open to an
-      // empty schedule silently marks everyone on time.
-      console.error("Failed to fetch working hours:", err);
-      setSecondaryError(
-        loadErrorMessage(err, "ساعات العمل") +
-          " قد تظهر نتائج الحضور غير دقيقة.",
-      );
-    }
-  }, []);
+  const fetchLeaves = useCallback(
+    async (status = leaveFilter) => {
+      try {
+        setLeavesLoading(true);
+        const res = await api.get("/barber-presence/leaves", {
+          params: { status: status === "all" ? undefined : status },
+        });
+        setLeaves(Array.isArray(res.data) ? res.data : []);
+      } catch {
+        setLeaves([]);
+      } finally {
+        setLeavesLoading(false);
+      }
+    },
+    [leaveFilter],
+  );
 
   useEffect(() => {
-    fetchAttendance();
-    fetchEmployees();
-    fetchWorkingHours();
-  }, [fetchAttendance, fetchEmployees, fetchWorkingHours]);
+    void fetchAttendance();
+  }, [fetchAttendance]);
+
+  useEffect(() => {
+    setArchivePage(1);
+  }, [searchTerm, startDate, endDate, employeeIdFilter]);
 
   const todayRecords = useMemo(
     () => deriveTodayRecords(records, employees),
@@ -126,7 +135,7 @@ export function useAttendanceData() {
     [records, employees],
   );
 
-  const archiveRecords = useMemo(
+  const filteredArchiveRecords = useMemo(
     () =>
       filterArchiveRecords(records, {
         startDate,
@@ -137,8 +146,25 @@ export function useAttendanceData() {
     [records, searchTerm, employeeIdFilter, startDate, endDate],
   );
 
+  const archiveTotalPages = Math.max(
+    1,
+    Math.ceil(filteredArchiveRecords.length / PAGE_SIZE),
+  );
+  const safeArchivePage = Math.min(archivePage, archiveTotalPages);
+  const archiveRecords = useMemo(
+    () =>
+      filteredArchiveRecords.slice(
+        (safeArchivePage - 1) * PAGE_SIZE,
+        safeArchivePage * PAGE_SIZE,
+      ),
+    [filteredArchiveRecords, safeArchivePage],
+  );
+
   const lateEmployees = useMemo(
-    () => todayRecords.filter((r) => (r.stats?.lateMinutes ?? 0) > 0),
+    () =>
+      todayRecords.filter(
+        (r) => Boolean(r.is_late) || Number(r.stats?.lateMinutes ?? 0) > 0,
+      ),
     [todayRecords],
   );
 
@@ -146,9 +172,11 @@ export function useAttendanceData() {
     records,
     employees,
     workingHours,
-    secondaryError,
-    setWorkingHours,
+    leaves,
     loading,
+    leavesLoading,
+    loadError,
+    secondaryError,
     searchTerm,
     setSearchTerm,
     startDate,
@@ -157,13 +185,20 @@ export function useAttendanceData() {
     setEndDate,
     calendarMonth,
     setCalendarMonth,
+    leaveFilter,
+    setLeaveFilter,
+    archivePage: safeArchivePage,
+    setArchivePage,
+    archiveTotalPages,
+    archiveTotal: filteredArchiveRecords.length,
+    pageSize: PAGE_SIZE,
     employeeIdFilter,
     fetchAttendance,
-    fetchEmployees,
-    fetchWorkingHours,
+    fetchLeaves,
     todayRecords,
     processedData,
     archiveRecords,
+    filteredArchiveRecords,
     lateEmployees,
   };
 }

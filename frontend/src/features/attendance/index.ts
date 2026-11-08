@@ -27,3 +27,4 @@ export { default as CalendarView } from "@/features/attendance/components/Calend
 export { default as LeavesView } from "@/features/attendance/components/LeavesView";
 export { default as MonthlyView } from "@/features/attendance/components/MonthlyView";
 export { default as PulseView } from "@/features/attendance/components/PulseView";
+export { default as RegisterView } from "@/features/attendance/components/RegisterView";
