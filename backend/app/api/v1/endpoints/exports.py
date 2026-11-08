@@ -38,6 +38,7 @@ from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
 from app.models.payroll_record import PayrollRecord
 from app.models.product import Product
+from app.models.inventory_log import InventoryLog
 from app.models.service import Service
 from app.models.user import User
 from app.services.activity_service import log_activity
@@ -1383,6 +1384,101 @@ def export_products_csv(
     rows = _product_rows(_query_products(db, search=search, q=q, status=status))
     log_activity(db, user_id=current_user.id, action="export", entity_type="product", description="تصدير قائمة المنتجات (CSV)")
     return _make_csv_response(columns=PRODUCT_COLUMNS, rows=rows, base_name="products")
+
+
+
+
+INVENTORY_LOG_COLUMNS = [
+    ("id", "Movement ID"),
+    ("created_at", "Date"),
+    ("type", "Type"),
+    ("product_name", "Product"),
+    ("product_category", "Category"),
+    ("change_amount", "Change"),
+    ("product_unit", "Unit"),
+    ("created_by", "Created By"),
+    ("note", "Note"),
+]
+
+
+def _query_inventory_logs(
+    db: Session,
+    *,
+    type_filter: str | None = None,
+    q: str | None = None,
+    product_id: int | None = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
+):
+    query = (
+        db.query(InventoryLog)
+        .options(joinedload(InventoryLog.product), joinedload(InventoryLog.created_by_user))
+        .order_by(InventoryLog.created_at.desc(), InventoryLog.id.desc())
+    )
+    if type_filter and type_filter not in {"", "all"}:
+        query = query.filter(InventoryLog.type == type_filter)
+    if product_id:
+        query = query.filter(InventoryLog.product_id == product_id)
+    if q and q.strip():
+        s = f"%{q.strip()}%"
+        query = query.join(Product, Product.id == InventoryLog.product_id).filter(
+            or_(Product.name.ilike(s), InventoryLog.note.ilike(s))
+        )
+    fd = _parse_optional_date(from_date)
+    td = _parse_optional_date(to_date)
+    if fd:
+        query = query.filter(InventoryLog.created_at >= datetime.combine(fd, datetime.min.time()))
+    if td:
+        query = query.filter(InventoryLog.created_at <= datetime.combine(td, datetime.max.time()))
+    return query.limit(50000).all()
+
+
+def _inventory_log_rows(logs):
+    rows = []
+    for log in logs:
+        creator = getattr(log, "created_by_user", None)
+        rows.append([
+            log.id,
+            log.created_at.isoformat() if log.created_at else "",
+            log.type,
+            getattr(log.product, "name", None) or f"Product #{log.product_id}",
+            getattr(log.product, "category", None) or "",
+            _safe_float(log.change_amount),
+            getattr(log.product, "unit", None) or "",
+            getattr(creator, "full_name", None) or getattr(creator, "username", None) or (f"User #{log.created_by_user_id}" if log.created_by_user_id else "System"),
+            _clean_text(log.note),
+        ])
+    return rows
+
+
+@router.get("/inventory-logs/excel")
+def export_inventory_logs_excel(
+    type: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+    product_id: int | None = Query(default=None),
+    from_date: str | None = Query(default=None),
+    to_date: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+):
+    logs = _query_inventory_logs(db, type_filter=type, q=q, product_id=product_id, from_date=from_date, to_date=to_date)
+    log_activity(db, user_id=current_user.id, action="export", entity_type="inventory_log", description="Export inventory logs (Excel)")
+    return _make_excel_response(sheet_name="InventoryLogs", columns=INVENTORY_LOG_COLUMNS, rows=_inventory_log_rows(logs), base_name="inventory_logs")
+
+
+@router.get("/inventory-logs/csv")
+def export_inventory_logs_csv(
+    type: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+    product_id: int | None = Query(default=None),
+    from_date: str | None = Query(default=None),
+    to_date: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+):
+    logs = _query_inventory_logs(db, type_filter=type, q=q, product_id=product_id, from_date=from_date, to_date=to_date)
+    log_activity(db, user_id=current_user.id, action="export", entity_type="inventory_log", description="Export inventory logs (CSV)")
+    return _make_csv_response(columns=INVENTORY_LOG_COLUMNS, rows=_inventory_log_rows(logs), base_name="inventory_logs")
 
 
 @router.get("/reports/revenue/excel")

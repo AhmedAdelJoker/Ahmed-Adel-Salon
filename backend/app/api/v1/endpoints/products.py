@@ -11,7 +11,12 @@ from app.models.expense import Expense
 from app.models.user import User
 from app.models.product import Product
 from app.models.inventory_log import InventoryLog
-from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
+from app.schemas.product import (
+    ProductCreate,
+    ProductRead,
+    ProductSummary,
+    ProductUpdate,
+)
 from app.schemas.inventory import (
     InventoryAddStockPayload,
     InventoryAdjustPayload,
@@ -98,6 +103,67 @@ def list_products(
         if page is not None:
             response.headers["X-Page"] = str(page)
     return query.offset(eff_offset).limit(eff_limit).all()
+
+
+@router.get("/summary", response_model=ProductSummary)
+def get_products_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+    q: Optional[str] = Query(None),
+):
+    q_norm = (q or "").strip()
+    base = db.query(Product)
+    if q_norm:
+        search = f"%{q_norm}%"
+        base = base.filter(
+            or_(
+                Product.name.ilike(search),
+                Product.sku.ilike(search),
+                Product.category.ilike(search),
+                Product.company_name.ilike(search),
+            )
+        )
+
+    total = base.with_entities(func.count(Product.id)).scalar() or 0
+    archived = (
+        base.with_entities(func.count(Product.id))
+        .filter(Product.is_archived.is_(True))
+        .scalar()
+        or 0
+    )
+    active = int(total) - int(archived)
+    low_stock = (
+        base.with_entities(func.count(Product.id))
+        .filter(
+            Product.is_archived.is_(False),
+            Product.quantity <= Product.min_quantity_alert,
+        )
+        .scalar()
+        or 0
+    )
+    totals = (
+        base.with_entities(
+            func.coalesce(func.sum(Product.quantity * Product.cost_price), 0),
+            func.coalesce(func.sum(Product.quantity * func.coalesce(Product.sell_price, 0)), 0),
+        )
+        .filter(Product.is_archived.is_(False))
+        .one()
+    )
+    categories = (
+        base.with_entities(func.count(func.distinct(Product.category)))
+        .filter(Product.category.isnot(None), Product.category != "")
+        .scalar()
+        or 0
+    )
+    return ProductSummary(
+        total=int(total),
+        active=int(active),
+        archived=int(archived),
+        low_stock=int(low_stock),
+        total_cost=Decimal(str(totals[0] or 0)),
+        total_value=Decimal(str(totals[1] or 0)),
+        categories=int(categories),
+    )
 
 
 @router.get("/logs/all", response_model=InventoryLogListResponse)
@@ -299,6 +365,7 @@ def create_product(
     # Create Product with 0 quantity
     product = Product(**payload.model_dump())
     product.quantity = 0
+    product.is_active = not bool(getattr(product, "is_archived", False))
     db.add(product)
     db.commit()
     db.refresh(product)
@@ -324,6 +391,8 @@ def update_product(
 
     for field, value in data.items():
         setattr(product, field, value)
+    if "is_archived" in data:
+        product.is_active = not bool(product.is_archived)
 
     db.add(product)
     db.commit()
@@ -363,6 +432,7 @@ def add_product_stock(
     
     # Auto-unarchive when adding stock
     product.is_archived = False
+    product.is_active = True
 
     pending_expense = None
     if payload.create_expense:
@@ -451,6 +521,7 @@ def remove_product_stock(
     # Auto-archive if quantity hits zero
     if product.quantity <= 0:
         product.is_archived = True
+        product.is_active = False
 
     db.commit()
     db.refresh(product)
@@ -468,6 +539,7 @@ def toggle_product_archive(
         raise HTTPException(status_code=404, detail="المنتج غير موجود")
 
     product.is_archived = not product.is_archived
+    product.is_active = not product.is_archived
     db.commit()
     db.refresh(product)
     return product
