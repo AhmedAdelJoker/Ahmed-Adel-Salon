@@ -20,6 +20,7 @@ export interface InventoryStats {
 export interface CategoryTone {
   Icon: typeof Droplets | typeof Box;
   badge: string;
+  badgeKey?: string;
   iconClass: string;
 }
 
@@ -120,11 +121,22 @@ export function useInventoryData(
     if (
       normalized.includes("زيت") ||
       normalized.includes("serum") ||
-      normalized.includes("سيروم")
+      normalized.includes("سيروم") ||
+      normalized.includes("oil")
     ) {
-      return { Icon: Droplets, badge: "سوائل وأمصال", iconClass: "bg-info/10 text-info" };
+      return {
+        Icon: Droplets,
+        badgeKey: "inventory.categoryLiquids",
+        badge: "سوائل وأمصال",
+        iconClass: "bg-info/10 text-info",
+      };
     }
-    return { Icon: Box, badge: "منتجات أساسية", iconClass: "bg-primary/10 text-primary" };
+    return {
+      Icon: Box,
+      badgeKey: "inventory.categoryEssentials",
+      badge: "منتجات أساسية",
+      iconClass: "bg-primary/10 text-primary",
+    };
   };
 
   const handleExport = (_format?: string) => {

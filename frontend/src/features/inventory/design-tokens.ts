@@ -1,3 +1,4 @@
+import i18n from "@/i18n";
 /**
  * Inventory Feature Design Tokens
  * Derived from the global Midnight Gold Luxury design system (src/styles/index.css)
@@ -302,11 +303,11 @@ export function getProductStatusLabel(product) {
   const qty = Number(product?.quantity || 0);
   const threshold = Number(product?.min_quantity_alert || 0);
   const isArchived = product?.is_archived;
-
-  if (isArchived) return "مؤرشف";
-  if (qty <= 0) return "منتهٍ";
-  if (qty <= threshold) return "منخفض";
-  return "مستقر";
+  const tr = (k, fb) => { try { return i18n.t(`owner:inventory.${k}`, { defaultValue: fb }); } catch { return fb; } };
+  if (isArchived) return tr("archived", "مؤرشف");
+  if (qty <= 0) return tr("statusOut", "نفد");
+  if (qty <= threshold) return tr("low", "منخفض");
+  return tr("stable", "مستقر");
 }
 
 /**
@@ -317,12 +318,14 @@ export function getCategoryTone(category) {
   const isOil =
     normalized.includes("زيت") ||
     normalized.includes("serum") ||
-    normalized.includes("سيروم");
+    normalized.includes("سيروم") ||
+    normalized.includes("oil");
+  const tr = (k, fb) => { try { return i18n.t(`owner:inventory.${k}`, { defaultValue: fb }); } catch { return fb; } };
 
   if (isOil) {
     return {
       icon: "Droplets",
-      badge: "زيوت وسوائل",
+      badge: tr("categoryLiquids", "سوائل وأمصال"),
       bg: "var(--info-soft)",
       text: "var(--info)",
       border: "var(--info)",
@@ -330,7 +333,7 @@ export function getCategoryTone(category) {
   }
   return {
     icon: "Box",
-    badge: "مستلزمات وتشغيل",
+    badge: tr("categoryEssentials", "منتجات أساسية"),
     bg: "var(--primary-soft)",
     text: "var(--primary)",
     border: "var(--primary)",

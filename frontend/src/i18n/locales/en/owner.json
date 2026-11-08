@@ -1517,7 +1517,14 @@
       "readOnlyNote": "Read-only view. Use edit from the inventory page if you have permission.",
       "movementLog": "Movement log",
       "name": "Product name"
-    }
+    },
+    "statusOut": "Out of stock",
+    "categoryLiquids": "Liquids & serums",
+    "categoryEssentials": "Essentials",
+    "stockStatusAria": "Stock status: {{status}}",
+    "viewMovementLog": "View product movement log",
+    "sale": "Sale",
+    "costLabel": "Cost"
   },
   "productBundles": {
     "title": "Product Bundles",

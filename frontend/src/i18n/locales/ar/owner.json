@@ -1517,7 +1517,14 @@
       "readOnlyNote": "عرض قراءة فقط. استخدم التعديل من صفحة المخزون إذا كانت لديك صلاحية.",
       "movementLog": "سجل الحركات",
       "name": "اسم الصنف"
-    }
+    },
+    "statusOut": "نفد",
+    "categoryLiquids": "سوائل وأمصال",
+    "categoryEssentials": "منتجات أساسية",
+    "stockStatusAria": "حالة المخزون: {{status}}",
+    "viewMovementLog": "عرض سجل حركات هذا المنتج",
+    "sale": "البيع",
+    "costLabel": "التكلفة"
   },
   "productBundles": {
     "title": "حزم المنتجات",

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { cn, formatCurrency } from "@/lib/core/utils";
 import {
   getProductStatusToken,
@@ -19,6 +20,7 @@ export function SmartStatusBar({
   product: any;
   className?: string;
 }) {
+  const { t } = useTranslation("owner");
   const qty = Number(product?.quantity || 0);
   const threshold = Number(product?.min_quantity_alert || 0);
   const isArchived = product?.is_archived;
@@ -57,7 +59,7 @@ export function SmartStatusBar({
       aria-valuenow={percentage}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-label={`حالة المخزون: ${getProductStatusLabel(product)}`}
+      aria-label={t("inventory.stockStatusAria", { status: getProductStatusLabel(product) })}
     >
       <div
         className="h-full rounded-full transition-all duration-500 ease-spring"
@@ -233,6 +235,7 @@ export function ProductCard({
   isLowStock,
   className,
 }) {
+  const { t } = useTranslation("owner");
   const statusToken = getProductStatusToken(product);
   const categoryTone = getCategoryTone(product.category);
   const statusLabel = getProductStatusLabel(product);
@@ -315,7 +318,7 @@ export function ProductCard({
               </h4>
               <p className="text-[10px] font-bold text-muted uppercase tracking-widest">
                 {product.company_name ? `${product.company_name} • ` : ""}
-                {product.category || "بدون تصنيف"}
+                {product.category || t("inventory.categoryFallback")}
               </p>
             </div>
           </div>
@@ -325,7 +328,7 @@ export function ProductCard({
         {/* LAYER 2: Vital Stats */}
         <div className="grid grid-cols-2 gap-3">
           <Metric
-            label="سعة العبوة"
+            label={t("inventory.modal.packCapacityLabel")}
             value={
               product.weight
                 ? `${product.weight} ${unitMeta.shortLabel}`
@@ -333,17 +336,17 @@ export function ProductCard({
             }
           />
           <Metric
-            label="الرصيد"
+            label={t("inventory.modal.balance")}
             value={
               product.weight
-                ? `${availablePacks} عبوة`
+                ? `${availablePacks} ${t("inventory.modal.pack")}`
                 : `${qty} ${unitMeta.shortLabel}`
             }
             accent={true}
             variant={isLowStock ? "warning" : "success"}
           />
           <Metric
-            label="البيع"
+            label={t("inventory.sale")}
             value={
               product.sell_price
                 ? formatCurrency(Number(product.sell_price))
@@ -352,7 +355,7 @@ export function ProductCard({
             variant="success"
           />
           <Metric
-            label="التكلفة"
+            label={t("inventory.costLabel")}
             value={
               product.cost_price
                 ? formatCurrency(Number(product.cost_price))
@@ -366,8 +369,7 @@ export function ProductCard({
         <div className="rounded-2xl border border-border/60 bg-soft/50 p-4 flex items-center justify-between group-hover:bg-card transition-colors">
           <div>
             <div className="text-[8px] font-black text-muted uppercase">
-              إجمالي الكمية
-            </div>
+              {t("inventory.totalQty")}</div>
             <div className="text-base font-black text-main font-data">
               {product.weight
                 ? `${(qty / (product.weight || 1)).toFixed(1)} ${unitMeta.label}`
@@ -377,8 +379,8 @@ export function ProductCard({
           <button
             onClick={() => onHistory?.(product)}
             className="h-9 w-9 rounded-xl bg-soft border border-border flex items-center justify-center text-muted hover:bg-card hover:text-accent hover:border-accent/30 transition-all"
-            title="سجل الحركات"
-            aria-label="عرض سجل حركات هذا المنتج"
+            title={t("inventory.movementLog")}
+            aria-label={t("inventory.viewMovementLog")}
           >
             <svg
               className="h-4 w-4"
@@ -405,7 +407,7 @@ export function ProductCard({
                 className="flex-1 rounded-xl h-10 text-xs font-black border border-border bg-soft hover:bg-card transition-colors"
                 tabIndex={0}
               >
-                تعديل
+                {t("inventory.edit")}
               </button>
             )}
             <button
@@ -431,7 +433,7 @@ export function ProductCard({
                   d="M12 4v16m8-8H4"
                 />
               </svg>
-              توريد
+              {t("inventory.supply")}
             </button>
           </div>
         </div>
