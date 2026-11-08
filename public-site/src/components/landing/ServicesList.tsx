@@ -130,7 +130,7 @@ export default function ServicesList({
 
   if (services.length === 0) {
     return (
-      <section id="services" className="mk-shell py-[length:var(--section-y)]">
+      <section id="services" className="mk-shell mk-section">
         <p className="mk-empty">{t("landing.noServices")}</p>
       </section>
     );
@@ -140,7 +140,7 @@ export default function ServicesList({
   let rowIndex = 0;
 
   return (
-    <section id="services" className="mk-shell py-[length:var(--section-y)]">
+    <section id="services" className="mk-shell mk-section">
       <header className="mk-svc-head">
         <div>
           {eyebrow ? <p className="mk-eyebrow">{eyebrow}</p> : null}

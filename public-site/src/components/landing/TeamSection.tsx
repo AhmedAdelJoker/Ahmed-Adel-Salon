@@ -65,7 +65,7 @@ export default function TeamSection({
   if (!members.length) return null;
 
   return (
-    <section id="team" className="mk-shell py-[length:var(--section-y)]">
+    <section id="team" className="mk-shell mk-section">
       <header className="mk-svc-head">
         <div>
           <p className="mk-eyebrow">{t("nav.team")}</p>
@@ -214,12 +214,17 @@ function TeamCard({
             the salon's dark style used to end on a hard line, which read as a
             broken image rather than a photograph; the wash makes the crop
             deliberate and the info band below feels continuous with it.
+
+            The wash is confined to the bottom fifth for that reason. It used to
+            start at 55%, which faded out the lower half of a 4:5 portrait —
+            chin, shoulders and all — and on a two-person team the section then
+            read as two fogged photographs rather than two people.
           */}
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0"
             style={{
-              backgroundImage: `linear-gradient(to bottom, transparent 55%, ${theme.card} 102%)`,
+              backgroundImage: `linear-gradient(to bottom, transparent 80%, ${theme.card} 100%)`,
             }}
           />
         </div>

@@ -523,6 +523,8 @@
     font-weight: 700;
     line-height: 1;
     color: var(--c-text);
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
   }
 
   .mk-trust dt {
@@ -785,6 +787,26 @@
     }
   }
 
+  /*
+    ── Section rhythm ─────────────────────────────────────────────────
+
+    Every landing section carried `py-[length:var(--section-y)]`, and two
+    neighbours therefore put *both* of their paddings in the same gap — up to
+    256px of nothing between a gallery and a booking button. The band that read
+    as "editorial breathing room" was two half-bands stacked by accident.
+
+    Collapsing the start padding of a section that follows another section
+    gives the page one rhythm instead of two, and it is a rule rather than
+    eight different numbers to keep in sync.
+  */
+  .mk-section {
+    padding-block: var(--section-y);
+  }
+
+  .mk-section + .mk-section {
+    padding-block-start: calc(var(--section-y) / 2);
+  }
+
   /* ── Service menu ────────────────────────────────────────────────────── */
   /*
     A printed menu, not a card grid.
@@ -797,10 +819,18 @@
   */
   .mk-menu {
     border-top: 1px solid var(--c-border-strong);
+    /*
+      A price list is read by scanning one column of numbers against one column
+      of names. At the shell's full width the name column absorbed the entire
+      difference and the two ends of a row stopped relating to each other — the
+      price looked like it belonged to the next row. A measure keeps the eye on
+      the line.
+    */
+    max-inline-size: 62rem;
   }
 
   .mk-menu-group + .mk-menu-group {
-    margin-top: clamp(2rem, 4vw, 3.25rem);
+    margin-top: clamp(1.25rem, 2.5vw, 2rem);
   }
 
   .mk-menu-group-title {
@@ -821,6 +851,15 @@
     background-color: var(--c-border);
   }
 
+  /*
+    `.mk-menu`'s own border-top and the first group's rule were drawing a
+    hairline one line-length apart with nothing between them, which reads as a
+    stray line rather than a section divider.
+  */
+  .mk-menu > .mk-menu-group:first-child > .mk-menu-group-title::after {
+    display: none;
+  }
+
   .mk-menu-row {
     display: grid;
     grid-template-columns: 2.25rem minmax(0, 1fr) auto auto;
@@ -829,6 +868,11 @@
     padding-block: 1.05rem;
     border-bottom: 1px solid var(--c-border);
     transition: background-color 0.2s ease;
+  }
+
+  /* The next group's title carries the rule, so the last row does not need one. */
+  .mk-menu-group:last-child .mk-menu-row:last-child {
+    border-bottom: 0;
   }
 
   @media (hover: hover) {
@@ -892,7 +936,8 @@
     font-weight: 700;
     color: var(--c-text);
     white-space: nowrap;
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
   }
 
   .mk-menu-price small {
@@ -1076,10 +1121,29 @@
     otherwise stretch to half the page each, turning two portraits into two
     billboards. The tracks stay card-sized and the row simply ends.
   */
+  /*
+    Flex, not grid.
+
+    `repeat(auto-fill, minmax(230px, 1fr))` sized the *tracks*, so a two-person
+    team — which is what a small shop actually has — filled two of the four
+    tracks the row could fit and left the trailing half of the section empty.
+    Under `auto-fit` the same two cards stretched to ~570px each and the
+    portrait blew up with them.
+
+    A flex row with a hard cap on the card keeps every portrait at a size that
+    reads as a person, and lets the leftover measure sit where the design
+    already puts whitespace: after the last card, on the trailing edge.
+  */
   .mk-team-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: clamp(1.25rem, 3vw, 2.5rem);
+  }
+
+  .mk-team-grid > li {
+    flex: 1 1 15rem;
+    min-width: 0;
+    max-inline-size: 21rem;
   }
 
   .mk-member {
@@ -1532,10 +1596,24 @@
     }
   }
 
-  /* Tabular figures for money/phone/counter text that opts in: digits hold
-     equal width, so totals stop jittering as they count or change. */
+  /*
+    Money, phone numbers, slot times and booking references.
+
+    Two axes are being pinned here, and only one of them was. `tabular-nums`
+    makes every digit the same width so a counting figure does not jitter; it
+    says nothing about *height*. The editorial face (Amiri for Arabic, Cormorant
+    for Latin) defaults to text figures, where `1` is an x-height stroke and `0`
+    sits below the cap line — so `EGP 100` on the price list read as `EGP IOO`
+    and `12+` as `II+` in the hero's trust row. On the two numbers a visitor
+    compares fastest, that is a legibility defect, not a style.
+
+    `lining-nums` puts every digit on the baseline at full height. It is
+    duplicated as `font-feature-settings` because several Arabic text faces
+    expose the figure substitution only through the raw feature tag.
+  */
   .numeric {
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
   }
 
   /* ── Footer ──────────────────────────────────────────────────────────── */
@@ -1663,6 +1741,31 @@
       max-width: 34rem;
       margin-inline: auto;
       width: 100%;
+    }
+
+    /*
+      Lead with the photograph on a phone.
+
+      In the two-column spread the copy is the entry point and the portrait
+      answers it from the side. Collapsed to one column, that order put the
+      image below the headline, both CTAs, the trust row and the phone number —
+      so the largest element on the page, and the one that decides whether a
+      visitor trusts the place, waited behind four text blocks. On a 390px
+      screen it started at roughly 1.5 viewports down.
+    */
+    .mk-hero-aside {
+      order: -1;
+    }
+
+    /*
+      Moving the portrait first put its status caption directly above the
+      openbar, so a phone showed "مفتوح الآن" twice inside one screen — and the
+      announcement strip above the header says it a third time. The caption is
+      the one attached to the photograph the visitor is looking at, so the
+      standalone pill goes.
+    */
+    .mk-openbar {
+      display: none;
     }
 
     /* The frame hangs outside the box; on a single column it can collide with

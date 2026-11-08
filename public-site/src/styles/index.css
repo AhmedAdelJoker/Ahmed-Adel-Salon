@@ -67,8 +67,6 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  --shadow-gold: 0 20px 50px -10px rgba(212, 175, 55, 0.3);
-  --shadow-gold-lg: 0 30px 80px -20px rgba(212, 175, 55, 0.5);
 
   /* ── Motion tokens ───────────────────────────────────────── */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -162,8 +160,6 @@
   /* ── Spacing extras ─────────────────────────────────────── */
   --page-padding-x: clamp(1rem, 4vw, 2rem);
   --topbar-height: 3.75rem;
-  --sidebar-width: 15.5rem;
-  --sidebar-rail: 4.25rem;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -212,222 +208,124 @@
 ────────────────────────────────────────────────────────────── */
 
 @layer base {
-  /* ── Light theme ──────────────────────────────────────── */
-  :root,
-  [data-theme="light"] {
-    color-scheme: light;
+  /*
+    ── The default palette ──────────────────────────────────────────
 
+    `applyThemeMode()` writes the salon's resolved palette onto <html> as
+    `--c-*`, but it runs from React — so on the very first frame, and for every
+    crawler and no-JavaScript visitor that reads the prerendered document,
+    those properties did not exist and every `bg-panel` / `text-ink` /
+    `border-line` utility resolved to nothing. The page painted unstyled until
+    hydration finished.
+
+    These are the pre-hydration defaults, deliberately equal to
+    `DEFAULT_THEME_NAME` in `lib/theme.ts` (the ivory/copper ground), so the
+    first frame is the house style rather than a blank canvas and the swap on
+    hydration is a re-tint rather than a reveal. `applyThemeMode` overwrites
+    them inline, which is what makes the duplication safe.
+  */
+  :root {
+    --c-bg: #f4efe7;
+    --c-surface: #f9f5ef;
+    --c-card: #fffcf7;
+    --c-inset: #ece5d9;
+    --c-border: rgba(42, 32, 24, 0.12);
+    --c-border-strong: rgba(42, 32, 24, 0.24);
+    --c-text: #201811;
+    --c-muted: #6b5e51;
+    --c-faint: #948777;
+    --c-on-text: #fffcf7;
+    --c-accent: #a85a32;
+    --c-accent-2: #c07344;
+    --c-accent-wash: rgba(168, 90, 50, 0.1);
+    --c-accent-line: rgba(168, 90, 50, 0.3);
+    --c-on-accent: #fff8f2;
+    --c-ok: #3f6b4e;
+    --c-ok-wash: rgba(63, 107, 78, 0.1);
+    --c-stop: #9e3a34;
+    --c-stop-wash: rgba(158, 58, 52, 0.1);
+    --c-glass: rgba(244, 239, 231, 0.78);
+  }
+
+  /*
+    ── Palette bridge ───────────────────────────────────────────────
+
+    Every token below is an alias onto the `--c-*` properties above, which
+    `applyThemeMode()` re-points at the salon's chosen palette. This is what
+    unifies the two skins: the landing page styles itself with `mk-*` classes
+    that read `--c-*` directly, and the booking flow still uses these legacy
+    names — so both now follow the same accent, ground and hairline.
+
+    They used to be two ~100-line blocks hardcoded to champagne gold
+    (`#D4AF37`) and keyed on `:root` / `.dark` / `[data-theme]`. That second
+    copy is why a salon that had chosen a cobalt or pine palette still got gold
+    buttons and gold prices the moment it opened the booking page.
+
+    Light and dark no longer need separate blocks: the palette object already
+    carries both grounds, and `applyThemeMode` writes the whole set at once.
+    `[data-theme]` is gone as a selector because `theme-init.js` sets it only to
+    hint `color-scheme`, which `applyThemeMode` also owns.
+  */
+  :root {
     /* Backgrounds */
-    --bg-main: #FAFAF7;
-    --bg-soft: #F5F5F2;
-    --bg-card: #ffffff;
-    --bg-elevated: #ffffff;
-    --bg-overlay: rgba(255, 255, 255, 0.75);
-    --bg-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    --bg-main: var(--c-bg);
+    --bg-soft: var(--c-inset);
+    --bg-card: var(--c-card);
+    --bg-elevated: var(--c-surface);
+    --bg-overlay: var(--c-glass);
 
     /* Text */
-    --text-main: #1A1510;
-    --text-secondary: #4A3F35;
-    --text-muted: #8C7A61;
-    --text-subtle: rgba(140, 122, 97, 0.45);
-    --text-inverse: #ffffff;
-    --text-on-accent: #ffffff;
+    --text-main: var(--c-text);
+    --text-secondary: var(--c-muted);
+    --text-muted: var(--c-muted);
+    --text-subtle: var(--c-faint);
+    --text-inverse: var(--c-on-text);
+    --text-on-accent: var(--c-on-accent);
 
     /* Borders */
-    --border: rgba(26, 21, 16, 0.07);
-    --border-2: rgba(26, 21, 16, 0.12);
-    --border-3: rgba(26, 21, 16, 0.2);
-    --border-accent: rgba(212, 175, 55, 0.25);
-    --border-focus: rgba(212, 175, 55, 0.5);
+    --border: var(--c-border);
+    --border-2: var(--c-border-strong);
+    --border-3: var(--c-border-strong);
+    --border-accent: var(--c-accent-line);
+    --border-focus: var(--c-accent-line);
 
-    /* Accent — Champagne Gold */
-    --accent: #D4AF37;
-    --accent-2: #B08D26;
-    --accent-dark: #8A6D1B;
-    --accent-light: #E5C366;
-    --accent-soft: rgba(212, 175, 55, 0.1);
-    --accent-subtle: rgba(212, 175, 55, 0.055);
-    --accent-glow: rgba(212, 175, 55, 0.2);
+    /* Accent — the salon's signal colour, whatever it happens to be */
+    --accent: var(--c-accent);
+    --accent-2: var(--c-accent-2);
+    --accent-dark: var(--c-accent-2);
+    --accent-light: var(--c-accent-2);
+    --accent-soft: var(--c-accent-wash);
+    --accent-subtle: var(--c-accent-wash);
+    --accent-glow: var(--c-accent-wash);
 
     /* Semantic */
-    --success: #10B981;
-    --success-soft: rgba(16, 185, 129, 0.1);
-    --danger: #EF4444;
-    --danger-soft: rgba(239, 68, 68, 0.1);
-    --warning: #F59E0B;
-    --warning-soft: rgba(245, 158, 11, 0.1);
-    --info: #3B82F6;
-    --info-soft: rgba(59, 130, 246, 0.1);
+    --success: var(--c-ok);
+    --success-soft: var(--c-ok-wash);
+    --danger: var(--c-stop);
+    --danger-soft: var(--c-stop-wash);
+    --warning: var(--c-accent);
+    --warning-soft: var(--c-accent-wash);
+    --info: var(--c-accent);
+    --info-soft: var(--c-accent-wash);
 
-    /* Sidebar */
-    --theme-sidebar-bg: #F5F5F2;
-    --theme-sidebar-text: #4A3F35;
-    --theme-sidebar-hover: rgba(212, 175, 55, 0.08);
-    --theme-sidebar-active: rgba(212, 175, 55, 0.12);
-    --theme-sidebar-active-border: #D4AF37;
-    --theme-sidebar-border: rgba(26, 21, 16, 0.07);
-
-    /* Topbar */
-    --theme-topbar-bg: rgba(255, 255, 255, 0.85);
-    --theme-topbar-border: rgba(26, 21, 16, 0.07);
-
-    /* Card */
-    --theme-card-bg: #ffffff;
-    --theme-card-text: #1A1510;
-    --theme-muted-text: #8C7A61;
-
-    /* Buttons */
-    --theme-button-primary: #D4AF37;
-    --theme-button-primary-hover: #B08D26;
-
-    /* Sidebar shorthand */
-    --sb-bg: var(--theme-sidebar-bg);
-    --sb-bg-2: var(--theme-sidebar-bg);
-    --sb-text: var(--theme-sidebar-text);
-    --sb-text-hover: #1A1510;
-    --sb-text-active: var(--theme-sidebar-active-border);
-    --sb-icon: #8C7A61;
-    --sb-icon-active: var(--theme-sidebar-active-border);
-    --sb-hover-bg: var(--theme-sidebar-hover);
-    --sb-active-bg: var(--theme-sidebar-active);
-    --sb-active-mark: var(--theme-sidebar-active-border);
-    --sb-border: var(--theme-sidebar-border);
+    /* Topbar / cards / buttons */
+    --theme-topbar-bg: var(--c-glass);
+    --theme-topbar-border: var(--c-border);
+    --theme-card-bg: var(--c-card);
+    --theme-card-text: var(--c-text);
+    --theme-muted-text: var(--c-muted);
+    --theme-button-primary: var(--c-accent);
+    --theme-button-primary-hover: var(--c-accent-2);
 
     /* Gradients */
     --grad-page:
-      radial-gradient(
-        ellipse 60% 40% at 8% -4%,
-        rgba(212, 175, 55, 0.07),
-        transparent 55%
-      ),
-      radial-gradient(
-        ellipse 40% 30% at 92% 96%,
-        rgba(176, 141, 38, 0.04),
-        transparent 45%
-      ),
-      linear-gradient(180deg, #FAFAF7 0%, #F5F5F2 100%);
-    --grad-card: linear-gradient(160deg, #ffffff 0%, #FAFAF7 100%);
-    --grad-accent: linear-gradient(
-      135deg,
-      #D4AF37 0%,
-      #E5C366 60%,
-      #F2D58E 100%
-    );
-    --grad-accent-h: linear-gradient(
-      135deg,
-      #B08D26 0%,
-      #D4AF37 60%,
-      #E5C366 100%
-    );
+      radial-gradient(ellipse 60% 40% at 8% -4%, var(--c-accent-wash), transparent 55%),
+      linear-gradient(180deg, var(--c-bg) 0%, var(--c-surface) 100%);
+    --grad-card: linear-gradient(160deg, var(--c-card) 0%, var(--c-surface) 100%);
+    --grad-accent: linear-gradient(135deg, var(--c-accent) 0%, var(--c-accent-2) 100%);
+    --grad-accent-h: linear-gradient(135deg, var(--c-accent-2) 0%, var(--c-accent) 100%);
   }
 
-  /* ── Dark theme (Midnight Gold) ───────────────────────── */
-  .dark,
-  [data-theme="dark"] {
-    color-scheme: dark;
-
-    /* Backgrounds */
-    --bg-main: #09090B;
-    --bg-soft: #121214;
-    --bg-card: #17171A;
-    --bg-elevated: #1C1C1F;
-    --bg-overlay: rgba(9, 9, 11, 0.85);
-
-    /* Text */
-    --text-main: #F8FAFC;
-    --text-secondary: #CBD5E1;
-    --text-muted: #94A3B8;
-    --text-subtle: #475569;
-    --text-inverse: #09090B;
-    --text-on-accent: #09090B;
-
-    /* Borders */
-    --border: rgba(255, 255, 255, 0.08);
-    --border-2: rgba(255, 255, 255, 0.12);
-    --border-3: rgba(255, 255, 255, 0.18);
-    --border-accent: rgba(212, 175, 55, 0.3);
-    --border-focus: rgba(212, 175, 55, 0.6);
-
-    /* Accent — Champagne Gold */
-    --accent: #D4AF37;
-    --accent-2: #B08D26;
-    --accent-dark: #8A6D1B;
-    --accent-light: #E5C366;
-    --accent-soft: rgba(212, 175, 55, 0.12);
-    --accent-subtle: rgba(212, 175, 55, 0.06);
-    --accent-glow: rgba(212, 175, 55, 0.25);
-
-    /* Semantic */
-    --success: #10B981;
-    --success-soft: rgba(16, 185, 129, 0.1);
-    --danger: #EF4444;
-    --danger-soft: rgba(239, 68, 68, 0.1);
-    --warning: #F59E0B;
-    --warning-soft: rgba(245, 158, 11, 0.1);
-    --info: #3B82F6;
-    --info-soft: rgba(59, 130, 246, 0.1);
-
-    /* Sidebar */
-    --theme-sidebar-bg: #0C0C0E;
-    --theme-sidebar-text: #94A3B8;
-    --theme-sidebar-hover: rgba(212, 175, 55, 0.1);
-    --theme-sidebar-active: rgba(212, 175, 55, 0.15);
-    --theme-sidebar-active-border: #D4AF37;
-    --theme-sidebar-border: rgba(255, 255, 255, 0.08);
-
-    /* Topbar */
-    --theme-topbar-bg: rgba(9, 9, 11, 0.85);
-    --theme-topbar-border: rgba(255, 255, 255, 0.08);
-
-    /* Card */
-    --theme-card-bg: #17171A;
-    --theme-card-text: #F8FAFC;
-    --theme-muted-text: #94A3B8;
-
-    /* Buttons */
-    --theme-button-primary: #D4AF37;
-    --theme-button-primary-hover: #B08D26;
-
-    /* Sidebar shorthand */
-    --sb-bg: var(--theme-sidebar-bg);
-    --sb-bg-2: var(--theme-sidebar-bg);
-    --sb-text: var(--theme-sidebar-text);
-    --sb-text-hover: #F8FAFC;
-    --sb-text-active: var(--theme-sidebar-active-border);
-    --sb-icon: #64748B;
-    --sb-icon-active: var(--theme-sidebar-active-border);
-    --sb-hover-bg: var(--theme-sidebar-hover);
-    --sb-active-bg: var(--theme-sidebar-active);
-    --sb-active-mark: var(--theme-sidebar-active-border);
-    --sb-border: var(--theme-sidebar-border);
-
-    /* Gradients */
-    --grad-page:
-      radial-gradient(
-        ellipse 60% 40% at 8% -4%,
-        rgba(212, 175, 55, 0.08),
-        transparent 55%
-      ),
-      radial-gradient(
-        ellipse 40% 30% at 92% 96%,
-        rgba(176, 141, 38, 0.05),
-        transparent 45%
-      ),
-      linear-gradient(180deg, #09090B 0%, #121214 100%);
-    --grad-card: linear-gradient(160deg, #1C1C1F 0%, #17171A 100%);
-    --grad-accent: linear-gradient(
-      135deg,
-      #D4AF37 0%,
-      #E5C366 60%,
-      #F2D58E 100%
-    );
-    --grad-accent-h: linear-gradient(
-      135deg,
-      #B08D26 0%,
-      #D4AF37 60%,
-      #E5C366 100%
-    );
-  }
 
   /* ── Global resets ────────────────────────────────────── */
   *,
@@ -1234,95 +1132,6 @@
     scrollbar-width: none;
   }
 
-  /* ── Sidebar ─────────────────────────────────────────── */
-  .sidebar,
-  .sidebar-rail {
-    background: var(--theme-sidebar-bg) !important;
-    color: var(--theme-sidebar-text) !important;
-    border-inline-start: 1px solid var(--theme-sidebar-border);
-    border-inline-end: 0;
-    box-shadow: none;
-    transition:
-      width var(--duration-base) var(--ease-smooth),
-      min-width var(--duration-base) var(--ease-smooth),
-      max-width var(--duration-base) var(--ease-smooth),
-      background-color var(--duration-slow) var(--ease-smooth),
-      color var(--duration-slow) var(--ease-smooth),
-      border-color var(--duration-slow) var(--ease-smooth);
-  }
-
-  .sidebar-logo,
-  .sidebar-header,
-  .sidebar-footer {
-    border-color: var(--theme-sidebar-border) !important;
-  }
-
-  .sidebar-label {
-    color: color-mix(
-      in srgb,
-      var(--theme-sidebar-text) 65%,
-      transparent
-    ) !important;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .sidebar-section {
-    padding-block: 0.5rem;
-  }
-
-  .sidebar-item {
-    color: var(--theme-sidebar-text) !important;
-    border-radius: var(--radius-lg) !important;
-    background: transparent;
-    transition:
-      background-color var(--duration-base) var(--ease-smooth),
-      color var(--duration-base) var(--ease-smooth),
-      border-color var(--duration-base) var(--ease-smooth),
-      box-shadow var(--duration-base) var(--ease-smooth),
-      transform var(--duration-base) var(--ease-spring);
-  }
-
-  .sidebar-item:hover {
-    background: var(--theme-sidebar-hover) !important;
-    color: var(--theme-sidebar-active-border) !important;
-    border-color: transparent !important;
-    transform: translateX(-3px);
-  }
-
-  .sidebar-item.active {
-    background: var(--theme-sidebar-active) !important;
-    color: var(--theme-sidebar-active-border) !important;
-    box-shadow:
-      inset 0 0 0 1px
-        color-mix(in srgb, var(--theme-sidebar-active-border) 18%, transparent),
-      0 2px 8px
-        color-mix(in srgb, var(--theme-sidebar-active-border) 12%, transparent) !important;
-    position: relative;
-    font-weight: 600;
-  }
-
-  /* Active left indicator bar */
-  .sidebar-item.active::before {
-    content: "";
-    position: absolute;
-    inset-inline-start: 0;
-    top: 18%;
-    bottom: 18%;
-    width: 3px;
-    border-radius: var(--radius-full);
-    background: var(--theme-sidebar-active-border);
-    box-shadow: 0 0 12px 2px var(--theme-sidebar-active-border);
-  }
-
-  .sidebar-item__icon,
-  .sidebar-item.active .sidebar-item__icon,
-  .sidebar-item:hover .sidebar-item__icon {
-    color: currentColor !important;
-  }
-
   /* ── Topbar ──────────────────────────────────────────── */
   .topbar {
     position: sticky;
@@ -1368,7 +1177,7 @@
   .topbar__pill-btn:hover,
   .topbar__profile-btn:hover {
     color: var(--theme-button-primary) !important;
-    background: var(--theme-sidebar-hover) !important;
+    background: var(--accent-soft) !important;
     transform: translateY(-1px) scale(1.04) !important;
   }
 

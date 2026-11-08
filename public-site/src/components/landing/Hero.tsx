@@ -256,8 +256,11 @@ export default function Hero({
             photograph; a framed figure keeps the image as a composed object, and
             the status strip inside it answers "are you open" at the point where
             the visitor is looking at the room.
+
+            Named `mk-hero-aside` so the single-column layout can move it above
+            the copy without depending on it being the grid's last child.
           */}
-          <div className="relative">
+          <div className="mk-hero-aside relative">
             <span className="mk-hero-frame" aria-hidden="true" />
             <figure
               className="mk-hero-media"

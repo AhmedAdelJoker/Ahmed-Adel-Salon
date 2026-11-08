@@ -968,10 +968,18 @@ test("every landing setting the backend stores is published to the public site",
   assert.ok(stored.size > 20, `only ${stored.size} landing columns found — the extraction is broken`);
 
   // The list literal that builds the snapshot.
-  const start = publish.indexOf("snapshot_fields = [");
+  //
+  // It was `snapshot_fields = [ ... ]` inline in the endpoint; it is now the
+  // module-level `PUBLIC_SNAPSHOT_FIELDS` tuple, because the staleness flag has
+  // to read the same list the publisher does and a second copy of it would be
+  // the exact drift this contract exists to catch. The guard is unchanged: the
+  // literal is still found by text, still parsed for `landing_*` names, and
+  // still compared against every column the model stores.
+  const start = publish.indexOf("PUBLIC_SNAPSHOT_FIELDS");
   assert.ok(start > -1, "the publish endpoint no longer builds a snapshot");
 
-  const end = publish.indexOf("]", start);
+  const end = publish.indexOf("\n)", start);
+  assert.ok(end > start, "the snapshot field list is not a closed literal");
   const published = new Set(
     (publish.slice(start, end).match(/\blanding_[a-z0-9_]+/g) || []),
   );

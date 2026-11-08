@@ -56,7 +56,7 @@ export default function FaqSection({
   if (items.length === 0) return null;
 
   return (
-    <section id="faq" className="mk-shell py-[length:var(--section-y)]">
+    <section id="faq" className="mk-shell mk-section">
       {/*
         The same header as every other section: eyebrow with a rule, serif
         title, one lead paragraph, all on the reading edge.

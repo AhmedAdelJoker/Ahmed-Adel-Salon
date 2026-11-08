@@ -68,7 +68,7 @@ function Section({
   children?: React.ReactNode;
 }) {
   return (
-    <section id={id} className="mk-shell py-[length:var(--section-y)]">
+    <section id={id} className="mk-shell mk-section">
       {/*
         Same header pattern as the services menu and the contact band: eyebrow
         with a rule, serif title, one lead paragraph, aligned to the reading

@@ -49,7 +49,7 @@ export default function OffersSection({
   if (!offers.length) return null;
 
   return (
-    <section id="offers" className="mk-shell py-[length:var(--section-y)]">
+    <section id="offers" className="mk-shell mk-section">
       <div className="mk-offers mk-offers--section">
         <div>
           <p className="mk-eyebrow">{t("landing.specialOffer")}</p>

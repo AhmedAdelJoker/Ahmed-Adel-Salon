@@ -60,11 +60,14 @@ function forwardedFields(code) {
   );
 }
 
-/** Quoted strings inside publish_site's snapshot_fields list. */
+/** Quoted strings inside the snapshot field list. */
 function snapshotFields(code) {
-  const start = code.indexOf("snapshot_fields = [");
-  assert.ok(start > -1, "publish_site has no snapshot_fields list");
-  const end = code.indexOf("]", start);
+  // Module-level since the staleness flag started reading it too: two copies of
+  // this list is how a setting ends up saved, published, and still missing.
+  const start = code.indexOf("PUBLIC_SNAPSHOT_FIELDS");
+  assert.ok(start > -1, "publish_site has no snapshot field list");
+  const end = code.indexOf("\n)", start);
+  assert.ok(end > start, "the snapshot field list is not a closed literal");
   return new Set(
     [...code.slice(start, end).matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]),
   );
