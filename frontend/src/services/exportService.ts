@@ -1,5 +1,6 @@
 import api from "@/services/api";
 import toast from "react-hot-toast";
+import i18n from "@/i18n";
 
 export const cleanParams = (params: Record<string, unknown> = {}): Record<string, unknown> => {
   const cleaned: Record<string, unknown> = {};
@@ -38,7 +39,8 @@ const downloadBlob = (blobData: BlobPart, filename: string, mediaType?: string):
  * Generic download handler.
  */
 const handleDownload = async (endpoint: string, filename: string, params: Record<string, unknown> = {}, mediaType?: string): Promise<boolean> => {
-  const toastId = toast.loading("جاري تحضير الملف...");
+  const t = i18n.getFixedT(i18n.language, "common");
+  const toastId = toast.loading(t("export.preparing", { defaultValue: "جاري تحضير الملف..." }));
 
   try {
     const response = await api.get(endpoint, {
@@ -50,20 +52,20 @@ const handleDownload = async (endpoint: string, filename: string, params: Record
 
     if (isEmpty) {
       toast.dismiss(toastId);
-      toast.error("لا توجد بيانات مطابقة للفلاتر المختارة");
+      toast.error(t("export.empty", { defaultValue: "لا توجد بيانات مطابقة للفلاتر المختارة" }));
       return false;
     }
 
     downloadBlob(response.data, filename, mediaType);
 
     toast.dismiss(toastId);
-    toast.success("تم تحميل الملف بنجاح");
+    toast.success(t("export.success", { defaultValue: "تم تحميل الملف بنجاح" }));
 
     return true;
   } catch (_error) {
     console.error("Export Error:", _error);
 
-    let errorMessage = "فشل تحميل الملف، يرجى المحاولة لاحقاً";
+    let errorMessage = t("export.failed", { defaultValue: "فشل تحميل الملف، يرجى المحاولة لاحقاً" });
     const apiError = _error as { response?: { data?: unknown; status?: number }; message?: string };
 
     // If response is a blob, we need to read it as text to see the JSON error

@@ -58,5 +58,11 @@
     "barber": "Barber",
     "accountant": "Accountant",
     "user": "User"
+  },
+  "export": {
+    "preparing": "Preparing file...",
+    "empty": "No data matches the selected filters",
+    "success": "File downloaded successfully",
+    "failed": "Failed to download the file, please try again"
   }
 }
