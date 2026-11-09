@@ -93,48 +93,58 @@ export function EmployeePhoto({
 
   const hasPhoto = Boolean(resolved) && !photoBroken;
   const canEnlarge = expandable && hasPhoto;
+  const frameClass = cn(
+    "grid place-items-center overflow-hidden border border-border bg-soft font-black text-accent shadow-sm transition",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
+    SIZE_CLASSES[size],
+    SHAPE_CLASSES[shape],
+    canEnlarge && "cursor-zoom-in hover:border-accent/40 hover:opacity-90",
+    !canEnlarge && "cursor-default",
+  );
+  const label = canEnlarge
+    ? `تكبير صورة ${name ?? "الموظف"}`
+    : `لا توجد صورة لـ ${name ?? "الموظف"}`;
+  const content = (
+    <>
+      {hasPhoto ? (
+        <img
+          src={resolved as string}
+          alt={name ?? ""}
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full object-cover"
+          onError={() => setPhotoBroken(true)}
+        />
+      ) : (
+        <span aria-hidden="true">{employeeInitials(name)}</span>
+      )}
+
+      {hintMissing && !hasPhoto && (
+        <span className="absolute -bottom-1 -end-1 grid h-4 w-4 place-items-center rounded-full border border-card bg-accent text-white">
+          <Camera size={9} aria-hidden="true" />
+        </span>
+      )}
+    </>
+  );
 
   return (
     <>
       <div className={cn("relative shrink-0", className)}>
-        <button
-          type="button"
-          disabled={!canEnlarge}
-          onClick={() => canEnlarge && setEnlarged(true)}
-          aria-label={
-            canEnlarge
-              ? `تكبير صورة ${name ?? "الموظف"}`
-              : `لا توجد صورة لـ ${name ?? "الموظف"}`
-          }
-          aria-haspopup={canEnlarge ? "dialog" : undefined}
-          className={cn(
-            "grid place-items-center overflow-hidden border border-border bg-soft font-black text-accent shadow-sm transition",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
-            SIZE_CLASSES[size],
-            SHAPE_CLASSES[shape],
-            canEnlarge && "cursor-zoom-in hover:border-accent/40 hover:opacity-90",
-            !canEnlarge && "cursor-default",
-          )}
-        >
-          {hasPhoto ? (
-            <img
-              src={resolved as string}
-              alt={name ?? ""}
-              loading="lazy"
-              decoding="async"
-              className="h-full w-full object-cover"
-              onError={() => setPhotoBroken(true)}
-            />
-          ) : (
-            <span aria-hidden="true">{employeeInitials(name)}</span>
-          )}
-
-          {hintMissing && !hasPhoto && (
-            <span className="absolute -bottom-1 -end-1 grid h-4 w-4 place-items-center rounded-full border border-card bg-accent text-white">
-              <Camera size={9} aria-hidden="true" />
-            </span>
-          )}
-        </button>
+        {canEnlarge ? (
+          <button
+            type="button"
+            onClick={() => setEnlarged(true)}
+            aria-label={label}
+            aria-haspopup="dialog"
+            className={frameClass}
+          >
+            {content}
+          </button>
+        ) : (
+          <div className={frameClass} aria-label={label} role="img">
+            {content}
+          </div>
+        )}
       </div>
 
       {canEnlarge && (
