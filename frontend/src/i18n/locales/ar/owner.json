@@ -992,7 +992,7 @@
     "editProfile": "تعديل الملف",
     "payrollSheet": "كشف الراتب",
     "attendanceRecord": "سجل الحضور",
-    "quickView": "عرض سريع",
+    "quickView": "عرض التفاصيل",
     "commissionLabel": "العمولة",
     "phonePrimary": "الجوال الأساسي",
     "preview": "معاينة",
@@ -1195,8 +1195,8 @@
     "employmentFullTime": "دوام كامل",
     "employmentPartTime": "دوام جزئي",
     "employmentTemporary": "مؤقت",
-    "fileTitle": "ملف الموظف",
-    "fileSubtitle": "نظرة سريعة على البيانات والرواتب والخدمات.",
+    "fileTitle": "تفاصيل الموظف",
+    "fileSubtitle": "بيانات الموظف ورواته وخدماته وحضوره.",
     "fileLoading": "جارٍ تحميل ملف الموظف...",
     "fileLoadFailed": "تعذّر تحميل ملف الموظف",
     "fileLoadFailedHint": "تحقق من الاتصال ثم أعد المحاولة.",
@@ -1442,7 +1442,8 @@
       "23": "البحر الأحمر",
       "24": "الوادي الجديد",
       "25": "مطروح"
-    }
+    },
+    "fileFooterHint": "للتعديل أو الرواتب أو الحضور، استخدم أزرار صف الموظف."
   },
   "expenses": {
     "title": "إدارة المصاريف",
@@ -1741,7 +1742,8 @@
       "idLabel": "معرف: #{{id}}",
       "readOnlyNote": "عرض قراءة فقط. استخدم التعديل من صفحة المخزون إذا كانت لديك صلاحية.",
       "movementLog": "سجل الحركات",
-      "name": "اسم الصنف"
+      "name": "اسم الصنف",
+      "recordExpenseManagementOnly": "للمدير فقط"
     },
     "statusOut": "نفد",
     "categoryLiquids": "سوائل وأمصال",
@@ -1749,7 +1751,9 @@
     "stockStatusAria": "حالة المخزون: {{status}}",
     "viewMovementLog": "عرض سجل حركات هذا المنتج",
     "sale": "البيع",
-    "costLabel": "التكلفة"
+    "costLabel": "التكلفة",
+    "showLowStockOnly": "إظهار النواقص فقط",
+    "showAllProducts": "إظهار الكل"
   },
   "productBundles": {
     "title": "حزم المنتجات",

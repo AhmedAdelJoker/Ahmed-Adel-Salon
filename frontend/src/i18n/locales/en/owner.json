@@ -992,7 +992,7 @@
     "editProfile": "Edit Profile",
     "payrollSheet": "Payroll Sheet",
     "attendanceRecord": "Attendance Record",
-    "quickView": "Quick View",
+    "quickView": "View details",
     "commissionLabel": "Commission",
     "phonePrimary": "Primary Phone",
     "preview": "Preview",
@@ -1195,8 +1195,8 @@
     "employmentFullTime": "Full time",
     "employmentPartTime": "Part time",
     "employmentTemporary": "Temporary",
-    "fileTitle": "Employee file",
-    "fileSubtitle": "A quick look at the record, payroll and services.",
+    "fileTitle": "Employee details",
+    "fileSubtitle": "The employee's record, payroll, services and attendance.",
     "fileLoading": "Loading employee file...",
     "fileLoadFailed": "Could not load the employee file",
     "fileLoadFailedHint": "Check the connection and try again.",
@@ -1442,7 +1442,8 @@
       "23": "Red Sea",
       "24": "New Valley",
       "25": "Matrouh"
-    }
+    },
+    "fileFooterHint": "To edit, or to open payroll and attendance, use the buttons on the employee's row."
   },
   "expenses": {
     "title": "Expense Management",
@@ -1741,7 +1742,8 @@
       "idLabel": "ID: #{{id}}",
       "readOnlyNote": "Read-only view. Use edit from the inventory page if you have permission.",
       "movementLog": "Movement log",
-      "name": "Product name"
+      "name": "Product name",
+      "recordExpenseManagementOnly": "Management only"
     },
     "statusOut": "Out of stock",
     "categoryLiquids": "Liquids & serums",
@@ -1749,7 +1751,9 @@
     "stockStatusAria": "Stock status: {{status}}",
     "viewMovementLog": "View product movement log",
     "sale": "Sale",
-    "costLabel": "Cost"
+    "costLabel": "Cost",
+    "showLowStockOnly": "Show low stock only",
+    "showAllProducts": "Show all"
   },
   "productBundles": {
     "title": "Product Bundles",

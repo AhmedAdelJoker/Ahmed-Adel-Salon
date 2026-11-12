@@ -11,6 +11,7 @@ from app.models.expense import Expense
 from app.models.user import User
 from app.models.product import Product
 from app.models.inventory_log import InventoryLog
+from app.core.rate_limit import rate_limit
 from app.schemas.product import (
     ProductCreate,
     ProductRead,
@@ -26,10 +27,29 @@ from app.schemas.inventory import (
     InventoryLogWithProductRead,
 )
 from app.services.inventory_service import add_stock, remove_stock, adjust_stock
+from app.services.activity_log_service import log_activity
 from app.utils.media import process_image_content, get_upload_path
 from app.core.upload_security import validate_image
 
 router = APIRouter(prefix="/products", tags=["Products Inventory"])
+
+# Roles allowed to make stock-sensitive / money-moving inventory operations.
+# Front-desk roles (cashier, accountant) can receive stock and record expenses,
+# but cannot edit stocked products, adjust balances or spend the cashbox on
+# supplies. Management (owner, admin, manager) can.
+MANAGEMENT_ROLES = {"owner", "admin", "manager"}
+
+
+def _require_management(current_user: User) -> None:
+    if (current_user.role or "").lower() not in MANAGEMENT_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="هذه العملية للمالك والمدير والأدمن فقط",
+        )
+
+
+def _has_stock(product: Product) -> bool:
+    return float(product.quantity or 0) > 0
 
 
 def _get_estimated_gram_cost(product: Product) -> Decimal:
@@ -49,6 +69,7 @@ def list_products(
     q: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     is_archived: Optional[bool] = Query(None),
+    low_stock: Optional[bool] = Query(None, description="Only products at or below min_quantity_alert"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     skip: int = Query(0, ge=0, description="Alias for offset"),
@@ -75,6 +96,9 @@ def list_products(
         
     if is_archived is not None:
         query = query.filter(Product.is_archived == is_archived)
+
+    if low_stock:
+        query = query.filter(Product.quantity <= Product.min_quantity_alert)
 
     # Phase 2: optional explicit sort
     if sort:
@@ -384,6 +408,11 @@ def update_product(
     if not product:
         raise HTTPException(status_code=404, detail="المنتج غير موجود")
 
+    # A product that has stock is live inventory: only management may edit it.
+    # Quantity itself is never changed here (it moves through stock logs).
+    if _has_stock(product):
+        _require_management(current_user)
+
     # Update fields except quantity (which is managed via logs)
     data = payload.model_dump()
     if "quantity" in data:
@@ -400,7 +429,11 @@ def update_product(
     return product
 
 
-@router.post("/{product_id}/add-stock", response_model=ProductRead)
+@router.post(
+    "/{product_id}/add-stock",
+    response_model=ProductRead,
+    dependencies=[Depends(rate_limit("products_add_stock", max_requests=30, window_seconds=60))],
+)
 def add_product_stock(
     product_id: int,
     payload: InventoryAddStockPayload,
@@ -420,6 +453,11 @@ def add_product_stock(
     # Amount in packs is multiplied by weight to get total quantity in units (g/ml)
     # If weight is not set, we assume 1 unit = 1 pack (e.g. piece)
     multiplier = Decimal(str(product.weight or 1))
+    if payload.create_expense:
+        # Cashiers must not book spend into suppliers/cashbox; that is a
+        # management decision. They can still receive stock into the shelf.
+        _require_management(current_user)
+
     total_units = Decimal(str(payload.amount)) * multiplier
 
     add_stock(
@@ -473,12 +511,24 @@ def add_product_stock(
 
     db.commit()
     db.refresh(product)
-    
+
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="ADD_STOCK",
+        entity_type="Product",
+        entity_id=str(product.id),
+        description=f"توريد {payload.amount} {product.unit} للصنف {product.name}",
+    )
+
     # Return enriched response if price changed to notify frontend
     return product
 
 
-@router.patch("/{product_id}/update-prices")
+@router.patch(
+    "/{product_id}/update-prices",
+    dependencies=[Depends(rate_limit("products_update_prices", max_requests=30, window_seconds=60))],
+)
 def update_product_prices(
     product_id: int,
     sell_price: Optional[Decimal] = Query(None),
@@ -489,13 +539,29 @@ def update_product_prices(
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="المنتج غير موجود")
-    
+
+    # Editing the price of a stocked product is a management decision.
+    if _has_stock(product):
+        _require_management(current_user)
+
     if sell_price is not None:
+        if sell_price < 0:
+            raise HTTPException(status_code=400, detail="سعر البيع لا يمكن أن يكون سالباً")
         product.sell_price = sell_price
     if cost_price is not None:
+        if cost_price < 0:
+            raise HTTPException(status_code=400, detail="سعر التكلفة لا يمكن أن يكون سالباً")
         product.cost_price = cost_price
         
     db.commit()
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="UPDATE_PRICES",
+        entity_type="Product",
+        entity_id=str(product_id),
+        description=f"تعديل أسعار {product.name}: بيع={product.sell_price} تكلفة={product.cost_price}",
+    )
     return {"status": "success", "sell_price": product.sell_price, "cost_price": product.cost_price}
 
 
@@ -509,6 +575,8 @@ def remove_product_stock(
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="المنتج غير موجود")
+
+    _require_management(current_user)
 
     remove_stock(
         db,
@@ -538,6 +606,8 @@ def toggle_product_archive(
     if not product:
         raise HTTPException(status_code=404, detail="المنتج غير موجود")
 
+    _require_management(current_user)
+
     product.is_archived = not product.is_archived
     product.is_active = not product.is_archived
     db.commit()
@@ -555,6 +625,8 @@ def adjust_product_stock(
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="المنتج غير موجود")
+
+    _require_management(current_user)
 
     adjust_stock(
         db,
@@ -606,7 +678,10 @@ def get_product_logs(
     return query.offset(eff_offset).limit(eff_limit).all()
 
 
-@router.post("/upload-image")
+@router.post(
+    "/upload-image",
+    dependencies=[Depends(rate_limit("products_upload_image", max_requests=20, window_seconds=60))],
+)
 async def upload_product_image(
     file: UploadFile = File(...),
     current_user: User = Depends(require_cashier_manager_owner),
@@ -626,10 +701,15 @@ def update_product_image(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    """Update product image URL. Owner only."""
+    """Update product image URL. Management only."""
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="المنتج غير موجود")
+    # Only self-served uploads are accepted — an arbitrary URL here would
+    # inject an external resource into every product card.
+    if image_url and not image_url.startswith("/uploads/products/"):
+        raise HTTPException(status_code=422, detail="رابط الصورة يجب أن يكون من رفع الملفات الداخلية")
+    _require_management(current_user)
     product.image_url = image_url
     db.commit()
     db.refresh(product)

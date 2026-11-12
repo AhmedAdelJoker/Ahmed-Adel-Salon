@@ -43,9 +43,9 @@ export interface StockFormData {
  */
 export function useInventoryForm(options: {
   fetchProducts: () => Promise<void>;
-  isOwner: boolean;
+  isManagement: boolean;
 }) {
-  const { fetchProducts, isOwner } = options;
+  const { fetchProducts, isManagement } = options;
 
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -89,7 +89,7 @@ export function useInventoryForm(options: {
   }
 
   function openEdit(product: InventoryProductAny) {
-    if (Number(product.quantity) > 0 && !isOwner) {
+    if (Number(product.quantity) > 0 && !isManagement) {
       toast.error(ft("editBlockedOwner","لا يمكن تعديل المنتج بعد تسجيل توريد. تواصل مع المالك."));
       return;
     }
@@ -202,7 +202,9 @@ export function useInventoryForm(options: {
       const res = await api.post(`/products/${editingProduct?.id}/add-stock`, {
         amount: Number(stockFormData.amount),
         note: stockFormData.note,
-        create_expense: stockFormData.create_expense,
+        // The backend rejects create_expense=true from non-management roles —
+        // strip it client-side so their flow can never 403.
+        create_expense: isManagement ? stockFormData.create_expense : false,
         purchase_price: stockFormData.purchase_price
           ? Number(stockFormData.purchase_price)
           : null,

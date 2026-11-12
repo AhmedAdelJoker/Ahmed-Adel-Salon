@@ -25,13 +25,14 @@ export interface CategoryTone {
 }
 
 /**
- * Inventory listing data: server-paginated products (scoped by tab/search),
+ * Inventory listing data: server-paginated products (scoped by tab/search/low-stock filter),
  * plus a global summary fetched from /products/summary so KPIs remain correct
  * across pages. `products` is the current page for the selected tab.
  */
 export function useInventoryData(
   searchTerm: string,
   activeTab: "active" | "archived",
+  lowStockOnly = false,
 ) {
   const [products, setProducts] = useState<InventoryProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +70,7 @@ export function useInventoryData(
         params: {
           q: searchTerm || undefined,
           is_archived: activeTab === "archived",
+          low_stock: lowStockOnly || undefined,
           page,
           page_size: pageSize,
         },
@@ -81,7 +83,7 @@ export function useInventoryData(
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, activeTab, page, pageSize]);
+  }, [searchTerm, activeTab, page, pageSize, lowStockOnly]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -93,7 +95,7 @@ export function useInventoryData(
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, activeTab]);
+  }, [searchTerm, activeTab, lowStockOnly]);
 
   const stats: InventoryStats = useMemo(
     () =>

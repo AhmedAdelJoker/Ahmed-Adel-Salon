@@ -41,10 +41,12 @@ export default function Inventory() {
   const { t } = useTranslation("owner");
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isOwner = String(user?.role || "").toLowerCase() === "owner";
+  const role = String(user?.role || "").toLowerCase();
+  const isManagement = ["owner", "admin", "manager"].includes(role);
 
   const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   const {
     loading,
@@ -59,13 +61,13 @@ export default function Inventory() {
     setPage,
     total,
     totalPages,
-  } = useInventoryData(searchTerm, activeTab);
+  } = useInventoryData(searchTerm, activeTab, showLowStockOnly);
 
   const form = useInventoryForm({
     fetchProducts: async () => {
       await fetchData();
     },
-    isOwner,
+    isManagement,
   });
 
   const {
@@ -219,14 +221,22 @@ export default function Inventory() {
       </div>
 
       {stats.lowStock > 0 && (
-        <div className="flex items-center gap-3 rounded-2xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm">
+        <button
+          type="button"
+          onClick={() => setShowLowStockOnly((v) => !v)}
+          aria-pressed={showLowStockOnly}
+          className="flex items-center gap-3 rounded-2xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm transition-colors hover:bg-danger/10"
+        >
           <AlertTriangle size={16} className="shrink-0 text-danger" />
           <p className="font-bold text-danger">{t("inventory.lowStockAlert", { count: stats.lowStock })}</p>
-        </div>
+          <span className="ms-auto rounded-full border border-danger/30 bg-danger/10 px-2.5 py-0.5 text-[10px] font-black text-danger">
+            {showLowStockOnly ? t("inventory.showAllProducts") : t("inventory.showLowStockOnly")}
+          </span>
+        </button>
       )}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "active" | "archived")} className="w-full lg:w-auto">
+        <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as "active" | "archived"); setShowLowStockOnly(false); }} className="w-full lg:w-auto">
           <TabsList className="h-11 w-full rounded-2xl bg-soft/60 p-1 sm:w-auto">
             <TabsTrigger value="active" className="h-9 flex-1 rounded-xl px-4 text-xs font-bold data-[state=active]:bg-card data-[state=active]:shadow-sm sm:flex-none">
               {t("inventory.activeTab")} ({formatNumber(stats.active)})
@@ -375,7 +385,7 @@ export default function Inventory() {
         selectedUnitLabel={selectedUnit.label}
         saving={saving}
         onSave={handleSave}
-        isOwner={isOwner}
+        isManagement={isManagement}
       />
       <StockSupplyModal
         open={isStockModalOpen}
@@ -391,6 +401,7 @@ export default function Inventory() {
         saving={saving}
         onConfirmSupply={handleAddStock}
         onUpdateSellPrice={handleUpdateSellPrice}
+        isManagement={isManagement}
       />
       <HistoryModal
         open={isHistoryModalOpen}

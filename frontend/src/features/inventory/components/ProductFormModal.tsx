@@ -39,7 +39,7 @@ export interface ProductFormModalProps {
   selectedUnitLabel: string;
   saving: boolean;
   onSave: () => void;
-  isOwner: boolean;
+  isManagement: boolean;
 }
 
 export function ProductFormModal({
@@ -58,7 +58,7 @@ export function ProductFormModal({
   selectedUnitLabel,
   saving,
   onSave,
-  isOwner,
+  isManagement,
 }: ProductFormModalProps) {
   const { t } = useTranslation("owner");
   const isEditing = !!editingProduct;
@@ -80,8 +80,8 @@ export function ProductFormModal({
         </DialogHeader>
         <div className="max-h-[65vh] space-y-4 overflow-y-auto p-4 sm:space-y-6 sm:p-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label={`${t("inventory.modal.name")}${editingProduct?.id && !isOwner ? ` ${t("inventory.modal.nameOwnerOnly")}` : ""}`}>
-              <Input value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} className="h-10 rounded-xl border-border bg-soft font-bold sm:h-12" placeholder={t("inventory.modal.namePlaceholder")} disabled={!!editingProduct?.id && !isOwner} />
+            <FormField label={`${t("inventory.modal.name")}${editingProduct?.id && !isManagement ? ` ${t("inventory.modal.nameOwnerOnly")}` : ""}`}>
+              <Input value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} className="h-10 rounded-xl border-border bg-soft font-bold sm:h-12" placeholder={t("inventory.modal.namePlaceholder")} disabled={!!editingProduct?.id && !isManagement} />
             </FormField>
             <FormField label={t("inventory.modal.sku")}>
               <Input value={formData.sku} onChange={(e) => setFormData((p) => ({ ...p, sku: e.target.value }))} className="h-10 rounded-xl border-border bg-soft font-bold sm:h-12" placeholder={t("inventory.modal.skuPlaceholder")} />

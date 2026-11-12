@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { formatCurrency, formatNumber } from "@/lib/core/utils";
+import { formatNumber } from "@/lib/core/utils";
 import { formatQuantity, getAvailablePacks } from "@/features/inventory/design-tokens";
 import { FormField } from "@/features/inventory";
 import { currencyLabel } from "@/lib/core/currency";
@@ -35,6 +35,7 @@ export interface StockSupplyModalProps {
   saving: boolean;
   onConfirmSupply: () => void;
   onUpdateSellPrice: () => void;
+  isManagement: boolean;
 }
 
 export function StockSupplyModal({
@@ -51,6 +52,7 @@ export function StockSupplyModal({
   saving,
   onConfirmSupply,
   onUpdateSellPrice,
+  isManagement,
 }: StockSupplyModalProps) {
   const { t } = useTranslation("owner");
   return (
@@ -108,7 +110,13 @@ export function StockSupplyModal({
                       <div className="text-[8px] font-bold text-muted">{t("inventory.modal.recordExpenseHint")}</div>
                     </div>
                   </div>
-                  <Switch checked={stockFormData.create_expense} onCheckedChange={(v) => setStockFormData((p) => ({ ...p, create_expense: v }))} className="data-[state=checked]:bg-success" />
+                  {isManagement ? (
+                    <Switch checked={stockFormData.create_expense} onCheckedChange={(v) => setStockFormData((p) => ({ ...p, create_expense: v }))} className="data-[state=checked]:bg-success" />
+                  ) : (
+                    <span className="max-w-[150px] rounded-lg bg-soft px-2 py-1.5 text-center text-[9px] font-black leading-tight text-muted" title={t("inventory.modal.recordExpenseManagementOnly")}>
+                      {t("inventory.modal.recordExpenseManagementOnly")}
+                    </span>
+                  )}
                 </div>
                 <FormField label={t("inventory.modal.purchasePrice")}>
                   <div className="relative">
