@@ -47,6 +47,7 @@ export default function RegisterView({
   const [fpEmployeeId, setFpEmployeeId] = useState("");
   const [fpType, setFpType] = useState<"check-in" | "check-out">("check-in");
   const [fpTime, setFpTime] = useState(localNowInput());
+  const [fpLateReason, setFpLateReason] = useState("");
   const [isFp, setIsFp] = useState(false);
 
   const [isImporting, setIsImporting] = useState<"" | "excel" | "biometric">(
@@ -100,12 +101,22 @@ export default function RegisterView({
     if (!fpEmployeeId) return toast.error(t("attendance.selectEmployee"));
     setIsFp(true);
     try {
-      await api.post("/attendance/fingerprint", {
-        employee_id: Number(fpEmployeeId),
-        punch_type: fpType,
-        timestamp: new Date(fpTime).toISOString(),
+      // The old call posted a JSON body {employee_id, punch_type, timestamp} to
+      // /attendance/fingerprint, but that endpoint only reads query params
+      // named `type` — every UI fingerprint attempt failed with 422. The
+      // fingerprint card now records through the same register endpoint and
+      // state machine as the manual card, so duplicate punches and late
+      // arrivals are guarded identically.
+      await api.post("/barber-presence/register", null, {
+        params: {
+          employee_id: fpEmployeeId,
+          status_type: fpType === "check-in" ? "in" : "out",
+          timestamp: fpTime,
+          ...(fpLateReason.trim() ? { late_reason: fpLateReason.trim() } : {}),
+        },
       });
       toast.success(t("attendance.fingerprintSuccess"));
+      setFpLateReason("");
       await onRefresh();
     } catch (err) {
       toast.error(detail(err));
@@ -299,6 +310,18 @@ export default function RegisterView({
                   className="h-11 rounded-xl"
                 />
               </div>
+            </div>
+            <div>
+              <label htmlFor="fp-late" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                {t("attendance.lateReason")}
+              </label>
+              <Input
+                id="fp-late"
+                value={fpLateReason}
+                onChange={(e) => setFpLateReason(e.target.value)}
+                placeholder={t("attendance.lateReasonPlaceholder")}
+                className="h-11 rounded-xl"
+              />
             </div>
             <Button
               variant="secondary"

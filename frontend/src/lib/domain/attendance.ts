@@ -4,9 +4,12 @@
  */
 
 export const deductionRules = {
-  latePerMinute: 2, // 2 EGP per late minute
-  absencePerDay: 100, // 100 EGP per day absent
-  missingCheckout: 50, // 50 EGP for missing out log
+  // Backend policy lives in BusinessSettings (late_penalty_per_minute) and is
+  // handed to this module per call; 0.5 matches the engine's fallback so a
+  // caller that forgets the option still agrees with /barber-presence/analytics.
+  latePerMinute: 0.5, // EGP per late minute
+  absencePerDay: 100, // EGP per day absent
+  missingCheckout: 50, // EGP for missing out log
   breakLimitMinutes: 60, // Max 1 hour break
 };
 
@@ -93,14 +96,24 @@ export const calculateAdvancedHours = (
 };
 
 /**
- * Integrated Payroll Calculation
+ * Integrated Payroll Calculation.
+ *
+ * `latePerMinute` defaults to the engine's fallback rate. The attendance page
+ * passes the value from BusinessSettings so the monthly view and the backend's
+ * /analytics endpoint compute the same penalty — they used to differ 4x
+ * (2 vs 0.5 EGP per minute) on the same screen.
  */
-export const calculatePayroll = (employee: Record<string, any>, stats: Record<string, any>, daysWorked = 30): Record<string, any> => {
+export const calculatePayroll = (
+  employee: Record<string, any>,
+  stats: Record<string, any>,
+  daysWorked = 30,
+  opts?: { latePerMinute?: number },
+): Record<string, any> => {
   const baseSalary = Number(employee.base_salary || 3000);
   const hourlyRate = baseSalary / 160;
 
   const overtimePay = Number(stats.overtime) * hourlyRate * 1.5;
-  const latePenalty = stats.lateMinutes * deductionRules.latePerMinute;
+  const latePenalty = stats.lateMinutes * Number(opts?.latePerMinute ?? deductionRules.latePerMinute);
   const absencePenalty = (30 - daysWorked) * deductionRules.absencePerDay;
   const checkoutPenalty = stats.hasMissingCheckout
     ? deductionRules.missingCheckout

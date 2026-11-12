@@ -1,60 +1,63 @@
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+"""Legacy /attendance router — kept only for fingerprint-device integration.
+
+This router used to duplicate the whole attendance feature with weaker rules:
+`/attendance/register` accepted duplicate check-ins (no state machine, no
+late-reason policy, no penalty rows, `datetime.now()` instead of the salon
+clock), and both import endpoints re-implemented parsing that had already
+drifted away from the canonical copies. Every write now goes through
+`app.services.attendance_service.apply_punch`, and the duplicate read/import
+endpoints are gone — `/barber-presence` is the one API the frontend consumes.
+
+`/attendance/fingerprint` survives because the physical device posts here
+(query params, rate-limited). It records through the same `apply_punch` engine
+as the manual register, so a device punch obeys the same state machine, late
+policy and penalty accounting as everything else.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
-import pandas as pd
-import io
-from datetime import datetime, date, time
+from typing import Optional
+from datetime import datetime, date
 
 from app.db.session import get_db
-from app.api.deps import require_owner_or_manager, require_any_staff
-from app.core.rate_limit import rate_limit
-from app.models.employee import Employee
-from app.models.employee_presence_log import EmployeePresenceLog
+from app.api.deps import require_owner_or_manager
 from app.models.user import User
-from app.schemas.barber_presence import BarberPresenceRead
-from app.services.activity_service import log_activity
-from app.core.upload_security import validate_data_sheet
+from app.core.rate_limit import rate_limit
+from app.services.activity_log_service import log_activity
+from app.services.attendance_service import apply_punch
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
-@router.get("/", response_model=List[BarberPresenceRead])
-def get_attendance(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner_or_manager),
-    employee_id: Optional[int] = None,
-    limit: int = 100
-):
-    return get_attendance_logs(db, current_user, employee_id, limit)
 
-@router.get("/logs", response_model=List[BarberPresenceRead])
+@router.get("/logs")
 def get_attendance_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
     employee_id: Optional[int] = None,
-    limit: int = 100
+    limit: int = Query(100, ge=1, le=1000),
 ):
+    from app.models.employee_presence_log import EmployeePresenceLog
+
     query = db.query(EmployeePresenceLog)
     if employee_id:
         query = query.filter(EmployeePresenceLog.employee_id == employee_id)
-    
+
     logs = query.order_by(EmployeePresenceLog.created_at.desc()).limit(limit).all()
-    
-    result = []
-    for log in logs:
-        result.append({
+
+    return [
+        {
             "id": log.id,
             "barber_id": log.employee_id,
             "barber_name": log.employee.full_name if log.employee else "Unknown",
             "employee_id": log.employee_id,
             "employee_name": log.employee.full_name if log.employee else "Unknown",
             "status": log.status,
-            "is_late": bool(getattr(log, "is_late", False)),
-            "late_reason": getattr(log, "late_reason", None),
+            "is_late": bool(log.is_late),
+            "late_reason": log.late_reason,
             "created_at": log.created_at,
-        })
-    return result
-
+        }
+        for log in logs
+    ]
 
 
 @router.get("/employee-summary")
@@ -65,6 +68,9 @@ def get_employee_attendance_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
+    from app.models.employee import Employee
+    from app.models.employee_presence_log import EmployeePresenceLog
+
     employee = db.query(Employee).filter(Employee.id == employee_id).first()
     if not employee:
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
@@ -72,10 +78,10 @@ def get_employee_attendance_summary(
     query = db.query(EmployeePresenceLog).filter(EmployeePresenceLog.employee_id == employee_id)
 
     if start_date:
-        query = query.filter(EmployeePresenceLog.created_at >= datetime.combine(start_date, time.min))
+        query = query.filter(EmployeePresenceLog.created_at >= datetime.combine(start_date, datetime.min.time()))
 
     if end_date:
-        query = query.filter(EmployeePresenceLog.created_at <= datetime.combine(end_date, time.max))
+        query = query.filter(EmployeePresenceLog.created_at <= datetime.combine(end_date, datetime.max.time()))
 
     logs = query.order_by(EmployeePresenceLog.created_at.desc()).all()
     check_ins = sum(1 for item in logs if item.status == "in")
@@ -92,39 +98,6 @@ def get_employee_attendance_summary(
         "last_seen_at": last_log.created_at if last_log else None,
     }
 
-@router.post("/register")
-def register_attendance(
-    employee_id: int,
-    status_type: str, # "in", "out", "break", "break_end"
-    timestamp: Optional[datetime] = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner_or_manager),
-):
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
-    if not employee:
-        raise HTTPException(status_code=404, detail="الموظف غير موجود")
-    
-    valid_statuses = ["in", "out", "break", "break_end"]
-    if status_type not in valid_statuses:
-        raise HTTPException(status_code=400, detail=f"حالة غير صالحة. يجب أن تكون واحدة من {valid_statuses}")
-    
-    new_log = EmployeePresenceLog(
-        employee_id=employee_id,
-        status=status_type,
-        created_at=timestamp or datetime.now()
-    )
-    db.add(new_log)
-    db.commit()
-    
-    log_activity(
-        db,
-        user_id=current_user.id,
-        action="register",
-        entity_type="attendance",
-        description=f"تسجيل {status_type} للموظف {employee.full_name}"
-    )
-    
-    return {"message": "تم تسجيل العملية بنجاح"}
 
 @router.post(
     "/fingerprint",
@@ -132,142 +105,32 @@ def register_attendance(
 )
 def fingerprint_attendance(
     employee_id: int,
-    type: str,  # "in" or "out"
+    type: str,  # "in" or "out" (break statuses also accepted)
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    """
-    Endpoint for Fingerprint Device Integration - requires authentication
-    """
-    if type not in ("in", "out", "break", "break_end"):
-        raise HTTPException(status_code=400, detail="نوع الحضور غير صالح")
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
-    if not employee:
-        raise HTTPException(status_code=404, detail="Employee not found")
+    """Endpoint for Fingerprint Device Integration - requires authentication.
 
-    new_log = EmployeePresenceLog(
+    Records through the same engine as the manual register: state-machine
+    guards, late policy and penalty rows all apply, and the timestamp is the
+    salon clock rather than the server's local time.
+    """
+    result = apply_punch(
+        db,
         employee_id=employee_id,
-        status=type,
-        created_at=datetime.now(),
+        status_type=type,
+        source="biometric",
+        # The device cannot type a reason; dropping the punch would lose the
+        # attendance event. It is still marked late with a penalty row.
+        require_late_reason=False,
     )
-    db.add(new_log)
-    db.commit()
 
     log_activity(
         db,
         user_id=current_user.id,
         action="fingerprint",
         entity_type="attendance",
-        description=f"بصمة {type} للموظف {employee.full_name} عبر الجهاز",
+        description=f"بصمة {type} للموظف {result['employee_name']} عبر الجهاز",
     )
 
-    return {"status": "success", "employee": employee.full_name}
-
-@router.post("/import-excel")
-async def import_attendance_excel(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner_or_manager),
-):
-    # Phase 3: validate MIME/size/filename
-    content = await validate_data_sheet(file, max_size=20 * 1024 * 1024)
-
-    try:
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(content))
-        else:
-            df = pd.read_excel(io.BytesIO(content))
-        
-        # Standardize columns
-        df.columns = [c.strip().lower() for c in df.columns]
-        
-        # Mapping common columns
-        mapping = {
-            'الاسم': 'name',
-            'اسم الموظف': 'name',
-            'الحالة': 'status',
-            'الوقت': 'time',
-            'التاريخ': 'date',
-            'name': 'name',
-            'employee_name': 'name',
-            'status': 'status',
-            'time': 'time',
-            'date': 'date'
-        }
-        df.rename(columns=mapping, inplace=True)
-
-        count = 0
-        errors = []
-        
-        # Get all employees for mapping
-        employees = db.query(Employee).all()
-        emp_map = {emp.full_name.strip().lower(): emp.id for emp in employees}
-        
-        for index, row in df.iterrows():
-            try:
-                name = str(row.get('name', '')).strip().lower()
-                status_val = str(row.get('status', 'in')).strip().lower()
-                
-                # Normalize status
-                if 'حض' in status_val or 'in' in status_val:
-                    status_val = "in"
-                elif 'انص' in status_val or 'out' in status_val:
-                    status_val = "out"
-                else:
-                    status_val = "in"
-                
-                emp_id = emp_map.get(name)
-                if not emp_id:
-                    errors.append(f"السطر {index+2}: الموظف '{name}' غير موجود")
-                    continue
-                
-                # Handle time/date
-                dt = datetime.now()
-                if 'date' in row and pd.notna(row['date']):
-                    if 'time' in row and pd.notna(row['time']):
-                        # Combine date and time
-                        dt_str = f"{row['date']} {row['time']}"
-                        try:
-                            dt = pd.to_datetime(dt_str)
-                        except:
-                            dt = pd.to_datetime(row['date'])
-                    else:
-                        dt = pd.to_datetime(row['date'])
-                
-                log = EmployeePresenceLog(
-                    employee_id=emp_id,
-                    status=status_val,
-                    created_at=dt
-                )
-                db.add(log)
-                count += 1
-            except Exception as e:
-                errors.append(f"خطأ في السطر {index+2}: {str(e)}")
-        
-        db.commit()
-        
-        log_activity(
-            db,
-            user_id=current_user.id,
-            action="import",
-            entity_type="attendance",
-            description=f"استيراد {count} سجل حضور من ملف {file.filename}"
-        )
-        
-        return {"message": f"تم استيراد {count} سجل بنجاح", "errors": errors}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"فشل معالجة الملف: {str(e)}")
-
-@router.post("/import-biometric")
-async def import_biometric_data(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner_or_manager),
-):
-    # This is similar to Excel import but can be tuned for specific biometric device exports
-    # For now, we'll treat it as a more flexible Excel/CSV import
-    return await import_attendance_excel(file, db, current_user)
-
-
-
+    return {"status": "success", "employee": result["employee_name"]}

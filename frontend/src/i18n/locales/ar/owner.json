@@ -1217,7 +1217,258 @@
     "specialties": "الخدمات والتخصصات",
     "noServices": "لم تُسند خدمات لهذا الموظف بعد",
     "visibilityAccess": "الظهور والوصول",
-    "tenure": "مدة الخدمة"
+    "tenure": "مدة الخدمة",
+    "toastImageUploaded": "تم رفع الصورة بنجاح",
+    "toastImageUploadFailed": "فشل رفع الصورة",
+    "toastImageNoUrl": "لم يتم إرجاع رابط الصورة من الخادم",
+    "toastLoadEmployeeFailed": "فشل تحميل بيانات الموظف",
+    "toastNamePhoneRequired": "يرجى إدخال الاسم ورقم الجوال",
+    "toastUsernameRequired": "يرجى إدخال اسم المستخدم لحساب الدخول",
+    "toastContractEndBeforeHire": "تاريخ انتهاء العقد لا يمكن أن يسبق تاريخ التعيين",
+    "toastPasswordRequired": "يرجى إدخال كلمة المرور لحساب الدخول",
+    "toastPasswordRule": "كلمة المرور: {{rule}}",
+    "toastWalletRequired": "رقم المحفظة مطلوب عند اختيار التحويل للمحفظة",
+    "toastWalletInvalid": "رقم المحفظة: {{error}}",
+    "toastBankRequired": "رقم الحساب البنكي مطلوب عند اختيار التحويل البنكي",
+    "toastPhoneDuplicate": "رقم الجوال مسجل بالفعل للموظف: {{name}}{{id}}",
+    "toastNationalIdDuplicate": "رقم الهوية مسجل بالفعل للموظف: {{name}}{{id}}",
+    "toastBirthDateMismatch": "تاريخ الميلاد لا يطابق الرقم القومي ({{date}})",
+    "toastEmployeeUpdated": "تم تحديث البيانات بنجاح",
+    "toastEmployeeAdded": "تم إضافة الموظف بنجاح",
+    "toastSaveFailed": "فشل حفظ البيانات - تحقق من الهاتف والبيانات المطلوبة",
+    "toastStatusLeave": "تم تسجيل الموظف في إجازة",
+    "toastStatusReturn": "تم إرجاع الموظف للعمل",
+    "toastStatusUpdateFailed": "فشل تعديل الحالة",
+    "idShort": "رقم",
+    "reviewAndApprove": "مراجعة واعتماد",
+    "fixedBonusLabel": "الحافز الثابت",
+    "defaultDeductionsLabel": "الخصومات الثابتة",
+    "tabPersonal": "الهوية الشخصية",
+    "tabWork": "المسار الوظيفي",
+    "tabSystem": "بوابة النظام",
+    "tabSkills": "المؤهلات والخدمات",
+    "tabFinancial": "الهيكل المالي",
+    "tabAssistant": "نظام المساعدين",
+    "tabDocuments": "الأرشيف الرقمي",
+    "stepSkillsNotApplicable": "المؤهلات والخدمة تُسجَّل لمقدمي الخدمة (حلاق، مصفف شعر، صبغة، بشرة، أظافر) فقط.",
+    "stepAssistantNotApplicable": "ربط المساعد بالحلاق المسؤول لا ينطبق إلا على مسار المساعد.",
+    "assistantTaskHairWash": "غسيل الشعر",
+    "assistantTaskClientPrep": "تجهيز العميل",
+    "assistantTaskToolCleanup": "تنظيف الأدوات",
+    "assistantTaskChairPrep": "تحضير الكرسي",
+    "assistantTaskLongServices": "مساعدة في الخدمات الطويلة",
+    "assistantTaskAreaCleanup": "تنظيف منطقة العمل",
+    "latePenaltiesThisMonth": "جزاءات التأخير — هذا الشهر",
+    "latePenaltiesCount": "{{count}} جزاء نشط",
+    "latePenaltiesWaived": "{{count}} مُعفى",
+    "blueprint": {
+      "manager": {
+        "eyebrow": "قيادة استراتيجية",
+        "title": "مدير",
+        "summary": "المسؤول عن تحقيق الأهداف التشغيلية، قيادة الفريق، واعتماد التقارير الإدارية والخصومات.",
+        "focus": [
+          "إدارة العمليات",
+          "اعتماد التقارير",
+          "تطوير الفريق"
+        ]
+      },
+      "accountant": {
+        "eyebrow": "حوكمة مالية",
+        "title": "محاسب",
+        "summary": "صلاحية كاملة لمراجعة التدفقات النقدية، تقديم التقارير التحليلية، وتدقيق كشوف الرواتب قبل التنفيذ.",
+        "focus": [
+          "التدقيق المالي",
+          "تحليل الربحية",
+          "الرقابة النقدية"
+        ]
+      },
+      "barber": {
+        "eyebrow": "هندسة المظهر",
+        "title": "حلاق",
+        "summary": "خبير شامل في فنون الحلاقة، تصفيف الشعر، ونحت اللحية بأعلى معايير الإتقان.",
+        "focus": [
+          "قص وتصفيف الشعر",
+          "نحت اللحية",
+          "علاجات الشعر"
+        ]
+      },
+      "cashier": {
+        "eyebrow": "إدارة النقدية",
+        "title": "كاشير",
+        "summary": "إدارة عمليات الدفع، إغلاق الورديات، والتأكد من مطابقة المبالغ النقدية.",
+        "focus": [
+          "نقاط البيع",
+          "تحصيل المدفوعات",
+          "تقفيل الوردية"
+        ]
+      },
+      "hairstylist": {
+        "eyebrow": "فن التصفيف",
+        "title": "مصفف شعر",
+        "summary": "متخصص في السشوار والتسريحة وتجهيز الإطلالات — بخبرة في أحدث صيحات التصفيف.",
+        "focus": [
+          "سشوار وتصفيف",
+          "تسريحات المناسبات",
+          "العناية بالشعر"
+        ]
+      },
+      "colorist": {
+        "eyebrow": "فن الألوان",
+        "title": "أخصائي صبغة",
+        "summary": "أخصائي في كيمياء الألوان ومعالجة الشعر التالف بأحدث البروتوكولات الصحية.",
+        "focus": [
+          "صبغ الشعر",
+          "معالجة البروتين",
+          "كيمياء الألوان"
+        ]
+      },
+      "esthetician": {
+        "eyebrow": "صحة البشرة",
+        "title": "أخصائي بشرة",
+        "summary": "تقديم خدمات تنظيف البشرة العميق والترطيب الفاخر باستخدام تقنيات سبا المتقدمة.",
+        "focus": [
+          "تنظيف البشرة",
+          "أقنعة النضارة",
+          "مساج الوجه"
+        ]
+      },
+      "nail_technician": {
+        "eyebrow": "عناية بالأظافر",
+        "title": "فني أظافر",
+        "summary": "متخصص في المنيكير والباديكير وتنسيق الأظافر مع أعلى معايير التعقيم والنظافة.",
+        "focus": [
+          "منيكير",
+          "باديكير",
+          "تنسيق الأظافر"
+        ]
+      },
+      "barber_assistant": {
+        "eyebrow": "إسناد فني",
+        "title": "مساعد حلاق",
+        "summary": "دعم لوجستي وفني كامل لخبراء الحلاقة، ضمان راحة العميل في منطقة الغسيل والتحضير.",
+        "focus": [
+          "تحضير العميل",
+          "تقنيات الغسيل",
+          "تنظيم الأدوات"
+        ]
+      },
+      "receptionist": {
+        "eyebrow": "إدارة التجربة",
+        "title": "استقبال",
+        "summary": "نقطة الاتصال الأولى لضمان رحلة عميل سلسة، من الحجز وحتى الوداع.",
+        "focus": [
+          "لباقة الاستقبال",
+          "إدارة الحجوزات",
+          "تحليل الرضا"
+        ]
+      },
+      "cleaner": {
+        "eyebrow": "معايير السلامة",
+        "title": "عامل نظافة",
+        "summary": "المسؤول عن بيئة العمل المعقمة، سلامة المرافق، والمظهر العام للصالون.",
+        "focus": [
+          "تعقيم مستمر",
+          "صحة المرافق",
+          "إدارة المستهلكات"
+        ]
+      },
+      "owner": {
+        "eyebrow": "القيادة العليا",
+        "title": "المالك",
+        "summary": "المسؤول عن الرؤية الاستراتيجية وتوسع العلامة التجارية.",
+        "focus": [
+          "الرؤية الشاملة",
+          "توسع الأعمال",
+          "الرقابة الكلية"
+        ]
+      },
+      "other": {
+        "eyebrow": "كادر مخصص",
+        "title": "موظف خاص",
+        "summary": "مهام إضافية وتخصصات نادرة حسب متطلبات نمو العمل.",
+        "focus": [
+          "مرونة المهام"
+        ]
+      }
+    },
+    "msg": {
+      "nameRequired": "الاسم مطلوب",
+      "nameTooShort": "الاسم قصير جدًا",
+      "nameTooLong": "الاسم طويل جدًا ({{max}} حرف كحد أقصى)",
+      "nameHasDigits": "الاسم لا يمكن أن يحتوي على أرقام",
+      "nameInvalidChars": "الاسم يحتوي على رموز غير مسموحة",
+      "usernameRequired": "اسم المستخدم مطلوب",
+      "usernameTooShort": "اسم المستخدم 3 أحرف على الأقل",
+      "usernameTooLong": "اسم المستخدم 30 حرفًا كحد أقصى",
+      "usernameInvalidChars": "اسم المستخدم: حروف إنجليزية وأرقام و . _ - فقط",
+      "moneyNotNumber": "{{label}} يجب أن يكون رقمًا",
+      "moneyNegative": "{{label}} لا يمكن أن يكون بالسالب",
+      "moneyTooHigh": "{{label}} يتجاوز الحد الأقصى ({{max}})",
+      "commissionNotNumber": "نسبة العمولة يجب أن تكون رقمًا",
+      "commissionRange": "نسبة العمولة من 0 إلى 100%",
+      "ibanInvalid": "رقم الحساب الدولي المصري يبدأ بـ EG ويتبعه 27 رقمًا",
+      "bankInvalid": "رقم الحساب البنكي غير صالح",
+      "passwordMinLength": "8 أحرف على الأقل",
+      "passwordUppercase": "حرف كبير (A-Z)",
+      "passwordLowercase": "حرف صغير (a-z)",
+      "passwordDigit": "رقم واحد على الأقل",
+      "phoneRequired": "رقم الجوال مطلوب",
+      "phoneRepeatedDigits": "رقم الجوال غير صحيح (أرقام متكررة)",
+      "phoneLength": "رقم الجوال غير صحيح (من 8 إلى 15 رقمًا)",
+      "phoneEgyptian": "رقم الجوال غير صحيح (رقم محمول مصري = 11 رقمًا يبدأ بـ 01)",
+      "phoneInvalid": "رقم الجوال غير صحيح",
+      "emailRequired": "البريد الإلكتروني مطلوب",
+      "emailInvalid": "البريد الإلكتروني غير صالح",
+      "nationalIdLength": "رقم الهوية يجب أن يكون {{length}} رقمًا بالضبط",
+      "nationalIdCentury": "رقم الهوية غير صحيح: أول رقم يجب أن يكون 2 أو 3",
+      "nationalIdBadDate": "رقم الهوية يحتوي على تاريخ ميلاد غير صحيح",
+      "nationalIdBadGovernorate": "رقم الهوية يحتوي على كود محافظة غير معروف",
+      "governorateUnknown": "محافظة {{code}}",
+      "birthDateMismatchId": "تاريخ الميلاد لا يطابق المسجل في الرقم القومي ({{date}})",
+      "contractEndBeforeHire": "تاريخ انتهاء العقد لا يمكن أن يسبق تاريخ التعيين",
+      "passwordIssue": "كلمة المرور: {{rule}}",
+      "walletNumber": "رقم المحفظة: {{error}}",
+      "walletRequired": "رقم المحفظة مطلوب عند اختيار التحويل للمحفظة",
+      "bankNumber": "رقم الحساب البنكي: {{error}}",
+      "bankRequired": "رقم الحساب البنكي مطلوب عند اختيار التحويل البنكي",
+      "draftNow": "الآن",
+      "draftMinutes": "منذ {{count}} دقيقة",
+      "draftHour": "منذ ساعة",
+      "draftTwoHours": "منذ ساعتين",
+      "draftHours": "منذ {{count}} ساعات",
+      "draftYesterday": "أمس",
+      "draftTwoDays": "منذ يومين",
+      "draftDays": "منذ {{count}} أيام",
+      "draftMonth": "منذ شهر",
+      "draftMonths": "منذ {{count}} أشهر"
+    },
+    "governorate": {
+      "01": "القاهرة",
+      "02": "الإسكندرية",
+      "03": "بورسعيد",
+      "04": "السويس",
+      "05": "دمياط",
+      "06": "الدقهلية",
+      "07": "الشرقية",
+      "08": "القليوبية",
+      "09": "كفر الشيخ",
+      "10": "الغربية",
+      "11": "المنوفية",
+      "12": "البحيرة",
+      "13": "الإسماعيلية",
+      "14": "الجيزة",
+      "15": "بني سويف",
+      "16": "الفيوم",
+      "17": "المنيا",
+      "18": "أسيوط",
+      "19": "سوهاج",
+      "20": "قنا",
+      "21": "أسوان",
+      "22": "الأقصر",
+      "23": "البحر الأحمر",
+      "24": "الوادي الجديد",
+      "25": "مطروح"
+    }
   },
   "expenses": {
     "title": "إدارة المصاريف",
@@ -1463,14 +1714,14 @@
       "nameOwnerOnly": "(المالك فقط)",
       "namePlaceholder": "اسم المنتج...",
       "sku": "كود المنتج",
-      "skuPlaceholder": "Barcode...",
+      "skuPlaceholder": "الباركود...",
       "company": "الشركة المصنعة",
       "category": "التصنيف",
       "images": "صور المنتج",
       "uploading": "جاري الرفع...",
       "changeImage": "تغيير الصورة",
       "uploadImage": "رفع صورة",
-      "imageHint": "JPG, PNG, WEBP - حد أقصى 20 ميجا",
+      "imageHint": "حد أقصى 20 ميجا - صيغ الصور: جى بي جى، بي إن جي، ويب بي",
       "description": "الوصف",
       "unit": "وحدة القياس",
       "sellPrice": "سعر البيع",
@@ -1505,7 +1756,7 @@
       "issueOut": "صرف",
       "detailsTitle": "عرض تفاصيل الصنف",
       "readOnly": "قراءة فقط",
-      "skuLabel": "الكود / SKU",
+      "skuLabel": "الكود / رمز الصنف",
       "unitLabel": "الوحدة",
       "balance": "الرصيد",
       "cost": "التكلفة",
@@ -2301,7 +2552,47 @@
     "leaveApproveNoPermission": "ليس لديك صلاحية اعتماد الإجازات",
     "overtime": "وقت إضافي",
     "lateMinutes": "دقائق التأخير",
-    "score": "التقييم"
+    "score": "التقييم",
+    "tabPenalties": "الجزاءات",
+    "penaltiesTitle": "جزاءات التأخير",
+    "penaltiesHint": "جزاءات التأخير المسجلة على الموظفين مع إمكانية الإعفاء — قرار إداري يؤثر على الراتب",
+    "kpiPenaltyCount": "عدد الجزاءات",
+    "kpiPenaltyTotal": "إجمالي الجزاءات",
+    "kpiPenaltyWaived": "جزاءات مُعفاة",
+    "colPenalty": "الجزاء",
+    "colAction": "إجراء",
+    "waived": "مُعفى",
+    "applied": "مطبّق",
+    "waivePenalty": "إعفاء",
+    "undoWaive": "إلغاء الإعفاء",
+    "penaltyExcused": "تم إعفاء الجزاء",
+    "penaltyUnwaived": "تم إلغاء الإعفاء",
+    "penaltyPerMinute": "جزاء الدقيقة",
+    "penaltyPerMinuteHint": "المبلغ المقتطع عن كل دقيقة تأخير (الافتراضي 0.5 ج)",
+    "penaltiesEmpty": "لا توجد جزاءات في هذه الفترة",
+    "penaltiesEmptyHint": "تُسجَّل الجزاءات تلقائياً عند تسجيل دخول متأخر بعد موعد الفتح + الحد المسموح",
+    "hoursPerDay": "ساعات العمل حسب اليوم",
+    "applyToAllDays": "تطبيق على كل الأيام",
+    "timesAppliedToAll": "تم تطبيق المواعيد على الأيام المفتوحة",
+    "policyTitle": "سياسة التأخير والجزاء",
+    "autoPenaltyLabel": "الجزاء التلقائي للتأخير",
+    "autoPenaltyHint": "عند الإيقاف يُسجل التأخير فقط بدون خصم تلقائي من الراتب",
+    "colSource": "المصدر",
+    "sourceAuto": "تلقائي",
+    "sourceManual": "يدوي",
+    "addPenalty": "إضافة جزاء",
+    "addPenaltyTitle": "إضافة جزاء يدوي",
+    "addPenaltyFailed": "تعذر إضافة الجزاء",
+    "penaltyCreated": "تم تسجيل الجزاء",
+    "penaltyReasonRequired": "السبب مطلوب (حرفان على الأقل)",
+    "penaltyInvalidMinutes": "دقائق التأخير يجب أن تكون رقماً موجباً",
+    "penaltyInvalidAmount": "قيمة الجزاء يجب أن تكون أكبر من صفر",
+    "penaltyAmountOrMinutes": "أدخل قيمة الجزاء، أو دقائق التأخير ليُحسب المبلغ تلقائياً",
+    "penaltyMinutes": "دقائق التأخير (اختياري)",
+    "penaltyAmount": "قيمة الجزاء",
+    "penaltyAmountPlaceholder": "أو تظهر تلقائياً من الدقائق",
+    "penaltyAmountHint": "إن تُركت فارغة تُحسب من الدقائق × جزاء الدقيقة",
+    "penaltyReasonPlaceholder": "مثال: كسر قاعدة، سلوك غير لائق، غياب بدون إذن..."
   },
   "settings": {
     "tabShop": "بيانات المنشأة",

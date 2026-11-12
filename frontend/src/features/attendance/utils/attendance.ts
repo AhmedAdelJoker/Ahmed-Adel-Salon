@@ -11,7 +11,6 @@ import type {
   EmployeeRecord,
   WorkingHours,
 } from "@/features/attendance/types";
-import { getIntlLocale } from "@/lib/format/locale";
 
 export type TranslateFn = (
   key: string,
@@ -27,6 +26,7 @@ export const ATTENDANCE_VIEW_MODES: Array<{
   { id: "leaves", labelKey: "attendance.tabLeaves" },
   { id: "calendar", labelKey: "attendance.tabCalendar" },
   { id: "analytics", labelKey: "attendance.tabAnalytics" },
+  { id: "penalties", labelKey: "attendance.tabPenalties" },
   { id: "archive", labelKey: "attendance.tabArchive" },
 ];
 
@@ -140,9 +140,33 @@ export function deriveTodayRecords(
   return Array.isArray(records) ? records : [];
 }
 
+/**
+ * Real shift bounds from the salon's working-hours settings.
+ * The monthly analytics used to hardcode a 10:00–18:00 shift while the salon
+ * actually opens 09:00–03:00, so "late minutes" and overtime never matched the
+ * backend. Falls back to the old constants only when no day is configured.
+ */
+export function effectiveShift(workingHours?: WorkingHours): {
+  start: string;
+  end: string;
+} {
+  const days = Object.values(workingHours || {});
+  const openDay = days.find(
+    (d) => d?.is_open && d.open_time && d.close_time,
+  );
+  if (openDay?.open_time && openDay?.close_time) {
+    return { start: openDay.open_time, end: openDay.close_time };
+  }
+  return { start: "10:00", end: "18:00" };
+}
+
 export function deriveMonthlyData(
   records: AttendanceRecord[],
   employees: EmployeeRecord[],
+  opts?: {
+    shift?: { start: string; end: string };
+    penaltyPerMinute?: number;
+  },
 ): AttendanceRecord[] {
   const logs = Array.isArray(records) ? records : [];
   const grouped: Record<string, AttendanceRecord[]> = {};
@@ -160,8 +184,10 @@ export function deriveMonthlyData(
     const employee =
       employees.find((e) => String(e.id) === String(empId)) ||
       ({ full_name: empRecords[0].employee_name } as EmployeeRecord);
-    const stats = calculateAdvancedHours(empRecords as any);
-    const payroll = calculatePayroll(employee as any, stats as any);
+    const stats = calculateAdvancedHours(empRecords as any, opts?.shift);
+    const payroll = calculatePayroll(employee as any, stats as any, undefined, {
+      latePerMinute: opts?.penaltyPerMinute,
+    });
     const ai = analyzeProductivity(stats as any);
     return {
       ...empRecords[0],
@@ -268,28 +294,81 @@ export async function exportAttendancePDF(opts: {
   t: TranslateFn;
 }): Promise<void> {
   const { rows, locale, t } = opts;
-  const { jsPDF } = await import("jspdf");
-  const { default: autoTable } = await import("jspdf-autotable");
-  const doc = new jsPDF();
-  doc.setFont("helvetica", "bold");
-  doc.text(`${t("attendance.title")} — ${t("attendance.exportPdf")}`, 14, 18);
-  const tableData = (rows || []).map((r) => [
-    String(r.employee_name || (r.full_name as string) || "—"),
-    statusLabel(r.status, t),
-    formatDateTime(r.created_at, locale, {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-  ]);
-  autoTable(doc, {
-    startY: 26,
-    head: [[t("attendance.colEmployee"), t("attendance.colOperation"), t("attendance.colDateTime")]],
-    body: tableData,
-    styles: { fontSize: 9 },
-  });
-  doc.save(`attendance_${todayKey()}.pdf`);
+
+  // jsPDF + helvetica cannot render Arabic — the glyphs left WinAnsi encoding
+  // and came out as garbage. A printable RTL HTML document sidesteps font
+  // embedding entirely: the browser shapes Arabic natively, and the print
+  // dialog saves a real PDF with selectable text.
+  const escapeHtml = (value: unknown) =>
+    String(value ?? "—")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const title = `${t("attendance.title")} — ${t("attendance.exportPdf")}`;
+  const generated = new Date().toLocaleString(locale);
+  const tableRows = (rows || [])
+    .map((r) =>
+      [
+        escapeHtml(r.employee_name || (r.full_name as string)),
+        escapeHtml(statusLabel(r.status, t)),
+        escapeHtml(
+          formatDateTime(r.created_at, locale, {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        ),
+      ].map((cell) => `<td>${cell}</td>`).join(""),
+    )
+    .map((cells) => `<tr>${cells}</tr>`)
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="${locale.startsWith("ar") ? "ar" : "en"}" dir="${locale.startsWith("ar") ? "rtl" : "ltr"}">
+<head>
+<meta charset="utf-8" />
+<title>${escapeHtml(title)}</title>
+<style>
+  @page { margin: 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Cairo", "Noto Kufi Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
+    color: #111827; margin: 0; padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .meta { color: #6b7280; font-size: 12px; margin-bottom: 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { border: 1px solid #e5e7eb; padding: 7px 9px; text-align: start; }
+  th { background: #f3f4f6; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  tbody tr { break-inside: avoid; }
+  .empty { color: #6b7280; text-align: center; padding: 32px 0; font-size: 13px; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <div class="meta">${escapeHtml(generated)} · ${(rows || []).length} ${escapeHtml(t("attendance.colOperation"))}</div>
+  ${
+    tableRows
+      ? `<table><thead><tr><th>${escapeHtml(t("attendance.colEmployee"))}</th><th>${escapeHtml(t("attendance.colOperation"))}</th><th>${escapeHtml(t("attendance.colDateTime"))}</th></tr></thead><tbody>${tableRows}</tbody></table>`
+      : `<p class="empty">${escapeHtml(t("attendance.noDataToday"))}</p>`
+  }
+  <script>window.onload = () => { window.print(); }</script>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank", "noopener,width=900,height=700");
+  if (!win) {
+    toast.error(t("attendance.exportPdfFailed"));
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
   toast.success(t("attendance.pdfSuccess"));
 }

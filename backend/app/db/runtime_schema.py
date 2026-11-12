@@ -113,6 +113,34 @@ def ensure_runtime_schema() -> None:
             "ALTER TABLE products ADD COLUMN weight NUMERIC(10, 2)",
         )
 
+        # Attendance policy columns (late threshold + penalty rate). The UI
+        # settings dialog edits both; without these the values it sent were
+        # dropped and the engine kept its hardcoded defaults.
+        _ensure_column(
+            connection,
+            "business_settings",
+            "late_threshold_minutes",
+            "ALTER TABLE business_settings ADD COLUMN late_threshold_minutes INTEGER NOT NULL DEFAULT 15",
+        )
+        _ensure_column(
+            connection,
+            "business_settings",
+            "late_penalty_per_minute",
+            "ALTER TABLE business_settings ADD COLUMN late_penalty_per_minute NUMERIC(10, 2) NOT NULL DEFAULT 0.5",
+        )
+        _ensure_column(
+            connection,
+            "business_settings",
+            "auto_penalty_enabled",
+            "ALTER TABLE business_settings ADD COLUMN auto_penalty_enabled BOOLEAN NOT NULL DEFAULT 1",
+        )
+        _ensure_column(
+            connection,
+            "attendance_penalties",
+            "source",
+            "ALTER TABLE attendance_penalties ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'auto'",
+        )
+
         _ensure_column(
             connection,
             "invoices",

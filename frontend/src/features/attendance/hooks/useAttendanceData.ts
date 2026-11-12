@@ -12,6 +12,7 @@ import type {
 import {
   deriveMonthlyData,
   deriveTodayRecords,
+  effectiveShift,
   filterArchiveRecords,
   normalizeCurrentRecords,
   type TranslateFn,
@@ -25,8 +26,12 @@ export function useAttendanceData(opts?: { t?: TranslateFn }) {
   const employeeIdFilter = searchParams.get("employeeId");
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [historyRecords, setHistoryRecords] = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHours>({});
+  const [penaltyRate, setPenaltyRate] = useState<number>(0.5);
+  const [lateThreshold, setLateThreshold] = useState<number>(15);
+  const [autoPenaltyEnabled, setAutoPenaltyEnabled] = useState<boolean>(true);
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -83,6 +88,12 @@ export function useAttendanceData(opts?: { t?: TranslateFn }) {
 
       if (whRes.status === "fulfilled") {
         setWorkingHours(whRes.value.data?.working_hours || {});
+        // The engine's own numbers — the payroll view used to hardcode 2
+        // EGP/minute while the backend applied 0.5, so the monthly view and
+        // /analytics disagreed 4x. Both sides now read the same value.
+        setPenaltyRate(Number(whRes.value.data?.late_penalty_per_minute ?? 0.5));
+        setLateThreshold(Number(whRes.value.data?.late_threshold_minutes ?? 15));
+        setAutoPenaltyEnabled(whRes.value.data?.auto_penalty_enabled !== false);
       } else {
         setWorkingHours({});
       }
@@ -99,6 +110,44 @@ export function useAttendanceData(opts?: { t?: TranslateFn }) {
       setLoading(false);
     }
   }, [tt]);
+
+  // Historical logs for the archive, calendar and monthly analytics.
+  // Those tabs used to be derived from `/barber-presence/current`, which only
+  // returns *today's* logs — the archive ignored its date filter, the calendar
+  // showed empty days, and "monthly" analytics showed today's numbers.
+  const fetchHistory = useCallback(
+    async (range?: { start: string; end: string }) => {
+      const start = range?.start || startDate;
+      const end = range?.end || endDate;
+      try {
+        const res = await api.get("/barber-presence/history", {
+          params: {
+            start_date: start || undefined,
+            end_date: end || undefined,
+            employee_id: employeeIdFilter || undefined,
+          },
+        });
+        const rows: AttendanceRecord[] = Array.isArray(res.data) ? res.data : [];
+        setHistoryRecords(
+          rows.map((row: any) => ({
+            ...row,
+            id: row.id,
+            employee_id: row.employee_id,
+            employee_name: row.employee_name || "—",
+            status: row.status,
+            created_at: row.created_at,
+            is_late: Boolean(row.is_late),
+            all_logs: [],
+          })),
+        );
+      } catch {
+        // The archive is a secondary view; the today tab stays functional.
+        setHistoryRecords([]);
+      }
+    },
+     
+    [startDate, endDate, employeeIdFilter],
+  );
 
   const fetchLeaves = useCallback(
     async (status = leaveFilter) => {
@@ -119,31 +168,46 @@ export function useAttendanceData(opts?: { t?: TranslateFn }) {
 
   useEffect(() => {
     void fetchAttendance();
-  }, [fetchAttendance]);
+     
+  }, []);
 
+  // Reset pagination when any filter changes.
   useEffect(() => {
     setArchivePage(1);
   }, [searchTerm, startDate, endDate, employeeIdFilter]);
+
+  // Re-fetch history when the archive range or employee filter changes.
+  // (Runs on mount too — that is the initial history load.)
+  useEffect(() => {
+    void fetchHistory();
+  }, [startDate, endDate, employeeIdFilter, fetchHistory]);
 
   const todayRecords = useMemo(
     () => deriveTodayRecords(records, employees),
     [records, employees],
   );
 
+  // Monthly analytics over the *fetched history window*, not today's snapshot.
+  // The real working hours drive the shift bounds and the backend's own
+  // penalty rate drives payroll, so this view agrees with /analytics.
   const processedData = useMemo(
-    () => deriveMonthlyData(records, employees),
-    [records, employees],
+    () =>
+      deriveMonthlyData(historyRecords, employees, {
+        shift: effectiveShift(workingHours),
+        penaltyPerMinute: penaltyRate,
+      }),
+    [historyRecords, employees, workingHours, penaltyRate],
   );
 
   const filteredArchiveRecords = useMemo(
     () =>
-      filterArchiveRecords(records, {
+      filterArchiveRecords(historyRecords, {
         startDate,
         endDate,
         searchTerm,
         employeeIdFilter,
       }),
-    [records, searchTerm, employeeIdFilter, startDate, endDate],
+    [historyRecords, searchTerm, employeeIdFilter, startDate, endDate],
   );
 
   const archiveTotalPages = Math.max(
@@ -170,8 +234,12 @@ export function useAttendanceData(opts?: { t?: TranslateFn }) {
 
   return {
     records,
+    historyRecords,
     employees,
     workingHours,
+    penaltyRate,
+    lateThreshold,
+    autoPenaltyEnabled,
     leaves,
     loading,
     leavesLoading,
@@ -194,6 +262,7 @@ export function useAttendanceData(opts?: { t?: TranslateFn }) {
     pageSize: PAGE_SIZE,
     employeeIdFilter,
     fetchAttendance,
+    fetchHistory,
     fetchLeaves,
     todayRecords,
     processedData,

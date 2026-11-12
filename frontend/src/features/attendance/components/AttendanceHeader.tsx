@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   History,
   Plane,
+  Receipt,
   RefreshCw,
   Settings,
   UserCheck,
@@ -29,6 +30,7 @@ const VIEW_ICONS: Record<AttendanceViewMode, typeof BarChart3> = {
   leaves: Plane,
   calendar: CalendarDays,
   analytics: BarChart3,
+  penalties: Receipt,
   archive: History,
 };
 

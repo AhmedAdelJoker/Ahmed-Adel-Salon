@@ -32,6 +32,18 @@ class BusinessSettings(Base):
     # VAT percentage applied to invoices, e.g. 5 (means 5%). 0 disables tax.
     tax_rate = Column(Numeric(5, 2), nullable=False, default=0, server_default="0")
     working_hours = Column(JSON, nullable=True)
+    # Attendance policy. These two used to be hardcoded in barber_presence.py
+    # (15 minutes / 0.5 EGP) while the UI's settings dialog exposed an editable
+    # "late threshold" field that was silently dropped — the dialog promised a
+    # control the backend never had. Persisting them here makes the dialog and
+    # the engine agree, and lets GET /barber-presence/working-hours hand both
+    # constants to the frontend so payroll maths uses the same numbers.
+    late_threshold_minutes = Column(Integer, nullable=False, default=15, server_default="15")
+    late_penalty_per_minute = Column(Numeric(10, 2), nullable=False, default=0.5, server_default="0.5")
+    # Master switch for automatic late-arrival penalties. Some salons prefer to
+    # track lateness without deducting; with this false the punch engine still
+    # records is_late/late_minutes, it just skips the AttendancePenalty row.
+    auto_penalty_enabled = Column(Boolean, nullable=False, default=True, server_default="1")
     shift_auto_close_grace_period = Column(Integer, nullable=False, default=30)  # Minutes after closing time before auto-close
     landing_hero_title = Column(String(500), nullable=True)
     landing_hero_subtitle = Column(Text, nullable=True)

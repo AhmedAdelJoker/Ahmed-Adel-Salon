@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
-import { X } from "lucide-react";
 import { PageShell } from "@/components/shared/PageShell";
 import InlineNotice from "@/components/shared/InlineNotice";
+import { cn } from "@/lib/core/utils";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,6 +24,7 @@ import api from "@/services/api";
 import { getIntlLocale } from "@/lib/format/locale";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
+import { useSocket } from "@/context/SocketContext";
 import {
   ArchiveView,
   AttendanceDashboardView,
@@ -33,24 +35,29 @@ import {
   CalendarView,
   LeavesView,
   MonthlyView,
+  PenaltiesView,
   RegisterView,
   useAttendanceData,
 } from "@/features/attendance";
-import type { AttendanceSettingsForm, AttendanceViewMode } from "@/features/attendance/types";
+import type { AttendanceSettingsForm, AttendanceViewMode, WorkingHours } from "@/features/attendance/types";
 import { emptyLeaveForm } from "@/features/attendance/types";
 import { exportAttendancePDF } from "@/features/attendance/utils/attendance";
 
 const AttendanceManagement = () => {
   const { t, i18n } = useTranslation("owner");
-  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
+  const language = i18n.resolvedLanguage || i18n.language || "ar";
+  const locale = getIntlLocale(language);
   const { user } = useAuth();
   const { openEmployeeQuickView } = useUI();
 
   const data = useAttendanceData({ t: t as any });
   const {
-    records,
+    historyRecords,
     employees,
     workingHours,
+    penaltyRate,
+    lateThreshold,
+    autoPenaltyEnabled,
     leaves,
     loading,
     leavesLoading,
@@ -86,9 +93,28 @@ const AttendanceManagement = () => {
     open_time: "09:00",
     close_time: "22:00",
     late_threshold: 15,
+    late_penalty_per_minute: 0.5,
+    auto_penalty_enabled: true,
   });
+  // Per-day editor state — seeded from the live working hours, saved as-is.
+  const [daysForm, setDaysForm] = useState<WorkingHours>({});
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ ...emptyLeaveForm });
+
+  // Live refresh: the backend broadcasts an event on every punch (manual,
+  // fingerprint, leave decision). POS wired this up a while ago; the attendance
+  // page never listened, so a punch made at the register only appeared after a
+  // manual reload.
+  const socketContext = useSocket();
+  const lastSocketEvent = socketContext?.notifications?.[0];
+  useEffect(() => {
+    const event = (lastSocketEvent as { event?: string } | undefined)?.event;
+    if (event === "attendance_update" || event === "attendance_refresh") {
+      void data.fetchAttendance();
+      void data.fetchHistory();
+    }
+     
+  }, [lastSocketEvent]);
 
   const canApproveLeaves = ["OWNER", "ADMIN", "MANAGER", "ACCOUNTANT"].includes(
     String(user?.role || "").toUpperCase(),
@@ -100,18 +126,20 @@ const AttendanceManagement = () => {
     }
   }, [activeViewMode, leaveFilter, fetchLeaves]);
 
-  // Seed settings from any available working-hours day (best effort).
+  // Seed settings + the per-day editor from the live working-hours response.
   useEffect(() => {
-    const days = Object.values(workingHours || {});
-    const openDay = days.find((d) => d?.is_open && d.open_time && d.close_time);
-    if (openDay?.open_time || openDay?.close_time) {
-      setSettingsForm((s) => ({
-        ...s,
-        open_time: openDay.open_time || s.open_time,
-        close_time: openDay.close_time || s.close_time,
-      }));
-    }
-  }, [workingHours]);
+    const hours = workingHours || {};
+    setDaysForm(hours);
+    const openDay = Object.values(hours).find((d) => d?.is_open && d.open_time && d.close_time);
+    setSettingsForm((s) => ({
+      ...s,
+      open_time: openDay?.open_time || s.open_time,
+      close_time: openDay?.close_time || s.close_time,
+      late_threshold: lateThreshold,
+      late_penalty_per_minute: penaltyRate,
+      auto_penalty_enabled: autoPenaltyEnabled,
+    }));
+  }, [workingHours, lateThreshold, penaltyRate, autoPenaltyEnabled]);
 
   const exportRows = useMemo(() => {
     if (activeViewMode === "analytics") return processedData;
@@ -132,32 +160,76 @@ const AttendanceManagement = () => {
     }
   };
 
+  const DAY_KEYS = [
+    "saturday",
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+  ] as const;
+
+  const updateDay = (
+    day: string,
+    patch: Partial<{ is_open: boolean; open_time: string; close_time: string }>,
+  ) =>
+    setDaysForm((prev) => ({
+      ...prev,
+      [day]: {
+        is_open: patch.is_open ?? prev[day]?.is_open ?? true,
+        open_time: patch.open_time ?? prev[day]?.open_time ?? "09:00",
+        close_time: patch.close_time ?? prev[day]?.close_time ?? "22:00",
+      },
+    }));
+
+  // Copy the first open day's times onto every open day — the common case of
+  // "same hours every day" without retyping seven times.
+  const applyToAllOpenDays = () => {
+    const template = DAY_KEYS.map((d) => daysForm[d]).find((d) => d?.is_open);
+    if (!template) return;
+    setDaysForm((prev) => {
+      const next: WorkingHours = { ...prev };
+      for (const day of DAY_KEYS) {
+        if (next[day]?.is_open) {
+          next[day] = { ...next[day], open_time: template.open_time, close_time: template.close_time };
+        }
+      }
+      return next;
+    });
+    toast.success(t("attendance.timesAppliedToAll"));
+  };
+
+  const detailOf = (err: unknown): string | null => {
+    const e = err as { response?: { data?: { detail?: unknown } } };
+    const d = e?.response?.data?.detail;
+    return typeof d === "string" ? d : null;
+  };
+
   const handleSaveSettings = async () => {
     try {
       const workingHoursPayload: Record<string, unknown> = {};
-      [
-        "sunday",
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-      ].forEach((day) => {
+      for (const day of DAY_KEYS) {
+        const current = daysForm[day];
+        const isOpen = current?.is_open !== false;
         workingHoursPayload[day] = {
-          is_open: true,
-          open_time: settingsForm.open_time,
-          close_time: settingsForm.close_time,
+          is_open: isOpen,
+          open_time: current?.open_time || settingsForm.open_time,
+          close_time: current?.close_time || settingsForm.close_time,
         };
-      });
+      }
       await api.post("/barber-presence/working-hours", {
         working_hours: workingHoursPayload,
+        late_threshold: settingsForm.late_threshold,
+        late_penalty_per_minute: settingsForm.late_penalty_per_minute,
+        auto_penalty_enabled: settingsForm.auto_penalty_enabled,
       });
       toast.success(t("attendance.settingsSaved"));
       setShowSettings(false);
       await fetchAttendance();
-    } catch {
-      toast.error(t("attendance.settingsFailed"));
+    } catch (err) {
+      // Surface the backend's validation message (invalid window, short day...)
+      toast.error(detailOf(err) || t("attendance.settingsFailed"));
     }
   };
 
@@ -210,7 +282,10 @@ const AttendanceManagement = () => {
         <AttendancePageHeader
           onShowSettings={() => setShowSettings(true)}
           onExportPDF={handleExportPDF}
-          onRefresh={fetchAttendance}
+          onRefresh={() => {
+            void fetchAttendance();
+            void data.fetchHistory();
+          }}
           loading={loading}
           t={t as any}
         />
@@ -259,7 +334,7 @@ const AttendanceManagement = () => {
         )}
         {activeViewMode === "calendar" && (
           <CalendarView
-            records={records}
+            records={historyRecords}
             calendarMonth={calendarMonth}
             setCalendarMonth={setCalendarMonth}
             workingHours={workingHours}
@@ -267,7 +342,12 @@ const AttendanceManagement = () => {
             locale={locale}
           />
         )}
-        {activeViewMode === "analytics" && <MonthlyView processedData={processedData} t={t as any} />}
+        {activeViewMode === "analytics" && (
+          <MonthlyView processedData={processedData} t={t as any} locale={locale} language={language} />
+        )}
+        {activeViewMode === "penalties" && (
+          <PenaltiesView t={t as any} locale={locale} language={language} employees={employees} />
+        )}
         {activeViewMode === "archive" && (
           <ArchiveView
             archiveRecords={archiveRecords}
@@ -290,30 +370,91 @@ const AttendanceManagement = () => {
       </PageShell>
 
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="max-w-lg rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-black">{t("attendance.settingsTitle")}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-xs font-medium text-muted">{t("attendance.settingsWorkingHoursHint")}</p>
-            <div>
-              <label htmlFor="set-open" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
-                {t("attendance.openingTime")}
-              </label>
-              <Input id="set-open" type="time" value={settingsForm.open_time} onChange={(e) => setSettingsForm({ ...settingsForm, open_time: e.target.value })} className="h-11 rounded-xl" />
+          <div className="max-h-[70vh] space-y-5 overflow-y-auto pe-1">
+            {/* ===== ساعات العمل لكل يوم ===== */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-black uppercase tracking-wide text-muted">{t("attendance.hoursPerDay")}</p>
+                <Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] font-bold" onClick={applyToAllOpenDays}>
+                  {t("attendance.applyToAllDays")}
+                </Button>
+              </div>
+              {DAY_KEYS.map((day) => {
+                const dayForm = daysForm[day];
+                const isOpen = dayForm?.is_open !== false;
+                return (
+                  <div
+                    key={day}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl border border-border bg-muted/5 p-2",
+                      !isOpen && "opacity-60",
+                    )}
+                  >
+                    <Switch
+                      checked={isOpen}
+                      onCheckedChange={(v: boolean) => updateDay(day, { is_open: v })}
+                      aria-label={t("workingHours.toggleAria", { day: t(`workingHours.day.${day}`) })}
+                    />
+                    <span className="w-16 shrink-0 text-xs font-black text-main">
+                      {t(`workingHours.day.${day}`)}
+                    </span>
+                    <Input
+                      type="time"
+                      value={dayForm?.open_time || "09:00"}
+                      onChange={(e) => updateDay(day, { open_time: e.target.value })}
+                      disabled={!isOpen}
+                      aria-label={t("attendance.openingTime")}
+                      className="h-9 rounded-lg text-sm"
+                    />
+                    <span className="text-muted">←</span>
+                    <Input
+                      type="time"
+                      value={dayForm?.close_time || "22:00"}
+                      onChange={(e) => updateDay(day, { close_time: e.target.value })}
+                      disabled={!isOpen}
+                      aria-label={t("attendance.closingTime")}
+                      className="h-9 rounded-lg text-sm"
+                    />
+                  </div>
+                );
+              })}
             </div>
-            <div>
-              <label htmlFor="set-close" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
-                {t("attendance.closingTime")}
+
+            {/* ===== سياسة التأخير ===== */}
+            <div className="space-y-3 border-t border-border pt-4">
+              <p className="text-[11px] font-black uppercase tracking-wide text-muted">{t("attendance.policyTitle")}</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="set-late" className="mb-1 block text-[11px] font-bold text-muted">
+                    {t("attendance.lateLimit")}
+                  </label>
+                  <Input id="set-late" type="number" min={0} max={240} value={settingsForm.late_threshold} onChange={(e) => setSettingsForm({ ...settingsForm, late_threshold: Number(e.target.value) })} className="h-11 rounded-xl" />
+                </div>
+                <div>
+                  <label htmlFor="set-penalty" className="mb-1 block text-[11px] font-bold text-muted">
+                    {t("attendance.penaltyPerMinute")}
+                  </label>
+                  <Input id="set-penalty" type="number" min={0} max={100} step="0.25" value={settingsForm.late_penalty_per_minute} onChange={(e) => setSettingsForm({ ...settingsForm, late_penalty_per_minute: Number(e.target.value) })} className="h-11 rounded-xl" />
+                </div>
+              </div>
+              <p className="text-[11px] font-medium text-muted">{t("attendance.penaltyPerMinuteHint")}</p>
+              <label htmlFor="set-auto-penalty" className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-muted/10 p-3">
+                <Switch
+                  id="set-auto-penalty"
+                  checked={settingsForm.auto_penalty_enabled}
+                  onCheckedChange={(v: boolean) => setSettingsForm({ ...settingsForm, auto_penalty_enabled: v })}
+                />
+                <span className="min-w-0">
+                  <span className="block text-xs font-black text-main">{t("attendance.autoPenaltyLabel")}</span>
+                  <span className="mt-0.5 block text-[11px] font-medium text-muted">{t("attendance.autoPenaltyHint")}</span>
+                </span>
               </label>
-              <Input id="set-close" type="time" value={settingsForm.close_time} onChange={(e) => setSettingsForm({ ...settingsForm, close_time: e.target.value })} className="h-11 rounded-xl" />
             </div>
-            <div>
-              <label htmlFor="set-late" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
-                {t("attendance.lateLimit")}
-              </label>
-              <Input id="set-late" type="number" value={settingsForm.late_threshold} onChange={(e) => setSettingsForm({ ...settingsForm, late_threshold: Number(e.target.value) })} className="h-11 rounded-xl" />
-            </div>
+
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="h-11 flex-1 rounded-xl" onClick={() => setShowSettings(false)}>
                 {t("attendance.cancel")}

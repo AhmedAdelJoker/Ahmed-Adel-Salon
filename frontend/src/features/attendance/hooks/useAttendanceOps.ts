@@ -48,6 +48,8 @@ export function useAttendanceOps(opts: {
     open_time: "09:00",
     close_time: "22:00",
     late_threshold: 15,
+    late_penalty_per_minute: 0.5,
+    auto_penalty_enabled: true,
   });
 
   const handleManualRegister = useCallback(async () => {

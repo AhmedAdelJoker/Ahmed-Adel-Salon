@@ -5,7 +5,7 @@ from sqlalchemy import func, and_, or_
 from typing import Dict, Any
 
 from app.models.employee import Employee
-from app.models.employee_presence_log import EmployeePresenceLog
+from app.models.employee_presence_log import EmployeePresenceLog, AttendancePenalty
 from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
 from app.models.salary_advance import SalaryAdvance
@@ -129,6 +129,7 @@ def calculate_expected_net_salary(
     bonus = Decimal("0.00")
     discipline_bonus = Decimal("0.00")
     auto_deduction = Decimal("0.00")
+    late_penalties = Decimal("0.00")
     
     if emp.employment_type == "temporary":
         # System "اليومية": Salary is daily rate * actual days
@@ -151,7 +152,27 @@ def calculate_expected_net_salary(
             # (base_salary / 30) * missed_days
             day_value = base_salary / Decimal("30")
             auto_deduction = (day_value * metrics["missed_days"]).quantize(Decimal("0.01"))
-        
+
+            # Late-arrival and disciplinary penalties raised in the period.
+            # Excused penalties are waived and never touch the salary. This is
+            # the deduction side of the attendance register: a penalty recorded
+            # in /penalties must actually leave the net pay, or the penalties
+            # tab is bookkeeping with no consequence.
+            penalty_total = (
+                db.query(func.sum(AttendancePenalty.penalty_amount))
+                .filter(
+                    AttendancePenalty.employee_id == emp.id,
+                    AttendancePenalty.is_excused.is_(False),
+                    AttendancePenalty.date >= start_date.date(),
+                    AttendancePenalty.date < end_date.date(),
+                )
+                .scalar()
+            )
+            late_penalties = Decimal(str(penalty_total or 0)).quantize(Decimal("0.01"))
+            auto_deduction += late_penalties
+        else:
+            late_penalties = Decimal("0.00")
+
     # 4. Advances & Fixed Deductions
     pending_advances_sum = db.query(func.sum(SalaryAdvance.amount)).filter(
         SalaryAdvance.employee_id == emp.id,
@@ -175,6 +196,7 @@ def calculate_expected_net_salary(
         "discipline_bonus": discipline_bonus,
         "fixed_deductions": fixed_deductions,
         "auto_deduction": auto_deduction,
+        "late_penalties": late_penalties,
         "advance_amount": advance_amount,
         "net_salary": max(Decimal("0.00"), net_salary),
         "metrics": metrics

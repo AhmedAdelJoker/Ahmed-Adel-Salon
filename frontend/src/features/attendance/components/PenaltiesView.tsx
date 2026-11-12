@@ -1,0 +1,393 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { BadgeCheck, BadgeX, Receipt, Loader2, RefreshCw, Plus } from "lucide-react";
+import { toast } from "react-hot-toast";
+import api from "@/services/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  formatDateTime,
+  type TranslateFn,
+} from "@/features/attendance/utils/attendance";
+import { formatEmployeeMoney } from "@/features/hr/utils/helpers";
+import { cn } from "@/lib/core/utils";
+
+export interface PenaltyRow {
+  id: number;
+  employee_id: number;
+  employee_name: string;
+  date: string;
+  late_minutes: number;
+  reason: string | null;
+  penalty_amount: number;
+  is_excused: boolean;
+  source: "auto" | "manual" | string;
+  created_at: string | null;
+}
+
+interface PenaltyEmployeeOption {
+  id?: number | string;
+  full_name?: string;
+  name?: string;
+}
+
+export default function PenaltiesView({
+  t,
+  locale,
+  language,
+  employees = [],
+}: {
+  t: TranslateFn;
+  locale: string;
+  language?: string;
+  employees?: PenaltyEmployeeOption[];
+}) {
+  const [startDate, setStartDate] = useState(
+    () =>
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        .toISOString()
+        .split("T")[0],
+  );
+  const [endDate, setEndDate] = useState(
+    () => new Date().toISOString().split("T")[0],
+  );
+  const [rows, setRows] = useState<PenaltyRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+
+  // Manual-add dialog state
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addEmployeeId, setAddEmployeeId] = useState("");
+  const [addDate, setAddDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [addMinutes, setAddMinutes] = useState("");
+  const [addAmount, setAddAmount] = useState("");
+  const [addReason, setAddReason] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
+
+  const fetchPenalties = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/barber-presence/penalties", {
+        params: {
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
+        },
+      });
+      setRows(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setRows([]);
+      toast.error(t("attendance.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
+     
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    void fetchPenalties();
+  }, [fetchPenalties]);
+
+  const totals = useMemo(
+    () =>
+      rows.reduce(
+        (acc, row) => ({
+          count: acc.count + 1,
+          amount: acc.amount + (row.is_excused ? 0 : Number(row.penalty_amount || 0)),
+          waived: acc.waived + (row.is_excused ? 1 : 0),
+        }),
+        { count: 0, amount: 0, waived: 0 },
+      ),
+    [rows],
+  );
+
+  const resetAddForm = () => {
+    setAddEmployeeId("");
+    setAddDate(new Date().toISOString().split("T")[0]);
+    setAddMinutes("");
+    setAddAmount("");
+    setAddReason("");
+  };
+
+  const handleAddPenalty = async () => {
+    if (!addEmployeeId) return toast.error(t("attendance.selectEmployee"));
+    if (addReason.trim().length < 2) return toast.error(t("attendance.penaltyReasonRequired"));
+
+    const minutes = addMinutes === "" ? undefined : Number(addMinutes);
+    const amount = addAmount === "" ? undefined : Number(addAmount);
+    if (minutes !== undefined && (!Number.isFinite(minutes) || minutes < 0)) {
+      return toast.error(t("attendance.penaltyInvalidMinutes"));
+    }
+    if (amount !== undefined && (!Number.isFinite(amount) || amount <= 0)) {
+      return toast.error(t("attendance.penaltyInvalidAmount"));
+    }
+    if (minutes === undefined && amount === undefined) {
+      return toast.error(t("attendance.penaltyAmountOrMinutes"));
+    }
+
+    setIsAdding(true);
+    try {
+      await api.post("/barber-presence/penalties", {
+        employee_id: Number(addEmployeeId),
+        date: addDate || undefined,
+        late_minutes: minutes,
+        penalty_amount: amount,
+        reason: addReason.trim(),
+      });
+      toast.success(t("attendance.penaltyCreated"));
+      setShowAddForm(false);
+      resetAddForm();
+      await fetchPenalties();
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: unknown } }; message?: string };
+      const detail = typeof e?.response?.data?.detail === "string" ? e.response.data.detail : e?.message;
+      toast.error(detail || t("attendance.addPenaltyFailed"));
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const toggleExcuse = async (row: PenaltyRow) => {
+    if (togglingId != null) return;
+    setTogglingId(row.id);
+    try {
+      await api.patch(`/barber-presence/penalties/${row.id}`, {
+        is_excused: !row.is_excused,
+      });
+      toast.success(
+        !row.is_excused
+          ? t("attendance.penaltyExcused")
+          : t("attendance.penaltyUnwaived"),
+      );
+      // Optimistic update so the row flips instantly without a refetch storm.
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, is_excused: !r.is_excused } : r)),
+      );
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response
+        ?.data?.detail;
+      toast.error(detail || t("attendance.settingsFailed"));
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  return (
+    <div
+      className="space-y-4"
+      id="attendance-panel-penalties"
+      role="tabpanel"
+      aria-labelledby="attendance-tab-penalties"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="flex items-center gap-2 text-base font-black text-main">
+            <Receipt size={18} className="text-primary" /> {t("attendance.penaltiesTitle")}
+          </h3>
+          <p className="mt-1 text-xs font-medium text-muted">{t("attendance.penaltiesHint")}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" className="h-10 gap-2 rounded-xl" onClick={() => setShowAddForm(true)}>
+            <Plus size={16} />
+            <span>{t("attendance.addPenalty")}</span>
+          </Button>
+          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10 w-auto rounded-xl" aria-label={t("attendance.from")} />
+          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-10 w-auto rounded-xl" aria-label={t("attendance.to")} />
+          <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl" onClick={() => void fetchPenalties()} aria-label={t("attendance.refresh")}>
+            <RefreshCw size={16} className={cn(loading && "animate-spin")} />
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {[
+          { label: t("attendance.kpiPenaltyCount"), value: String(totals.count) },
+          {
+            label: t("attendance.kpiPenaltyTotal"),
+            value: formatEmployeeMoney(totals.amount, locale, language),
+          },
+          { label: t("attendance.kpiPenaltyWaived"), value: String(totals.waived) },
+        ].map((kpi) => (
+          <div key={kpi.label} className="rounded-xl border border-border bg-muted/10 p-3">
+            <p className="text-[11px] font-black uppercase tracking-wide text-muted">{kpi.label}</p>
+            <p className="mt-1 text-2xl font-black tabular-nums text-main">{kpi.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 size={22} className="animate-spin text-primary" />
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/20 text-muted">
+              <Receipt size={24} />
+            </div>
+            <p className="mt-4 text-sm font-black text-main">{t("attendance.penaltiesEmpty")}</p>
+            <p className="mt-1 max-w-sm text-xs font-medium text-muted">{t("attendance.penaltiesEmptyHint")}</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("attendance.colEmployee")}</TableHead>
+                <TableHead>{t("attendance.colDateTime")}</TableHead>
+                <TableHead>{t("attendance.lateMinutes")}</TableHead>
+                <TableHead>{t("attendance.colSource")}</TableHead>
+                <TableHead>{t("attendance.reason")}</TableHead>
+                <TableHead>{t("attendance.colPenalty")}</TableHead>
+                <TableHead>{t("attendance.colStatus")}</TableHead>
+                <TableHead className="text-end">{t("attendance.colAction")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.id} className={cn(row.is_excused && "opacity-60")}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <EmployeeAvatar name={row.employee_name} size="xs" shape="circle" />
+                      <span className="font-bold text-main">{row.employee_name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="tabular-nums">
+                    {formatDateTime(row.date, locale, {
+                      year: "numeric",
+                      month: "short",
+                      day: "2-digit",
+                    })}
+                  </TableCell>
+                  <TableCell className="tabular-nums">{row.late_minutes}</TableCell>
+                  <TableCell>
+                    <Badge variant={row.source === "manual" ? "default" : "secondary"}>
+                      {row.source === "manual"
+                        ? t("attendance.sourceManual")
+                        : t("attendance.sourceAuto")}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="max-w-[180px] truncate" title={row.reason || undefined}>
+                    {row.reason || "—"}
+                  </TableCell>
+                  <TableCell className="font-semibold tabular-nums">
+                    {formatEmployeeMoney(row.penalty_amount, locale, language)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={row.is_excused ? "secondary" : "danger"} className="gap-1">
+                      {row.is_excused ? <BadgeCheck size={12} /> : <BadgeX size={12} />}
+                      {row.is_excused ? t("attendance.waived") : t("attendance.applied")}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-xl text-xs font-bold"
+                      disabled={togglingId != null}
+                      onClick={() => void toggleExcuse(row)}
+                    >
+                      {togglingId === row.id ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : row.is_excused ? (
+                        t("attendance.undoWaive")
+                      ) : (
+                        t("attendance.waivePenalty")
+                      )}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+
+      {/* Manual penalty dialog — the manual counterpart to the punch engine */}
+      <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black">{t("attendance.addPenaltyTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="pn-emp" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                {t("attendance.employee")}
+              </label>
+              <Select value={addEmployeeId} onValueChange={setAddEmployeeId}>
+                <SelectTrigger id="pn-emp" className="h-11 rounded-xl">
+                  <SelectValue placeholder={t("attendance.selectEmployeeLabel")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees
+                    .filter((emp) => emp.id != null)
+                    .map((emp) => (
+                      <SelectItem key={emp.id} value={String(emp.id)}>
+                        {emp.full_name || emp.name || `#${emp.id}`}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="pn-date" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                  {t("attendance.colDateTime")}
+                </label>
+                <Input id="pn-date" type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} className="h-11 rounded-xl" />
+              </div>
+              <div>
+                <label htmlFor="pn-minutes" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                  {t("attendance.penaltyMinutes")}
+                </label>
+                <Input id="pn-minutes" type="number" min={0} max={1440} placeholder="0" value={addMinutes} onChange={(e) => setAddMinutes(e.target.value)} className="h-11 rounded-xl" />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="pn-amount" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                {t("attendance.penaltyAmount")}
+              </label>
+              <Input id="pn-amount" type="number" min={0} step="0.5" placeholder={t("attendance.penaltyAmountPlaceholder")} value={addAmount} onChange={(e) => setAddAmount(e.target.value)} className="h-11 rounded-xl" />
+              <p className="mt-1 text-[11px] font-medium text-muted">{t("attendance.penaltyAmountHint")}</p>
+            </div>
+            <div>
+              <label htmlFor="pn-reason" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                {t("attendance.reason")} <span className="text-danger">*</span>
+              </label>
+              <Input id="pn-reason" value={addReason} onChange={(e) => setAddReason(e.target.value)} placeholder={t("attendance.penaltyReasonPlaceholder")} className="h-11 rounded-xl" autoFocus />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="h-11 flex-1 rounded-xl" onClick={() => setShowAddForm(false)}>
+                {t("attendance.cancel")}
+              </Button>
+              <Button className="h-11 flex-1 rounded-xl" onClick={() => void handleAddPenalty()} disabled={isAdding}>
+                {isAdding ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                <span>{isAdding ? t("attendance.submitting") : t("attendance.addPenalty")}</span>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

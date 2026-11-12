@@ -26,6 +26,7 @@ export type AttendanceViewMode =
   | "leaves"
   | "calendar"
   | "analytics"
+  | "penalties"
   | "archive";
 
 export interface CalendarDay {

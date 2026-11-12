@@ -1217,7 +1217,258 @@
     "specialties": "Services and specialties",
     "noServices": "No services assigned yet",
     "visibilityAccess": "Visibility and access",
-    "tenure": "Tenure"
+    "tenure": "Tenure",
+    "toastImageUploaded": "Image uploaded successfully",
+    "toastImageUploadFailed": "Failed to upload image",
+    "toastImageNoUrl": "Server did not return an image URL",
+    "toastLoadEmployeeFailed": "Failed to load employee data",
+    "toastNamePhoneRequired": "Please enter name and mobile number",
+    "toastUsernameRequired": "Please enter a username for the login account",
+    "toastContractEndBeforeHire": "Contract end date cannot be before hire date",
+    "toastPasswordRequired": "Please enter a password for the login account",
+    "toastPasswordRule": "Password: {{rule}}",
+    "toastWalletRequired": "Wallet number is required for wallet transfer",
+    "toastWalletInvalid": "Wallet number: {{error}}",
+    "toastBankRequired": "Bank account number is required for bank transfer",
+    "toastPhoneDuplicate": "Mobile number is already registered to: {{name}}{{id}}",
+    "toastNationalIdDuplicate": "National ID is already registered to: {{name}}{{id}}",
+    "toastBirthDateMismatch": "Birth date does not match national ID ({{date}})",
+    "toastEmployeeUpdated": "Employee updated successfully",
+    "toastEmployeeAdded": "Employee added successfully",
+    "toastSaveFailed": "Failed to save data - check phone and required fields",
+    "toastStatusLeave": "Employee marked as on leave",
+    "toastStatusReturn": "Employee returned to work",
+    "toastStatusUpdateFailed": "Failed to update status",
+    "idShort": "ID",
+    "reviewAndApprove": "Review & approve",
+    "fixedBonusLabel": "Fixed bonus",
+    "defaultDeductionsLabel": "Default deductions",
+    "tabPersonal": "Personal identity",
+    "tabWork": "Work profile",
+    "tabSystem": "System access",
+    "tabSkills": "Skills & services",
+    "tabFinancial": "Financial setup",
+    "tabAssistant": "Assistant setup",
+    "tabDocuments": "Documents archive",
+    "stepSkillsNotApplicable": "Skills and services apply only to service providers (barber, hairstylist, colorist, esthetician, nail technician).",
+    "stepAssistantNotApplicable": "Assistant-to-barber assignment applies only to the assistant role.",
+    "assistantTaskHairWash": "Hair wash",
+    "assistantTaskClientPrep": "Client preparation",
+    "assistantTaskToolCleanup": "Tool cleanup",
+    "assistantTaskChairPrep": "Chair preparation",
+    "assistantTaskLongServices": "Assist long services",
+    "assistantTaskAreaCleanup": "Work area cleanup",
+    "latePenaltiesThisMonth": "Late penalties — this month",
+    "latePenaltiesCount": "{{count}} active",
+    "latePenaltiesWaived": "{{count}} waived",
+    "blueprint": {
+      "manager": {
+        "eyebrow": "Strategic leadership",
+        "title": "Manager",
+        "summary": "Responsible for meeting operational targets, leading the team, and approving the administrative reports and deductions.",
+        "focus": [
+          "Operations management",
+          "Report approval",
+          "Team development"
+        ]
+      },
+      "accountant": {
+        "eyebrow": "Financial governance",
+        "title": "Accountant",
+        "summary": "Full authority to review cash flows, produce the analytical reports, and audit the payroll sheets before they run.",
+        "focus": [
+          "Financial audit",
+          "Profitability analysis",
+          "Cash control"
+        ]
+      },
+      "barber": {
+        "eyebrow": "The craft of appearance",
+        "title": "Barber",
+        "summary": "A complete expert in cutting, styling and beard-shaping, to the highest standard of craft.",
+        "focus": [
+          "Cutting and styling",
+          "Beard shaping",
+          "Hair treatments"
+        ]
+      },
+      "cashier": {
+        "eyebrow": "Cash desk",
+        "title": "Cashier",
+        "summary": "Runs the payments, closes the shifts, and makes sure the money adds up.",
+        "focus": [
+          "Point of sale",
+          "Collecting payments",
+          "Shift closing"
+        ]
+      },
+      "hairstylist": {
+        "eyebrow": "The art of styling",
+        "title": "Hairstylist",
+        "summary": "A specialist in blow-drying, curling and styling for the occasion, with an eye on the latest trends.",
+        "focus": [
+          "Blow-drying and styling",
+          "Occasion curls",
+          "Hair care"
+        ]
+      },
+      "colorist": {
+        "eyebrow": "The art of colour",
+        "title": "Colourist",
+        "summary": "A specialist in colour chemistry and in repairing damaged hair with the latest safe protocols.",
+        "focus": [
+          "Hair colouring",
+          "Protein treatments",
+          "Colour chemistry"
+        ]
+      },
+      "esthetician": {
+        "eyebrow": "Skin health",
+        "title": "Esthetician",
+        "summary": "Deep skin cleansing and premium hydration, using advanced spa techniques.",
+        "focus": [
+          "Skin cleansing",
+          "Brightening masks",
+          "Facial massage"
+        ]
+      },
+      "nail_technician": {
+        "eyebrow": "Nail care",
+        "title": "Nail technician",
+        "summary": "A specialist in manicures, pedicures and nail finishing, to the highest standards of hygiene.",
+        "focus": [
+          "Manicure",
+          "Pedicure",
+          "Nail finishing"
+        ]
+      },
+      "barber_assistant": {
+        "eyebrow": "Hands-on support",
+        "title": "Barber assistant",
+        "summary": "Full logistical and technical support for the barbers, keeping the client comfortable in the wash and prep area.",
+        "focus": [
+          "Client preparation",
+          "Washing technique",
+          "Tool organisation"
+        ]
+      },
+      "receptionist": {
+        "eyebrow": "Experience management",
+        "title": "Receptionist",
+        "summary": "The first point of contact, keeping the client's journey smooth from the booking to the goodbye.",
+        "focus": [
+          "Reception courtesy",
+          "Managing bookings",
+          "Satisfaction analysis"
+        ]
+      },
+      "cleaner": {
+        "eyebrow": "Safety standards",
+        "title": "Cleaner",
+        "summary": "Responsible for a clean working environment, safe facilities, and the salon's overall appearance.",
+        "focus": [
+          "Continuous sanitising",
+          "Facility safety",
+          "Consumables management"
+        ]
+      },
+      "owner": {
+        "eyebrow": "Top leadership",
+        "title": "Owner",
+        "summary": "Responsible for the strategic vision and for growing the brand.",
+        "focus": [
+          "Overall vision",
+          "Business growth",
+          "Overall oversight"
+        ]
+      },
+      "other": {
+        "eyebrow": "Specialist staff",
+        "title": "Specialist",
+        "summary": "Extra tasks and rare specialisms, as the business grows.",
+        "focus": [
+          "Task flexibility"
+        ]
+      }
+    },
+    "msg": {
+      "nameRequired": "Name is required",
+      "nameTooShort": "Name is too short",
+      "nameTooLong": "Name is too long ({{max}} characters at most)",
+      "nameHasDigits": "Name cannot contain digits",
+      "nameInvalidChars": "Name contains disallowed characters",
+      "usernameRequired": "Username is required",
+      "usernameTooShort": "Username must be at least 3 characters",
+      "usernameTooLong": "Username must be at most 30 characters",
+      "usernameInvalidChars": "Username: English letters, digits and . _ - only",
+      "moneyNotNumber": "{{label}} must be a number",
+      "moneyNegative": "{{label}} cannot be negative",
+      "moneyTooHigh": "{{label}} exceeds the maximum ({{max}})",
+      "commissionNotNumber": "Commission rate must be a number",
+      "commissionRange": "Commission rate must be between 0 and 100%",
+      "ibanInvalid": "An Egyptian IBAN starts with EG followed by 27 digits",
+      "bankInvalid": "Bank account number is invalid",
+      "passwordMinLength": "At least 8 characters",
+      "passwordUppercase": "An uppercase letter (A-Z)",
+      "passwordLowercase": "A lowercase letter (a-z)",
+      "passwordDigit": "At least one digit",
+      "phoneRequired": "Mobile number is required",
+      "phoneRepeatedDigits": "Mobile number is invalid (repeated digits)",
+      "phoneLength": "Mobile number is invalid (8 to 15 digits)",
+      "phoneEgyptian": "Mobile number is invalid (an Egyptian mobile is 11 digits starting 01)",
+      "phoneInvalid": "Mobile number is invalid",
+      "emailRequired": "Email address is required",
+      "emailInvalid": "Email address is invalid",
+      "nationalIdLength": "National ID must be exactly {{length}} digits",
+      "nationalIdCentury": "National ID is invalid: the first digit must be 2 or 3",
+      "nationalIdBadDate": "National ID contains an invalid date of birth",
+      "nationalIdBadGovernorate": "National ID contains an unknown governorate code",
+      "governorateUnknown": "Governorate {{code}}",
+      "birthDateMismatchId": "Date of birth does not match the one recorded in the national ID ({{date}})",
+      "contractEndBeforeHire": "Contract end date cannot be before the hire date",
+      "passwordIssue": "Password: {{rule}}",
+      "walletNumber": "Wallet number: {{error}}",
+      "walletRequired": "Wallet number is required when the payment goes to the wallet",
+      "bankNumber": "Bank account: {{error}}",
+      "bankRequired": "Bank account number is required when the payment goes to the bank",
+      "draftNow": "just now",
+      "draftMinutes": "{{count}} minutes ago",
+      "draftHour": "an hour ago",
+      "draftTwoHours": "two hours ago",
+      "draftHours": "{{count}} hours ago",
+      "draftYesterday": "yesterday",
+      "draftTwoDays": "two days ago",
+      "draftDays": "{{count}} days ago",
+      "draftMonth": "a month ago",
+      "draftMonths": "{{count}} months ago"
+    },
+    "governorate": {
+      "01": "Cairo",
+      "02": "Alexandria",
+      "03": "Port Said",
+      "04": "Suez",
+      "05": "Damietta",
+      "06": "Dakahlia",
+      "07": "Sharqia",
+      "08": "Qalyubia",
+      "09": "Kafr El Sheikh",
+      "10": "Gharbia",
+      "11": "Monufia",
+      "12": "Beheira",
+      "13": "Ismailia",
+      "14": "Giza",
+      "15": "Beni Suef",
+      "16": "Faiyum",
+      "17": "Minya",
+      "18": "Asyut",
+      "19": "Sohag",
+      "20": "Qena",
+      "21": "Aswan",
+      "22": "Luxor",
+      "23": "Red Sea",
+      "24": "New Valley",
+      "25": "Matrouh"
+    }
   },
   "expenses": {
     "title": "Expense Management",
@@ -2301,7 +2552,47 @@
     "leaveApproveNoPermission": "You don't have permission to approve leaves",
     "overtime": "Overtime",
     "lateMinutes": "Late minutes",
-    "score": "Score"
+    "score": "Score",
+    "tabPenalties": "Penalties",
+    "penaltiesTitle": "Late penalties",
+    "penaltiesHint": "Recorded late-arrival penalties per employee, with manager waiver — a payroll decision",
+    "kpiPenaltyCount": "Penalty count",
+    "kpiPenaltyTotal": "Total penalties",
+    "kpiPenaltyWaived": "Waived penalties",
+    "colPenalty": "Penalty",
+    "colAction": "Action",
+    "waived": "Waived",
+    "applied": "Applied",
+    "waivePenalty": "Waive",
+    "undoWaive": "Undo waiver",
+    "penaltyExcused": "Penalty waived",
+    "penaltyUnwaived": "Waiver removed",
+    "penaltyPerMinute": "Penalty per minute",
+    "penaltyPerMinuteHint": "Amount deducted per minute late (default 0.5 EGP)",
+    "penaltiesEmpty": "No penalties in this range",
+    "penaltiesEmptyHint": "Penalties are created automatically for check-ins later than opening time + threshold",
+    "hoursPerDay": "Working hours per day",
+    "applyToAllDays": "Apply to all days",
+    "timesAppliedToAll": "Times applied to all open days",
+    "policyTitle": "Late & penalty policy",
+    "autoPenaltyLabel": "Automatic late penalty",
+    "autoPenaltyHint": "When off, lateness is recorded without an automatic salary deduction",
+    "colSource": "Source",
+    "sourceAuto": "Auto",
+    "sourceManual": "Manual",
+    "addPenalty": "Add penalty",
+    "addPenaltyTitle": "Add manual penalty",
+    "addPenaltyFailed": "Could not add penalty",
+    "penaltyCreated": "Penalty recorded",
+    "penaltyReasonRequired": "Reason required (at least 2 characters)",
+    "penaltyInvalidMinutes": "Minutes must be a positive number",
+    "penaltyInvalidAmount": "Amount must be greater than zero",
+    "penaltyAmountOrMinutes": "Enter an amount, or late minutes to auto-calculate",
+    "penaltyMinutes": "Late minutes (optional)",
+    "penaltyAmount": "Penalty amount",
+    "penaltyAmountPlaceholder": "or auto from minutes",
+    "penaltyAmountHint": "Leave empty to calculate from minutes × penalty/minute",
+    "penaltyReasonPlaceholder": "e.g. policy breach, misconduct, absence without leave..."
   },
   "settings": {
     "tabShop": "Shop data",

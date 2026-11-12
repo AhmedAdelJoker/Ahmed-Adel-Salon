@@ -25,6 +25,7 @@ describe("attendance utils", () => {
       "leaves",
       "calendar",
       "analytics",
+      "penalties",
       "archive",
     ]);
     expect(ATTENDANCE_VIEW_MODES.every((m) => m.labelKey.startsWith("attendance."))).toBe(true);

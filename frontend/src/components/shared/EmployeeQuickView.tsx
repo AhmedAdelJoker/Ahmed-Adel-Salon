@@ -107,6 +107,9 @@ export const EmployeeQuickView = ({
     window.location.hash = `#${path}`;
   }, []);
   const [payroll, setPayroll] = useState<PayrollSnapshot | null>(null);
+  const [penalties, setPenalties] = useState<
+    Array<{ penalty_amount: number; is_excused: boolean }> | null
+  >(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payrollUnavailable, setPayrollUnavailable] = useState(false);
@@ -118,10 +121,15 @@ export const EmployeeQuickView = ({
     setEmployee(null);
     setPayroll(null);
     setPayrollUnavailable(false);
+    setPenalties(null);
 
-    const [empResult, payrollResult] = await Promise.allSettled([
+    const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`;
+    const [empResult, payrollResult, penaltiesResult] = await Promise.allSettled([
       api.get(`/employees/${id}`),
       api.get(`/payroll/expected-net`, { params: { employee_id: id } }),
+      // Optional context: a permission or network failure should not hide the
+      // rest of the employee file. The tile simply stays hidden.
+      api.get(`/barber-presence/penalties`, { params: { employee_id: id, start_date: monthStart } }),
     ]);
 
     if (empResult.status === "fulfilled") {
@@ -139,6 +147,12 @@ export const EmployeeQuickView = ({
       setPayrollUnavailable(true);
     }
 
+    if (penaltiesResult.status === "fulfilled") {
+      setPenalties(Array.isArray(penaltiesResult.value.data) ? penaltiesResult.value.data : []);
+    } else {
+      setPenalties(null);
+    }
+
     setLoading(false);
   }, [t]);
 
@@ -151,6 +165,7 @@ export const EmployeeQuickView = ({
       setPayroll(null);
       setError(null);
       setPayrollUnavailable(false);
+      setPenalties(null);
       setLoading(false);
     }
   }, [open, employeeId, fetchData, reloadKey]);
@@ -188,6 +203,15 @@ export const EmployeeQuickView = ({
     toNumber(payroll?.fixed_deductions) +
     toNumber(payroll?.auto_deduction) +
     toNumber(payroll?.advance_amount);
+
+  // Late penalties this month — active (non-waived) amounts only, so the tile
+  // reflects the deduction actually pending against this employee.
+  const activePenalties = (penalties || []).filter((p) => !p.is_excused);
+  const waivedPenaltyCount = (penalties || []).filter((p) => p.is_excused).length;
+  const penaltyTotal = activePenalties.reduce(
+    (sum, p) => sum + toNumber(p.penalty_amount),
+    0,
+  );
 
   const metrics = payroll?.metrics;
   const canEdit = employee?.id != null;
@@ -491,6 +515,22 @@ export const EmployeeQuickView = ({
                           <span className="font-mono font-semibold tabular-nums text-content">{formatEmployeeMoney(totalDeductions, locale, language)}</span>
                         </div>
                       </div>
+                      {penalties != null && (
+                        <div className="rounded-lg border border-danger-soft bg-danger-soft/40 p-2.5 text-xs sm:col-span-2" data-testid="employee-file-late-penalties">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-content-tertiary">{t("hr.latePenaltiesThisMonth")}</span>
+                            <span className="font-mono font-bold tabular-nums text-danger">{formatEmployeeMoney(penaltyTotal, locale, language)}</span>
+                          </div>
+                          <p className="mt-1 text-[10px] text-content-tertiary">
+                            {t("hr.latePenaltiesCount", {
+                              count: activePenalties.length,
+                            })}
+                            {waivedPenaltyCount > 0 && (
+                              <> · {t("hr.latePenaltiesWaived", { count: waivedPenaltyCount })}</>
+                            )}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-content-secondary" data-testid="employee-file-payroll-unavailable">
