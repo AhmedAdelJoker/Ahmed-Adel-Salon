@@ -82,7 +82,9 @@ test('archive records the exit, and restore brings the employee back visible', a
   await page.goto('/manager/hr');
 
   // The board's readout now counts the roster, not the visible page.
-  await expect(page.getByText('على رأس العمل')).toBeVisible({ timeout: 30000 });
+  // The stat card is labelled "Team size" / "إجمالي الفريق" -- the assertion
+  // follows the label that is actually on screen.
+  await expect(page.getByText('إجمالي الفريق').first()).toBeVisible({ timeout: 30000 });
   await expect(shown(page, 'سامي علي')).toBeVisible();
 
   // Dense ops view: the reachability column is the new part.
@@ -91,11 +93,12 @@ test('archive records the exit, and restore brings the employee back visible', a
   await page.screenshot({ path: `${SHOTS}/01-hr-team.png`, fullPage: true });
 
   // Server-side search: the row that is not on page one still answers.
-  await page.getByLabel('ابحث باسم الموظف أو المسمى الوظيفي...').fill('مصطفى');
+  const searchBox = page.getByLabel('ابحث بالاسم أو الجوال أو المسمى الوظيفي...');
+  await searchBox.fill('مصطفى');
   await expect(shown(page, 'مصطفى كمال')).toBeVisible();
   await expect(page.getByText('سامي علي')).toHaveCount(0);
 
-  await page.getByLabel('ابحث باسم الموظف أو المسمى الوظيفي...').fill('سامي');
+  await searchBox.fill('سامي');
   // Wait for the debounced search to land before reaching for a row: click
   // immediately after typing and the list still shows the *previous* result,
   // so the action goes to the wrong employee. That race is the test's, not the

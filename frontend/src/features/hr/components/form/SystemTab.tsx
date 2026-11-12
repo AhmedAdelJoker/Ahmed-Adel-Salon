@@ -36,14 +36,14 @@ export default function SystemTab({
 }) {
   const { t } = useTranslation("owner");
   const typedUsername = String(formData.username ?? "").trim();
-  const usernameError = typedUsername ? validateUsername(typedUsername) : null;
+  const usernameError = typedUsername ? validateUsername(typedUsername, t) : null;
   /*
     Shown once the owner starts typing, and never for "keep the existing
     password" (empty while editing): the checklist is a coaching aid, not a
     gate. The backend's `validate_password_strength` is the actual gate.
   */
   const passwordValue = String(formData.password ?? "");
-  const passwordChecks = passwordRequirements(passwordValue);
+  const passwordChecks = passwordRequirements(passwordValue, t);
 
   return (
           <div className="space-y-8 animate-in fade-in duration-500">
@@ -73,8 +73,11 @@ export default function SystemTab({
             {formData.hasLoginAccount && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-3xl border border-border bg-soft/50">
                 <div className="space-y-2">
-                  <label className={FIELD_LABEL_CLASS}>{t("hr.username")}</label>
+                  <label className={FIELD_LABEL_CLASS} htmlFor="employee-username">
+                    {t("hr.username")}
+                  </label>
                   <Input
+                    id="employee-username"
                     value={formData.username}
                     onChange={(e) =>
                       setFormData({ ...formData, username: e.target.value })
@@ -95,8 +98,11 @@ export default function SystemTab({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <label className={FIELD_LABEL_CLASS}>{t("hr.password")}</label>
+                  <label className={FIELD_LABEL_CLASS} htmlFor="employee-password">
+                    {t("hr.password")}
+                  </label>
                   <Input
+                    id="employee-password"
                     type="password"
                     value={formData.password}
                     onChange={(e) =>
@@ -157,8 +163,11 @@ export default function SystemTab({
               </div>
             )}
             <div className="space-y-2">
-              <label className={FIELD_LABEL_CLASS}>{t("hr.adminNotes")}</label>
+              <label className={FIELD_LABEL_CLASS} htmlFor="employee-admin-notes">
+                {t("hr.adminNotes")}
+              </label>
               <textarea
+                id="employee-admin-notes"
                 value={formData.personalNotes}
                 onChange={(e) =>
                   setFormData({ ...formData, personalNotes: e.target.value })

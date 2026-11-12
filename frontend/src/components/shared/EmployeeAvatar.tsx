@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/core/utils";
-import { staticURL } from "@/services/api";
+import { resolveAssetUrl } from "@/lib/media/assetUrl";
 import { employeeInitials } from "./EmployeePhoto";
 
 interface EmployeeAvatarProps {
@@ -30,17 +30,11 @@ export function EmployeeAvatar({
 
   const getAvatarUrl = () => {
     if (!imageUrl) return null;
-    // Support blob:, data:, and absolute http(s) URLs as-is
-    if (
-      imageUrl.startsWith("http") ||
-      imageUrl.startsWith("blob:") ||
-      imageUrl.startsWith("data:")
-    )
-      return imageUrl;
-    // In dev (Vite), staticURL is "" and /uploads is proxied to localhost:8000.
-    // In Electron / VITE_API_URL, staticURL is the absolute backend origin.
-    const base = staticURL.replace(/\/$/, "");
-    return base ? `${base}/uploads${imageUrl}` : `/uploads${imageUrl}`;
+    // The stored value is already the full media path (`/uploads/profiles/<id>.jpg`),
+    // so it must be resolved against the media origin, not prefixed with
+    // `/uploads` a second time -- that produced `/uploads/uploads/profiles/...`
+    // and every avatar fell back to initials.
+    return resolveAssetUrl(imageUrl);
   };
 
   const getInitials = () => employeeInitials(name);

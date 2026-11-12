@@ -12,18 +12,26 @@ declare global {
   }
 }
 
-const isElectron: boolean = !!(
-  window.electronAPI ||
-  window.location.protocol === "file:" ||
-  navigator.userAgent.includes("Electron") ||
-  (window.process as unknown as { versions?: { electron?: string } } | undefined)
-    ?.versions?.electron
-);
-// ملاحظة: على file:// يكون hostname فارغاً، لذلك أي بروتوكول file يعني Electron
-// ونثبّت عنوان الباك إند المحلي بدل بناء URL معطوب مثل file://:8000/...
-// Electron هو الحالة الوحيدة التي يبقى فيها العنوان مطلقاً، لأن الصفحة نفسها
-// تُحمَّل من ملف على القرص ولا يوجد أصل (origin) يُحلّ بالنسبة إليه.
-const DEFAULT_API_URL: string = isElectron
+/*
+ * The desktop app is the only case where the backend address has to be
+ * absolute: the page is loaded from a file on disk (`file:`), so there is no
+ * origin to resolve a relative path against, and `file://:8000/...` is a
+ * broken URL. Every page served over http(s) -- the dev server, a packaged
+ * web build, and the desktop app's own dev mode -- resolves `/api` against
+ * its own origin.
+ *
+ * The protocol decides this, not the user-agent string. Electron's UA also
+ * appears in other Electron shells (desktop wrappers, IDE webviews), where the
+ * page is served over http and a relative path is both correct and required:
+ * an absolute `127.0.0.1` image URL is a *different site* from the page, and
+ * the backend's `Cross-Origin-Resource-Policy: same-site` header blocks it
+ * (`ERR_BLOCKED_BY_RESPONSE.NotSameSite`), so every avatar silently falls
+ * back to initials.
+ */
+const isFileOrigin: boolean = window.location.protocol === "file:";
+// ملاحظة: على file:// يكون hostname فارغاً، لذلك نثبّت عنوان الباك إند المحلي
+// بدل بناء URL معطوب مثل file://:8000/...
+const DEFAULT_API_URL: string = isFileOrigin
   ? "http://127.0.0.1:8000/api/v1"
   : "/api/v1";
 /**

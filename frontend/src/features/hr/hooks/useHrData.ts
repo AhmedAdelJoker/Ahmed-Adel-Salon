@@ -79,8 +79,13 @@ export function useHrData() {
 
   // A new question is a new answer set: page 3 of the old search is not a page
   // of the new one, and staying there shows an empty list under a count.
+  // Clear stale rows immediately so a failed/slow fetch cannot present old
+  // results as if they match the new filter (e.g. active rows under "suspended").
   useEffect(() => {
     setPage(1);
+    setEmployees([]);
+    setTotalCount(0);
+    setLoading(true);
   }, [debouncedSearch, statusFilter]);
 
   const setActiveView = useCallback((view: HrViewMode) => {
@@ -156,6 +161,8 @@ export function useHrData() {
       void fetchStats();
     } catch {
       setLoadError(true);
+      setEmployees([]);
+      setTotalCount(0);
       if (!errorNotified.current) {
         errorNotified.current = true;
         toast.error(t("hr.loadFailed"));

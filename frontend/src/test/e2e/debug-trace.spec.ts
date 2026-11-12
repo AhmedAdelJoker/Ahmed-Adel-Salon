@@ -22,7 +22,10 @@ test('trace the roster response across an archive', async ({ page, request }) =>
   await request.post(`${API}/employees`, {
     headers: auth,
     data: {
-      fullName: 'سامي علي',
+      // A name of its own: the archive spec seeds "سامي علي" too, and two
+      // employees with the same name make the row-count assertions in either
+      // spec depend on which one ran first.
+      fullName: 'سامي عبد الله',
       phonePrimary: '01099900921',
       jobTitle: 'barber',
       hireDate: '2023-02-10T00:00:00',
@@ -47,7 +50,7 @@ test('trace the roster response across an archive', async ({ page, request }) =>
 
   await login(page);
   await page.goto('/manager/hr');
-  await page.getByLabel('ابحث باسم الموظف أو المسمى الوظيفي...').fill('سامي');
+  await page.getByLabel('ابحث بالاسم أو الجوال أو المسمى الوظيفي...').fill('سامي عبد');
   await page.waitForTimeout(1500);
   await page.getByTitle('عرض القائمة').first().click();
   await page.waitForTimeout(500);

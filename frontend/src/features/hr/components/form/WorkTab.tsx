@@ -55,7 +55,7 @@ export default function WorkTab({
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-job-title">
                   <Briefcase size={14} /> {t("hr.jobTitle")}
                 </label>
                 <Select
@@ -80,13 +80,13 @@ export default function WorkTab({
                     }
                   }}
                 >
-                  <SelectTrigger className={FIELD_SELECT_CLASS}>
+                  <SelectTrigger className={FIELD_SELECT_CLASS} id="employee-job-title">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl max-h-72 overflow-y-auto">
                     {JOB_TITLES.map((jt) => (
                       <SelectItem key={jt.value} value={jt.value}>
-                        {jt.label}
+                        {t(jt.labelKey ?? "hr.notSpecified", { defaultValue: jt.label })}
                       </SelectItem>
                     ))}
                     <SelectItem value="__custom__" className="font-black text-accent">
@@ -129,7 +129,7 @@ export default function WorkTab({
                 )}
               </div>
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-contract-type">
                   <Clock size={14} /> {t("hr.contractType")}
                 </label>
                 <Select
@@ -138,13 +138,13 @@ export default function WorkTab({
                     setFormData({ ...formData, employmentType: v })
                   }
                 >
-                  <SelectTrigger className={FIELD_SELECT_CLASS}>
+                  <SelectTrigger className={FIELD_SELECT_CLASS} id="employee-contract-type">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     {EMPLOYMENT_TYPES.map((et) => (
                       <SelectItem key={et.value} value={et.value}>
-                        {et.label}
+                        {t(et.labelKey ?? "hr.notSpecified", { defaultValue: et.label })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -157,10 +157,11 @@ export default function WorkTab({
               */}
               {formData.employmentType !== "full_time" && (
                 <div className="space-y-2">
-                  <label className={FIELD_LABEL_CLASS}>
+                  <label className={FIELD_LABEL_CLASS} htmlFor="employee-contract-end">
                     <CalendarOff size={14} /> {t("hr.contractEnd")}
                   </label>
                   <Input
+                    id="employee-contract-end"
                     type="date"
                     value={String(formData.contractEndDate ?? "")}
                     min={String(formData.hireDate ?? "") || undefined}
@@ -189,10 +190,11 @@ export default function WorkTab({
                 </div>
               )}
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-hire-date">
                   <Calendar size={14} /> {t("hr.hireDate")}
                 </label>
                 <Input
+                  id="employee-hire-date"
                   type="date"
                   value={formData.hireDate}
                   onChange={(e) =>
@@ -202,14 +204,14 @@ export default function WorkTab({
                 />
               </div>
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-status">
                   <Activity size={14} /> {t("hr.status")}
                 </label>
                 <Select
                   value={formData.status}
                   onValueChange={(v) => setFormData({ ...formData, status: v })}
                 >
-                  <SelectTrigger className={FIELD_SELECT_CLASS}>
+                  <SelectTrigger className={FIELD_SELECT_CLASS} id="employee-status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">

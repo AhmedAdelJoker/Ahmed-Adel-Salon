@@ -16,9 +16,9 @@ export {
   FIELD_SELECT_CLASS,
 } from "@/features/hr/utils/constants";
 export {
-  getJobTitleLabel,
   jobTitleLabel,
   employmentTypeLabel,
+  blueprintText,
   formatEmployeeDate,
   formatEmployeeMoney,
   currencyLabelForLanguage,
@@ -29,6 +29,7 @@ export {
   deriveDateOnly,
   normalizeEmployeeRecord,
 } from "@/features/hr/utils/helpers";
+export type { BlueprintText } from "@/features/hr/utils/helpers";
 export type {
   HrStats,
   HrStatusFilter,

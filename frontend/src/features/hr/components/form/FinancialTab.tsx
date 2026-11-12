@@ -38,24 +38,25 @@ export default function FinancialTab({
   setFormData: Dispatch<SetStateAction<EmployeeRecord>>;
 }) {
   const { t, i18n } = useTranslation("owner");
-  const salaryError = validateMoney(formData.baseSalary, t("hr.baseSalary"));
-  const commissionError = validateCommission(formData.commissionRate);
-  const bonusError = validateMoney(formData.fixedBonus, t("hr.fixedBonus"));
+  const salaryError = validateMoney(formData.baseSalary, t("hr.baseSalary"), t);
+  const commissionError = validateCommission(formData.commissionRate, t);
+  const bonusError = validateMoney(formData.fixedBonus, t("hr.fixedBonus"), t);
   const deductionsError = validateMoney(
     formData.defaultDeductions,
     t("hr.fixedDeductions"),
+    t,
   );
 
   const paymentMethod = String(formData.paymentMethod ?? "cash");
   const typedWallet = String(formData.walletNumber ?? "").trim();
   const walletError = typedWallet
-    ? validatePhone(typedWallet)
+    ? validatePhone(typedWallet, t)
     : paymentMethod === "wallet"
        ? t("hr.walletRequired")
       : null;
   const typedBank = String(formData.bankAccount ?? "").trim();
   const bankError = typedBank
-    ? validateBankAccount(typedBank)
+    ? validateBankAccount(typedBank, t)
     : paymentMethod === "bank"
        ? t("hr.bankRequired")
       : null;

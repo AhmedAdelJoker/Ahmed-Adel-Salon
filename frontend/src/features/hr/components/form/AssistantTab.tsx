@@ -67,27 +67,30 @@ export default function AssistantTab({
               <div className="space-y-3">
                 <label className={FIELD_LABEL_CLASS}>{t("hr.operationalTasks")}</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {ASSISTANT_TASKS.map((task) => (
-                    <button
-                      key={task}
-                      onClick={() => {
-                        const next = (formData.assistantTasksJson ?? []).includes(task)
-                          ? (formData.assistantTasksJson ?? []).filter(
-                              (t) => t !== task,
-                            )
-                          : [...(formData.assistantTasksJson ?? []), task];
-                        setFormData({ ...formData, assistantTasksJson: next });
-                      }}
-                      className={cn(
-                        "px-4 py-2 rounded-xl text-xs font-black border transition-all",
-                        (formData.assistantTasksJson ?? []).includes(task)
-                          ? "bg-primary-soft text-primary border-primary/40 shadow-sm"
-                          : "bg-card text-muted border-border hover:bg-soft",
-                      )}
-                    >
-                      {task}
-                    </button>
-                  ))}
+                  {ASSISTANT_TASKS.map((task) => {
+                    const selected = (formData.assistantTasksJson ?? []).includes(task.value);
+                    return (
+                      <button
+                        key={task.value}
+                        onClick={() => {
+                          const next = selected
+                            ? (formData.assistantTasksJson ?? []).filter(
+                                (value) => value !== task.value,
+                              )
+                            : [...(formData.assistantTasksJson ?? []), task.value];
+                          setFormData({ ...formData, assistantTasksJson: next });
+                        }}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-xs font-black border transition-all",
+                          selected
+                            ? "bg-primary-soft text-primary border-primary/40 shadow-sm"
+                            : "bg-card text-muted border-border hover:bg-soft",
+                        )}
+                      >
+                        {t(task.labelKey, { defaultValue: task.value })}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>

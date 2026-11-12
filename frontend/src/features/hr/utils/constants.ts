@@ -21,20 +21,20 @@ import {
  * labels shown to people change here, never the values.
  */
 export const JOB_TITLES = [
-  { value: "owner", label: "المالك" },
-  { value: "manager", label: "مدير" },
-  { value: "accountant", label: "محاسب" },
-  { value: "barber", label: "حلاق" },
-  { value: "hairstylist", label: "مصفف شعر (ستايلست)" },
-  { value: "colorist", label: "أخصائي صبغة" },
-  { value: "esthetician", label: "أخصائي بشرة" },
-  { value: "nail_technician", label: "فني أظافر" },
-  { value: "barber_assistant", label: "مساعد حلاق" },
-  { value: "cashier", label: "كاشير" },
-  { value: "receptionist", label: "استقبال" },
-  { value: "cleaner", label: "عامل نظافة" },
-  { value: "other", label: "أخرى" },
-];
+  { value: "owner", label: "المالك", labelKey: "hr.jobTitleOwner" },
+  { value: "manager", label: "مدير", labelKey: "hr.jobTitleManager" },
+  { value: "accountant", label: "محاسب", labelKey: "hr.jobTitleAccountant" },
+  { value: "barber", label: "حلاق", labelKey: "hr.jobTitleBarber" },
+  { value: "hairstylist", label: "مصفف شعر (ستايلست)", labelKey: "hr.jobTitleHairstylist" },
+  { value: "colorist", label: "أخصائي صبغة", labelKey: "hr.jobTitleColorist" },
+  { value: "esthetician", label: "أخصائي بشرة", labelKey: "hr.jobTitleEsthetician" },
+  { value: "nail_technician", label: "فني أظافر", labelKey: "hr.jobTitleNailTechnician" },
+  { value: "barber_assistant", label: "مساعد حلاق", labelKey: "hr.jobTitleBarberAssistant" },
+  { value: "cashier", label: "كاشير", labelKey: "hr.jobTitleCashier" },
+  { value: "receptionist", label: "استقبال", labelKey: "hr.jobTitleReceptionist" },
+  { value: "cleaner", label: "عامل نظافة", labelKey: "hr.jobTitleCleaner" },
+  { value: "other", label: "أخرى", labelKey: "hr.jobTitleOther" },
+] as const;
 
 export const JOB_TITLE_BLUEPRINTS: Record<
   string,
@@ -206,10 +206,10 @@ export const JOB_TITLE_BLUEPRINTS: Record<
 };
 
 export const EMPLOYMENT_TYPES = [
-  { value: "full_time", label: "دوام كامل" },
-  { value: "part_time", label: "دوام جزئي" },
-  { value: "temporary", label: "مؤقت" },
-];
+  { value: "full_time", label: "دوام كامل", labelKey: "hr.employmentFullTime" },
+  { value: "part_time", label: "دوام جزئي", labelKey: "hr.employmentPartTime" },
+  { value: "temporary", label: "مؤقت", labelKey: "hr.employmentTemporary" },
+] as const;
 
 export const ROLES = [
   { value: "owner", label: "مالك (صلاحيات كاملة)" },
@@ -224,14 +224,17 @@ export const ROLES = [
 ];
 
 export const ASSISTANT_TASKS = [
-  "غسيل الشعر",
-  "تجهيز العميل",
-  "تنظيف الأدوات",
-  "تحضير الكرسي",
-  "مساعدة في الخدمات الطويلة",
-  "تنظيف منطقة العمل",
-  "أخرى",
-];
+  { value: "غسيل الشعر", labelKey: "hr.assistantTaskHairWash" },
+  { value: "تجهيز العميل", labelKey: "hr.assistantTaskClientPrep" },
+  { value: "تنظيف الأدوات", labelKey: "hr.assistantTaskToolCleanup" },
+  { value: "تحضير الكرسي", labelKey: "hr.assistantTaskChairPrep" },
+  { value: "مساعدة في الخدمات الطويلة", labelKey: "hr.assistantTaskLongServices" },
+  { value: "تنظيف منطقة العمل", labelKey: "hr.assistantTaskAreaCleanup" },
+  { value: "أخرى", labelKey: "hr.reasonOther" },
+] as const;
+
+/** Plain values, for callers that need the stored string, not the label. */
+export const ASSISTANT_TASK_VALUES = ASSISTANT_TASKS.map((t) => t.value);
 
 export const defaultForm = {
   fullName: "",
@@ -293,6 +296,7 @@ export type FormStepId =
 export interface FormStep {
   id: FormStepId;
   label: string;
+  labelKey?: string;
   icon: typeof User;
 }
 
@@ -329,8 +333,8 @@ export const FORM_STEP_RULES: Partial<
 };
 
 export const FORM_TABS: FormStep[] = [
-  { id: "personal", label: "الهوية الشخصية", icon: User },
-  { id: "work", label: "المسار الوظيفي", icon: Briefcase },
+  { id: "personal", label: "الهوية الشخصية", labelKey: "hr.tabPersonal", icon: User },
+  { id: "work", label: "المسار الوظيفي", labelKey: "hr.tabWork", icon: Briefcase },
   /*
     The system step comes third, before the role-specific ones. The role chosen
     in "work" decides visibility, the login account and the linked user's role,
@@ -338,11 +342,11 @@ export const FORM_TABS: FormStep[] = [
     the financial and skills steps meant an owner who changed their mind had to
     walk back through two steps they had already filled in.
   */
-  { id: "system", label: "بوابة النظام", icon: ShieldCheck },
-  { id: "skills", label: "المؤهلات والخدمات", icon: Scissors },
-  { id: "financial", label: "الهيكل المالي", icon: DollarSign },
-  { id: "assistant", label: "نظام المساعدين", icon: UserPlus },
-  { id: "documents", label: "الأرشيف الرقمي", icon: FileText },
+  { id: "system", label: "بوابة النظام", labelKey: "hr.tabSystem", icon: ShieldCheck },
+  { id: "skills", label: "المؤهلات والخدمات", labelKey: "hr.tabSkills", icon: Scissors },
+  { id: "financial", label: "الهيكل المالي", labelKey: "hr.tabFinancial", icon: DollarSign },
+  { id: "assistant", label: "نظام المساعدين", labelKey: "hr.tabAssistant", icon: UserPlus },
+  { id: "documents", label: "الأرشيف الرقمي", labelKey: "hr.tabDocuments", icon: FileText },
 ];
 
 export function isFormStepVisible(stepId: FormStepId, jobTitle?: string | null): boolean {

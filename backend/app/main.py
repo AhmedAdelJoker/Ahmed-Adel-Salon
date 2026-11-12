@@ -428,24 +428,30 @@ async def add_security_headers(request, call_next):
     response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
     # CORP is scoped to the static uploads, not to every response.
     #
-    # In development the frontend is on :5173 and this app is on :8000 -- two
-    # origins. `Cross-Origin-Resource-Policy: same-origin` on an image therefore
-    # blocks it, and the browser says:
+    # The uploads are the one resource the browser fetches from a *different*
+    # origin than the API: a split-origin deployment (`VITE_API_URL` pointing
+    # at another host), the packaged desktop app (the page is on `file://`),
+    # and the test preview (:5174 against :18001). `same-origin` blocks all
+    # three, and `same-site` blocks the ones whose host differs -- the browser
+    # says:
     #
     #     ERR_BLOCKED_BY_RESPONSE.NotSameOrigin
+    #     ERR_BLOCKED_BY_RESPONSE.NotSameSite
     #
     # on every avatar, logo and uploaded photo, with no console error from the
-    # server and nothing in the logs. The header is right in production, where
-    # the SPA is served from this origin -- it is wrong for a file served to a
-    # dev server on another port.
+    # server and nothing in the logs. The image simply never arrives, and the
+    # UI falls back to initials, which reads as "this employee has no photo"
+    # rather than "the file was blocked".
     #
-    # So: `same-site` in development, `same-origin` in production. `same-site`
-    # keeps the protection that matters (no third-party site can read a user's
-    # images) while letting `localhost:5173` load `localhost:8000`, which are
-    # the same site. Derived from ENVIRONMENT rather than a separate setting,
-    # because the two have to agree and a flag that can contradict them is the
-    # same class of bug as the one being fixed.
-    if settings.ENVIRONMENT == "production":
+    # So the uploads are served with `cross-origin`. That is the right scope
+    # for them: an uploaded photo is public media that the booking site and
+    # the printed receipt both embed, and it is already readable by anyone
+    # who has the URL -- the header protects nothing here that the URL does
+    # not. Every *other* response keeps the strict value, so the API's own
+    # data is never readable from another origin.
+    if request.url.path.startswith("/uploads"):
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+    elif settings.ENVIRONMENT == "production":
         response.headers.setdefault(
             "Cross-Origin-Resource-Policy", "same-origin"
         )

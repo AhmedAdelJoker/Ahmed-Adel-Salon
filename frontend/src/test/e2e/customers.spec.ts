@@ -34,18 +34,25 @@ test('customers page: create with second phone, then find and review', async ({ 
   const phone = `011${suffix}`;
   const phone2 = `012${suffix}`;
 
-  await page.getByRole('button', { name: 'إضافة عميل' }).click();
+  await page.getByRole('button', { name: 'إضافة عميل' }).first().click();
+  const form = page.getByRole('dialog');
   await expect(page.getByText('إضافة عميل جديد')).toBeVisible();
   await page.locator('input[placeholder="مثال: أحمد محمد"]').fill(name);
   const phoneInputs = page.locator('input[placeholder="010XXXXXXXX"]');
   await phoneInputs.nth(0).fill(phone);
   await phoneInputs.nth(1).fill(phone2);
-  await page.getByRole('button', { name: 'إضافة العميل' }).click();
+  // The dialog's own submit button, scoped to the dialog: the toolbar button
+  // behind it carries the same label.
+  await form.getByRole('button', { name: 'إضافة عميل' }).click();
 
   // The details dialog opens after a successful save and must show BOTH
   // numbers — the second phone is stored in its own column now, not 422'd.
-  await expect(page.getByText('رقم آخر:')).toBeVisible({ timeout: 20000 });
-  await expect(page.locator(`text=${phone2}`).first()).toBeVisible();
+  // Scoped to the dialog: the form behind it labels the same field.
+  const details = page.getByRole('dialog');
+  await expect(details.getByText('رقم إضافي').first()).toBeVisible({
+    timeout: 20000,
+  });
+  await expect(details.locator(`text=${phone2}`).first()).toBeVisible();
 
   // --- search finds the fresh customer --------------------------------------
   await page.keyboard.press('Escape');

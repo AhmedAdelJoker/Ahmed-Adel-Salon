@@ -1,6 +1,7 @@
 import {
   ARCHIVE_REASON_LABEL_KEY,
   JOB_TITLES,
+  JOB_TITLE_BLUEPRINTS,
 } from "@/features/hr/utils/constants";
 import { currencyLabel, getCurrency } from "@/lib/core/currency";
 
@@ -20,9 +21,6 @@ export const SERVICE_PROVIDER_JOB_TITLES = [
 
 export const isServiceProviderJobTitle = (value: any) =>
   SERVICE_PROVIDER_JOB_TITLES.includes(String(value ?? "").trim().toLowerCase());
-
-export const getJobTitleLabel = (value: any) =>
-  JOB_TITLES.find((item) => item.value === value)?.label || value || "غير محدد";
 
 export const isCustomJobTitleValue = (value: any) =>
   !JOB_TITLES.some((item) => item.value === value);
@@ -137,6 +135,41 @@ export const archiveReasonLabel = (
   if (!value) return "";
   const key = ARCHIVE_REASON_LABEL_KEY[value];
   return key ? t(key) : value;
+};
+
+/**
+ * The job-title blueprint, in the reader's language.
+ *
+ * The blueprint is the card the owner sees beside the form: what this role is
+ * called, what it is judged on, and what it is for. It was written once, in
+ * Arabic, and shown in Arabic in an English interface -- the one place on
+ * this screen that never followed the language.
+ *
+ * The colours and the icon stay where they are: they are not text, and they
+ * are not the reader's to choose.
+ */
+export type BlueprintText = {
+  title: string;
+  eyebrow: string;
+  summary: string;
+  focus: string[];
+};
+
+export const blueprintText = (
+  jobTitle: string | null | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): BlueprintText => {
+  const key = String(jobTitle ?? "other");
+  const prefix = `hr.blueprint.${key}`;
+  const fallback = JOB_TITLE_BLUEPRINTS[key] ?? JOB_TITLE_BLUEPRINTS.other;
+  return {
+    title: t(`${prefix}.title`, { defaultValue: fallback.title }),
+    eyebrow: t(`${prefix}.eyebrow`, { defaultValue: fallback.eyebrow }),
+    summary: t(`${prefix}.summary`, { defaultValue: fallback.summary }),
+    focus: (fallback.focus ?? []).map((_, index) =>
+      t(`${prefix}.focus${index}`, { defaultValue: fallback.focus[index] }),
+    ),
+  };
 };
 
 /**

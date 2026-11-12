@@ -300,34 +300,33 @@ export default function EmployeeCardGrid({
                 </div>
 
                 <div className="flex flex-col items-center pt-5 text-center">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      hasId && openEmployeeQuickView(emp.id as string | number)
-                    }
-                    disabled={!hasId}
-                    className="group/avatar rounded-full transition-transform duration-200 hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent disabled:cursor-default disabled:hover:scale-100"
-                    title={t("hr.openFile")}
-                    aria-label={t("hr.openFile")}
+                  {/*
+                    The photo *is* the control that opens the file. It used to
+                    be a button around a button, which the browser rejects
+                    (`validateDOMNesting`) -- the click still worked, so the
+                    invalid markup showed up only as a console warning.
+                  */}
+                  <div
+                    className="rounded-full p-1 transition-transform duration-200 hover:scale-[1.02] focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-accent"
+                    style={{
+                      boxShadow:
+                        "0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent), 0 8px 20px -10px color-mix(in srgb, var(--accent) 30%, transparent)",
+                    }}
                   >
-                    <div
-                      className="rounded-full p-1"
-                      style={{
-                        boxShadow:
-                          "0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent), 0 8px 20px -10px color-mix(in srgb, var(--accent) 30%, transparent)",
-                      }}
-                    >
-                      <EmployeePhoto
-                        imageUrl={emp.profileImageUrl || emp.profile_image_url}
-                        name={emp.fullName}
-                        role={job}
-                        size="lg"
-                        shape="circle"
-                        hintMissing
-                        expandable={false}
-                      />
-                    </div>
-                  </button>
+                    <EmployeePhoto
+                      imageUrl={emp.profileImageUrl || emp.profile_image_url}
+                      name={emp.fullName}
+                      role={job}
+                      size="lg"
+                      shape="circle"
+                      hintMissing
+                      expandable={false}
+                      onActivate={() =>
+                        hasId && openEmployeeQuickView(emp.id as string | number)
+                      }
+                      activateLabel={t("hr.openFile")}
+                    />
+                  </div>
                   <h3 className="mt-3 max-w-full truncate px-2 text-sm font-bold leading-tight text-content">
                     {emp.fullName}
                   </h3>

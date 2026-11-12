@@ -86,6 +86,7 @@ const LITERAL_COLOR_ALLOWLIST = new Set([
   "components/shared/AppearancePanel.tsx", // accent swatches must show the colour they select
   "lib/export/utils.ts", // builds HTML/PDF strings outside the DOM
   "lib/export/customerPDF.ts", // standalone print document outside the app CSS scope
+  "features/attendance/utils/attendance.ts", // standalone print document outside the app CSS scope
   "features/pos/utils.ts", // canvas confetti particle colours
 ]);
 

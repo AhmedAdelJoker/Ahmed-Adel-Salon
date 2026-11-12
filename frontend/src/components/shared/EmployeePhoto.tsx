@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Camera } from "lucide-react";
 
 import { cn } from "@/lib/core/utils";
-import { staticURL } from "@/services/api";
+import { resolveAssetUrl } from "@/lib/media/assetUrl";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +46,22 @@ export interface EmployeePhotoProps {
   hintMissing?: boolean;
   /** Allow enlarging the photo. Defaults to true. */
   expandable?: boolean;
+  /**
+   * What the photo does when it is pressed, for a caller that wants a photo to
+   * *do* something other than enlarge -- "open this employee's file".
+   *
+   * This exists because the alternative was a button around this button: the
+   * card grid wrapped the photo in a button that opened the employee file, and
+   * the photo inside it was a button too. The browser rejects that markup
+   * (`validateDOMNesting: <button> cannot appear as a descendant of <button>`),
+   * and the console warning was the only evidence -- the click still worked,
+   * so nothing looked broken while the DOM was invalid.
+   *
+   * With this, the photo *is* the control: one button, one action, no nesting.
+   */
+  onActivate?: () => void;
+  /** The accessible name for `onActivate`; defaults to the file's own name. */
+  activateLabel?: string;
   className?: string;
 }
 
@@ -69,6 +85,8 @@ export function EmployeePhoto({
   shape = "rounded",
   hintMissing = false,
   expandable = true,
+  onActivate,
+  activateLabel,
   className,
 }: EmployeePhotoProps) {
   const [photoBroken, setPhotoBroken] = useState(false);
@@ -78,32 +96,35 @@ export function EmployeePhoto({
   // previous row's broken-image state.
   useEffect(() => setPhotoBroken(false), [imageUrl]);
 
-  const resolved = useMemo(() => {
-    if (!imageUrl) return null;
-    const raw = String(imageUrl);
-    if (
-      raw.startsWith("http") ||
-      raw.startsWith("blob:") ||
-      raw.startsWith("data:")
-    ) {
-      return raw;
-    }
-    return `${staticURL}${raw}`;
-  }, [imageUrl]);
+  const resolved = useMemo(() => resolveAssetUrl(imageUrl), [imageUrl]);
 
   const hasPhoto = Boolean(resolved) && !photoBroken;
   const canEnlarge = expandable && hasPhoto;
+  /*
+    One control, one action. When the caller supplied `onActivate` the photo
+    opens that instead of the enlarge dialog -- and it stays pressable even
+    without a photo, because "open this employee's file" is still a thing the
+    owner can do from an initials tile. With nothing to press at all, the
+    button is disabled and says so, rather than pretending to be a photo.
+  */
+  const isActivatable = Boolean(onActivate);
+  const isDisabled = !isActivatable && !canEnlarge;
   const frameClass = cn(
     "grid place-items-center overflow-hidden border border-border bg-soft font-black text-accent shadow-sm transition",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
+    "disabled:cursor-default disabled:opacity-100",
     SIZE_CLASSES[size],
+    SHAPE_CLASSES[size],
     SHAPE_CLASSES[shape],
     canEnlarge && "cursor-zoom-in hover:border-accent/40 hover:opacity-90",
-    !canEnlarge && "cursor-default",
+    isActivatable && !canEnlarge && "cursor-pointer hover:border-accent/40",
+    !canEnlarge && !isActivatable && "cursor-default",
   );
-  const label = canEnlarge
-    ? `تكبير صورة ${name ?? "الموظف"}`
-    : `لا توجد صورة لـ ${name ?? "الموظف"}`;
+  const label = isActivatable
+    ? (activateLabel ?? `فتح ملف ${name ?? "الموظف"}`)
+    : canEnlarge
+      ? `تكبير صورة ${name ?? "الموظف"}`
+      : `لا توجد صورة لـ ${name ?? "الموظف"}`;
   const content = (
     <>
       {hasPhoto ? (
@@ -130,24 +151,25 @@ export function EmployeePhoto({
   return (
     <>
       <div className={cn("relative shrink-0", className)}>
-        {canEnlarge ? (
-          <button
-            type="button"
-            onClick={() => setEnlarged(true)}
-            aria-label={label}
-            aria-haspopup="dialog"
-            className={frameClass}
-          >
-            {content}
-          </button>
-        ) : (
-          <div className={frameClass} aria-label={label} role="img">
-            {content}
-          </div>
-        )}
+        <button
+          type="button"
+          disabled={isDisabled}
+          onClick={() => {
+            if (onActivate) {
+              onActivate();
+              return;
+            }
+            if (canEnlarge) setEnlarged(true);
+          }}
+          aria-label={label}
+          aria-haspopup={canEnlarge && !onActivate ? "dialog" : undefined}
+          className={frameClass}
+        >
+          {content}
+        </button>
       </div>
 
-      {canEnlarge && (
+      {canEnlarge && !onActivate && (
         <Dialog open={enlarged} onOpenChange={setEnlarged}>
           <DialogContent className="max-w-md rounded-3xl">
             <DialogHeader>

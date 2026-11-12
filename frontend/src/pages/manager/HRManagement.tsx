@@ -63,6 +63,7 @@ import {
   EmployeeTable,
   ArchiveEmployeeDialog,
   formatEmployeeMoney,
+  blueprintText,
 } from "@/features/hr";
 import { describeDraftAge } from "@/features/hr/utils/draft";
 import { useTranslation } from "react-i18next";
@@ -157,6 +158,10 @@ const HRManagement = () => {
     }
   }, [editingEmp, activeTab, fetchDocuments]);
 
+  // The blueprint is prose, so it follows the reader's language; the colours
+  // and the icon stay as they are.
+  const blueprint = blueprintText(formData.jobTitle, t);
+
   // Deep links: /manager/hr?employeeId=ID opens the employee file,
   // /manager/hr?edit=ID opens the edit form. Consume each param once.
   useEffect(() => {
@@ -192,7 +197,7 @@ const HRManagement = () => {
             setImagePreview={setImagePreview}
             uploading={uploading}
             onImageChange={handleImageChange}
-            blueprint={currentBlueprint}
+            blueprint={{ title: blueprint.title }}
           />
         );
       case "work":
@@ -248,7 +253,7 @@ const HRManagement = () => {
         return (
           <ReviewTab
             formData={formData}
-            blueprint={currentBlueprint}
+            blueprint={{ title: blueprint.title }}
             onSubmit={handleSubmit}
             isActionLoading={isActionLoading}
             isEditing={!!editingEmp}
@@ -514,7 +519,7 @@ const HRManagement = () => {
                         {draftOffer.formData.fullName
                           ? t("hr.draftOffer", { name: String(draftOffer.formData.fullName) })
                           : t("hr.draftOfferFallback")}
-                        {t("hr.draftAge", { age: describeDraftAge(draftOffer.savedAt) })}
+                        {t("hr.draftAge", { age: describeDraftAge(draftOffer.savedAt, t) })}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Button
@@ -596,7 +601,7 @@ const HRManagement = () => {
                     </h4>
                     <div className="flex items-center justify-center">
                       <Badge className={cn("rounded-full px-3.5 py-1 text-[10px] font-black tracking-widest border shadow-sm", currentBlueprint.badgeClass)}>
-                        {currentBlueprint.title}
+                        {blueprint.title}
                       </Badge>
                     </div>
                     {formData.phonePrimary && (
@@ -648,7 +653,7 @@ const HRManagement = () => {
                     <div className="h-6 w-6 rounded-lg bg-accent/10 flex items-center justify-center text-accent"><Sparkles size={12} /></div> {t("hr.rolePriorities")}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {currentBlueprint.focus.map((f) => (
+                    {blueprint.focus.map((f) => (
                       <span key={f} className="inline-flex items-center gap-1 rounded-full bg-card border border-border px-2.5 py-1 text-[10px] font-bold text-main shadow-sm">
                         <span className="h-1.5 w-1.5 rounded-full bg-accent" /> {f}
                       </span>
@@ -661,7 +666,7 @@ const HRManagement = () => {
                     <div className="h-7 w-7 rounded-lg bg-accent/10 text-accent flex items-center justify-center"><Building2 size={14} /></div>
                     <span className="text-[10px] font-black uppercase tracking-widest text-muted">{t("hr.roleSummary")}</span>
                   </div>
-                  <p className="relative text-[11px] font-medium leading-relaxed text-main line-clamp-3">{currentBlueprint.summary}</p>
+                  <p className="relative text-[11px] font-medium leading-relaxed text-main line-clamp-3">{blueprint.summary}</p>
                 </div>
                 {formData.bioAr && (
                   <div className="rounded-2xl border border-border bg-card p-4">
@@ -702,7 +707,7 @@ const HRManagement = () => {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[11px] font-black text-main truncate">{formData.fullName || t("hr.noName")}</div>
-                    <div className="text-[10px] font-bold text-accent">{currentBlueprint.title}</div>
+                    <div className="text-[10px] font-bold text-accent">{blueprint.title}</div>
                     <div className="flex gap-1 mt-1">
                       <span className={cn("text-[8px] px-1.5 py-0.5 rounded-full font-black border", formData.status==="active"?"bg-success text-white border-success":formData.status==="suspended"?"bg-warning text-white border-warning":"bg-danger text-white border-danger")}>{formData.status==="active"?t("hr.statusActive"):formData.status==="suspended"?t("hr.statusSuspended"):t("hr.statusArchived")}</span>
                       <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-soft border border-border font-bold tabular-nums text-muted">
@@ -779,7 +784,7 @@ const HRManagement = () => {
                   </Button>
                   {draftSavedAt && (
                     <span className="text-[10px] font-bold text-muted">
-                      {t("hr.draftSaved", { age: describeDraftAge(draftSavedAt) })}
+                      {t("hr.draftSaved", { age: describeDraftAge(draftSavedAt, t) })}
                     </span>
                   )}
                 </div>

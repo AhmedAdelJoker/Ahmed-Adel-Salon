@@ -87,25 +87,64 @@ export function clearEmployeeDraft(): void {
   }
 }
 
-/** "منذ 5 دقائق" style label for the resume prompt. */
-export function describeDraftAge(savedAt: string): string {
+/**
+ * "منذ 5 دقائق" style label for the resume prompt.
+ *
+ * The translator is optional: without one the Arabic phrase stands, which is
+ * what the unit tests rely on.
+ */
+export function describeDraftAge(
+  savedAt: string,
+  t?: (key: string, options?: Record<string, unknown>) => string,
+): string {
   const then = new Date(savedAt).getTime();
   if (Number.isNaN(then)) return "";
 
   const minutes = Math.floor((Date.now() - then) / 60_000);
-  if (minutes < 1) return "الآن";
-  if (minutes < 60) return `منذ ${minutes} دقيقة`;
+  if (minutes < 1) return label(t, "draftNow", "الآن");
+  if (minutes < 60) {
+    return label(t, "draftMinutes", "منذ {{count}} دقيقة", { count: minutes });
+  }
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return hours === 1 ? "منذ ساعة" : hours === 2 ? "منذ ساعتين" : `منذ ${hours} ساعات`;
+  if (hours < 24) {
+    if (hours === 1) return label(t, "draftHour", "منذ ساعة");
+    if (hours === 2) return label(t, "draftTwoHours", "منذ ساعتين");
+    return label(t, "draftHours", "منذ {{count}} ساعات", { count: hours });
+  }
 
   const days = Math.floor(hours / 24);
-  if (days === 1) return "أمس";
-  if (days < 30) return days === 2 ? "منذ يومين" : `منذ ${days} أيام`;
+  if (days === 1) return label(t, "draftYesterday", "أمس");
+  if (days < 30) {
+    if (days === 2) return label(t, "draftTwoDays", "منذ يومين");
+    return label(t, "draftDays", "منذ {{count}} أيام", { count: days });
+  }
 
   const months = Math.floor(days / 30);
-  if (months === 1) return "منذ شهر";
-  return `منذ ${months} أشهر`;
+  if (months === 1) return label(t, "draftMonth", "منذ شهر");
+  return label(t, "draftMonths", "منذ {{count}} أشهر", { count: months });
+}
+
+/** One phrase, in the reader's language when there is one. */
+function label(
+  t: ((key: string, options?: Record<string, unknown>) => string) | undefined,
+  key: string,
+  fallback: string,
+  values?: Record<string, unknown>,
+): string {
+  if (!t) return interpolate(fallback, values);
+  return t(`hr.msg.${key}`, { defaultValue: fallback, ...(values ?? {}) });
+}
+
+/** `{{count}}` placeholders, for the fallback path only. */
+function interpolate(
+  template: string,
+  values?: Record<string, unknown>,
+): string {
+  if (!values) return template;
+  return template.replace(/\{\{(\w+)\}\}/g, (match, name: string) =>
+    name in values ? String(values[name]) : match,
+  );
 }
 
 /**

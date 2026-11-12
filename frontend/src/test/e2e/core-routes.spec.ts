@@ -12,7 +12,8 @@ const ROUTES: Array<{ path: string; heading: string }> = [
   { path: '/reception-board', heading: 'لوحة التحكم والعمليات' },
   { path: '/pos', heading: 'الجلسات الجاهزة' },
   { path: '/bookings', heading: 'إدارة الحجوزات' },
-  { path: '/schedule', heading: 'مخطط المواعيد الذكي' },
+  // The schedule page's own header, as `schedule.page.title` reads it.
+  { path: '/schedule', heading: 'المخطط الزمني الذكي' },
 ];
 
 async function login(page: Page) {

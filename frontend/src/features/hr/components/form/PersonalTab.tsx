@@ -44,13 +44,13 @@ export default function PersonalTab({
   // An empty field is not an error while the owner is still filling it in; only
   // speak up once something has been typed and looks wrong.
   const typedName = String(formData.fullName ?? "").trim();
-  const nameError = typedName ? validatePersonName(typedName) : null;
+  const nameError = typedName ? validatePersonName(typedName, t) : null;
   const typedPhone = String(formData.phonePrimary ?? "").trim();
-  const phoneError = typedPhone ? validatePhone(typedPhone) : null;
+  const phoneError = typedPhone ? validatePhone(typedPhone, t) : null;
   const typedEmail = String(formData.email ?? "").trim();
-  const emailError = typedEmail ? validateEmployeeEmail(typedEmail) : null;
+  const emailError = typedEmail ? validateEmployeeEmail(typedEmail, t) : null;
 
-  const idAnalysis = analyzeNationalId(formData.nationalId);
+  const idAnalysis = analyzeNationalId(formData.nationalId, t);
   const idError = idAnalysis.error;
   /*
     The id knows the birth date. When both are present and disagree, one of them
@@ -138,10 +138,11 @@ export default function PersonalTab({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-full-name">
                   <User size={14} /> {t("hr.fullName")}
                 </label>
                 <Input
+                  id="employee-full-name"
                   value={formData.fullName}
                   onChange={(e) =>
                     setFormData({ ...formData, fullName: e.target.value })
@@ -157,10 +158,11 @@ export default function PersonalTab({
                 )}
               </div>
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-phone-primary">
                   <Phone size={14} /> {t("hr.phonePrimary")}
                 </label>
                 <Input
+                  id="employee-phone-primary"
                   value={formData.phonePrimary}
                   onChange={(e) =>
                     setFormData({
@@ -188,10 +190,11 @@ export default function PersonalTab({
                 )}
               </div>
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-email">
                   <Mail size={14} /> {t("hr.email")}
                 </label>
                 <Input
+                  id="employee-email"
                   type="email"
                   value={String(formData.email ?? "")}
                   onChange={(e) =>
@@ -208,10 +211,11 @@ export default function PersonalTab({
                 )}
               </div>
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-national-id">
                   <ShieldCheck size={14} /> {t("hr.nationalId")}
                 </label>
                 <Input
+                  id="employee-national-id"
                   value={formData.nationalId}
                   onChange={(e) => handleNationalIdChange(e.target.value)}
                   className={FIELD_INPUT_CLASS}
@@ -238,15 +242,16 @@ export default function PersonalTab({
                 ) : (
                   <p className="text-[11px] font-bold text-muted">
                     {t("hr.idInfo")}
-            
+
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-birth-date">
                   <Calendar size={14} /> {t("hr.birthDate")}
                 </label>
                 <Input
+                  id="employee-birth-date"
                   type="date"
                   value={formData.birthDate}
                   onChange={(e) =>
@@ -261,10 +266,11 @@ export default function PersonalTab({
                 )}
               </div>
               <div className="md:col-span-2 space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-address">
                   <MapPin size={14} /> {t("hr.address")}
                 </label>
                 <Input
+                  id="employee-address"
                   value={formData.detailedAddress}
                   onChange={(e) =>
                     setFormData({
@@ -276,10 +282,11 @@ export default function PersonalTab({
                 />
               </div>
               <div className="md:col-span-2 space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-bio-ar">
                   <FileText size={14} /> {t("hr.professionalBioAr")}
                 </label>
                 <textarea
+                  id="employee-bio-ar"
                   value={formData.bioAr}
                   onChange={(e) =>
                     setFormData({ ...formData, bioAr: e.target.value })

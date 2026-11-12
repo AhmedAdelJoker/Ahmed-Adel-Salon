@@ -10,6 +10,7 @@ import {
   JOB_TITLE_BLUEPRINTS,
   defaultForm,
 } from "@/features/hr/utils/constants";
+import type { FormStep } from "@/features/hr/utils/constants";
 import {
   SERVICE_PROVIDER_JOB_TITLES,
   isCustomJobTitleValue,
@@ -117,25 +118,48 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
 
   // Dynamic Tabs based on Role
   const DYNAMIC_TABS = useMemo(() => {
-    const visible = visibleFormTabs(formData.jobTitle);
+    const tabKey: Record<string, string> = {
+      personal: "hr.tabPersonal",
+      work: "hr.tabWork",
+      system: "hr.tabSystem",
+      skills: "hr.tabSkills",
+      financial: "hr.tabFinancial",
+      assistant: "hr.tabAssistant",
+      documents: "hr.tabDocuments",
+    };
+    const visible = visibleFormTabs(formData.jobTitle).map((tab) => ({
+      ...tab,
+      label: t(tabKey[tab.id] || "hr.reviewAndApprove", { defaultValue: tab.label }),
+    }));
 
     // Add Review step at the end
     return [
       ...visible,
       {
         id: "review" as const,
-        label: "مراجعة واعتماد",
+        label: t("hr.reviewAndApprove"),
         icon: CheckCircle2,
       },
-    ];
-  }, [formData.jobTitle]);
+    ] as Array<FormStep & { id: string }>;
+  }, [formData.jobTitle, t]);
 
   // The steps this job title does not ask for, with the reason for each, so the
   // wizard can explain the shrinking stepper instead of leaving a hole in it.
-  const hiddenSteps = useMemo(
-    () => hiddenFormSteps(formData.jobTitle),
-    [formData.jobTitle],
-  );
+  const hiddenSteps = useMemo(() => {
+    const stepKey: Record<string, string> = {
+      skills: "hr.stepSkillsNotApplicable",
+      assistant: "hr.stepAssistantNotApplicable",
+    };
+    const tabKey: Record<string, string> = {
+      skills: "hr.tabSkills",
+      assistant: "hr.tabAssistant",
+    };
+    return hiddenFormSteps(formData.jobTitle).map((s) => ({
+      ...s,
+      label: t(tabKey[s.id] || s.id, { defaultValue: s.label }),
+      reason: t(stepKey[s.id] || "", { defaultValue: s.reason }),
+    }));
+  }, [formData.jobTitle, t]);
 
   /*
     Everything currently wrong, per step, from one pure function — the same
@@ -143,8 +167,8 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
     re-check at submit, so the three can never disagree about the form.
   */
   const stepIssues = useMemo(
-    () => collectEmployeeFormIssues(formData),
-    [formData],
+    () => collectEmployeeFormIssues(formData, t),
+    [formData, t],
   );
 
   /**
@@ -225,17 +249,17 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
         headers: { "Content-Type": "multipart/form-data" },
       });
       const imageUrl = res.data?.url || res.data?.profile_image_url;
-      if (!imageUrl) throw new Error("لم يتم إرجاع رابط الصورة من الخادم");
+      if (!imageUrl) throw new Error(t("hr.toastImageNoUrl"));
       setFormData((prev) => ({ ...prev, profileImageUrl: imageUrl }));
       // Replace blob preview with server URL (cache-busted)
       const serverUrl = imageUrl.startsWith("http") ? imageUrl : `${staticURL}${imageUrl}`;
       // Revoke old blob after server succeeds
       setTimeout(() => URL.revokeObjectURL(localPreview), 2000);
       setImagePreview(`${serverUrl}${serverUrl.includes("?") ? "&" : "?"}t=${Date.now()}`);
-      toast.success("تم رفع الصورة بنجاح");
+      toast.success(t("hr.toastImageUploaded"));
     } catch (error) {
       const apiErr = error as { response?: { data?: { detail?: unknown } }; message?: string };
-      const msg = (apiErr?.response?.data?.detail as string) || apiErr?.message || "فشل رفع الصورة";
+      const msg = (apiErr?.response?.data?.detail as string) || apiErr?.message || t("hr.toastImageUploadFailed");
       toast.error(String(msg));
       /*
         Revert the preview. It was a local object URL that never reached the
@@ -341,7 +365,7 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
       setIsModalOpen(true);
     } catch (error) {
       const apiErr = error as { response?: { data?: { detail?: unknown } }; message?: string };
-      const msg = (apiErr?.response?.data?.detail as string) || apiErr?.message || "فشل تحميل بيانات الموظف";
+      const msg = (apiErr?.response?.data?.detail as string) || apiErr?.message || t("hr.toastLoadEmployeeFailed");
       toast.error(String(msg));
     } finally {
       setIsActionLoading(false);
@@ -350,16 +374,16 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
 
   const handleSubmit = async () => {
     if (!formData.fullName || !formData.phonePrimary) {
-      toast.error("يرجى إدخال الاسم ورقم الجوال");
+      toast.error(t("hr.toastNamePhoneRequired"));
       return;
     }
     // Shape first (free, instant), then identity against the roster.
-    const nameError = validatePersonName(formData.fullName);
+    const nameError = validatePersonName(formData.fullName, t);
     if (nameError) {
       toast.error(nameError);
       return;
     }
-    const phoneError = validatePhone(formData.phonePrimary);
+    const phoneError = validatePhone(formData.phonePrimary, t);
     if (phoneError) {
       toast.error(phoneError);
       return;
@@ -369,7 +393,7 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
       gate on "next" is not enough on its own: everything is re-checked here,
       where it actually matters.
     */
-    const idAnalysis = analyzeNationalId(formData.nationalId);
+    const idAnalysis = analyzeNationalId(formData.nationalId, t);
     if (idAnalysis.error) {
       toast.error(idAnalysis.error);
       return;
@@ -379,17 +403,15 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
       formData.birthDate &&
       formData.birthDate !== idAnalysis.info.birthDate
     ) {
-      toast.error(
-        `تاريخ الميلاد لا يطابق الرقم القومي (${idAnalysis.info.birthDate})`,
-      );
+      toast.error(t("hr.toastBirthDateMismatch", { date: idAnalysis.info.birthDate }));
       return;
     }
     if (formData.hasLoginAccount) {
       if (!formData.username) {
-        toast.error("يرجى إدخال اسم المستخدم لحساب الدخول");
+        toast.error(t("hr.toastUsernameRequired"));
         return;
       }
-      const usernameError = validateUsername(formData.username);
+      const usernameError = validateUsername(formData.username, t);
       if (usernameError) {
         toast.error(usernameError);
         return;
@@ -398,7 +420,7 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
     // Only when something was typed: an empty address is a legitimate "no
     // address", not a failed entry.
     if (String(formData.email ?? "").trim()) {
-      const emailError = validateEmployeeEmail(formData.email);
+      const emailError = validateEmployeeEmail(formData.email, t);
       if (emailError) {
         toast.error(emailError);
         return;
@@ -409,33 +431,33 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
     const contractEnd = String(formData.contractEndDate ?? "").trim();
     const hiredOn = String(formData.hireDate ?? "").trim();
     if (contractEnd && hiredOn && contractEnd < hiredOn) {
-      toast.error("تاريخ انتهاء العقد لا يمكن أن يسبق تاريخ التعيين");
+      toast.error(t("hr.toastContractEndBeforeHire"));
       return;
     }
     if (formData.hasLoginAccount && !editingEmp && !formData.password) {
-      toast.error("يرجى إدخال كلمة المرور لحساب الدخول");
+      toast.error(t("hr.toastPasswordRequired"));
       return;
     }
     if (formData.hasLoginAccount && formData.password) {
-      const unmet = passwordRequirements(formData.password).find((r) => !r.met);
+      const unmet = passwordRequirements(formData.password, t).find((r) => !r.met);
       if (unmet) {
-        toast.error(`كلمة المرور: ${unmet.label}`);
+        toast.error(t("hr.toastPasswordRule", { rule: unmet.label }));
         return;
       }
     }
     const moneyChecks: Array<[string, unknown]> = [
-      ["الراتب الأساسي", formData.baseSalary],
-      ["الحافز الثابت", formData.fixedBonus],
-      ["الخصومات الثابتة", formData.defaultDeductions],
+      [t("hr.salaryLabel"), formData.baseSalary],
+      [t("hr.fixedBonusLabel", { defaultValue: "Fixed bonus" }), formData.fixedBonus],
+      [t("hr.defaultDeductionsLabel", { defaultValue: "Default deductions" }), formData.defaultDeductions],
     ];
     for (const [label, value] of moneyChecks) {
-      const moneyError = validateMoney(value, label);
+      const moneyError = validateMoney(value, label, t);
       if (moneyError) {
         toast.error(moneyError);
         return;
       }
     }
-    const commissionIssue = validateCommission(formData.commissionRate);
+    const commissionIssue = validateCommission(formData.commissionRate, t);
     if (commissionIssue) {
       toast.error(commissionIssue);
       return;
@@ -443,23 +465,23 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
     const paymentMethod = String(formData.paymentMethod ?? "cash");
     const wallet = String(formData.walletNumber ?? "").trim();
     if (paymentMethod === "wallet" && !wallet) {
-      toast.error("رقم المحفظة مطلوب عند اختيار التحويل للمحفظة");
+      toast.error(t("hr.toastWalletRequired"));
       return;
     }
     if (wallet) {
-      const walletError = validatePhone(wallet);
+      const walletError = validatePhone(wallet, t);
       if (walletError) {
-        toast.error(`رقم المحفظة: ${walletError}`);
+        toast.error(t("hr.toastWalletInvalid", { error: walletError }));
         return;
       }
     }
     const bank = String(formData.bankAccount ?? "").trim();
     if (paymentMethod === "bank" && !bank) {
-      toast.error("رقم الحساب البنكي مطلوب عند اختيار التحويل البنكي");
+      toast.error(t("hr.toastBankRequired"));
       return;
     }
     if (bank) {
-      const bankIssue = validateBankAccount(bank);
+      const bankIssue = validateBankAccount(bank, t);
       if (bankIssue) {
         toast.error(bankIssue);
         return;
@@ -484,8 +506,10 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
         );
         if (conflict) {
           toast.error(
-            `رقم الجوال مسجل بالفعل للموظف: ${conflict.name}` +
-              (conflict.id ? ` (رقم ${conflict.id})` : ""),
+            t("hr.toastPhoneDuplicate", {
+              name: conflict.name,
+              id: conflict.id ? ` (${t("hr.idShort")} ${conflict.id})` : "",
+            }),
           );
           return;
         }
@@ -505,8 +529,10 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
           );
           if (idConflict) {
             toast.error(
-              `رقم الهوية مسجل بالفعل للموظف: ${idConflict.name}` +
-                (idConflict.id ? ` (رقم ${idConflict.id})` : ""),
+              t("hr.toastNationalIdDuplicate", {
+                name: idConflict.name,
+                id: idConflict.id ? ` (${t("hr.idShort")} ${idConflict.id})` : "",
+              }),
             );
             return;
           }
@@ -557,11 +583,11 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
       if (editingEmp) {
         await api.put(`/employees/${editingEmp.id}`, payload);
         empId = editingEmp.id;
-        toast.success("تم تحديث البيانات بنجاح");
+        toast.success(t("hr.toastEmployeeUpdated"));
       } else {
         const res = await api.post("/employees", payload);
         empId = res.data.id;
-        toast.success("تم إضافة الموظف بنجاح");
+        toast.success(t("hr.toastEmployeeAdded"));
       }
 
       // Save services (backend also handles inline, but keep for compatibility)
@@ -593,7 +619,7 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
       if (Array.isArray(detail)) text = detail.map((m) => m?.msg || m?.detail || JSON.stringify(m)).join(" | ");
       else if (typeof detail === "string") text = detail;
       else text = apiErr?.message || "";
-      toast.error(text || "فشل حفظ البيانات - تحقق من الهاتف والبيانات المطلوبة");
+      toast.error(text || t("hr.toastSaveFailed"));
     } finally {
       setIsActionLoading(false);
     }
@@ -608,13 +634,13 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
       await api.put(`/employees/${deleteTarget.id}`, { status: nextStatus });
       toast.success(
         nextStatus === "suspended"
-          ? "تم تسجيل الموظف في إجازة"
-          : "تم إرجاع الموظف للعمل",
+          ? t("hr.toastStatusLeave")
+          : t("hr.toastStatusReturn"),
       );
       setDeleteTarget(null);
       fetchEmployees();
     } catch (_error) {
-      toast.error("فشل تعديل الحالة");
+      toast.error(t("hr.toastStatusUpdateFailed"));
     } finally {
       setIsActionLoading(false);
     }
@@ -654,6 +680,8 @@ export function useEmployeeForm(fetchEmployees: () => Promise<void>) {
       setIsActionLoading(true);
       await api.post(`/employees/${archiveTarget.id}/archive`, {
         reason: archiveForm.reason || null,
+        // Send both for compatibility: schema defines effective_date (snake_case).
+        effective_date: archiveForm.effectiveDate || null,
         effectiveDate: archiveForm.effectiveDate || null,
       });
       toast.success(t("hr.archivedToast"));

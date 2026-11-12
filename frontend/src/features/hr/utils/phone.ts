@@ -8,6 +8,7 @@
  * and payouts land against the wrong person.
  */
 import { digitsOnly, normalizeNumericInput } from "./digits";
+import type { ValidatorTranslate } from "./validators";
 
 /** The longest a real phone number can be (ITU E.164). */
 export const MAX_PHONE_DIGITS = 15;
@@ -38,31 +39,38 @@ export function normalizePhoneTyping(value: string | null | undefined): string {
  * an Egyptian mobile as the shape most of this roster actually uses.
  * Returns an error message, or null when the number is acceptable.
  */
-export function validatePhone(value: string | null | undefined): string | null {
+export function validatePhone(
+  value: string | null | undefined,
+  t?: ValidatorTranslate,
+): string | null {
   const digits = phoneDigits(value);
 
-  if (!digits) return "رقم الجوال مطلوب";
+  if (!digits) return msg(t, "phoneRequired", "رقم الجوال مطلوب");
 
   // Common keypad typo: the same digit repeated enough times that it is almost
   // certainly a miskey. Six in a row, not five: an Egyptian number like
   // 01000007777 legitimately contains a five-run, and rejecting a real number
   // is worse than accepting one odd-looking fake.
   if (/(\d)\1{5,}/.test(digits)) {
-    return "رقم الجوال غير صحيح (أرقام متكررة)";
+    return msg(t, "phoneRepeatedDigits", "رقم الجوال غير صحيح (أرقام متكررة)");
   }
 
   if (digits.length < 8 || digits.length > 15) {
-    return "رقم الجوال غير صحيح (من 8 إلى 15 رقمًا)";
+    return msg(t, "phoneLength", "رقم الجوال غير صحيح (من 8 إلى 15 رقمًا)");
   }
 
   // Egyptian mobiles are 11 digits starting 01. If it looks Egyptian but is
   // not, say so plainly rather than reporting a generic length error.
   if (digits.startsWith("01") && digits.length !== 11) {
-    return "رقم الجوال غير صحيح (رقم محمول مصري = 11 رقمًا يبدأ بـ 01)";
+    return msg(
+      t,
+      "phoneEgyptian",
+      "رقم الجوال غير صحيح (رقم محمول مصري = 11 رقمًا يبدأ بـ 01)",
+    );
   }
   // 0 alone, or a local number starting with 0 that is far too short to be one.
   if (/^0\d{0,2}$/.test(digits)) {
-    return "رقم الجوال غير صحيح";
+    return msg(t, "phoneInvalid", "رقم الجوال غير صحيح");
   }
 
   return null;
@@ -101,24 +109,44 @@ export type EmployeeId = string | number | null | undefined;
  * Deliberately shape-only: an address that looks wrong is caught, an address
  * that merely bounces is not something this form could know.
  */
-export function validateEmployeeEmail(value: string | null | undefined): string | null {
+export function validateEmployeeEmail(
+  value: string | null | undefined,
+  t?: ValidatorTranslate,
+): string | null {
   const text = String(value ?? "").trim();
-  if (!text) return "البريد الإلكتروني مطلوب";
+  if (!text) return msg(t, "emailRequired", "البريد الإلكتروني مطلوب");
 
   const at = text.split("@");
-  if (at.length !== 2) return "البريد الإلكتروني غير صالح";
+  if (at.length !== 2) return msg(t, "emailInvalid", "البريد الإلكتروني غير صالح");
   const [local, domain] = at;
-  if (!local || !domain) return "البريد الإلكتروني غير صالح";
-  if (/\s/.test(text)) return "البريد الإلكتروني غير صالح";
+  if (!local || !domain) return msg(t, "emailInvalid", "البريد الإلكتروني غير صالح");
+  if (/\s/.test(text)) return msg(t, "emailInvalid", "البريد الإلكتروني غير صالح");
   if (!domain.includes(".") || domain.startsWith(".") || domain.endsWith(".")) {
-    return "البريد الإلكتروني غير صالح";
+    return msg(t, "emailInvalid", "البريد الإلكتروني غير صالح");
   }
   // A domain has no spaces or consecutive dots, and needs characters either side
   // of every dot.
   if (domain.includes("..") || /\.$/.test(domain) || /^\./.test(domain)) {
-    return "البريد الإلكتروني غير صالح";
+    return msg(t, "emailInvalid", "البريد الإلكتروني غير صالح");
   }
   return null;
+}
+
+/**
+ * One message, in the reader's language when there is one.
+ *
+ * The Arabic sentence stays in the code as the fallback: the validators are
+ * used where no language is in scope, and a validator that cannot speak
+ * returns nothing is a validator that does not work.
+ */
+function msg(
+  t: ValidatorTranslate | undefined,
+  key: string,
+  fallback: string,
+  values?: Record<string, unknown>,
+): string {
+  if (!t) return fallback;
+  return t(`hr.msg.${key}`, { defaultValue: fallback, ...(values ?? {}) });
 }
 
 export interface PhoneConflict {

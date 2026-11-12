@@ -15,6 +15,7 @@
  * governorate catch every mistake a human actually makes.
  */
 import { digitsOnly } from "./digits";
+import type { ValidatorTranslate } from "./validators";
 
 export const NATIONAL_ID_LENGTH = 14;
 
@@ -72,6 +73,7 @@ export interface NationalIdAnalysis {
  */
 export function analyzeNationalId(
   value: string | null | undefined,
+  t?: ValidatorTranslate,
 ): NationalIdAnalysis {
   const digits = digitsOnly(value);
 
@@ -81,7 +83,12 @@ export function analyzeNationalId(
   if (digits.length !== NATIONAL_ID_LENGTH) {
     return {
       digits,
-      error: `رقم الهوية يجب أن يكون ${NATIONAL_ID_LENGTH} رقمًا بالضبط`,
+      error: msg(
+        t,
+        "nationalIdLength",
+        `رقم الهوية يجب أن يكون ${NATIONAL_ID_LENGTH} رقمًا بالضبط`,
+        { length: NATIONAL_ID_LENGTH },
+      ),
       info: null,
     };
   }
@@ -90,7 +97,11 @@ export function analyzeNationalId(
   if (century !== "2" && century !== "3") {
     return {
       digits,
-      error: "رقم الهوية غير صحيح: أول رقم يجب أن يكون 2 أو 3",
+      error: msg(
+        t,
+        "nationalIdCentury",
+        "رقم الهوية غير صحيح: أول رقم يجب أن يكون 2 أو 3",
+      ),
       info: null,
     };
   }
@@ -109,7 +120,11 @@ export function analyzeNationalId(
   if (!isRealDate) {
     return {
       digits,
-      error: "رقم الهوية يحتوي على تاريخ ميلاد غير صحيح",
+      error: msg(
+        t,
+        "nationalIdBadDate",
+        "رقم الهوية يحتوي على تاريخ ميلاد غير صحيح",
+      ),
       info: null,
     };
   }
@@ -119,7 +134,11 @@ export function analyzeNationalId(
   if (!(governorateCode in GOVERNORATE_NAMES) && !(numericCode >= 1 && numericCode <= 35)) {
     return {
       digits,
-      error: "رقم الهوية يحتوي على كود محافظة غير معروف",
+      error: msg(
+        t,
+        "nationalIdBadGovernorate",
+        "رقم الهوية يحتوي على كود محافظة غير معروف",
+      ),
       info: null,
     };
   }
@@ -130,10 +149,30 @@ export function analyzeNationalId(
     info: {
       birthDate: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
       governorateCode,
-      governorateName:
-        GOVERNORATE_NAMES[governorateCode] ?? `محافظة ${governorateCode}`,
+      governorateName: t
+        ? t(`hr.governorate.${governorateCode}`, {
+            defaultValue: GOVERNORATE_NAMES[governorateCode] ?? `محافظة ${governorateCode}`,
+          })
+        : GOVERNORATE_NAMES[governorateCode] ?? `محافظة ${governorateCode}`,
     },
   };
+}
+
+/**
+ * One message, in the reader's language when there is one.
+ *
+ * The Arabic sentence stays in the code as the fallback: the validators are
+ * used where no language is in scope, and a validator that cannot speak
+ * returns nothing is a validator that does not work.
+ */
+function msg(
+  t: ValidatorTranslate | undefined,
+  key: string,
+  fallback: string,
+  values?: Record<string, unknown>,
+): string {
+  if (!t) return fallback;
+  return t(`hr.msg.${key}`, { defaultValue: fallback, ...(values ?? {}) });
 }
 
 /** The error alone, for validators that only need a yes/no. */

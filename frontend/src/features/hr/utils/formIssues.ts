@@ -7,6 +7,9 @@
  * *wrong* (typed but invalid, or two fields that contradict each other) —
  * empty required fields stay the submit's business, because flagging them the
  * moment the dialog opens would paint the stepper red before anyone touched it.
+ *
+ * The translator is optional: without one the Arabic sentences stand, which is
+ * what the unit tests and any caller outside a language context rely on.
  */
 import type { EmployeeRecord } from "@/types/employee";
 import { FormStepId } from "./constants";
@@ -19,11 +22,15 @@ import {
   validateCommission,
   validateBankAccount,
   passwordRequirements,
+  type ValidatorTranslate,
 } from "./validators";
 
 export type EmployeeFormIssues = Record<FormStepId, string[]>;
 
-export function collectEmployeeFormIssues(formData: EmployeeRecord): EmployeeFormIssues {
+export function collectEmployeeFormIssues(
+  formData: EmployeeRecord,
+  t?: ValidatorTranslate,
+): EmployeeFormIssues {
   const issues: EmployeeFormIssues = {
     personal: [],
     work: [],
@@ -36,23 +43,23 @@ export function collectEmployeeFormIssues(formData: EmployeeRecord): EmployeeFor
 
   const typedName = String(formData.fullName ?? "").trim();
   if (typedName) {
-    const nameError = validatePersonName(typedName);
+    const nameError = validatePersonName(typedName, t);
     if (nameError) issues.personal.push(nameError);
   }
 
   const typedPhone = String(formData.phonePrimary ?? "").trim();
   if (typedPhone) {
-    const phoneError = validatePhone(typedPhone);
+    const phoneError = validatePhone(typedPhone, t);
     if (phoneError) issues.personal.push(phoneError);
   }
 
   const typedEmail = String(formData.email ?? "").trim();
   if (typedEmail) {
-    const emailError = validateEmployeeEmail(typedEmail);
+    const emailError = validateEmployeeEmail(typedEmail, t);
     if (emailError) issues.personal.push(emailError);
   }
 
-  const idAnalysis = analyzeNationalId(formData.nationalId);
+  const idAnalysis = analyzeNationalId(formData.nationalId, t);
   if (idAnalysis.error) issues.personal.push(idAnalysis.error);
   // The id encodes the birth date; a birth date that disagrees with it means
   // one of the two was mistyped and the payroll file would carry the wrong one.
@@ -62,7 +69,12 @@ export function collectEmployeeFormIssues(formData: EmployeeRecord): EmployeeFor
     formData.birthDate !== idAnalysis.info.birthDate
   ) {
     issues.personal.push(
-      `تاريخ الميلاد لا يطابق المسجل في الرقم القومي (${idAnalysis.info.birthDate})`,
+      t
+        ? t("hr.msg.birthDateMismatchId", {
+            date: idAnalysis.info.birthDate,
+            defaultValue: `تاريخ الميلاد لا يطابق المسجل في الرقم القومي (${idAnalysis.info.birthDate})`,
+          })
+        : `تاريخ الميلاد لا يطابق المسجل في الرقم القومي (${idAnalysis.info.birthDate})`,
     );
   }
 
@@ -71,52 +83,86 @@ export function collectEmployeeFormIssues(formData: EmployeeRecord): EmployeeFor
   const contractEnd = String(formData.contractEndDate ?? "").trim();
   const hiredOn = String(formData.hireDate ?? "").trim();
   if (contractEnd && hiredOn && contractEnd < hiredOn) {
-    issues.work.push("تاريخ انتهاء العقد لا يمكن أن يسبق تاريخ التعيين");
+    issues.work.push(
+      t
+        ? t("hr.msg.contractEndBeforeHire", {
+            defaultValue: "تاريخ انتهاء العقد لا يمكن أن يسبق تاريخ التعيين",
+          })
+        : "تاريخ انتهاء العقد لا يمكن أن يسبق تاريخ التعيين",
+    );
   }
 
   if (formData.hasLoginAccount) {
     const typedUsername = String(formData.username ?? "").trim();
     if (typedUsername) {
-      const usernameError = validateUsername(typedUsername);
+      const usernameError = validateUsername(typedUsername, t);
       if (usernameError) issues.system.push(usernameError);
     }
     const typedPassword = String(formData.password ?? "");
     if (typedPassword) {
-      const unmet = passwordRequirements(typedPassword).filter((r) => !r.met);
+      const unmet = passwordRequirements(typedPassword, t).filter((r) => !r.met);
       if (unmet.length > 0) {
-        issues.system.push(`كلمة المرور: ${unmet[0].label}`);
+        issues.system.push(
+          t
+            ? t("hr.msg.passwordIssue", {
+                rule: unmet[0].label,
+                defaultValue: `كلمة المرور: ${unmet[0].label}`,
+              })
+            : `كلمة المرور: ${unmet[0].label}`,
+        );
       }
     }
   }
 
   const moneyFields: Array<[string, unknown]> = [
-    ["الراتب الأساسي", formData.baseSalary],
-    ["الحافز الثابت", formData.fixedBonus],
-    ["الخصومات الثابتة", formData.defaultDeductions],
+    [t?.("hr.salaryLabel", { defaultValue: "الراتب الأساسي" }) ?? "الراتب الأساسي", formData.baseSalary],
+    [t?.("hr.fixedBonusLabel", { defaultValue: "الحافز الثابت" }) ?? "الحافز الثابت", formData.fixedBonus],
+    [t?.("hr.defaultDeductionsLabel", { defaultValue: "الخصومات الثابتة" }) ?? "الخصومات الثابتة", formData.defaultDeductions],
   ];
   for (const [label, value] of moneyFields) {
-    const moneyError = validateMoney(value, label);
+    const moneyError = validateMoney(value, label, t);
     if (moneyError) issues.financial.push(moneyError);
   }
-  const commissionError = validateCommission(formData.commissionRate);
+  const commissionError = validateCommission(formData.commissionRate, t);
   if (commissionError) issues.financial.push(commissionError);
 
   const paymentMethod = String(formData.paymentMethod ?? "cash");
   const typedWallet = String(formData.walletNumber ?? "").trim();
   if (typedWallet) {
     // A wallet number is a mobile number, so it answers to the phone rules.
-    const walletError = validatePhone(typedWallet);
-    if (walletError) issues.financial.push(`رقم المحفظة: ${walletError}`);
+    const walletError = validatePhone(typedWallet, t);
+    if (walletError) {
+      issues.financial.push(
+        t
+          ? t("hr.msg.walletNumber", {
+              error: walletError,
+              defaultValue: `رقم المحفظة: ${walletError}`,
+            })
+          : `رقم المحفظة: ${walletError}`,
+      );
+    }
   } else if (paymentMethod === "wallet") {
-    issues.financial.push("رقم المحفظة مطلوب عند اختيار التحويل للمحفظة");
+    issues.financial.push(
+      t
+        ? t("hr.msg.walletRequired", {
+            defaultValue: "رقم المحفظة مطلوب عند اختيار التحويل للمحفظة",
+          })
+        : "رقم المحفظة مطلوب عند اختيار التحويل للمحفظة",
+    );
   }
 
   const typedBank = String(formData.bankAccount ?? "").trim();
   if (typedBank) {
-    const bankError = validateBankAccount(typedBank);
+    const bankError = validateBankAccount(typedBank, t);
     if (bankError) issues.financial.push(bankError);
   } else if (paymentMethod === "bank") {
-    issues.financial.push("رقم الحساب البنكي مطلوب عند اختيار التحويل البنكي");
+    issues.financial.push(
+      t
+        ? t("hr.msg.bankRequired", {
+            defaultValue: "رقم الحساب البنكي مطلوب عند اختيار التحويل البنكي",
+          })
+        : "رقم الحساب البنكي مطلوب عند اختيار التحويل البنكي",
+    );
   }
 
   return issues;
