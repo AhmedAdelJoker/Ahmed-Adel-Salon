@@ -21,7 +21,9 @@ from tests.test_payroll_flow import _seed_barber
 
 from app.models.business_settings import BusinessSettings
 from app.models.employee_presence_log import EmployeePresenceLog, AttendancePenalty
+from app.models.month_closure import MonthClosure
 from app.core.clock import salon_now
+from app.core.security import get_password_hash
 
 
 def _seed_settings(db_session, *, open_time="09:00", close_time="22:00", late_threshold=15, penalty=0.5):
@@ -214,7 +216,9 @@ def test_penalties_endpoint_lists_late_penalties_with_employee(client, db_sessio
 
 def test_penalty_excuse_toggle_owner_allowed_cashier_forbidden(client, db_session):
     make_user(db_session, username="owner-penalties", role="owner")
-    _seed_settings(db_session, late_threshold=15, penalty=0.5)
+    settings = _seed_settings(db_session, late_threshold=15, penalty=0.5)
+    settings.penalty_cancel_pin_hash = get_password_hash("1234")
+    db_session.commit()
     barber = _seed_barber(db_session)
     headers = auth_headers(client, username="owner-penalties", password="Cashier123")
 
@@ -233,26 +237,138 @@ def test_penalty_excuse_toggle_owner_allowed_cashier_forbidden(client, db_sessio
     cashier_headers = auth_headers(client, username="cashier1", password="Cashier123")
     denied = client.patch(
         f"/api/v1/barber-presence/penalties/{penalty.id}",
-        json={"is_excused": True},
+        json={"is_excused": True, "pin": "1234"},
         headers=cashier_headers,
     )
     assert denied.status_code == 403
 
-    excused = client.patch(
-        f"/api/v1/barber-presence/penalties/{penalty.id}",
-        json={"is_excused": True},
-        headers=headers,
-    )
-    assert excused.status_code == 200, excused.text
-    assert excused.json()["is_excused"] is True
-
+    # Un-waiving never existed and must not silently come back.
     unexcused = client.patch(
         f"/api/v1/barber-presence/penalties/{penalty.id}",
         json={"is_excused": False},
         headers=headers,
     )
-    assert unexcused.status_code == 200, unexcused.text
-    assert unexcused.json()["is_excused"] is False
+    assert unexcused.status_code == 409
+
+    # Wrong PIN rejected — and the penalty stays applied.
+    wrong_pin = client.patch(
+        f"/api/v1/barber-presence/penalties/{penalty.id}",
+        json={"is_excused": True, "pin": "0000"},
+        headers=headers,
+    )
+    assert wrong_pin.status_code == 403
+    db_session.refresh(penalty)
+    assert penalty.is_excused is False
+
+    # Correct PIN waives exactly once — irreversible by design.
+    excused = client.patch(
+        f"/api/v1/barber-presence/penalties/{penalty.id}",
+        json={"is_excused": True, "pin": "1234"},
+        headers=headers,
+    )
+    assert excused.status_code == 200, excused.text
+    assert excused.json()["is_excused"] is True
+
+    again = client.patch(
+        f"/api/v1/barber-presence/penalties/{penalty.id}",
+        json={"is_excused": True, "pin": "1234"},
+        headers=headers,
+    )
+    assert again.status_code == 409
+
+
+def test_waiver_without_configured_pin_is_refused(client, db_session):
+    make_user(db_session, username="owner-no-pin", role="owner")
+    _seed_settings(db_session)
+    barber = _seed_barber(db_session)
+    headers = auth_headers(client, username="owner-no-pin", password="Cashier123")
+
+    penalty = AttendancePenalty(
+        employee_id=barber.id, date=salon_now().date(),
+        late_minutes=10, penalty_amount=5,
+    )
+    db_session.add(penalty)
+    db_session.commit()
+    db_session.refresh(penalty)
+
+    resp = client.patch(
+        f"/api/v1/barber-presence/penalties/{penalty.id}",
+        json={"is_excused": True, "pin": "1234"},
+        headers=headers,
+    )
+    assert resp.status_code == 409
+    assert "رقم الإلغاء" in resp.text
+
+
+def test_closed_month_freezes_penalty_writes(client, db_session):
+    make_user(db_session, username="owner-locked", role="owner")
+    settings = _seed_settings(db_session, late_threshold=15, penalty=0.5)
+    settings.penalty_cancel_pin_hash = get_password_hash("1234")
+    barber = _seed_barber(db_session)
+    headers = auth_headers(client, username="owner-locked", password="Cashier123")
+
+    today = salon_now().date()
+    penalty = AttendancePenalty(
+        employee_id=barber.id, date=today, late_minutes=10, penalty_amount=5,
+    )
+    db_session.add(penalty)
+    db_session.commit()
+    db_session.refresh(penalty)
+
+    # Close the current month in the archive.
+    now = salon_now()
+    closure = MonthClosure(
+        year=now.year,
+        month=now.month,
+        closed_at=datetime.now(),
+        closed_by_user_id=None,
+        invoice_count=0,
+        total_amount=0,
+    )
+    db_session.add(closure)
+    db_session.commit()
+
+    manual = client.post(
+        "/api/v1/barber-presence/penalties",
+        json={
+            "employee_id": barber.id,
+            "penalty_amount": 5,
+            "reason": "سبب",
+            "date": today.isoformat(),
+        },
+        headers=headers,
+    )
+    assert manual.status_code == 409
+
+    waived = client.patch(
+        f"/api/v1/barber-presence/penalties/{penalty.id}",
+        json={"is_excused": True, "pin": "1234"},
+        headers=headers,
+    )
+    assert waived.status_code == 409
+
+    # Lateness still recorded, but no penalty row appears for a locked month.
+    now_dt = salon_now()
+    late_ts = (
+        now_dt.replace(hour=12, minute=0, second=0, microsecond=0)
+        if now_dt.hour >= 12
+        else now_dt - timedelta(minutes=30)
+    )
+    before = db_session.query(AttendancePenalty).count()
+    make_user(db_session, username="cashier-punch", role="cashier")
+    punch_headers = auth_headers(client, username="cashier-punch", password="Cashier123")
+    punch = client.post(
+        "/api/v1/barber-presence/register",
+        params={
+            "employee_id": barber.id,
+            "status_type": "in",
+            "timestamp": late_ts.isoformat(),
+            "late_reason": "ازدحام",
+        },
+        headers=punch_headers,
+    )
+    assert punch.status_code == 200, punch.text
+    assert db_session.query(AttendancePenalty).count() == before
 
 
 def test_manual_penalty_with_minutes_derives_amount_from_settings(client, db_session):

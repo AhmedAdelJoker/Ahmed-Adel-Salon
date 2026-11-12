@@ -1266,129 +1266,103 @@
         "eyebrow": "Strategic leadership",
         "title": "Manager",
         "summary": "Responsible for meeting operational targets, leading the team, and approving the administrative reports and deductions.",
-        "focus": [
-          "Operations management",
-          "Report approval",
-          "Team development"
-        ]
+        "focus0": "Operations management",
+        "focus1": "Report approval",
+        "focus2": "Team development"
       },
       "accountant": {
         "eyebrow": "Financial governance",
         "title": "Accountant",
         "summary": "Full authority to review cash flows, produce the analytical reports, and audit the payroll sheets before they run.",
-        "focus": [
-          "Financial audit",
-          "Profitability analysis",
-          "Cash control"
-        ]
+        "focus0": "Financial audit",
+        "focus1": "Profitability analysis",
+        "focus2": "Cash control"
       },
       "barber": {
         "eyebrow": "The craft of appearance",
         "title": "Barber",
         "summary": "A complete expert in cutting, styling and beard-shaping, to the highest standard of craft.",
-        "focus": [
-          "Cutting and styling",
-          "Beard shaping",
-          "Hair treatments"
-        ]
+        "focus0": "Cutting and styling",
+        "focus1": "Beard shaping",
+        "focus2": "Hair treatments"
       },
       "cashier": {
         "eyebrow": "Cash desk",
         "title": "Cashier",
         "summary": "Runs the payments, closes the shifts, and makes sure the money adds up.",
-        "focus": [
-          "Point of sale",
-          "Collecting payments",
-          "Shift closing"
-        ]
+        "focus0": "Point of sale",
+        "focus1": "Collecting payments",
+        "focus2": "Shift closing"
       },
       "hairstylist": {
         "eyebrow": "The art of styling",
         "title": "Hairstylist",
         "summary": "A specialist in blow-drying, curling and styling for the occasion, with an eye on the latest trends.",
-        "focus": [
-          "Blow-drying and styling",
-          "Occasion curls",
-          "Hair care"
-        ]
+        "focus0": "Blow-drying and styling",
+        "focus1": "Occasion curls",
+        "focus2": "Hair care"
       },
       "colorist": {
         "eyebrow": "The art of colour",
         "title": "Colourist",
         "summary": "A specialist in colour chemistry and in repairing damaged hair with the latest safe protocols.",
-        "focus": [
-          "Hair colouring",
-          "Protein treatments",
-          "Colour chemistry"
-        ]
+        "focus0": "Hair colouring",
+        "focus1": "Protein treatments",
+        "focus2": "Colour chemistry"
       },
       "esthetician": {
         "eyebrow": "Skin health",
         "title": "Esthetician",
         "summary": "Deep skin cleansing and premium hydration, using advanced spa techniques.",
-        "focus": [
-          "Skin cleansing",
-          "Brightening masks",
-          "Facial massage"
-        ]
+        "focus0": "Skin cleansing",
+        "focus1": "Brightening masks",
+        "focus2": "Facial massage"
       },
       "nail_technician": {
         "eyebrow": "Nail care",
         "title": "Nail technician",
         "summary": "A specialist in manicures, pedicures and nail finishing, to the highest standards of hygiene.",
-        "focus": [
-          "Manicure",
-          "Pedicure",
-          "Nail finishing"
-        ]
+        "focus0": "Manicure",
+        "focus1": "Pedicure",
+        "focus2": "Nail finishing"
       },
       "barber_assistant": {
         "eyebrow": "Hands-on support",
         "title": "Barber assistant",
         "summary": "Full logistical and technical support for the barbers, keeping the client comfortable in the wash and prep area.",
-        "focus": [
-          "Client preparation",
-          "Washing technique",
-          "Tool organisation"
-        ]
+        "focus0": "Client preparation",
+        "focus1": "Washing technique",
+        "focus2": "Tool organisation"
       },
       "receptionist": {
         "eyebrow": "Experience management",
         "title": "Receptionist",
         "summary": "The first point of contact, keeping the client's journey smooth from the booking to the goodbye.",
-        "focus": [
-          "Reception courtesy",
-          "Managing bookings",
-          "Satisfaction analysis"
-        ]
+        "focus0": "Reception courtesy",
+        "focus1": "Managing bookings",
+        "focus2": "Satisfaction analysis"
       },
       "cleaner": {
         "eyebrow": "Safety standards",
         "title": "Cleaner",
         "summary": "Responsible for a clean working environment, safe facilities, and the salon's overall appearance.",
-        "focus": [
-          "Continuous sanitising",
-          "Facility safety",
-          "Consumables management"
-        ]
+        "focus0": "Continuous sanitising",
+        "focus1": "Facility safety",
+        "focus2": "Consumables management"
       },
       "owner": {
         "eyebrow": "Top leadership",
         "title": "Owner",
         "summary": "Responsible for the strategic vision and for growing the brand.",
-        "focus": [
-          "Overall vision",
-          "Business growth",
-          "Overall oversight"
-        ]
+        "focus0": "Overall vision",
+        "focus1": "Business growth",
+        "focus2": "Overall oversight"
       },
       "other": {
         "eyebrow": "Specialist staff",
         "title": "Specialist",
         "summary": "Extra tasks and rare specialisms, as the business grows.",
-        "focus": [
-          "Task flexibility"
-        ]
+        "focus0": "Task flexibility"
       }
     },
     "msg": {
@@ -2592,7 +2566,22 @@
     "penaltyAmount": "Penalty amount",
     "penaltyAmountPlaceholder": "or auto from minutes",
     "penaltyAmountHint": "Leave empty to calculate from minutes × penalty/minute",
-    "penaltyReasonPlaceholder": "e.g. policy breach, misconduct, absence without leave..."
+    "penaltyReasonPlaceholder": "e.g. policy breach, misconduct, absence without leave...",
+    "penaltyPinLabel": "Waiver PIN (4 digits)",
+    "penaltyPinSet": "Set",
+    "penaltyPinMissing": "Not set",
+    "penaltyPinHint": "4-digit PIN required to waive any penalty. Stored hashed — never shown. Waivers are irreversible.",
+    "penaltyPinInvalid": "Waiver PIN must be 4 digits",
+    "pinNotConfigured": "Waiver PIN is not set — configure it in attendance settings before any waiver",
+    "lockedMonthsHint": "Months locked in the archive — their penalties are fully frozen:",
+    "monthLocked": "Month is locked in the archive",
+    "addPenaltyLockedMonth": "Cannot add a penalty — this month is locked in the archive",
+    "waiveTitle": "Confirm penalty waiver",
+    "waiveWarning": "This penalty ({{amount}}) will be waived permanently — no undo afterwards",
+    "waivedPermanent": "Waived (final)",
+    "waiveConfirm": "Waive permanently",
+    "penaltyWaivedPermanently": "Penalty waived permanently",
+    "penaltyWaiveFailed": "Could not waive penalty"
   },
   "settings": {
     "tabShop": "Shop data",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BadgeCheck, BadgeX, Receipt, Loader2, RefreshCw, Plus } from "lucide-react";
+import { BadgeCheck, BadgeX, Receipt, Loader2, RefreshCw, Plus, Lock, ShieldCheck } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,7 @@ export interface PenaltyRow {
   penalty_amount: number;
   is_excused: boolean;
   source: "auto" | "manual" | string;
+  locked?: boolean;
   created_at: string | null;
 }
 
@@ -75,7 +76,15 @@ export default function PenaltiesView({
   );
   const [rows, setRows] = useState<PenaltyRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [togglingId, setTogglingId] = useState<number | null>(null);
+
+  // Waiver gate — the 4-digit PIN is configured in attendance settings.
+  // The server refuses waivers while it is missing, and month closures in
+  // the archive freeze the month entirely.
+  const [pinConfigured, setPinConfigured] = useState(false);
+  const [lockedMonths, setLockedMonths] = useState<string[]>([]);
+  const [waiveTarget, setWaiveTarget] = useState<PenaltyRow | null>(null);
+  const [waiverPin, setWaiverPin] = useState("");
+  const [isWaiving, setIsWaiving] = useState(false);
 
   // Manual-add dialog state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -85,6 +94,21 @@ export default function PenaltiesView({
   const [addAmount, setAddAmount] = useState("");
   const [addReason, setAddReason] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+
+  const fetchGate = useCallback(async () => {
+    try {
+      const res = await api.get("/barber-presence/penalty-months");
+      setPinConfigured(Boolean(res.data?.pin_configured));
+      setLockedMonths(Array.isArray(res.data?.locked_months) ? res.data.locked_months : []);
+    } catch {
+      setPinConfigured(false);
+      setLockedMonths([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchGate();
+  }, [fetchGate]);
 
   const fetchPenalties = useCallback(async () => {
     try {
@@ -102,8 +126,7 @@ export default function PenaltiesView({
     } finally {
       setLoading(false);
     }
-     
-  }, [startDate, endDate]);
+  }, [startDate, endDate, t]);
 
   useEffect(() => {
     void fetchPenalties();
@@ -168,28 +191,33 @@ export default function PenaltiesView({
     }
   };
 
-  const toggleExcuse = async (row: PenaltyRow) => {
-    if (togglingId != null) return;
-    setTogglingId(row.id);
+  const monthOf = (row: PenaltyRow) => row.date?.slice(0, 7) ?? "";
+  const rowLocked = (row: PenaltyRow) =>
+    Boolean(row.locked) || lockedMonths.includes(monthOf(row));
+
+  // Waives are irreversible by design: one PIN, one action, no undo.
+  const handleConfirmWaive = async () => {
+    if (!waiveTarget || isWaiving || waiverPin.length !== 4) return;
+    setIsWaiving(true);
     try {
-      await api.patch(`/barber-presence/penalties/${row.id}`, {
-        is_excused: !row.is_excused,
+      await api.patch(`/barber-presence/penalties/${waiveTarget.id}`, {
+        is_excused: true,
+        pin: waiverPin,
       });
-      toast.success(
-        !row.is_excused
-          ? t("attendance.penaltyExcused")
-          : t("attendance.penaltyUnwaived"),
-      );
-      // Optimistic update so the row flips instantly without a refetch storm.
       setRows((prev) =>
-        prev.map((r) => (r.id === row.id ? { ...r, is_excused: !r.is_excused } : r)),
+        prev.map((r) => (r.id === waiveTarget.id ? { ...r, is_excused: true } : r)),
       );
+      toast.success(t("attendance.penaltyWaivedPermanently"));
+      setWaiveTarget(null);
+      setWaiverPin("");
     } catch (err) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response
-        ?.data?.detail;
-      toast.error(detail || t("attendance.settingsFailed"));
+      const e = err as { response?: { data?: { detail?: unknown } } };
+      const detail = e?.response?.data?.detail;
+      toast.error(
+        typeof detail === "string" ? detail : t("attendance.penaltyWaiveFailed"),
+      );
     } finally {
-      setTogglingId(null);
+      setIsWaiving(false);
     }
   };
 
@@ -219,6 +247,23 @@ export default function PenaltiesView({
           </Button>
         </div>
       </div>
+
+      {/* Lock banners: pin missing / months frozen by archive closure */}
+      {!pinConfigured && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-900">
+          <Lock size={14} className="shrink-0" />
+          {t("attendance.pinNotConfigured")}
+        </div>
+      )}
+      {lockedMonths.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-900">
+          <Lock size={14} className="shrink-0" />
+          <span>{t("attendance.lockedMonthsHint")}</span>
+          {lockedMonths.map((m) => (
+            <span key={m} className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 font-mono text-[11px]">{m}</span>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
@@ -273,11 +318,14 @@ export default function PenaltiesView({
                     </div>
                   </TableCell>
                   <TableCell className="tabular-nums">
-                    {formatDateTime(row.date, locale, {
-                      year: "numeric",
-                      month: "short",
-                      day: "2-digit",
-                    })}
+                    <div className="flex items-center gap-1.5">
+                      {rowLocked(row) && <Lock size={12} className="text-amber-700" aria-label={t("attendance.monthLocked")} />}
+                      {formatDateTime(row.date, locale, {
+                        year: "numeric",
+                        month: "short",
+                        day: "2-digit",
+                      })}
+                    </div>
                   </TableCell>
                   <TableCell className="tabular-nums">{row.late_minutes}</TableCell>
                   <TableCell>
@@ -300,21 +348,26 @@ export default function PenaltiesView({
                     </Badge>
                   </TableCell>
                   <TableCell className="text-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 rounded-xl text-xs font-bold"
-                      disabled={togglingId != null}
-                      onClick={() => void toggleExcuse(row)}
-                    >
-                      {togglingId === row.id ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : row.is_excused ? (
-                        t("attendance.undoWaive")
-                      ) : (
-                        t("attendance.waivePenalty")
-                      )}
-                    </Button>
+                    {row.is_excused ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted">
+                        <ShieldCheck size={12} /> {t("attendance.waivedPermanent")}
+                      </span>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 rounded-xl text-xs font-bold"
+                        disabled={rowLocked(row)}
+                        title={rowLocked(row) ? t("attendance.monthLocked") : undefined}
+                        onClick={() => {
+                          setWaiveTarget(row);
+                          setWaiverPin("");
+                        }}
+                      >
+                        {rowLocked(row) ? <Lock size={12} /> : null}
+                        {t("attendance.waivePenalty")}
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -322,6 +375,58 @@ export default function PenaltiesView({
           </Table>
         )}
       </div>
+
+      {/* Waiver confirmation — one-way door, PIN-gated */}
+      <Dialog open={waiveTarget != null} onOpenChange={(open) => { if (!open) { setWaiveTarget(null); setWaiverPin(""); } }}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-danger">{t("attendance.waiveTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-danger-soft bg-danger-soft p-3 text-xs font-medium text-danger">
+              {t("attendance.waiveWarning", { amount: waiveTarget ? formatEmployeeMoney(waiveTarget.penalty_amount, locale, language) : "" })}
+            </div>
+            {!pinConfigured ? (
+              <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs font-bold text-amber-900">
+                {t("attendance.pinNotConfigured")}
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="waive-pin" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                  {t("attendance.penaltyPinLabel")}
+                </label>
+                <Input
+                  id="waive-pin"
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={4}
+                  autoFocus
+                  value={waiverPin}
+                  onChange={(e) => setWaiverPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="••••"
+                  onKeyDown={(e) => { if (e.key === "Enter" && waiverPin.length === 4) void handleConfirmWaive(); }}
+                  className="h-12 rounded-xl text-center text-xl tracking-[0.6em]"
+                />
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="h-11 flex-1 rounded-xl" onClick={() => { setWaiveTarget(null); setWaiverPin(""); }}>
+                {t("attendance.cancel")}
+              </Button>
+              <Button
+                variant="danger"
+                className="h-11 flex-1 rounded-xl font-black"
+                disabled={!pinConfigured || waiverPin.length !== 4 || isWaiving}
+                onClick={() => void handleConfirmWaive()}
+              >
+                {isWaiving ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                <span>{isWaiving ? t("attendance.submitting") : t("attendance.waiveConfirm")}</span>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Manual penalty dialog — the manual counterpart to the punch engine */}
       <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
@@ -376,11 +481,18 @@ export default function PenaltiesView({
               </label>
               <Input id="pn-reason" value={addReason} onChange={(e) => setAddReason(e.target.value)} placeholder={t("attendance.penaltyReasonPlaceholder")} className="h-11 rounded-xl" autoFocus />
             </div>
+            {lockedMonths.includes(addDate.slice(0, 7)) && (
+              <p className="text-[11px] font-bold text-amber-800">{t("attendance.addPenaltyLockedMonth")}</p>
+            )}
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="h-11 flex-1 rounded-xl" onClick={() => setShowAddForm(false)}>
                 {t("attendance.cancel")}
               </Button>
-              <Button className="h-11 flex-1 rounded-xl" onClick={() => void handleAddPenalty()} disabled={isAdding}>
+              <Button
+                className="h-11 flex-1 rounded-xl"
+                onClick={() => void handleAddPenalty()}
+                disabled={isAdding || lockedMonths.includes(addDate.slice(0, 7))}
+              >
                 {isAdding ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                 <span>{isAdding ? t("attendance.submitting") : t("attendance.addPenalty")}</span>
               </Button>

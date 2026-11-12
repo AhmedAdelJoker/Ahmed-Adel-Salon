@@ -58,6 +58,7 @@ const AttendanceManagement = () => {
     penaltyRate,
     lateThreshold,
     autoPenaltyEnabled,
+    penaltyPinConfigured,
     leaves,
     loading,
     leavesLoading,
@@ -98,6 +99,9 @@ const AttendanceManagement = () => {
   });
   // Per-day editor state — seeded from the live working hours, saved as-is.
   const [daysForm, setDaysForm] = useState<WorkingHours>({});
+  // 4-digit cancellation PIN — write-only: the field stays empty unless the
+  // user types a new PIN. The configured state comes from the server.
+  const [pinForm, setPinForm] = useState("");
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ ...emptyLeaveForm });
 
@@ -218,12 +222,22 @@ const AttendanceManagement = () => {
           close_time: current?.close_time || settingsForm.close_time,
         };
       }
-      await api.post("/barber-presence/working-hours", {
+      const payload: Record<string, unknown> = {
         working_hours: workingHoursPayload,
         late_threshold: settingsForm.late_threshold,
         late_penalty_per_minute: settingsForm.late_penalty_per_minute,
         auto_penalty_enabled: settingsForm.auto_penalty_enabled,
-      });
+      };
+      // Send the PIN only when the user typed a new one — empty means keep.
+      if (pinForm && !/^\d{4}$/.test(pinForm)) {
+        toast.error(t("attendance.penaltyPinInvalid"));
+        return;
+      }
+      if (/^\d{4}$/.test(pinForm)) {
+        payload.penalty_cancel_pin = pinForm;
+      }
+      await api.post("/barber-presence/working-hours", payload);
+      setPinForm("");
       toast.success(t("attendance.settingsSaved"));
       setShowSettings(false);
       await fetchAttendance();
@@ -453,6 +467,32 @@ const AttendanceManagement = () => {
                   <span className="mt-0.5 block text-[11px] font-medium text-muted">{t("attendance.autoPenaltyHint")}</span>
                 </span>
               </label>
+
+              {/* ===== رقم إلغاء الجزاء (4 أرقام) ===== */}
+              <div className="space-y-1.5 rounded-xl border border-border bg-muted/10 p-3">
+                <label htmlFor="set-pin" className="flex items-center justify-between gap-2 text-xs font-black text-main">
+                  <span>{t("attendance.penaltyPinLabel")}</span>
+                  <span className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-black",
+                    penaltyPinConfigured ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-800",
+                  )}>
+                    {penaltyPinConfigured ? t("attendance.penaltyPinSet") : t("attendance.penaltyPinMissing")}
+                  </span>
+                </label>
+                <Input
+                  id="set-pin"
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  autoComplete="new-password"
+                  value={pinForm}
+                  onChange={(e) => setPinForm(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder={penaltyPinConfigured ? "••••" : "1234"}
+                  className="h-11 rounded-xl tracking-[0.5em]"
+                  aria-label={t("attendance.penaltyPinLabel")}
+                />
+                <p className="text-[11px] font-medium text-muted">{t("attendance.penaltyPinHint")}</p>
+              </div>
             </div>
 
             <div className="flex gap-2 pt-1">

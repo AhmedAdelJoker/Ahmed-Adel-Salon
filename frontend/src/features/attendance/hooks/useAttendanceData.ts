@@ -32,6 +32,7 @@ export function useAttendanceData(opts?: { t?: TranslateFn }) {
   const [penaltyRate, setPenaltyRate] = useState<number>(0.5);
   const [lateThreshold, setLateThreshold] = useState<number>(15);
   const [autoPenaltyEnabled, setAutoPenaltyEnabled] = useState<boolean>(true);
+  const [penaltyPinConfigured, setPenaltyPinConfigured] = useState<boolean>(false);
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -94,6 +95,7 @@ export function useAttendanceData(opts?: { t?: TranslateFn }) {
         setPenaltyRate(Number(whRes.value.data?.late_penalty_per_minute ?? 0.5));
         setLateThreshold(Number(whRes.value.data?.late_threshold_minutes ?? 15));
         setAutoPenaltyEnabled(whRes.value.data?.auto_penalty_enabled !== false);
+        setPenaltyPinConfigured(Boolean(whRes.value.data?.penalty_cancel_pin_configured));
       } else {
         setWorkingHours({});
       }
@@ -240,6 +242,7 @@ export function useAttendanceData(opts?: { t?: TranslateFn }) {
     penaltyRate,
     lateThreshold,
     autoPenaltyEnabled,
+    penaltyPinConfigured,
     leaves,
     loading,
     leavesLoading,

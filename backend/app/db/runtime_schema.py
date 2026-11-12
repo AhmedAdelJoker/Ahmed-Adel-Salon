@@ -140,6 +140,12 @@ def ensure_runtime_schema() -> None:
             "source",
             "ALTER TABLE attendance_penalties ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'auto'",
         )
+        _ensure_column(
+            connection,
+            "business_settings",
+            "penalty_cancel_pin_hash",
+            "ALTER TABLE business_settings ADD COLUMN penalty_cancel_pin_hash VARCHAR(255)",
+        )
 
         _ensure_column(
             connection,

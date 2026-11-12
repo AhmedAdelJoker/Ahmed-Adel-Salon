@@ -24,6 +24,9 @@ from app.core.config import settings as app_settings
 from app.core.rate_limit import rate_limit
 from app.services.activity_log_service import log_activity
 from app.core.clock import salon_now
+from app.core.security import get_password_hash, verify_password
+from app.models.month_closure import MonthClosure
+from app.services.attendance_service import month_is_locked
 from app.core.working_hours import (
     WorkingHoursError,
     day_key,
@@ -491,6 +494,8 @@ def get_working_hours(db: Session = Depends(get_db), current_user: User = Depend
         "late_threshold_minutes": policy["late_threshold_minutes"],
         "late_penalty_per_minute": policy["late_penalty_per_minute"],
         "auto_penalty_enabled": policy["auto_penalty_enabled"],
+        # Hash only; the PIN itself is never returned anywhere.
+        "penalty_cancel_pin_configured": bool(settings and settings.penalty_cancel_pin_hash),
     }
 
 
@@ -555,6 +560,15 @@ def update_working_hours(
             raise HTTPException(status_code=422, detail="auto_penalty_enabled يجب أن يكون true أو false")
         settings.auto_penalty_enabled = auto_penalty
 
+    # 4-digit cancellation PIN — hash once here, never store or return the
+    # plain value. Only a full 4-digit change is accepted; the old hash is
+    # replaced.
+    pin = payload.get("penalty_cancel_pin")
+    if pin is not None:
+        if not isinstance(pin, str) or len(pin) != 4 or not pin.isdigit():
+            raise HTTPException(status_code=422, detail="رقم الإلغاء يجب أن يكون 4 أرقام")
+        settings.penalty_cancel_pin_hash = get_password_hash(pin)
+
     db.commit()
     db.refresh(settings)
 
@@ -572,6 +586,7 @@ def update_working_hours(
         "late_threshold_minutes": int(settings.late_threshold_minutes or 15),
         "late_penalty_per_minute": float(settings.late_penalty_per_minute or 0.5),
         "auto_penalty_enabled": bool(settings.auto_penalty_enabled),
+        "penalty_cancel_pin_configured": bool(settings.penalty_cancel_pin_hash),
         "message": "تم حفظ الإعدادات بنجاح",
     }
 
@@ -648,6 +663,10 @@ def list_penalties(
         query = query.filter(AttendancePenalty.employee_id == employee_id)
 
     rows = query.order_by(AttendancePenalty.date.desc(), AttendancePenalty.id.desc()).limit(limit).all()
+    locked = {
+        f"{row.year:04d}-{row.month:02d}"
+        for row in db.query(MonthClosure).all()
+    }
     return [
         {
             "id": row.id,
@@ -659,10 +678,32 @@ def list_penalties(
             "penalty_amount": float(row.penalty_amount or 0),
             "is_excused": bool(row.is_excused),
             "source": row.source or "auto",
+            "locked": f"{row.date.year:04d}-{row.date.month:02d}" in locked,
             "created_at": row.created_at.isoformat() if row.created_at else None,
         }
         for row in rows
     ]
+
+
+@router.get("/penalty-months")
+def get_penalty_months(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_manager),
+):
+    """Gate data for the penalties tab: configured PIN + locked months.
+
+    The frontend uses this to disable the waiver action (PIN missing) and to
+    show which months are frozen by the archive month-closure.
+    """
+    settings = db.query(BusinessSettings).first()
+    locked = [
+        f"{row.year:04d}-{row.month:02d}"
+        for row in db.query(MonthClosure).order_by(MonthClosure.year.desc(), MonthClosure.month.desc()).all()
+    ]
+    return {
+        "pin_configured": bool(settings and settings.penalty_cancel_pin_hash),
+        "locked_months": locked,
+    }
 
 
 @router.post("/penalties")
@@ -723,6 +764,12 @@ def create_manual_penalty(
         except ValueError:
             raise HTTPException(status_code=422, detail="التاريخ يجب أن يكون بصيغة YYYY-MM-DD") from None
 
+    if month_is_locked(db, penalty_date):
+        raise HTTPException(
+            status_code=409,
+            detail=f"شهر {penalty_date.strftime('%Y-%m')} مقفول في الأرشيف — لا يمكن إضافة جزاءات عليه",
+        )
+
     penalty = AttendancePenalty(
         employee_id=int(employee_id),
         date=penalty_date,
@@ -759,23 +806,60 @@ def create_manual_penalty(
     }
 
 
-@router.patch("/penalties/{penalty_id}")
+@router.patch(
+    "/penalties/{penalty_id}",
+    dependencies=[Depends(rate_limit("penalty_waive", max_requests=10, window_seconds=60))],
+)
 def set_penalty_excused(
     penalty_id: int,
     payload: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    """إعفاء الجزاء أو إلغاؤه — قرار إداري يُسجَّل في سجل النشاط."""
+    """إعفاء الجزاء — عملية نهائية، تتطلب رقم إلغاء من 4 أرقام.
+
+    بمجرد الإعفاء لا يمكن التراجع عنه (لا يوجد مسار undo)، والشهر المقفول
+    في الأرشيف (month_closures) مجمّد تماماً: لا إضافة، لا إعفاء، ولا
+    جزاء تلقائي جديد.
+    """
     penalty = db.query(AttendancePenalty).filter(AttendancePenalty.id == penalty_id).first()
     if not penalty:
         raise HTTPException(status_code=404, detail="الجزاء غير موجود")
 
     is_excused = payload.get("is_excused")
-    if not isinstance(is_excused, bool):
-        raise HTTPException(status_code=400, detail="is_excused يجب أن تكون true أو false")
+    if is_excused is not True:
+        # No un-waiving exists. A waiver that can be undone is not a waiver.
+        raise HTTPException(status_code=409, detail="الإعفاء نهائي ولا يمكن التراجع عنه")
 
-    penalty.is_excused = is_excused
+    if month_is_locked(db, penalty.date):
+        raise HTTPException(
+            status_code=409,
+            detail=f"شهر {penalty.date.strftime('%Y-%m')} مقفول في الأرشيف — لا يمكن تعديل الجزاءات عليه",
+        )
+
+    if penalty.is_excused:
+        raise HTTPException(status_code=409, detail="الجزاء مُعفى بالفعل")
+
+    pin = payload.get("pin")
+    if not isinstance(pin, str) or len(pin) != 4 or not pin.isdigit():
+        raise HTTPException(status_code=400, detail="رقم الإلغاء يجب أن يكون 4 أرقام")
+
+    settings = db.query(BusinessSettings).first()
+    if not settings or not settings.penalty_cancel_pin_hash:
+        raise HTTPException(status_code=409, detail="رقم الإلغاء غير مضبوط — اضبطه من إعدادات الحضور أولاً")
+
+    if not verify_password(pin, settings.penalty_cancel_pin_hash):
+        log_activity(
+            db,
+            user_id=current_user.id,
+            action="PENALTY_WAIVE_FAILED",
+            entity_type="AttendancePenalty",
+            entity_id=str(penalty.id),
+            description=f"محاولة إلغاء جزاء برقم غير صحيح (الجزاء #{penalty.id})",
+        )
+        raise HTTPException(status_code=403, detail="رقم الإلغاء غير صحيح")
+
+    penalty.is_excused = True
     db.commit()
     db.refresh(penalty)
 
@@ -783,20 +867,20 @@ def set_penalty_excused(
     log_activity(
         db,
         user_id=current_user.id,
-        action="EXCUSE_PENALTY" if is_excused else "UNEXCUSE_PENALTY",
+        action="EXCUSE_PENALTY",
         entity_type="AttendancePenalty",
         entity_id=str(penalty.id),
         description=(
-            f"{'إعفاء' if is_excused else 'إلغاء إعفاء'} جزاء {penalty.late_minutes} دقيقة"
-            f" للموظف {employee.full_name if employee else penalty.employee_id}"
+            f"إعفاء نهائي للموظف {employee.full_name if employee else penalty.employee_id}"
+            f" — جزاء #{penalty.id} بقيمة {penalty.penalty_amount} ج"
         ),
     )
 
     return {
         "id": penalty.id,
-        "is_excused": penalty.is_excused,
+        "is_excused": True,
         "penalty_amount": float(penalty.penalty_amount or 0),
-        "message": "تم تحديث الجزاء" if is_excused else "تم إلغاء الإعفاء",
+        "message": "تم إعفاء الجزاء نهائياً",
     }
 
 

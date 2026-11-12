@@ -22,6 +22,7 @@ from app.core.working_hours import day_key, normalize_working_hours
 from app.models.business_settings import BusinessSettings
 from app.models.employee import Employee
 from app.models.employee_presence_log import EmployeePresenceLog, AttendancePenalty
+from app.models.month_closure import MonthClosure
 
 # Fallbacks used only when BusinessSettings has no row yet. The live values
 # come from the database so the settings dialog and this engine cannot drift.
@@ -35,6 +36,22 @@ VALID_STATUSES = ("in", "out", "break", "break_end")
 # the log fills with duplicate-second rows (the live database already contains
 # a break_end + out pair stamped 21:09:00 twice).
 DUPLICATE_WINDOW_SECONDS = 120
+
+
+def month_is_locked(db: Session, day) -> bool:
+    """True when the archive month-closure covers `day`.
+
+    A closed month freezes everything that creates money obligations:
+    no manual penalty, no waiver, no auto penalty from a late punch. The
+    lateness itself is still recorded (is_late/late_minutes) so reports stay
+    complete; only the deduction is suppressed.
+    """
+    return (
+        db.query(MonthClosure)
+        .filter(MonthClosure.year == day.year, MonthClosure.month == day.month)
+        .first()
+        is not None
+    )
 
 
 def attendance_policy(db: Session) -> dict:
@@ -250,18 +267,23 @@ def apply_punch(
     db.add(log)
 
     # The engine honours a salon-wide switch to track lateness without
-    # deducting. is_late/late_minutes are recorded either way.
+    # deducting. is_late/late_minutes are recorded either way. A closed
+    # archive month suppresses the deduction entirely — penalties written
+    # after month close would silently move money inside a frozen period.
     if is_late and late_minutes > 0 and policy["auto_penalty_enabled"]:
-        db.add(
-            AttendancePenalty(
-                employee_id=employee_id,
-                date=dt.date(),
-                late_minutes=late_minutes,
-                reason=str(late_reason).strip() if late_reason else None,
-                penalty_amount=late_minutes * penalty_rate,
-                source="auto",
+        if month_is_locked(db, dt.date()):
+            pass  # Locked month: lateness recorded, no penalty row created.
+        else:
+            db.add(
+                AttendancePenalty(
+                    employee_id=employee_id,
+                    date=dt.date(),
+                    late_minutes=late_minutes,
+                    reason=str(late_reason).strip() if late_reason else None,
+                    penalty_amount=late_minutes * penalty_rate,
+                    source="auto",
+                )
             )
-        )
 
     db.commit()
 

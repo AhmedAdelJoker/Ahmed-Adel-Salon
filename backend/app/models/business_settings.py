@@ -44,6 +44,9 @@ class BusinessSettings(Base):
     # track lateness without deducting; with this false the punch engine still
     # records is_late/late_minutes, it just skips the AttendancePenalty row.
     auto_penalty_enabled = Column(Boolean, nullable=False, default=True, server_default="1")
+    # 4-digit PIN authorising a penalty waiver. Stored as a hash; never echoed
+    # back in any response. An unset PIN disables waivers entirely.
+    penalty_cancel_pin_hash = Column(String(255), nullable=True)
     shift_auto_close_grace_period = Column(Integer, nullable=False, default=30)  # Minutes after closing time before auto-close
     landing_hero_title = Column(String(500), nullable=True)
     landing_hero_subtitle = Column(Text, nullable=True)
