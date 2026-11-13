@@ -2602,7 +2602,18 @@
     "editPenaltyAmountTitle": "تعديل قيمة الجزاء",
     "editPenaltyAmountHint": "القيمة الحالية: {amount}",
     "penaltyAmountUpdated": "تم تعديل قيمة الجزاء",
-    "penaltyEditFailed": "تعذر تعديل قيمة الجزاء"
+    "penaltyEditFailed": "تعذر تعديل قيمة الجزاء",
+    "penaltiesScopeLabel": "نطاق العرض",
+    "penaltiesScopeOpen": "الشهر الحالي",
+    "penaltiesScopeArchive": "الأرشيف",
+    "penaltiesArchiveHint": "هذا الأرشيف للقراءة فقط — الأشهر المقفولة ما تقدر تعمل فيها أي تعديل",
+    "penaltiesViewLabel": "طريقة العرض",
+    "penaltiesViewDaily": "يومي",
+    "penaltiesViewWeekly": "أسبوعي",
+    "penaltiesViewMonthly": "شهري",
+    "rollupWeek": "الأسبوع",
+    "rollupMonth": "الشهر",
+    "rollupWaived": "معفاة"
   },
   "settings": {
     "tabShop": "بيانات المنشأة",

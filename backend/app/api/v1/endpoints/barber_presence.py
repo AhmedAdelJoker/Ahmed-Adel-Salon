@@ -644,14 +644,18 @@ def list_penalties(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     employee_id: Optional[int] = Query(None),
+    scope: str = Query("open", pattern="^(open|archive|all)$"),
     limit: int = Query(500, ge=1, le=5000),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
     """قائمة الجزاءات المسجلة — حضور/حالات تأخير.
 
-    تُعرض و تُدار من تابة «الجزاءات» في صفحة الحضور. الـ endpoint للأدمن والمدير
-    والمحاسب/المالك — مثل مسارات الحضور الحساسة الأخرى.
+    scope:
+    - "open" (default): current month only — everything before the calendar
+      month rolls forward is archived and moved to the archive tab.
+    - "archive": only archived months (read-only, not editable).
+    - "all": every penalty ever recorded.
     """
     query = (
         db.query(AttendancePenalty)
@@ -665,10 +669,26 @@ def list_penalties(
         query = query.filter(AttendancePenalty.employee_id == employee_id)
 
     rows = query.order_by(AttendancePenalty.date.desc(), AttendancePenalty.id.desc()).limit(limit).all()
-    locked = {
-        f"{row.year:04d}-{row.month:02d}"
-        for row in db.query(MonthClosure).all()
+
+    today = salon_now().date()
+    explicit_locked = {
+        f"{row.year:04d}-{row.month:02d}" for row in db.query(MonthClosure).all()
     }
+
+    def is_archived(day: date) -> bool:
+        if (day.year, day.month) < (today.year, today.month):
+            return True
+        return f"{day.year:04d}-{day.month:02d}" in explicit_locked
+
+    filtered = []
+    for row in rows:
+        arch = is_archived(row.date)
+        if scope == "open" and arch:
+            continue
+        if scope == "archive" and not arch:
+            continue
+        filtered.append((row, arch))
+
     return [
         {
             "id": row.id,
@@ -680,10 +700,10 @@ def list_penalties(
             "penalty_amount": float(row.penalty_amount or 0),
             "is_excused": bool(row.is_excused),
             "source": row.source or "auto",
-            "locked": f"{row.date.year:04d}-{row.date.month:02d}" in locked,
+            "locked": arch,
             "created_at": row.created_at.isoformat() if row.created_at else None,
         }
-        for row in rows
+        for row, arch in filtered
     ]
 
 
@@ -695,16 +715,28 @@ def get_penalty_months(
     """Gate data for the penalties tab: configured PIN + locked months.
 
     The frontend uses this to disable the waiver action (PIN missing) and to
-    show which months are frozen by the archive month-closure.
+    show which months are frozen by the archive month-closure. Auto-lock now
+    applies: any month before the current month is implicitly locked.
     """
     settings = db.query(BusinessSettings).first()
-    locked = [
+    today = salon_now().date()
+    explicit = [
         f"{row.year:04d}-{row.month:02d}"
         for row in db.query(MonthClosure).order_by(MonthClosure.year.desc(), MonthClosure.month.desc()).all()
     ]
+    # Past months are implicitly locked — at most 24 months of history are
+    # returned, further back has no business in this tab.
+    past = []
+    year, month = today.year, today.month  # copy
+    for _ in range(24):
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+        past.append(f"{year:04d}-{month:02d}")
     return {
         "pin_configured": bool(settings and settings.penalty_cancel_pin_hash),
-        "locked_months": locked,
+        "locked_months": sorted(set(explicit) | set(past), reverse=True),
     }
 
 
@@ -730,6 +762,13 @@ def compute_absence_penalties(
     if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month_raw):
         raise HTTPException(status_code=422, detail="month يجب أن يكون بصيغة YYYY-MM")
     year, month = int(month_raw[:4]), int(month_raw[5:7])
+
+    today = salon_now().date()
+    if (year, month) < (today.year, today.month):
+        raise HTTPException(
+            status_code=409,
+            detail=f"شهر {month_raw} مقفول في الأرشيف — لا يمكن إضافة جزاءات عليه",
+        )
 
     summary = ensure_absence_penalties(
         db,
@@ -798,6 +837,12 @@ def create_manual_penalty(
             penalty_date = date.fromisoformat(str(raw_date))
         except ValueError:
             raise HTTPException(status_code=422, detail="التاريخ يجب أن يكون بصيغة YYYY-MM-DD") from None
+
+    if penalty_date < salon_now().date():
+        raise HTTPException(
+            status_code=409,
+            detail="لا يمكن إضافة جزاء ليوم مضى — الأيام الماضية تُحتسب تلقائياً من النظام (بصمة أو غياباً)",
+        )
 
     if month_is_locked(db, penalty_date):
         raise HTTPException(

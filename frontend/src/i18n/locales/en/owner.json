@@ -2602,7 +2602,18 @@
     "editPenaltyAmountTitle": "Edit penalty amount",
     "editPenaltyAmountHint": "Current amount: {amount}",
     "penaltyAmountUpdated": "Penalty amount updated",
-    "penaltyEditFailed": "Could not update penalty amount"
+    "penaltyEditFailed": "Could not update penalty amount",
+    "penaltiesScopeLabel": "Scope",
+    "penaltiesScopeOpen": "Current month",
+    "penaltiesScopeArchive": "Archive",
+    "penaltiesArchiveHint": "This archive is read-only — locked months can no longer be edited",
+    "penaltiesViewLabel": "View",
+    "penaltiesViewDaily": "Daily",
+    "penaltiesViewWeekly": "Weekly",
+    "penaltiesViewMonthly": "Monthly",
+    "rollupWeek": "Week",
+    "rollupMonth": "Month",
+    "rollupWaived": "Waived"
   },
   "settings": {
     "tabShop": "Shop data",

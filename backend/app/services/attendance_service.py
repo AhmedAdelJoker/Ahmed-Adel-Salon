@@ -41,11 +41,30 @@ DUPLICATE_WINDOW_SECONDS = 120
 def month_is_locked(db: Session, day) -> bool:
     """True when the archive month-closure covers `day`.
 
-    A closed month freezes everything that creates money obligations:
-    no manual penalty, no waiver, no auto penalty from a late punch. The
-    lateness itself is still recorded (is_late/late_minutes) so reports stay
-    complete; only the deduction is suppressed.
+    A closed month freezes everything that creates money obligations: no
+    manual penalty, no waiver, no auto penalty from a late punch. The
+    lateness itself is still recorded (is_late/late_minutes) so reports
+    stay complete; only the deduction is suppressed.
+
+    Behaviour change (today's delivery): a month is automatically archived
+    once the calendar rolls past it — closed not only when an operator taps
+    "close month" in the archive screen, but also as soon as the month in
+    question is no longer the current month. This is the invariant a seeded
+    salon needs:
+
+    * September and earlier are read-only once October starts.
+    * October's penalties can still be edited while October is open, but the
+      moment November arrives, October's penalties are frozen — payroll for
+      October already ran (it ran at month end), so nothing legitimate would
+      change after the fact.
+
+    Explicit closures (month_closures table) are additive on top of this
+    rule: a manually closed month stays closed even while it is still the
+    current month.
     """
+    today = salon_now().date()
+    if (day.year, day.month) < (today.year, today.month):
+        return True
     return (
         db.query(MonthClosure)
         .filter(MonthClosure.year == day.year, MonthClosure.month == day.month)

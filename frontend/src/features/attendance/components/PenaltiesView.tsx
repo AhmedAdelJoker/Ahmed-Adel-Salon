@@ -77,6 +77,8 @@ export default function PenaltiesView({
   );
   const [rows, setRows] = useState<PenaltyRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scope, setScope] = useState<"open" | "archive">("open");
+  const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
 
   // Waiver gate — the 4-digit PIN is configured in attendance settings.
   // The server refuses waivers while it is missing, and month closures in
@@ -132,6 +134,7 @@ export default function PenaltiesView({
         params: {
           start_date: startDate || undefined,
           end_date: endDate || undefined,
+          scope: scope === "archive" ? "archive" : "open",
         },
       });
       setRows(Array.isArray(res.data) ? res.data : []);
@@ -159,6 +162,49 @@ export default function PenaltiesView({
       ),
     [rows],
   );
+
+  // Weekly / monthly rollups from the same rows. ISO-week bucketing keeps the
+  // grouping stable across locale boundaries; monthly grouping uses YYYY-MM.
+  const rollups = useMemo(() => {
+    if (viewMode === "daily") return [] as Array<{
+      key: string;
+      label: string;
+      count: number;
+      amount: number;
+      excused: number;
+      late_minutes: number;
+    }>;
+
+    const buckets = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const d = new Date(row.date);
+      let key: string;
+      if (viewMode === "weekly") {
+        const monday = new Date(d);
+        monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+        key = `W:${monday.toISOString().split("T")[0]}`;
+      } else {
+        key = `M:${row.date.slice(0, 7)}`;
+      }
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key)!.push(row);
+    }
+    return Array.from(buckets.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, group]) => {
+        const label = key.slice(2);
+        const amount = group.reduce((a, r) => a + (r.is_excused ? 0 : Number(r.penalty_amount || 0)), 0);
+        const late_minutes = group.reduce((a, r) => a + Number(r.late_minutes || 0), 0);
+        return {
+          key,
+          label,
+          count: group.length,
+          amount,
+          excused: group.filter((r) => r.is_excused).length,
+          late_minutes,
+        };
+      });
+  }, [rows, viewMode]);
 
   const resetAddForm = () => {
     setAddEmployeeId("");
@@ -208,7 +254,7 @@ export default function PenaltiesView({
 
   const monthOf = (row: PenaltyRow) => row.date?.slice(0, 7) ?? "";
   const rowLocked = (row: PenaltyRow) =>
-    Boolean(row.locked) || lockedMonths.includes(monthOf(row));
+    scope === "archive" || Boolean(row.locked) || lockedMonths.includes(monthOf(row));
 
   // Waives are irreversible by design: one PIN, one action, no undo.
   const handleConfirmWaive = async () => {
@@ -313,7 +359,53 @@ export default function PenaltiesView({
           <p className="mt-1 text-xs font-medium text-muted">{t("attendance.penaltiesHint")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {isManagement && (
+          {/* نطاق العرض: الحالية أو الأرشيف */}
+          <div className="flex items-center gap-1 rounded-xl border border-border bg-card/70 p-1 text-[11px] font-black" role="tablist" aria-label={t("attendance.penaltiesScopeLabel")}>
+            {(["open", "archive"] as const).map((s) => {
+              const active = scope === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setScope(s)}
+                  className={cn(
+                    "flex h-9 items-center gap-1.5 rounded-lg px-3 transition-colors",
+                    active ? "bg-primary text-primary-foreground" : "text-muted hover:bg-soft hover:text-main",
+                  )}
+                >
+                  {s === "open" ? t("attendance.penaltiesScopeOpen") : t("attendance.penaltiesScopeArchive")}
+                </button>
+              );
+            })}
+          </div>
+          {/* العرض: يومي / أسبوعي / شهري */}
+          <div className="flex items-center gap-1 rounded-xl border border-border bg-card/70 p-1 text-[11px] font-black" role="tablist" aria-label={t("attendance.penaltiesViewLabel")}>
+            {(["daily", "weekly", "monthly"] as const).map((mode) => {
+              const active = viewMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setViewMode(mode)}
+                  className={cn(
+                    "h-9 rounded-lg px-3 transition-colors",
+                    active ? "bg-card text-main shadow-sm" : "text-muted hover:text-main",
+                  )}
+                >
+                  {mode === "daily"
+                    ? t("attendance.penaltiesViewDaily")
+                    : mode === "weekly"
+                    ? t("attendance.penaltiesViewWeekly")
+                    : t("attendance.penaltiesViewMonthly")}
+                </button>
+              );
+            })}
+          </div>
+          {scope === "open" && isManagement && (
             <Button
               variant="outline"
               size="sm"
@@ -326,10 +418,12 @@ export default function PenaltiesView({
               <span>{t("attendance.absencesCompute")}</span>
             </Button>
           )}
-          <Button size="sm" className="h-10 gap-2 rounded-xl" onClick={() => setShowAddForm(true)}>
-            <Plus size={16} />
-            <span>{t("attendance.addPenalty")}</span>
-          </Button>
+          {scope === "open" && (
+            <Button size="sm" className="h-10 gap-2 rounded-xl" onClick={() => setShowAddForm(true)}>
+              <Plus size={16} />
+              <span>{t("attendance.addPenalty")}</span>
+            </Button>
+          )}
           <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10 w-auto rounded-xl" aria-label={t("attendance.from")} />
           <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-10 w-auto rounded-xl" aria-label={t("attendance.to")} />
           <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl" onClick={() => void fetchPenalties()} aria-label={t("attendance.refresh")}>
@@ -345,6 +439,13 @@ export default function PenaltiesView({
           {t("attendance.pinNotConfigured")}
         </div>
       )}
+      {scope === "archive" && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-900">
+          <Lock size={14} className="shrink-0" />
+          {t("attendance.penaltiesArchiveHint")}
+        </div>
+      )}
+
       {lockedMonths.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-900">
           <Lock size={14} className="shrink-0" />
@@ -352,6 +453,44 @@ export default function PenaltiesView({
           {lockedMonths.map((m) => (
             <span key={m} className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 font-mono text-[11px]">{m}</span>
           ))}
+        </div>
+      )}
+
+      {/* View rollups for weekly / monthly modes */}
+      {viewMode !== "daily" && (
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          {rollups.length === 0 ? (
+            <div className="py-10 text-center text-xs font-bold text-muted">
+              {t("attendance.penaltiesEmpty")}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-[11px] font-black uppercase tracking-wide text-muted">
+                    <th className="px-3 py-2 text-start">{t(viewMode === "weekly" ? "attendance.rollupWeek" : "attendance.rollupMonth")}</th>
+                    <th className="px-3 py-2 text-start">{t("attendance.kpiPenaltyCount")}</th>
+                    <th className="px-3 py-2 text-start">{t("attendance.lateMinutes")}</th>
+                    <th className="px-3 py-2 text-start">{t("attendance.penaltyAmount")}</th>
+                    <th className="px-3 py-2 text-start">{t("attendance.rollupWaived")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rollups.map((r) => (
+                    <tr key={r.key}>
+                      <td className="px-3 py-2 font-mono text-xs font-black text-main">{r.label}</td>
+                      <td className="px-3 py-2 tabular-nums font-bold text-main">{r.count}</td>
+                      <td className="px-3 py-2 tabular-nums text-muted">{r.late_minutes}</td>
+                      <td className="px-3 py-2 font-semibold tabular-nums text-danger">{formatEmployeeMoney(r.amount, locale, language)}</td>
+                      <td className="px-3 py-2 tabular-nums text-muted">
+                        {r.excused > 0 ? <span className="text-success">{r.excused}</span> : "0"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
