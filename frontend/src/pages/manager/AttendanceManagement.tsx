@@ -378,6 +378,7 @@ const AttendanceManagement = () => {
             pageSize={pageSize}
             t={t as any}
             locale={locale}
+            language={language}
           />
         )}
         </div>

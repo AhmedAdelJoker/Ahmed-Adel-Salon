@@ -2613,7 +2613,11 @@
     "penaltiesViewMonthly": "Monthly",
     "rollupWeek": "Week",
     "rollupMonth": "Month",
-    "rollupWaived": "Waived"
+    "rollupWaived": "Waived",
+    "archivePenaltiesTitle": "Archived penalties",
+    "archivePenaltiesTotal": "{count} penalties — total {amount}",
+    "archivePenaltiesEmpty": "No archived penalties in range",
+    "archivePenaltiesByEmployee": "Penalties by employee"
   },
   "settings": {
     "tabShop": "Shop data",

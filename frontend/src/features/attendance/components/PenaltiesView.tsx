@@ -78,6 +78,16 @@ export default function PenaltiesView({
   const [rows, setRows] = useState<PenaltyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"open" | "archive">("open");
+  const monthBounds = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth(); // 0-based
+    const first = new Date(y, m, 1).toISOString().split("T")[0];
+    const last = new Date(y, m + 1, 0).toISOString().split("T")[0];
+    const prevLast = new Date(y, m, 0).toISOString().split("T")[0];
+    // scope=open → current month bounds; archive → never past last day of previous month.
+    return { first, last, prevLast };
+  }, []);
   const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
 
   // Waiver gate — the 4-digit PIN is configured in attendance settings.
@@ -369,7 +379,19 @@ export default function PenaltiesView({
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => setScope(s)}
+                  onClick={() => {
+                    setScope(s);
+                    // Snap dates into the picked scope's valid window.
+                    if (s === "archive") {
+                      const pm = new Date(monthBounds.prevLast);
+                      pm.setDate(1);
+                      setStartDate(pm.toISOString().split("T")[0]);
+                      setEndDate(monthBounds.prevLast);
+                    } else {
+                      setStartDate(monthBounds.first);
+                      setEndDate(new Date().toISOString().split("T")[0]);
+                    }
+                  }}
                   className={cn(
                     "flex h-9 items-center gap-1.5 rounded-lg px-3 transition-colors",
                     active ? "bg-primary text-primary-foreground" : "text-muted hover:bg-soft hover:text-main",
@@ -424,8 +446,8 @@ export default function PenaltiesView({
               <span>{t("attendance.addPenalty")}</span>
             </Button>
           )}
-          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10 w-auto rounded-xl" aria-label={t("attendance.from")} />
-          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-10 w-auto rounded-xl" aria-label={t("attendance.to")} />
+          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10 w-auto rounded-xl" aria-label={t("attendance.from")} max={scope === "open" ? monthBounds.last : monthBounds.prevLast} />
+          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-10 w-auto rounded-xl" aria-label={t("attendance.to")} max={scope === "open" ? new Date().toISOString().split("T")[0] : monthBounds.prevLast} />
           <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl" onClick={() => void fetchPenalties()} aria-label={t("attendance.refresh")}>
             <RefreshCw size={16} className={cn(loading && "animate-spin")} />
           </Button>

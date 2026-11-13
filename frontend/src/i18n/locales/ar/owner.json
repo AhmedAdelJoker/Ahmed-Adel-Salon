@@ -2613,7 +2613,11 @@
     "penaltiesViewMonthly": "شهري",
     "rollupWeek": "الأسبوع",
     "rollupMonth": "الشهر",
-    "rollupWaived": "معفاة"
+    "rollupWaived": "معفاة",
+    "archivePenaltiesTitle": "الجزاءات المؤرشفة",
+    "archivePenaltiesTotal": "{count} جزاء — إجمالي {amount}",
+    "archivePenaltiesEmpty": "لا توجد جزاءات مؤرشفة في النطاق المحدد",
+    "archivePenaltiesByEmployee": "الجزاءات حسب الموظف"
   },
   "settings": {
     "tabShop": "بيانات المنشأة",
