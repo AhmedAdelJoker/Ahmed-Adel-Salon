@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BadgeCheck, BadgeX, Receipt, Loader2, RefreshCw, Plus, Lock, ShieldCheck } from "lucide-react";
+import { BadgeCheck, BadgeX, Receipt, Loader2, RefreshCw, Plus, Lock, ShieldCheck, CalendarClock, Pencil } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -85,6 +86,20 @@ export default function PenaltiesView({
   const [waiveTarget, setWaiveTarget] = useState<PenaltyRow | null>(null);
   const [waiverPin, setWaiverPin] = useState("");
   const [isWaiving, setIsWaiving] = useState(false);
+  const [isComputingAbsence, setIsComputingAbsence] = useState(false);
+  const [editTarget, setEditTarget] = useState<PenaltyRow | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editPin, setEditPin] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const { user } = useAuth();
+  const isManagement = ["owner", "admin", "manager"].includes(
+    String(user?.role || "").toLowerCase(),
+  );
+  const absenceMonth = useMemo(
+    () => (endDate || new Date().toISOString().split("T")[0]).slice(0, 7),
+    [endDate],
+  );
 
   // Manual-add dialog state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -221,6 +236,68 @@ export default function PenaltiesView({
     }
   };
 
+  const handleComputeAbsence = async () => {
+    if (isComputingAbsence) return;
+    setIsComputingAbsence(true);
+    try {
+      const res = await api.post("/barber-presence/penalties/compute-absence", {
+        month: absenceMonth,
+      });
+      const created = Number(res.data?.created ?? 0);
+      toast.success(
+        created > 0
+          ? t("attendance.absencesComputed", { count: created })
+          : t("attendance.absencesComputedNone", { month: absenceMonth }),
+      );
+      await fetchPenalties();
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: unknown } } };
+      const detail = e?.response?.data?.detail;
+      toast.error(
+        typeof detail === "string" ? detail : t("attendance.absencesComputedFailed"),
+      );
+    } finally {
+      setIsComputingAbsence(false);
+    }
+  };
+
+  const handleConfirmEditAmount = async () => {
+    if (!editTarget || isSavingEdit) return;
+    const amount = Number(editAmount);
+    if (!Number.isFinite(amount) || amount < 0 || amount > 100000) {
+      return toast.error(t("attendance.penaltyInvalidAmount"));
+    }
+    if (editPin.length !== 4) {
+      return toast.error(t("attendance.penaltyPinInvalid"));
+    }
+    setIsSavingEdit(true);
+    try {
+      const res = await api.patch(`/barber-presence/penalties/${editTarget.id}`, {
+        amount,
+        pin: editPin,
+      });
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === editTarget.id
+            ? { ...r, penalty_amount: Number(res.data?.penalty_amount ?? amount) }
+            : r,
+        ),
+      );
+      toast.success(t("attendance.penaltyAmountUpdated"));
+      setEditTarget(null);
+      setEditAmount("");
+      setEditPin("");
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: unknown } } };
+      const detail = e?.response?.data?.detail;
+      toast.error(
+        typeof detail === "string" ? detail : t("attendance.penaltyEditFailed"),
+      );
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   return (
     <div
       className="space-y-4"
@@ -236,6 +313,19 @@ export default function PenaltiesView({
           <p className="mt-1 text-xs font-medium text-muted">{t("attendance.penaltiesHint")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {isManagement && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 gap-2 rounded-xl"
+              onClick={() => void handleComputeAbsence()}
+              disabled={isComputingAbsence}
+              title={t("attendance.absencesComputeTitle", { month: absenceMonth })}
+            >
+              {isComputingAbsence ? <Loader2 size={16} className="animate-spin" /> : <CalendarClock size={16} />}
+              <span>{t("attendance.absencesCompute")}</span>
+            </Button>
+          )}
           <Button size="sm" className="h-10 gap-2 rounded-xl" onClick={() => setShowAddForm(true)}>
             <Plus size={16} />
             <span>{t("attendance.addPenalty")}</span>
@@ -353,20 +443,37 @@ export default function PenaltiesView({
                         <ShieldCheck size={12} /> {t("attendance.waivedPermanent")}
                       </span>
                     ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-9 rounded-xl text-xs font-bold"
-                        disabled={rowLocked(row)}
-                        title={rowLocked(row) ? t("attendance.monthLocked") : undefined}
-                        onClick={() => {
-                          setWaiveTarget(row);
-                          setWaiverPin("");
-                        }}
-                      >
-                        {rowLocked(row) ? <Lock size={12} /> : null}
-                        {t("attendance.waivePenalty")}
-                      </Button>
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        {isManagement && !rowLocked(row) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditTarget(row);
+                              setEditAmount(String(row.penalty_amount ?? ""));
+                              setEditPin("");
+                            }}
+                            title={t("attendance.editPenaltyAmount")}
+                            aria-label={t("attendance.editPenaltyAmount")}
+                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted transition-colors hover:border-accent hover:text-accent"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-9 rounded-xl text-xs font-bold"
+                          disabled={rowLocked(row)}
+                          title={rowLocked(row) ? t("attendance.monthLocked") : undefined}
+                          onClick={() => {
+                            setWaiveTarget(row);
+                            setWaiverPin("");
+                          }}
+                        >
+                          {rowLocked(row) ? <Lock size={12} /> : null}
+                          {t("attendance.waivePenalty")}
+                        </Button>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
@@ -428,7 +535,72 @@ export default function PenaltiesView({
         </DialogContent>
       </Dialog>
 
-      {/* Manual penalty dialog — the manual counterpart to the punch engine */}
+      {/* Edit-amount dialog: PATCH with PIN, audit-logged, management-only */}
+      <Dialog open={editTarget != null} onOpenChange={(open) => { if (!open) { setEditTarget(null); setEditAmount(""); setEditPin(""); } }}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black">{t("attendance.editPenaltyAmountTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border bg-muted/10 p-3 text-xs font-medium text-muted">
+              {t("attendance.editPenaltyAmountHint", { amount: editTarget ? formatEmployeeMoney(editTarget.penalty_amount, locale, language) : "" })}
+            </div>
+            <div>
+              <label htmlFor="edit-amount" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                {t("attendance.penaltyAmount")}
+              </label>
+              <Input
+                id="edit-amount"
+                type="number"
+                min={0}
+                max={100000}
+                step="0.5"
+                value={editAmount}
+                onChange={(e) => setEditAmount(e.target.value)}
+                className="h-12 rounded-xl font-black tabular-nums"
+              />
+            </div>
+            {!pinConfigured ? (
+              <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs font-bold text-amber-900">
+                {t("attendance.pinNotConfigured")}
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="edit-pin" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                  {t("attendance.penaltyPinLabel")}
+                </label>
+                <Input
+                  id="edit-pin"
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={4}
+                  autoFocus
+                  value={editPin}
+                  onChange={(e) => setEditPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="••••"
+                  onKeyDown={(e) => { if (e.key === "Enter" && editPin.length === 4) void handleConfirmEditAmount(); }}
+                  className="h-12 rounded-xl text-center text-xl tracking-[0.6em]"
+                />
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="h-11 flex-1 rounded-xl" onClick={() => { setEditTarget(null); setEditAmount(""); setEditPin(""); }}>
+                {t("attendance.cancel")}
+              </Button>
+              <Button
+                className="h-11 flex-1 rounded-xl"
+                disabled={!pinConfigured || editPin.length !== 4 || isSavingEdit || editAmount.trim() === ""}
+                onClick={() => void handleConfirmEditAmount()}
+              >
+                {isSavingEdit ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                <span>{isSavingEdit ? t("attendance.submitting") : t("attendance.save")}</span>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>

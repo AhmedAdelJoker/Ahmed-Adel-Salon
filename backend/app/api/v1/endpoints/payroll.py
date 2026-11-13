@@ -155,6 +155,13 @@ def calculate_payroll(
     else:
         end_date = datetime(req.year, req.month + 1, 1)
 
+    # Full-day absence penalties are generated as part of payroll calculation —
+    # this is the "automatic" half of the absence system. The manual backfill
+    # button in the penalties tab calls the same service. Idempotent.
+    from app.services.absence_service import ensure_absence_penalties
+
+    ensure_absence_penalties(db, year=req.year, month=req.month, created_by_user_id=current_user.id)
+
     # Fetch active employees
     employees = db.query(Employee).filter(Employee.is_active == True).all()
     

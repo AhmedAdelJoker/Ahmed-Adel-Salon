@@ -296,9 +296,11 @@ export async function exportAttendancePDF(opts: {
   const { rows, locale, t } = opts;
 
   // jsPDF + helvetica cannot render Arabic — the glyphs left WinAnsi encoding
-  // and came out as garbage. A printable RTL HTML document sidesteps font
-  // embedding entirely: the browser shapes Arabic natively, and the print
-  // dialog saves a real PDF with selectable text.
+  // and came out as garbage. The previous window.open() print approach worked
+  // in unblocked browsers but was silently dropped by popup blockers (the
+  // button then did nothing at all). A hidden iframe sidesteps both: the
+  // browser shapes Arabic natively, and printing the iframe's document needs
+  // no popup permission. "Save as PDF" is the browser's own export path.
   const escapeHtml = (value: unknown) =>
     String(value ?? "—")
       .replace(/&/g, "&amp;")
@@ -359,16 +361,45 @@ export async function exportAttendancePDF(opts: {
       ? `<table><thead><tr><th>${escapeHtml(t("attendance.colEmployee"))}</th><th>${escapeHtml(t("attendance.colOperation"))}</th><th>${escapeHtml(t("attendance.colDateTime"))}</th></tr></thead><tbody>${tableRows}</tbody></table>`
       : `<p class="empty">${escapeHtml(t("attendance.noDataToday"))}</p>`
   }
-  <script>window.onload = () => { window.print(); }</script>
 </body>
 </html>`;
 
-  const win = window.open("", "_blank", "noopener,width=900,height=700");
-  if (!win) {
-    toast.error(t("attendance.exportPdfFailed"));
-    return;
+  // Hidden same-origin iframe: content is fully under this page's control, a
+  // popup is never requested, and print happens against `iframe.contentWindow`.
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+
+  try {
+    const frameDoc = iframe.contentWindow?.document;
+    if (!frameDoc) throw new Error("iframe document unavailable");
+    frameDoc.open();
+    frameDoc.write(html);
+    frameDoc.close();
+    // Let layout settle before invoking print — some engines drop the call
+    // when the document hasn't finished first paint.
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 120));
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    toast.success(t("attendance.pdfSuccess"));
+    // Delay removal so the print dialog can consume the document.
+    window.setTimeout(() => iframe.remove(), 2000);
+  } catch {
+    iframe.remove();
+    // Fall back to the pop-up route only if the iframe was refused entirely.
+    const win = window.open("", "_blank", "noopener,width=900,height=700");
+    if (!win) {
+      toast.error(t("attendance.exportPdfFailed"));
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    toast.success(t("attendance.pdfSuccess"));
   }
-  win.document.write(html);
-  win.document.close();
-  toast.success(t("attendance.pdfSuccess"));
 }

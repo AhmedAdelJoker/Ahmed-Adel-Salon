@@ -1443,7 +1443,13 @@
       "24": "الوادي الجديد",
       "25": "مطروح"
     },
-    "fileFooterHint": "للتعديل أو الرواتب أو الحضور، استخدم أزرار صف الموظف."
+    "accessRole": {
+      "owner": "مالك (صلاحيات كاملة)",
+      "manager": "مدير",
+      "accountant": "محاسب",
+      "cashier": "كاشير",
+      "barber": "حلاق"
+    }
   },
   "expenses": {
     "title": "إدارة المصاريف",
@@ -2585,7 +2591,18 @@
     "waivedPermanent": "مُعفى نهائياً",
     "waiveConfirm": "إعفاء نهائياً",
     "penaltyWaivedPermanently": "تم إعفاء الجزاء نهائياً",
-    "penaltyWaiveFailed": "تعذر إعفاء الجزاء"
+    "penaltyWaiveFailed": "تعذر إعفاء الجزاء",
+    "absencesCompute": "احتساب غياب الشهر",
+    "absencesComputeTitle": "احتساب غياب شهر {month}",
+    "absencesComputeFailed": "تعذر احتساب الغياب",
+    "absencesComputed": "تم تسجيل {count} جزاء غياب",
+    "absencesComputedNone": "لا يوجد غياب لحساب الشهر {month}",
+    "absencesComputedFailed": "تعذر احتساب الغياب",
+    "editPenaltyAmount": "تعديل قيمة الجزاء",
+    "editPenaltyAmountTitle": "تعديل قيمة الجزاء",
+    "editPenaltyAmountHint": "القيمة الحالية: {amount}",
+    "penaltyAmountUpdated": "تم تعديل قيمة الجزاء",
+    "penaltyEditFailed": "تعذر تعديل قيمة الجزاء"
   },
   "settings": {
     "tabShop": "بيانات المنشأة",

@@ -1443,7 +1443,13 @@
       "24": "New Valley",
       "25": "Matrouh"
     },
-    "fileFooterHint": "To edit, or to open payroll and attendance, use the buttons on the employee's row."
+    "accessRole": {
+      "owner": "Owner (full access)",
+      "manager": "Manager",
+      "accountant": "Accountant",
+      "cashier": "Cashier",
+      "barber": "Barber"
+    }
   },
   "expenses": {
     "title": "Expense Management",
@@ -2585,7 +2591,18 @@
     "waivedPermanent": "Waived (final)",
     "waiveConfirm": "Waive permanently",
     "penaltyWaivedPermanently": "Penalty waived permanently",
-    "penaltyWaiveFailed": "Could not waive penalty"
+    "penaltyWaiveFailed": "Could not waive penalty",
+    "absencesCompute": "Compute month's absences",
+    "absencesComputeTitle": "Compute absences for {month}",
+    "absencesComputeFailed": "Could not compute absences",
+    "absencesComputed": "Logged {count} absence penalties",
+    "absencesComputedNone": "Nothing to compute for {month}",
+    "absencesComputedFailed": "Could not compute absences",
+    "editPenaltyAmount": "Edit penalty amount",
+    "editPenaltyAmountTitle": "Edit penalty amount",
+    "editPenaltyAmountHint": "Current amount: {amount}",
+    "penaltyAmountUpdated": "Penalty amount updated",
+    "penaltyEditFailed": "Could not update penalty amount"
   },
   "settings": {
     "tabShop": "Shop data",

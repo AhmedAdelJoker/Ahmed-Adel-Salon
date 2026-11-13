@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import extract
 from datetime import datetime, timedelta, date, time as dt_time
 from typing import Optional
+from decimal import Decimal
 import io
+import re
 
 import pandas as pd
 
@@ -706,6 +708,39 @@ def get_penalty_months(
     }
 
 
+@router.post(
+    "/penalties/compute-absence",
+    dependencies=[Depends(rate_limit("absence_compute", max_requests=5, window_seconds=60))],
+)
+def compute_absence_penalties(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_manager),
+):
+    """Manual backfill for the absence detector.
+
+    The automatic path runs inside /payroll/calculate; this endpoint lets a
+    manager trigger the same generator from the penalties tab for any month —
+    typically to backfill the current month on day N without running payroll.
+    Idempotent by (employee, date, source="absence").
+    """
+    from app.services.absence_service import ensure_absence_penalties
+
+    month_raw = str(payload.get("month") or "").strip()
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month_raw):
+        raise HTTPException(status_code=422, detail="month يجب أن يكون بصيغة YYYY-MM")
+    year, month = int(month_raw[:4]), int(month_raw[5:7])
+
+    summary = ensure_absence_penalties(
+        db,
+        year=year,
+        month=month,
+        created_by_user_id=current_user.id,
+    )
+
+    return {"month": month_raw, **summary}
+
+
 @router.post("/penalties")
 def create_manual_penalty(
     payload: dict,
@@ -816,17 +851,88 @@ def set_penalty_excused(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    """إعفاء الجزاء — عملية نهائية، تتطلب رقم إلغاء من 4 أرقام.
+    """إعفاء الجزاء أو تعديل قيمته — يتطلب رقم إلغاء من 4 أرقام.
 
-    بمجرد الإعفاء لا يمكن التراجع عنه (لا يوجد مسار undo)، والشهر المقفول
-    في الأرشيف (month_closures) مجمّد تماماً: لا إضافة، لا إعفاء، ولا
-    جزاء تلقائي جديد.
+    عمليات:
+    - is_excused=true → إعفاء نهائي (irreversible) كما هو.
+    - amount=<number> → تعديل قيمة جزاء مفتوح (غير معفي، غير مقفول) —
+      العملية reversible وبسجل نشاط.
+
+    الشهر المقفول في الأرشيف (month_closures) مجمّد تماماً: لا إضافة،
+    لا إعفاء، ولا تعديل قيمة.
     """
     penalty = db.query(AttendancePenalty).filter(AttendancePenalty.id == penalty_id).first()
     if not penalty:
         raise HTTPException(status_code=404, detail="الجزاء غير موجود")
 
-    is_excused = payload.get("is_excused")
+    amount_payload = payload.get("amount")
+    waive_payload = payload.get("is_excused")
+
+    if amount_payload is not None and waive_payload is not None:
+        raise HTTPException(status_code=400, detail="أرسل amount أو is_excused فقط — لا الاثنين معاً")
+
+    if amount_payload is not None:
+        # --- Manual amount override (editable, audited) ---
+        if month_is_locked(db, penalty.date):
+            raise HTTPException(
+                status_code=409,
+                detail=f"شهر {penalty.date.strftime('%Y-%m')} مقفول في الأرشيف — لا يمكن تعديل الجزاءات عليه",
+            )
+        if penalty.is_excused:
+            raise HTTPException(status_code=409, detail="الجزاء مُعفى — لا يمكن تعديل قيمته")
+
+        try:
+            new_amount = Decimal(str(amount_payload))
+        except Exception:
+            raise HTTPException(status_code=422, detail="قيمة الجزاء يجب أن تكون رقماً") from None
+        if new_amount < 0 or new_amount > Decimal("100000"):
+            raise HTTPException(status_code=422, detail="قيمة الجزاء يجب أن تكون بين 0 و 100000")
+
+        pin = payload.get("pin")
+        if not isinstance(pin, str) or len(pin) != 4 or not pin.isdigit():
+            raise HTTPException(status_code=400, detail="رقم الإلغاء يجب أن يكون 4 أرقام")
+
+        settings = db.query(BusinessSettings).first()
+        if not settings or not settings.penalty_cancel_pin_hash:
+            raise HTTPException(status_code=409, detail="رقم الإلغاء غير مضبوط — اضبطه من إعدادات الحضور أولاً")
+
+        if not verify_password(pin, settings.penalty_cancel_pin_hash):
+            log_activity(
+                db,
+                user_id=current_user.id,
+                action="PENALTY_EDIT_FAILED",
+                entity_type="AttendancePenalty",
+                entity_id=str(penalty.id),
+                description=f"محاولة تعديل جزاء #{penalty.id} برقم غير صحيح",
+            )
+            raise HTTPException(status_code=403, detail="رقم الإلغاء غير صحيح")
+
+        old_amount = penalty.penalty_amount
+        penalty.penalty_amount = new_amount
+        db.commit()
+        db.refresh(penalty)
+
+        employee = db.query(Employee).filter(Employee.id == penalty.employee_id).first()
+        log_activity(
+            db,
+            user_id=current_user.id,
+            action="EDIT_PENALTY_AMOUNT",
+            entity_type="AttendancePenalty",
+            entity_id=str(penalty.id),
+            description=(
+                f"تعديل قيمة جزاء #{penalty.id} للموظف "
+                f"{employee.full_name if employee else penalty.employee_id}: "
+                f"{old_amount} ← {new_amount}"
+            ),
+        )
+
+        return {
+            "id": penalty.id,
+            "penalty_amount": float(penalty.penalty_amount or 0),
+            "message": "تم تعديل قيمة الجزاء",
+        }
+
+    is_excused = waive_payload
     if is_excused is not True:
         # No un-waiving exists. A waiver that can be undone is not a waiver.
         raise HTTPException(status_code=409, detail="الإعفاء نهائي ولا يمكن التراجع عنه")
