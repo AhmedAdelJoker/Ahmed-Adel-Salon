@@ -494,6 +494,14 @@ export function getEstimatedUnitCost(product) {
   return costPrice > 0 ? costPrice : 0;
 }
 
+export function getEstimatedUnitPrice(product) {
+  const sellPrice = Number(product?.sell_price || 0);
+  const weight = Number(product?.weight || 0);
+
+  if (weight > 0) return sellPrice / weight;
+  return sellPrice > 0 ? sellPrice : 0;
+}
+
 export function formatNumber(value, maximumFractionDigits = 2) {
   const num = Number(value || 0);
   return num.toLocaleString("ar-EG", {

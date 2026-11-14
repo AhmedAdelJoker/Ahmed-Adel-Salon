@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.customer import Customer
 from app.models.product import Product
 from app.services.activity_service import log_activity
+from app.services.inventory_service import add_stock
 from app.core.upload_security import validate_data_sheet
 
 router = APIRouter(prefix="/imports", tags=["Imports"])
@@ -154,16 +155,35 @@ async def import_products(
                     if existing:
                         continue
                 
+                quantity = (
+                    float(row.get('quantity', 0))
+                    if pd.notna(row.get('quantity'))
+                    else 0
+                )
+                # The spreadsheet's quantity is the opening balance. It goes
+                # through `add_stock` rather than straight onto the row, because
+                # the ledger is what the archive screen replays: a quantity with
+                # no movement behind it makes every before/after balance on that
+                # screen wrong by the imported amount.
                 product = Product(
                     name=name,
                     sku=sku,
-                    quantity=float(row.get('quantity', 0)) if pd.notna(row.get('quantity')) else 0,
+                    quantity=0,
                     cost_price=float(row.get('cost_price', 0)) if pd.notna(row.get('cost_price')) else 0,
                     sell_price=float(row.get('sell_price', 0)) if pd.notna(row.get('sell_price')) else 0,
                     unit=str(row.get('unit', 'قطعة')).strip() if pd.notna(row.get('unit')) else 'قطعة',
                     is_active=True
                 )
                 db.add(product)
+                db.flush()
+                if quantity > 0:
+                    add_stock(
+                        db,
+                        product=product,
+                        amount=quantity,
+                        note=f"رصيد افتتاحي - استيراد {file.filename}",
+                        created_by_user_id=current_user.id,
+                    )
                 count += 1
             except Exception as e:
                 errors.append(f"خطأ في السطر {index + 2}: {str(e)}")

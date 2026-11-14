@@ -107,10 +107,18 @@ def _sniff_mime(content: bytes) -> str | None:
     # xlsx / docx / zip-based formats all start with PK\x03\x04
     if head[:4] == b"PK\x03\x04":
         return "application/zip"
-    # Plain text / CSV heuristic
+    # Plain text / CSV heuristic.
+    #
+    # Decode a generous prefix with `errors="ignore"` rather than the 16-byte
+    # magic header: a UTF-8 Arabic header is multi-byte, so byte 16 can land
+    # in the middle of a character and turn a perfectly valid CSV into a
+    # UnicodeDecodeError -- which the caller reports as "the content does not
+    # match the extension", i.e. an import of an Arabic spreadsheet failed as
+    # if it were malware.
     try:
-        head.decode("utf-8")
-        if "," in head.decode("utf-8", errors="ignore").splitlines()[0]:
+        text = content[:4096].decode("utf-8", errors="ignore")
+        first_line = text.splitlines()[0] if text else ""
+        if "," in first_line:
             return "text/csv"
     except (UnicodeDecodeError, IndexError):
         pass

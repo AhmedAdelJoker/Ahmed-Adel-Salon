@@ -587,18 +587,43 @@ def _service_rows(services: list[Service]) -> list[list]:
 
 
 def _query_products(
-    db: Session, *, search: str | None, q: str | None, status: str | None
+    db: Session,
+    *,
+    search: str | None,
+    q: str | None,
+    status: str | None,
+    is_archived: str | None = None,
 ) -> list[Product]:
+    """
+    The products behind the inventory screen, filtered the way it filters them.
+
+    The screen shows one tab at a time -- the active rows, or the archived
+    ones -- and searches by name, SKU, category or company. The export used to
+    match only name/SKU/unit and ignore the tab entirely, so exporting from
+    the active tab handed the owner a file that also contained everything that
+    had been archived, and a category search exported the whole catalogue.
+    """
     term = _optional_text(search) or _optional_text(q)
     status_filter = _optional_text(status)
+    archived_filter = _optional_text(is_archived)
     products = db.query(Product).order_by(Product.id.desc()).all()
     result = []
     for product in products:
-        if not _matches_term(term, product.name, product.sku, product.unit):
+        if not _matches_term(
+            term,
+            product.name,
+            product.sku,
+            product.category,
+            product.company_name,
+        ):
             continue
         if status_filter == "active" and not product.is_active:
             continue
         if status_filter == "inactive" and product.is_active:
+            continue
+        if archived_filter in {"true", "1", "yes"} and not product.is_archived:
+            continue
+        if archived_filter in {"false", "0", "no"} and product.is_archived:
             continue
         result.append(product)
     return result
@@ -1360,10 +1385,13 @@ def export_products_excel(
     search: str | None = Query(default=None),
     q: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    is_archived: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    rows = _product_rows(_query_products(db, search=search, q=q, status=status))
+    rows = _product_rows(
+        _query_products(db, search=search, q=q, status=status, is_archived=is_archived)
+    )
     log_activity(db, user_id=current_user.id, action="export", entity_type="product", description="تصدير قائمة المنتجات (Excel)")
     return _make_excel_response(
         sheet_name="Products",
@@ -1378,10 +1406,13 @@ def export_products_csv(
     search: str | None = Query(default=None),
     q: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    is_archived: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    rows = _product_rows(_query_products(db, search=search, q=q, status=status))
+    rows = _product_rows(
+        _query_products(db, search=search, q=q, status=status, is_archived=is_archived)
+    )
     log_activity(db, user_id=current_user.id, action="export", entity_type="product", description="تصدير قائمة المنتجات (CSV)")
     return _make_csv_response(columns=PRODUCT_COLUMNS, rows=rows, base_name="products")
 

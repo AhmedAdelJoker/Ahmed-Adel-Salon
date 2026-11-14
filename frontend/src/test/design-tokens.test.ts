@@ -87,6 +87,7 @@ const LITERAL_COLOR_ALLOWLIST = new Set([
   "lib/export/utils.ts", // builds HTML/PDF strings outside the DOM
   "lib/export/customerPDF.ts", // standalone print document outside the app CSS scope
   "features/attendance/utils/attendance.ts", // standalone print document outside the app CSS scope
+  "features/attendance/components/ArchiveView.tsx", // standalone print document outside the app CSS scope
   "features/pos/utils.ts", // canvas confetti particle colours
 ]);
 

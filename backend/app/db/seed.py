@@ -8,6 +8,7 @@ from app.models.employee import Employee
 from app.models.service import Service
 from app.models.service_category import ServiceCategory
 from app.models.product import Product
+from app.models.inventory_log import InventoryLog
 from app.models.expense import Expense
 from app.core.security import get_password_hash
 from app.core.config import settings as app_settings
@@ -101,6 +102,20 @@ def seed_data(include_demo_data: bool = True):
                 Product(name="كريم حلاقة", category="حلاقة", unit="g", weight=Decimal("500.00"), quantity=Decimal("4000.00"), sell_price=Decimal("35.00"), cost_price=Decimal("0.07")),
             ]
             db.add_all(products)
+            db.flush()
+            # A seeded quantity is an opening balance, so it gets a movement
+            # like any other. Without this row the archive screen replays a
+            # ledger that sums to zero against a shelf that does not, and every
+            # before/after balance it shows is off by the seeded amount.
+            for product in products:
+                db.add(
+                    InventoryLog(
+                        product_id=product.id,
+                        change_amount=product.quantity,
+                        type="add",
+                        note="رصيد افتتاحي - بيانات تجريبية",
+                    )
+                )
             print("[seed] Products created")
 
         # ✅ Expenses

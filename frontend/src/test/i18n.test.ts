@@ -169,7 +169,7 @@ describe("i18n", () => {
     // translated.
     const PLACEHOLDER = /\{\{[^{}]*\}\}/g;
     const ALLOWED =
-      /\b(?:requestDevice|WebUSB|Electron|TAURI|Chrome|Edge|Ctrl|Enter|SMTP|API|URL|SSL|POS|CSV|PDF|Excel|Email|VAT|USB|QR|Code|Web|ID|VIP|XXX)\b/g;
+      /\b(?:requestDevice|WebUSB|Electron|TAURI|Chrome|Edge|Ctrl|Enter|SMTP|API|URL|SSL|POS|CSV|PDF|PNG|JPG|JPEG|GIF|WEBP|Excel|Email|VAT|USB|QR|Code|Web|ID|VIP|XXX)\b/g;
     const leaks: string[] = [];
 
     for (const [ns, tree] of Object.entries(readLocale("ar"))) {

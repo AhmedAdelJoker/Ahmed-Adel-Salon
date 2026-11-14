@@ -164,7 +164,7 @@ export default function SuppliesArchive() {
   const hasFilters = !!(searchTerm || filterType !== "all" || fromDate || toDate);
 
   return (
-    <div className="min-h-screen app-shell-bg p-4 sm:p-6 lg:p-8" dir="rtl">
+    <div className="min-h-screen app-shell-bg p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={t("inventoryArchive.title")}
         subtitle={t("inventoryArchive.subtitle")}

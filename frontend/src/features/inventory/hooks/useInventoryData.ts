@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import api, { baseURL } from "@/services/api";
+import i18n from "@/i18n";
 import { normalizeListResponse } from "@/services/apiAdapter";
 import { exportService } from "@/services/exportService";
 import { Droplets, Box } from "lucide-react";
@@ -33,10 +34,13 @@ export function useInventoryData(
   searchTerm: string,
   activeTab: "active" | "archived",
   lowStockOnly = false,
+  sort = "",
+  category = "",
 ) {
   const [products, setProducts] = useState<InventoryProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<InventoryStats | null>(null);
+  const [summaryReady, setSummaryReady] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [total, setTotal] = useState(0);
@@ -60,6 +64,11 @@ export function useInventoryData(
       });
     } catch {
       setSummary(null);
+    } finally {
+      // The hero shows a shimmer skeleton rather than "0.00" while the first
+      // summary request is in flight -- a zero that flashes and then jumps to
+      // the real number reads as a bug, because it is one.
+      setSummaryReady(true);
     }
   }, [searchTerm]);
 
@@ -71,6 +80,8 @@ export function useInventoryData(
           q: searchTerm || undefined,
           is_archived: activeTab === "archived",
           low_stock: lowStockOnly || undefined,
+          sort: sort || undefined,
+          category: category || undefined,
           page,
           page_size: pageSize,
         },
@@ -79,11 +90,15 @@ export function useInventoryData(
       setProducts(items);
       setTotal(Number(totalCount ?? items.length));
     } catch {
-      toast.error("تعذر تحميل بيانات المخزون");
+      toast.error(
+        i18n.t("owner:inventory.loadError", {
+          defaultValue: "تعذر تحميل بيانات المخزون",
+        }),
+      );
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, activeTab, page, pageSize, lowStockOnly]);
+  }, [searchTerm, activeTab, page, pageSize, lowStockOnly, sort, category]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -95,7 +110,7 @@ export function useInventoryData(
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, activeTab, lowStockOnly]);
+  }, [searchTerm, activeTab, lowStockOnly, sort, category]);
 
   const stats: InventoryStats = useMemo(
     () =>
@@ -145,7 +160,13 @@ export function useInventoryData(
     void exportService.downloadExcel(
       "/exports/products/excel",
       `products_${new Date().toISOString().slice(0, 10)}`,
-      { q: searchTerm || undefined, is_archived: activeTab === "archived" ? true : undefined },
+      {
+        q: searchTerm || undefined,
+        // The tab decides what is on screen, so it decides what is in the
+        // file: exporting from the active tab used to hand over the archived
+        // rows as well.
+        is_archived: activeTab === "archived" ? "true" : "false",
+      },
     );
   };
 
@@ -159,6 +180,7 @@ export function useInventoryData(
     products,
     loading,
     stats,
+    summaryReady,
     uniqueCategories,
     filteredProducts,
     getCategoryTone,

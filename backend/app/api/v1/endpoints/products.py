@@ -1,8 +1,9 @@
+from datetime import timedelta
 from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Response
-from sqlalchemy import func, or_
+from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
@@ -29,6 +30,7 @@ from app.schemas.inventory import (
 from app.services.inventory_service import add_stock, remove_stock, adjust_stock
 from app.services.activity_log_service import log_activity
 from app.utils.media import process_image_content, get_upload_path
+from app.core.clock import salon_now
 from app.core.upload_security import validate_image
 
 router = APIRouter(prefix="/products", tags=["Products Inventory"])
@@ -52,15 +54,31 @@ def _has_stock(product: Product) -> bool:
     return float(product.quantity or 0) > 0
 
 
-def _get_estimated_gram_cost(product: Product) -> Decimal:
-    weight = Decimal(str(product.weight or 0))
-    cost_price = Decimal(str(product.cost_price or 0))
+def _unit_cost_of(
+    quantity,
+    cost_price,
+    sell_price,
+    weight,
+) -> tuple[Decimal, Decimal]:
+    """The money one row of stock is worth: (cost, value).
 
-    if weight > 0:
-        return cost_price / weight
-    if (product.unit or "g").lower() == "g":
-        return cost_price
-    return Decimal("0")
+    `cost_price` and `sell_price` are per *pack*; `weight` is how many base
+    units a pack holds. The quantity on the row is in base units. So the row is
+    worth `quantity * (price / weight)` -- and a product with no pack size
+    keeps its own price, because there one unit is one pack.
+
+    Returned as a pair so the caller does not divide twice, and computed in
+    Python because SQLite divides two integers into an integer: `25 / 250` is
+    `0` there, not `0.1`, which silently zeroed the pack-priced rows.
+    """
+    quantity_d = Decimal(str(quantity or 0))
+    cost_d = Decimal(str(cost_price or 0))
+    price_d = Decimal(str(sell_price or 0))
+    weight_d = Decimal(str(weight or 0))
+
+    if weight_d > 0:
+        return quantity_d * (cost_d / weight_d), quantity_d * (price_d / weight_d)
+    return quantity_d * cost_d, quantity_d * price_d
 
 
 @router.get("", response_model=list[ProductRead])
@@ -87,6 +105,12 @@ def list_products(
             or_(
                 Product.name.ilike(search),
                 Product.sku.ilike(search),
+                # The category is searchable here for the same reason it is in
+                # `/products/summary`: the KPI row counts the category, so a
+                # search that finds it in one place must find it in the other.
+                # Without this, searching a category name showed "1 result" in
+                # the KPI and an empty list underneath it.
+                Product.category.ilike(search),
                 Product.company_name.ilike(search)
             )
         )
@@ -98,7 +122,13 @@ def list_products(
         query = query.filter(Product.is_archived == is_archived)
 
     if low_stock:
-        query = query.filter(Product.quantity <= Product.min_quantity_alert)
+        # The archived rows are not on the shelf, so a low-stock filter is
+        # about what is there now. The KPI counts the same set (see
+        # `/products/summary`), so the banner and the list agree.
+        query = query.filter(
+            Product.is_archived.is_(False),
+            Product.quantity <= Product.min_quantity_alert,
+        )
 
     # Phase 2: optional explicit sort
     if sort:
@@ -165,14 +195,31 @@ def get_products_summary(
         .scalar()
         or 0
     )
-    totals = (
+    # The money in the shelf is base units times the *unit* price, not times
+    # the pack price: `quantity` is grams/millilitres/pieces, while
+    # `cost_price` and `sell_price` are per pack. Multiplying grams by the
+    # price of a pack overstated the stock by the pack size -- 250x for a 250g
+    # pack, 1000x for a litre.
+    #
+    # Summed in Python rather than SQL, for two reasons. SQLite divides two
+    # integers into an integer (`25 / 250` is 0, not 0.1), so the division
+    # has to happen somewhere that knows about decimals; and the money is
+    # `Decimal` everywhere else, so it stays `Decimal` here too.
+    money_rows = (
         base.with_entities(
-            func.coalesce(func.sum(Product.quantity * Product.cost_price), 0),
-            func.coalesce(func.sum(Product.quantity * func.coalesce(Product.sell_price, 0)), 0),
+            Product.quantity,
+            Product.cost_price,
+            Product.sell_price,
+            Product.weight,
         )
         .filter(Product.is_archived.is_(False))
-        .one()
+        .all()
     )
+    total_cost = Decimal("0")
+    total_value = Decimal("0")
+    for quantity, cost_price, sell_price, weight in money_rows:
+        total_cost += _unit_cost_of(quantity, cost_price, sell_price, weight)[0]
+        total_value += _unit_cost_of(quantity, cost_price, sell_price, weight)[1]
     categories = (
         base.with_entities(func.count(func.distinct(Product.category)))
         .filter(Product.category.isnot(None), Product.category != "")
@@ -184,10 +231,205 @@ def get_products_summary(
         active=int(active),
         archived=int(archived),
         low_stock=int(low_stock),
-        total_cost=Decimal(str(totals[0] or 0)),
-        total_value=Decimal(str(totals[1] or 0)),
+        total_cost=total_cost,
+        total_value=total_value,
         categories=int(categories),
     )
+
+
+@router.get("/insights")
+def get_products_insights(
+    days: int = Query(60, ge=1, le=365),
+    limit: int = Query(4, ge=1, le=12),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+):
+    """
+    The numbers behind the inventory dashboard.
+
+    `/products/summary` answers "how much is on the shelf"; this answers "where
+    is the money and what is moving":
+
+    - `top_by_value`: the lines that hold the most selling value.
+    - `most_consumed`: what went out in the last `days` (removals only).
+    - `stagnant`: what has not moved in `days` -- including products that were
+      created and never received a single movement.
+    - `categories`: the composition of the shelf, for the distribution bar.
+    - `low_stock`: what is at or below its alert threshold, with a suggested
+      reorder quantity (enough to reach twice the threshold).
+    - `totals`: units and packs on the shelf, for the page header.
+
+    Archived rows are excluded everywhere: the panel is about the shelf as it
+    is now.
+    """
+    since = salon_now() - timedelta(days=days)
+
+    rows = (
+        db.query(
+            Product.id,
+            Product.name,
+            Product.category,
+            Product.unit,
+            Product.quantity,
+            Product.cost_price,
+            Product.sell_price,
+            Product.weight,
+            Product.min_quantity_alert,
+        )
+        .filter(Product.is_archived.is_(False))
+        .all()
+    )
+
+    enriched = []
+    for (
+        product_id,
+        name,
+        category,
+        unit,
+        quantity,
+        cost_price,
+        sell_price,
+        weight,
+        min_quantity_alert,
+    ) in rows:
+        cost_part, value_part = _unit_cost_of(quantity, cost_price, sell_price, weight)
+        quantity_d = Decimal(str(quantity or 0))
+        weight_d = Decimal(str(weight or 0))
+        enriched.append(
+            {
+                "id": product_id,
+                "name": name,
+                "category": (category or "").strip() or None,
+                "unit": unit,
+                "quantity": float(quantity_d),
+                "min_quantity_alert": float(Decimal(str(min_quantity_alert or 0))),
+                "cost": float(cost_part),
+                "value": float(value_part),
+                "weight": float(weight_d) if weight_d > 0 else 0.0,
+            }
+        )
+
+    total_units = sum(item["quantity"] for item in enriched)
+    total_packs = sum(
+        item["quantity"] / item["weight"]
+        for item in enriched
+        if item["weight"] > 0
+    )
+    # Lines stocked by the base unit with no pack size (e.g. grams with no
+    # pack capacity) get valued at face price -- technically consistent, but
+    # the screen must not let a missing `weight` masquerade as a real pack.
+    missing_pack_size = sum(
+        1
+        for item in enriched
+        if (item["unit"] or "").lower() not in {"piece", "قطعة", "pieces", "pcs"}
+        and item["weight"] == 0
+    )
+    for item in enriched:
+        item.pop("weight", None)
+
+    top_by_value = sorted(enriched, key=lambda item: item["value"], reverse=True)[:limit]
+
+    consumption = (
+        db.query(
+            InventoryLog.product_id,
+            func.sum(-InventoryLog.change_amount).label("used"),
+        )
+        .filter(
+            InventoryLog.type == "remove",
+            InventoryLog.created_at >= since,
+        )
+        .group_by(InventoryLog.product_id)
+        .order_by(desc("used"))
+        .limit(limit)
+        .all()
+    )
+    by_id = {item["id"]: item for item in enriched}
+    most_consumed = []
+    for product_id, used in consumption:
+        entry = by_id.get(product_id)
+        if entry is None:
+            continue
+        most_consumed.append(
+            {
+                "id": entry["id"],
+                "name": entry["name"],
+                "unit": entry["unit"],
+                "consumed": float(used or 0),
+            }
+        )
+
+    last_move_rows = (
+        db.query(
+            InventoryLog.product_id,
+            func.max(InventoryLog.created_at).label("last_movement_at"),
+        )
+        .group_by(InventoryLog.product_id)
+        .all()
+    )
+    last_move = {int(product_id): last for product_id, last in last_move_rows}
+    stagnant = []
+    for item in enriched:
+        if item["quantity"] <= 0:
+            continue
+        last = last_move.get(item["id"])
+        if last is not None and last >= since:
+            continue
+        stagnant.append(
+            {
+                "id": item["id"],
+                "name": item["name"],
+                "unit": item["unit"],
+                "quantity": item["quantity"],
+                "value": item["value"],
+                "last_movement_at": last.isoformat() if last is not None else None,
+            }
+        )
+    # Most expensive dead weight first -- the ones worth acting on.
+    stagnant.sort(key=lambda item: item["value"], reverse=True)
+    stagnant = stagnant[:limit]
+
+    categories: dict[str, dict[str, float]] = {}
+    for item in enriched:
+        key = item["category"] or "—"
+        bucket = categories.setdefault(key, {"count": 0, "value": 0.0, "cost": 0.0})
+        bucket["count"] += 1
+        bucket["value"] += item["value"]
+        bucket["cost"] += item["cost"]
+    category_list = [
+        {"category": key, "count": int(bucket["count"]), "value": bucket["value"], "cost": bucket["cost"]}
+        for key, bucket in categories.items()
+    ]
+    category_list.sort(key=lambda item: item["value"], reverse=True)
+
+    low_stock = [
+        {
+            "id": item["id"],
+            "name": item["name"],
+            "unit": item["unit"],
+            "quantity": item["quantity"],
+            "min_quantity_alert": item["min_quantity_alert"],
+            # Enough to reach twice the threshold.
+            "suggested": float(max(0.0, 2 * item["min_quantity_alert"] - item["quantity"])),
+        }
+        for item in enriched
+        if item["min_quantity_alert"] > 0 and item["quantity"] <= item["min_quantity_alert"]
+    ]
+    low_stock.sort(key=lambda item: item["suggested"], reverse=True)
+
+    return {
+        "days": days,
+        "totals": {
+            "units": total_units,
+            "packs": total_packs,
+            "lines": len(enriched),
+            "missing_pack_size": int(missing_pack_size),
+        },
+        "top_by_value": top_by_value,
+        "most_consumed": most_consumed,
+        "stagnant": stagnant,
+        "categories": category_list[:8],
+        "low_stock": low_stock[:12],
+    }
 
 
 @router.get("/logs/all", response_model=InventoryLogListResponse)
@@ -413,8 +655,13 @@ def update_product(
     if _has_stock(product):
         _require_management(current_user)
 
-    # Update fields except quantity (which is managed via logs)
-    data = payload.model_dump()
+    # Update fields except quantity (which is managed via logs).
+    #
+    # `exclude_unset` matters for the two flags: `ProductUpdate` defaults
+    # `is_active=True` and `is_archived=False`, so a plain `model_dump()`
+    # filled them in even when the client had not mentioned them -- which
+    # quietly un-archived a product the moment someone edited its name.
+    data = payload.model_dump(exclude_unset=True)
     if "quantity" in data:
         del data["quantity"]
 
@@ -510,7 +757,8 @@ def add_product_stock(
                 commit=False,
             )
         except ValueError as e:
-            # الرصيد لا يستوعب الصرف — لا تكتمل عملية المخزون بدون حركتها في الخزينة
+            # الرصيد لا يستوعب الصرف — لا تكتمل عملية المخزون بدون
+            # حركتها في الخزينة: نفشل العملية كلها مع رسالة واضحة.
             db.rollback()
             raise HTTPException(status_code=400, detail=str(e))
 
