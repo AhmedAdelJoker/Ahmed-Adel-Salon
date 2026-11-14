@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
+import i18n from "@/i18n";
 import api from "@/services/api";
 import { validateImageSize } from "@/lib/media/upload";
 import {
@@ -8,6 +9,9 @@ import {
   getUnitMeta,
   normalizeUnit,
 } from "@/features/inventory";
+
+const ft = (key: string, fallback: string) =>
+  i18n.t(`owner:inventory.form.${key}`, { defaultValue: fallback });
 
  
 export type InventoryProductAny = Record<string, any>;
@@ -39,9 +43,9 @@ export interface StockFormData {
  */
 export function useInventoryForm(options: {
   fetchProducts: () => Promise<void>;
-  isOwner: boolean;
+  isManagement: boolean;
 }) {
-  const { fetchProducts, isOwner } = options;
+  const { fetchProducts, isManagement } = options;
 
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -85,8 +89,8 @@ export function useInventoryForm(options: {
   }
 
   function openEdit(product: InventoryProductAny) {
-    if (Number(product.quantity) > 0 && !isOwner) {
-      toast.error("لا يمكن تعديل المنتج بعد تسجيل توريد. تواصل مع المالك.");
+    if (Number(product.quantity) > 0 && !isManagement) {
+      toast.error(ft("editBlockedOwner","لا يمكن تعديل المنتج بعد تسجيل توريد. تواصل مع المالك."));
       return;
     }
     setEditingProduct(product);
@@ -126,7 +130,7 @@ export function useInventoryForm(options: {
       const res = await api.get(`/products/${product.id}/logs`);
       setHistoryLogs(res.data || []);
     } catch (err) {
-      toast.error("فشل تحميل سجل الحركات");
+      toast.error(ft("historyLoadFailed","فشل تحميل سجل الحركات"));
     } finally {
       setHistoryLoading(false);
     }
@@ -145,17 +149,17 @@ export function useInventoryForm(options: {
       if (url) {
         setProductImage(url);
         setImagePreview(url);
-        toast.success("تم رفع الصورة بنجاح");
+        toast.success(ft("imageUploaded","تم رفع الصورة بنجاح"));
       }
     } catch (err) {
-      toast.error("فشل رفع الصورة");
+      toast.error(ft("imageUploadFailed","فشل رفع الصورة"));
     } finally {
       setUploading(false);
     }
   }
 
   async function handleSave() {
-    if (!formData.name.trim()) return toast.error("اسم الصنف مطلوب");
+    if (!formData.name.trim()) return toast.error(ft("nameRequired","اسم الصنف مطلوب"));
     const payload = {
       ...formData,
       sell_price: Number(formData.sell_price || 0),
@@ -169,16 +173,16 @@ export function useInventoryForm(options: {
       setSaving(true);
       if (editingProduct?.id) {
         await api.put(`/products/${editingProduct.id}`, payload);
-        toast.success("تم تحديث المنتج");
+        toast.success(ft("productUpdated","تم تحديث المنتج"));
       } else {
         await api.post("/products", payload);
-        toast.success("تم إدراج الصنف بنجاح.");
+        toast.success(ft("productCreated","تم إدراج الصنف بنجاح."));
       }
       setIsModalOpen(false);
       await fetchProducts();
     } catch (error) {
       const apiErr = error as { response?: { data?: { detail?: unknown } } };
-      toast.error((apiErr?.response?.data?.detail as string) || "تعذر حفظ بيانات المنتج");
+      toast.error((apiErr?.response?.data?.detail as string) || ft("saveFailed","تعذر حفظ بيانات المنتج"));
     } finally {
       setSaving(false);
     }
@@ -186,19 +190,21 @@ export function useInventoryForm(options: {
 
   const handleAddStock = async () => {
     if (!stockFormData.amount || Number(stockFormData.amount) <= 0)
-      return toast.error("الكمية مطلوبة");
+      return toast.error(ft("amountRequired","الكمية مطلوبة"));
     if (
       stockFormData.create_expense &&
       (!stockFormData.purchase_price ||
         Number(stockFormData.purchase_price) <= 0)
     )
-      return toast.error("يجب إدخال سعر الشراء");
+      return toast.error(ft("purchasePriceRequired","يجب إدخال سعر الشراء"));
     try {
       setSaving(true);
       const res = await api.post(`/products/${editingProduct?.id}/add-stock`, {
         amount: Number(stockFormData.amount),
         note: stockFormData.note,
-        create_expense: stockFormData.create_expense,
+        // The backend rejects create_expense=true from non-management roles —
+        // strip it client-side so their flow can never 403.
+        create_expense: isManagement ? stockFormData.create_expense : false,
         purchase_price: stockFormData.purchase_price
           ? Number(stockFormData.purchase_price)
           : null,
@@ -210,15 +216,15 @@ export function useInventoryForm(options: {
       if (newCost !== oldCost && oldCost > 0) {
         setShowPriceAlert(true);
         setNewSellPrice(updatedProduct.sell_price || "");
-        toast.success("تم التوريد وتحديث سعر الشراء");
+        toast.success(ft("stockAddedPriceChanged","تم التوريد وتحديث سعر الشراء"));
       } else {
-        toast.success("تمت إضافة الكمية");
+        toast.success(ft("stockAdded","تمت إضافة الكمية"));
         setIsStockModalOpen(false);
       }
       await fetchProducts();
     } catch (error) {
       const apiErr = error as { response?: { data?: { detail?: unknown } } };
-      toast.error((apiErr?.response?.data?.detail as string) || "فشل تحديث المخزون");
+      toast.error((apiErr?.response?.data?.detail as string) || ft("stockFailed","فشل تحديث المخزون"));
     } finally {
       setSaving(false);
     }
@@ -230,12 +236,12 @@ export function useInventoryForm(options: {
       await api.patch(`/products/${editingProduct?.id}/update-prices`, null, {
         params: { sell_price: Number(newSellPrice) },
       });
-      toast.success("تم تحديث سعر البيع");
+      toast.success(ft("sellPriceUpdated","تم تحديث سعر البيع"));
       setShowPriceAlert(false);
       setIsStockModalOpen(false);
       await fetchProducts();
     } catch (err) {
-      toast.error("فشل تحديث سعر البيع");
+      toast.error(ft("sellPriceFailed","فشل تحديث سعر البيع"));
     } finally {
       setSaving(false);
     }

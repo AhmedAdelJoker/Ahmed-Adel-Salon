@@ -5,6 +5,7 @@ import { barberService } from "@/services/barberService";
 import api from "@/services/api";
 import { formatCurrency } from "@/lib/core/utils";
 import { toast } from "react-hot-toast";
+import { loadErrorMessage } from "@/lib/core/asyncError";
 
 export const formatTime = (seconds: number) => {
   const h = Math.floor(seconds / 3600)
@@ -34,6 +35,7 @@ export const useBarberWorkStation = () => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [tipAmount, setTipAmount] = useState("");
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const timerRef = useRef<any>(null);
 
@@ -44,9 +46,21 @@ export const useBarberWorkStation = () => {
       setAppointment((res as any)?.data);
       const startedAt = (res as any)?.data?.started_at;
       if (startedAt) {
-        const start = new Date(startedAt).getTime();
+        /**
+         * The column is stored as **naive UTC**, like every other timestamp in
+         * this schema. A naive ISO string has no zone, so `new Date(value)`
+         * silently assumes the *browser's* zone -- which made this timer correct
+         * only for a barber sitting in Cairo and wrong for everyone else by
+         * their offset from it.
+         *
+         * The explicit `Z` is what marks it as UTC. A value that already carries
+         * an offset is left alone, so an aware timestamp would not be double
+         * shifted if the writer ever changes.
+         */
+        const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(startedAt);
+        const start = new Date(hasZone ? startedAt : `${startedAt}Z`).getTime();
         const elapsed = Math.floor((Date.now() - start) / 1000);
-        setElapsedTime(elapsed);
+        setElapsedTime(elapsed > 0 ? elapsed : 0);
         setTimerRunning(true);
       }
     } catch (_err) {
@@ -59,13 +73,17 @@ export const useBarberWorkStation = () => {
 
   const fetchAppointments = useCallback(async () => {
     try {
+      setLoadError(null);
       const res = await barberService.getQueue();
       const data: any = (res as any).data || {};
       const waiting = Array.isArray(data.waiting) ? data.waiting : [];
       const inService = Array.isArray(data.inService) ? data.inService : [];
       setAppointments([...waiting, ...inService]);
     } catch (err) {
+      // The queue the barber picks the next customer from failed to load, and
+      // an empty list is indistinguishable from a cleared queue.
       console.error("Failed to fetch appointments:", err);
+      setLoadError(loadErrorMessage(err, "قائمة الانتظار"));
     } finally {
       setLoading(false);
     }
@@ -157,6 +175,7 @@ export const useBarberWorkStation = () => {
     setAppointment,
     appointments,
     loading,
+    loadError,
     timerRunning,
     setTimerRunning,
     elapsedTime,

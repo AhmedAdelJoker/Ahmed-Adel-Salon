@@ -4,6 +4,7 @@ from app.models.business_settings import BusinessSettings
 from decimal import Decimal
 from datetime import datetime, timedelta
 import json
+from app.core.clock import utc_now_naive
 
 
 def _normalize_loyalty_settings(raw):
@@ -78,7 +79,7 @@ def get_loyalty_settings(db: Session):
 
 
 def _points_cutoff(months: int) -> datetime:
-    return datetime.utcnow() - timedelta(days=30 * months)
+    return utc_now_naive() - timedelta(days=30 * months)
 
 
 def _expire_stale_points(customer: Customer, cutoff: datetime) -> bool:
@@ -120,6 +121,21 @@ def sweep_expired_points(db: Session, customers) -> bool:
     return changed
 
 
+def _tier_for_visits(tiers, visits: int):
+    """The highest tier the visit count reaches — the one ladder rule.
+
+    Three places need this answer (assigning a tier, refreshing one after a
+    merge, and pricing the discount) and they used to compute it separately.
+    Three copies of a ladder are three chances for the badge, the stored tier
+    and the discount to disagree, so they share this function now.
+    """
+    ordered = sorted(tiers, key=lambda t: t.get("min_visits", 0), reverse=True)
+    for tier in ordered:
+        if visits >= tier.get("min_visits", 0):
+            return tier
+    return None
+
+
 def update_customer_loyalty(db: Session, customer_id: int, amount_paid: Decimal):
     customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
     if not customer:
@@ -143,24 +159,50 @@ def update_customer_loyalty(db: Session, customer_id: int, amount_paid: Decimal)
     points_per_egp = Decimal(str(settings.get("points_per_egp", 0.1)))
     new_points = amount_paid * points_per_egp
     customer.loyalty_points += new_points
-    customer.loyalty_points_earned_at = datetime.utcnow()
+    customer.loyalty_points_earned_at = utc_now_naive()
 
     # 3. Update Tier
     tiers = settings.get("tiers", [])
-    # Sort tiers by min_visits descending to find the highest reached
-    sorted_tiers = sorted(tiers, key=lambda x: x.get("min_visits", 0), reverse=True)
-
-    for tier in sorted_tiers:
-        if customer.visits_count >= tier.get("min_visits", 0):
-            customer.current_tier = tier.get("name", "Bronze")
-            break
+    tier = _tier_for_visits(tiers, int(customer.visits_count or 0))
+    if tier is not None:
+        customer.current_tier = tier.get("name", "Bronze")
 
     db.add(customer)
     # Note: We don't commit here, the caller should commit
 
 
+def refresh_customer_tier(db: Session, customer: Customer) -> None:
+    """Recompute the current tier from the aggregate visits_count.
+
+    Used after a merge, where visits from two customers land on one row and
+    the stored tier may no longer match the combined total.
+    """
+    settings = get_loyalty_settings(db)
+    if not settings or not settings.get("enabled"):
+        return
+    tier = _tier_for_visits(
+        settings.get("tiers", []), int(customer.visits_count or 0)
+    )
+    if tier is not None:
+        customer.current_tier = tier.get("name", "Bronze")
+
+
 def calculate_loyalty_discount(db: Session, customer_id: int, current_total: Decimal) -> Decimal:
-    """Calculates the discount based on the customer's current tier."""
+    """Calculates the discount based on the customer's current tier.
+
+    The tier is resolved from `visits_count`, not from the stored
+    `current_tier` string. The stored name is a fragile key: it is written
+    from the owner-editable tier names, so renaming a tier in settings, or a
+    row still holding a legacy value ("Bronze" while the configured names are
+    Arabic), silently voided the customer's discount. The visit count is the
+    authority the tier is derived from in the first place — `update_customer_loyalty`
+    and `refresh_customer_tier` both assign it that way — so it is what the
+    price is matched on too, and the two can never disagree.
+
+    A customer below the first rung of the ladder has no tier and therefore no
+    discount. That is deliberate: honouring a stale stored name there would
+    resurrect exactly the silent-discount-loss this function exists to close.
+    """
     customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
     if not customer:
         return Decimal("0.00")
@@ -170,13 +212,14 @@ def calculate_loyalty_discount(db: Session, customer_id: int, current_total: Dec
         return Decimal("0.00")
 
     tiers = settings.get("tiers", [])
-    discount_percent = 0
+    if not tiers:
+        return Decimal("0.00")
 
-    for tier in tiers:
-        if tier.get("name") == customer.current_tier:
-            discount_percent = tier.get("discount_percent", 0)
-            break
+    tier = _tier_for_visits(tiers, int(customer.visits_count or 0))
+    if tier is None:
+        return Decimal("0.00")
 
+    discount_percent = tier.get("discount_percent", 0)
     if discount_percent > 0:
         return (current_total * Decimal(str(discount_percent))) / Decimal("100")
 

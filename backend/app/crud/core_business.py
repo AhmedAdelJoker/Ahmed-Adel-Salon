@@ -6,6 +6,7 @@ from sqlalchemy import func
 from app.models.shop_settings import ShopSettings
 from app.models.cash_transaction import CashTransaction
 from app.models.audit_log_core import AuditLog
+from app.core.clock import utc_now_naive
 
 
 def safe_json(value):
@@ -38,7 +39,7 @@ def update_shop_settings(db: Session, payload: dict):
         if value is not None and hasattr(settings, key):
             setattr(settings, key, value)
 
-    settings.updated_at = datetime.utcnow()
+    settings.updated_at = utc_now_naive()
     db.add(settings)
     db.commit()
     db.refresh(settings)
@@ -283,7 +284,7 @@ def get_dashboard_core_summary(db: Session, period: str | None = None, from_date
         CashTransaction.is_voided == 0
     ).scalar() or 0
 
-    today = datetime.utcnow().date()
+    today = utc_now_naive().date()
     today_str = str(today)
 
     today_sales = db.query(func.coalesce(func.sum(CashTransaction.amount), 0)).filter(
@@ -357,7 +358,7 @@ def get_dashboard_core_summary(db: Session, period: str | None = None, from_date
         total_opening = sum(float(s.opening_cash or 0) for s in open_shifts)
         total_cash_sales = 0.0
         for s in open_shifts:
-            shift_start = s.opened_at - timedelta(seconds=1) if s.opened_at else datetime.utcnow()
+            shift_start = s.opened_at - timedelta(seconds=1) if s.opened_at else utc_now_naive()
             invoices = db.query(Invoice).filter(
                 Invoice.created_at >= shift_start,
                 Invoice.created_by_user_id == s.user_id,
@@ -440,9 +441,9 @@ def void_cash_transactions_by_reference(
     for row in rows:
         row.is_voided = 1
         row.void_reason = reason or f"Void {reference_type} #{reference_id}"
-        row.voided_at = datetime.utcnow()
+        row.voided_at = utc_now_naive()
         row.voided_by = user_id
-        row.updated_at = datetime.utcnow()
+        row.updated_at = utc_now_naive()
         db.add(row)
 
     if commit:

@@ -57,7 +57,7 @@ export function EmployeeCardStats({
           className="h-8 rounded-lg px-3 text-[10px] font-black sm:h-9 sm:px-4 sm:text-[11px]"
           onClick={onDetailsClick}
         >
-          <Eye size={12} className="ml-1" /> التفاصيل
+          <Eye size={12} className="ms-1" /> التفاصيل
         </Button>
       </div>
     </>

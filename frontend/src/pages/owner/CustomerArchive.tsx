@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/shared/EmptyState";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -18,18 +19,22 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import CustomerDetailsDialog from "@/features/customers/components/CustomerDetailsDialog";
+import { CustomerDetailsDialog } from "@/features/customers";
 import { exportService } from "@/services/exportService";
 import { cn, formatDateTime } from "@/lib/core/utils";
 import api from "@/services/api";
 import { normalizeListResponse } from "@/services/apiAdapter";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "@/lib/format/locale";
 import { PageHeader, SkeletonCard } from "@/components/shared/PremiumUI";
 import { StatCard } from "@/components/shared/DisplayComponents";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 
 const CustomerArchive = () => {
+  const { t, i18n } = useTranslation("owner");
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
   const navigate = useNavigate();
 
   const [customers, setCustomers] = useState<any[]>([]);
@@ -50,7 +55,7 @@ const CustomerArchive = () => {
       const data = normalizeListResponse(res);
       setCustomers(data.items || data);
     } catch (err) {
-      toast.error("فشل تحميل أرشيف العملاء");
+      toast.error(t("custArch.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -65,12 +70,12 @@ const CustomerArchive = () => {
     try {
       setIsActionLoading(true);
       await api.post(`/customers/${confirmTarget.customer_id}/restore`);
-      toast.success("تم استعادة العميل بنجاح");
+      toast.success(t("custArch.restoreSuccess"));
       setConfirmTarget(null);
       setConfirmAction(null);
       fetchArchive();
     } catch (err) {
-      toast.error("فشل استعادة العميل");
+      toast.error(t("custArch.restoreFailed"));
     } finally {
       setIsActionLoading(false);
     }
@@ -81,13 +86,13 @@ const CustomerArchive = () => {
     try {
       setIsActionLoading(true);
       await api.delete(`/customers/${confirmTarget.customer_id}/permanent`);
-      toast.success("تم حذف العميل نهائياً");
+      toast.success(t("custArch.deleteSuccess"));
       setConfirmTarget(null);
       setConfirmAction(null);
       fetchArchive();
     } catch (error) {
 
-      const msg = (error as any)?.response?.data?.detail || "فشل الحذف النهائي";
+      const msg = (error as any)?.response?.data?.detail || t("custArch.deleteFailed");
       toast.error(msg, { duration: 5000 });
     } finally {
       setIsActionLoading(false);
@@ -105,19 +110,20 @@ const CustomerArchive = () => {
       if (res.status === 207 && res.data) {
         const { restored, blocked, detail } = res.data;
         toast.success(
-          `تم استعادة ${restored?.length ?? selectedIds.size} عميل. تعذّر استعادة ${
-            blocked?.length ?? 0
-          } عميل.`,
+          t("custArch.bulkRestorePartial", {
+            restored: restored?.length ?? selectedIds.size,
+            failed: blocked?.length ?? 0,
+          }),
           { duration: 5000 },
         );
         if (detail) console.warn("Bulk restore partial:", detail);
       } else {
-        toast.success(`تم استعادة ${selectedIds.size} عميل بنجاح`);
+        toast.success(t("custArch.bulkRestoreSuccess", { count: selectedIds.size }));
       }
       setSelectedIds(new Set());
       fetchArchive();
     } catch (err) {
-      const msg = (err as any)?.response?.data?.detail || "فشل الاستعادة الجماعية";
+      const msg = (err as any)?.response?.data?.detail || t("custArch.bulkRestoreFailed");
       toast.error(msg, { duration: 5000 });
     } finally {
       setIsActionLoading(false);
@@ -135,20 +141,21 @@ const CustomerArchive = () => {
       if (res.status === 207 && res.data) {
         const { deleted, blocked, detail } = res.data;
         toast.success(
-          `تم حذف ${deleted?.length || 0} عميل. تعذّر حذف ${
-            blocked?.length || 0
-          } عميل (لديهم سجلات مرتبطة).`,
+          t("custArch.bulkDeletePartial", {
+            deleted: deleted?.length || 0,
+            failed: blocked?.length || 0,
+          }),
           { duration: 5000 },
         );
         if (detail) console.warn("Bulk delete partial:", detail);
       } else {
-        toast.success(`تم حذف ${selectedIds.size} عميل نهائياً`);
+        toast.success(t("custArch.bulkDeleteSuccess", { count: selectedIds.size }));
       }
       setSelectedIds(new Set());
       fetchArchive();
     } catch (error) {
 
-      const msg = (error as any)?.response?.data?.detail || "فشل الحذف النهائي الجماعي";
+      const msg = (error as any)?.response?.data?.detail || t("custArch.bulkDeleteFailed");
       toast.error(msg, { duration: 5000 });
     } finally {
       setIsActionLoading(false);
@@ -165,9 +172,9 @@ const CustomerArchive = () => {
         filename,
         {},
       );
-      toast.success("تم تصدير الأرشيف بنجاح");
+      toast.success(t("custArch.exportSuccess"));
     } catch (err) {
-      toast.error("فشل تصدير الأرشيف");
+      toast.error(t("custArch.exportFailed"));
     } finally {
       setIsExporting(false);
     }
@@ -240,11 +247,11 @@ const CustomerArchive = () => {
         onOpenChange={(open) => {
           if (!open) closeSingleConfirm();
         }}
-        title="استعادة العميل؟"
-        description="هل أنت متأكد من رغبتك في استعادة هذا العميل للعمل؟ سيتم إرجاعه للقائمة النشطة مع جميع بياناته."
+        title={t("custArch.restoreSingleTitle")}
+        description={t("custArch.restoreSingleDesc")}
         onConfirm={handleRestore}
         loading={isActionLoading}
-        confirmText="استعادة"
+        confirmText={t("custArch.restoreSingleConfirm")}
       />
 
       <ConfirmDialog
@@ -252,11 +259,11 @@ const CustomerArchive = () => {
         onOpenChange={(open) => {
           if (!open) closeSingleConfirm();
         }}
-        title="حذف نهائي لا يمكن التراجع عنه"
-        description={`سيتم حذف العميل ${confirmTarget?.first_name || ""} ${confirmTarget?.last_name || ""} وجميع بياناته نهائياً. قد يفشل الحذف إذا كان للعميل فواتير مرتبطة.`}
+        title={t("custArch.deleteSingleTitle")}
+        description={t("custArch.deleteSingleDesc", { firstName: confirmTarget?.first_name || "", lastName: confirmTarget?.last_name || "" })}
         onConfirm={handlePermanentDelete}
         loading={isActionLoading}
-        confirmText="حذف نهائي"
+        confirmText={t("custArch.deleteSingleConfirm")}
         variant="danger"
       />
 
@@ -265,11 +272,11 @@ const CustomerArchive = () => {
         onOpenChange={(open) => {
           if (!open) setConfirmAction(null);
         }}
-        title="استعادة جماعية؟"
-        description={`هل أنت متأكد من استعادة ${selectedIds.size} عميل محدد؟`}
+        title={t("custArch.restoreBulkTitle")}
+        description={t("custArch.restoreBulkDesc", { count: selectedIds.size })}
         onConfirm={handleBulkRestore}
         loading={isActionLoading}
-        confirmText="استعادة الجميع"
+        confirmText={t("custArch.restoreBulkConfirm")}
       />
 
       <ConfirmDialog
@@ -277,11 +284,11 @@ const CustomerArchive = () => {
         onOpenChange={(open) => {
           if (!open) setConfirmAction(null);
         }}
-        title="حذف نهائي جماعي"
-        description={`سيتم حذف ${selectedIds.size} عميل وجميع بياناتهم نهائياً.`}
+        title={t("custArch.deleteBulkTitle")}
+        description={t("custArch.deleteBulkDesc", { count: selectedIds.size })}
         onConfirm={handleBulkPermanentDelete}
         loading={isActionLoading}
-        confirmText="حذف الجميع"
+        confirmText={t("custArch.deleteBulkConfirm")}
         variant="danger"
       />
 
@@ -302,21 +309,21 @@ const CustomerArchive = () => {
       />
 
       <PageHeader
-        title="أرشيف العملاء"
-        subtitle="سجل العملاء المحذوفين — يمكن استعادتهم أو حذفهم نهائياً."
-        badge="الأرشيف"
+        title={t("custArch.title")}
+        subtitle={t("custArch.subtitle")}
+        badge={t("custArch.badge")}
         icon={Archive}
         actions={
           <>
             <Badge className="shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-black tabular-nums">
-              {customers.length} عميل
+              {customers.length} {t("custArch.statResigned")}
             </Badge>
             <Button
               variant="outline"
               size="icon"
               onClick={() => navigate("/customers")}
-              title="العودة لقائمة العملاء"
-              aria-label="العودة لقائمة العملاء"
+              title={t("custArch.backButton")}
+              aria-label={t("custArch.backButtonAria")}
               className="h-12 w-12 rounded-2xl border-border/60 bg-soft text-muted shadow-sm hover:border-primary hover:bg-primary/10 hover:text-primary"
             >
               <ChevronRight size={24} />
@@ -327,25 +334,25 @@ const CustomerArchive = () => {
 
       <div data-stats-grid="true">
         <StatCard
-          label="إجمالي الأرشيف"
+          label={t("custArch.statTotal")}
           value={customers.length}
           icon={Archive}
           variant="primary"
-          hint="عميل محذوف"
+          hint={t("custArch.statResigned")}
         />
         <StatCard
-          label="المحدد حالياً"
+          label={t("custArch.statSelected")}
           value={selectedIds.size}
           icon={Check}
           variant="warning"
-          hint="لإجراء جماعي"
+          hint={t("custArch.statSelectedHint")}
         />
         <StatCard
-          label="نتائج البحث"
+          label={t("custArch.statSearchResults")}
           value={filteredCustomers.length}
           icon={Search}
           variant="secondary"
-          hint={searchTerm.trim() ? `عن "${searchTerm.trim()}"` : "كل السجلات"}
+          hint={searchTerm.trim() ? t("custArch.statSearchHint", { query: searchTerm.trim() }) : t("custArch.statSearchHintAll")}
         />
       </div>
 
@@ -359,9 +366,9 @@ const CustomerArchive = () => {
           <Input
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="بحث بالاسم أو الجوال أو الإيميل..."
-            aria-label="بحث في أرشيف العملاء"
-            className="h-11 w-full rounded-xl pr-9 text-sm font-bold shadow-sm"
+            placeholder={t("custArch.searchPlaceholder")}
+            aria-label={t("custArch.searchAria")}
+            className="h-11 w-full rounded-xl pe-9 text-sm font-bold shadow-sm"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -373,7 +380,7 @@ const CustomerArchive = () => {
             className="h-11 gap-1.5 rounded-xl px-4 text-xs font-black"
           >
             <Download size={14} />
-            تصدير
+            {t("custArch.exportButton")}
           </Button>
         </div>
       </div>
@@ -397,12 +404,12 @@ const CustomerArchive = () => {
             >
               {allVisibleSelected && <Check size={12} className="text-white" />}
             </span>
-            تحديد الظاهر
+            {t("custArch.selectAllVisible")}
           </button>
           {selectedIds.size > 0 && (
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-bold tabular-nums text-muted">
-                {selectedIds.size} محدد
+                {t("custArch.selectedCount", { count: selectedIds.size })}
               </span>
               <Button
                 variant="ghost"
@@ -411,7 +418,7 @@ const CustomerArchive = () => {
                 onClick={() => setConfirmAction("bulk_restore")}
                 disabled={isActionLoading}
               >
-                <RotateCcw size={11} className="ml-1" /> استعادة
+                <RotateCcw size={11} className="ms-1" /> {t("custArch.restoreButton")}
               </Button>
               <Button
                 variant="ghost"
@@ -420,15 +427,15 @@ const CustomerArchive = () => {
                 onClick={() => setConfirmAction("bulk_permanent_delete")}
                 disabled={isActionLoading}
               >
-                <Trash2 size={11} className="ml-1" /> حذف
+                <Trash2 size={11} className="ms-1" /> {t("custArch.deleteButton")}
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
                 onClick={clearSelection}
-                title="إلغاء التحديد"
-                aria-label="إلغاء التحديد"
+                title={t("custArch.deselect")}
+                aria-label={t("custArch.deselectAria")}
               >
                 <X size={12} />
               </Button>
@@ -445,29 +452,30 @@ const CustomerArchive = () => {
           ))}
         </div>
       ) : filteredCustomers.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-4 py-16 text-center sm:py-20">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-soft sm:h-16 sm:w-16">
-            <Archive size={28} className="text-muted" />
-          </div>
-          <p className="text-sm font-black text-main sm:text-base">
-            {customers.length === 0 ? "الأرشيف فارغ" : "لا توجد نتائج مطابقة"}
-          </p>
-          <p className="mt-1 text-xs font-bold text-muted">
-            {customers.length === 0
-              ? "لا يوجد عملاء محذوفون حالياً"
-              : "جرّب كلمة بحث مختلفة أو امسح البحث لعرض الكل"}
-          </p>
-          {customers.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleSearchChange("")}
-              className="mt-4 gap-1.5 rounded-xl text-xs font-black"
-            >
-              <X size={13} /> مسح البحث
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          variant="page"
+          icon={Archive}
+          title={
+            customers.length === 0 ? t("custArch.emptyTitle") : t("custArch.noResults")
+          }
+          message={
+            customers.length === 0
+              ? t("custArch.emptyMessage")
+              : t("custArch.noResultsHint")
+          }
+          action={
+            customers.length > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSearchChange("")}
+                className="gap-1.5 rounded-xl text-xs font-black"
+              >
+                <X size={13} /> {t("custArch.clearSearch")}
+              </Button>
+            ) : null
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filteredCustomers.map((customer) => {
@@ -485,8 +493,8 @@ const CustomerArchive = () => {
                     type="button"
                     onClick={() => toggleSelect(customer.customer_id)}
                     aria-pressed={isSelected}
-                    aria-label={`تحديد ${customer.first_name || ""} ${customer.last_name || ""}`}
-                    title={isSelected ? "إلغاء التحديد" : "تحديد للاجراء الجماعي"}
+                    aria-label={t("custArch.selectForAction", { firstName: customer.first_name || "", lastName: customer.last_name || "" })}
+                    title={isSelected ? t("custArch.deselectForAction") : t("custArch.selectForAction", { firstName: customer.first_name || "", lastName: customer.last_name || "" })}
                     className={cn(
                       "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                       isSelected
@@ -510,7 +518,7 @@ const CustomerArchive = () => {
                     </h3>
                     <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted">
                       <Calendar size={10} />
-                      <span>حذف: {customer.deleted_at ? formatDateTime(customer.deleted_at) : "---"}</span>
+                      <span>{t("custArch.deletedAt", { date: customer.deleted_at ? formatDateTime(customer.deleted_at) : "---" })}</span>
                     </div>
                   </div>
                 </div>
@@ -534,7 +542,7 @@ const CustomerArchive = () => {
                     <ShieldCheck size={10} className="shrink-0" />
                     <span>
                       {customer.current_tier || "Bronze"} •{" "}
-                      {customer.loyalty_points || 0} نقطة
+                      {t("custArch.loyaltyPoints", { points: customer.loyalty_points || 0 })}
                     </span>
                   </div>
                 </div>
@@ -545,14 +553,14 @@ const CustomerArchive = () => {
                     onClick={() => openConfirm(customer, "restore")}
                     className="h-8 flex-1 rounded-lg border-success/30 text-[10px] font-black text-success hover:bg-success-soft sm:text-xs"
                   >
-                    <RotateCcw size={11} className="ml-1" /> استعادة
+                    <RotateCcw size={11} className="ms-1" /> {t("custArch.restoreButton")}
                   </Button>
                   <Button
                     variant="ghost"
                     onClick={() => setDetailsTarget(customer)}
                     className="h-8 w-8 shrink-0 rounded-lg text-primary hover:bg-primary/10"
-                    title="تفاصيل أكثر"
-                    aria-label={`عرض تفاصيل ${customer.first_name || ""} ${customer.last_name || ""}`}
+                    title={t("custArch.moreDetails")}
+                    aria-label={t("custArch.viewDetails", { firstName: customer.first_name || "", lastName: customer.last_name || "" })}
                   >
                     <Eye size={14} />
                   </Button>
@@ -560,8 +568,8 @@ const CustomerArchive = () => {
                     variant="ghost"
                     onClick={() => openConfirm(customer, "permanent_delete")}
                     className="h-8 w-8 shrink-0 rounded-lg text-danger hover:bg-danger-soft"
-                    title="حذف نهائي"
-                    aria-label={`حذف ${customer.first_name || ""} ${customer.last_name || ""} نهائياً`}
+                    title={t("custArch.deleteFinal")}
+                    aria-label={t("custArch.deleteCustomer", { firstName: customer.first_name || "", lastName: customer.last_name || "" })}
                   >
                     <Trash2 size={13} />
                   </Button>

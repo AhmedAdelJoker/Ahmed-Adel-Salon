@@ -1,4 +1,8 @@
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "framer-motion";
+import { formatCurrency } from "@/lib/core/utils";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Calendar, Clock, Edit3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
@@ -9,6 +13,7 @@ import {
   timeOnly,
 } from "@/features/bookings";
 import BookingCardFull from "@/features/bookings/components/BookingCardFull";
+import RescheduleBookingDialog from "@/features/bookings/components/RescheduleBookingDialog";
 
 export default function BookingsBoardContent({
   isLoading,
@@ -27,9 +32,24 @@ export default function BookingsBoardContent({
   handleDrop,
   handleDragOver,
 }: any) {
+  const { t } = useTranslation("bookings");
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
+  const [rescheduleBooking, setRescheduleBooking] = useState<any>(null);
+  // Client-side pagination: the grid renders a fixed page of cards and lets
+  // the cashier load more instead of mounting hundreds of cards at once.
+  const PAGE_SIZE = 24;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => setVisibleCount(PAGE_SIZE), [filteredBookings]);
+
+  const handleRescheduleSave = (bookingId: string | number, newDate: string, newTime: string, barberId?: string | number) => {
+    handleRescheduleBooking(rescheduleBooking, newDate, newTime);
+    setRescheduleBooking(null);
+    setIsRescheduleOpen(false);
+  };
+
   return (
     <div className="p-4 sm:p-6">
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -65,22 +85,12 @@ export default function BookingsBoardContent({
             transition={{ duration: 0.2 }}
           >
             {viewMode === "grid" ? (
+              <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                 {filteredBookings.length === 0 ? (
-                  <div className="col-span-full py-20 text-center text-muted bg-soft/20 rounded-3xl border border-dashed border-border/60 p-8 space-y-2">
-                    <Calendar
-                      size={40}
-                      className="mx-auto text-muted/40 mb-2"
-                    />
-                    <p className="font-black text-sm text-main">
-                      لم يتم العثور على أي مواعيد بهذه الفلاتر.
-                    </p>
-                    <p className="text-xs font-bold text-muted">
-                      جرب تغيير الفلاتر أو تاريخ الحجز لعرض النتيجة.
-                    </p>
-                  </div>
+                  <EmptyState variant="section" icon={Calendar} title={t("board.gridEmptyTitle")} message={t("board.gridEmptyMessage")} />
                 ) : (
-                  filteredBookings.map((b: any) => (
+                  filteredBookings.slice(0, visibleCount).map((b: any) => (
                     <BookingCardFull
                       key={b.id}
                       booking={b}
@@ -90,22 +100,31 @@ export default function BookingsBoardContent({
                       onTransferToPOS={handleTransferToPOS}
                       onOpenCustomer={handleOpenCustomerProfile}
                       onReschedule={(booking: any) => {
-                        const newDate = prompt(
-                          "أدخل التاريخ الجديد (YYYY-MM-DD):",
-                          booking.appointment_date,
-                        );
-                        const newTime = prompt(
-                          "أدخل الوقت الجديد (HH:MM):",
-                          booking.appointment_time,
-                        );
-                        if (newDate && newTime)
-                          handleRescheduleBooking(booking, newDate, newTime);
+                        setRescheduleBooking(booking);
+                        setIsRescheduleOpen(true);
                       }}
                       canEdit={canEditBooking(b)}
                       loading={actionLoading}
                     />
                   ))
                 )}
+              </div>
+
+              {filteredBookings.length > visibleCount && (
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                    className="h-10 px-6 rounded-xl bg-soft text-main font-black text-xs border border-border hover:border-primary hover:text-primary transition-all"
+                    aria-label={t("board.showMoreAria", {
+                      count: filteredBookings.length - visibleCount,
+                    })}
+                  >
+                    {t("board.showMore", {
+                      count: filteredBookings.length - visibleCount,
+                    })}
+                  </button>
+                </div>
+              )}
               </div>
             ) : (
               /* Board / Kanban View (snap-scroll on mobile, no double scroll) */
@@ -140,7 +159,9 @@ export default function BookingsBoardContent({
                               {emp.display_name || emp.full_name}
                             </span>
                             <span className="text-[11px] font-bold text-muted">
-                              {empBookings.length} حجوزات
+                              {t("board.bookingsCount", {
+                                count: empBookings.length,
+                              })}
                             </span>
                           </div>
                         </div>
@@ -154,15 +175,7 @@ export default function BookingsBoardContent({
 
                       <div className="space-y-3 flex-1 overflow-y-auto custom-scrollbar p-1 min-h-0">
                         {empBookings.length === 0 ? (
-                          <div className="py-16 text-center border-2 border-dashed border-border/50 rounded-2xl text-muted/60 space-y-1">
-                            <Clock
-                              size={24}
-                              className="mx-auto opacity-30 mb-1"
-                            />
-                            <p className="text-xs font-bold">
-                              لا توجد حجوزات حالياً
-                            </p>
-                          </div>
+                          <EmptyState variant="section" icon={Clock} title={t("board.kanbanEmpty")} />
                         ) : (
                           empBookings.map((b: any) => (
                             <div
@@ -186,7 +199,8 @@ export default function BookingsBoardContent({
                                 </span>
                                 <span className="flex items-center gap-1 text-primary shrink-0">
                                   <Clock size={12} />{" "}
-                                  {b.total_estimated_duration_minutes || 30} د
+                                  {b.total_estimated_duration_minutes || 30}{" "}
+                                  {t("card.minutesShort")}
                                 </span>
                               </div>
 
@@ -197,14 +211,16 @@ export default function BookingsBoardContent({
                                       key={i}
                                       className="text-[10px] font-bold px-2 py-0.5 bg-soft rounded-md text-muted"
                                     >
-                                      {s.service_name_snapshot || "خدمة"}
+                                      {s.service_name_snapshot ||
+                                        t("card.service")}
                                     </span>
                                   ))}
                                 </div>
                                 <button
                                   onClick={() => openEdit(b)}
                                   className="p-1.5 rounded-lg bg-soft text-muted hover:bg-primary hover:text-white transition-all shrink-0"
-                                  title="تعديل الحجز"
+                                  title={t("card.edit")}
+                                  aria-label={t("card.edit")}
                                 >
                                   <Edit3 size={13} />
                                 </button>
@@ -215,9 +231,9 @@ export default function BookingsBoardContent({
                       </div>
 
                       <div className="pt-3 mt-1 border-t border-border/40 flex items-center justify-between text-[11px] font-black text-muted shrink-0">
-                        <span>إيراد متوقع</span>
+                        <span>{t("board.expectedRevenue")}</span>
                         <span className="text-primary tabular-nums">
-                          {empRevenue.toLocaleString("en-EG")} ج.م
+                          {formatCurrency(empRevenue)}
                         </span>
                       </div>
                     </div>
@@ -228,6 +244,15 @@ export default function BookingsBoardContent({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <RescheduleBookingDialog
+        open={isRescheduleOpen}
+        onOpenChange={setIsRescheduleOpen}
+        booking={rescheduleBooking}
+        employees={employees}
+        onSave={handleRescheduleSave}
+        saving={actionLoading === `${rescheduleBooking?.id}-reschedule`}
+      />
     </div>
   );
 }

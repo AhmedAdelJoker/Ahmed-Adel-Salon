@@ -1,4 +1,5 @@
 import { Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useDroppable } from "@dnd-kit/core";
 import { cn } from "@/lib/core/utils";
 import { ROW_HEIGHT, ROW_BLOCK } from "@/pages/cashier/schedule/scheduleUtils";
@@ -20,6 +21,7 @@ export function SlotDropZone({
   hasAppointment,
   index,
 }: SlotDropZoneProps) {
+  const { t } = useTranslation("schedule");
   const { setNodeRef, isOver } = useDroppable({
     id: `${barberId}:${slot}`,
     data: { type: "slot", barberId, slot },
@@ -44,7 +46,15 @@ export function SlotDropZone({
       )}
       style={{ top: index * ROW_BLOCK, height: ROW_HEIGHT }}
       role="gridcell"
-      aria-label={`خانة ${slot} - موظف رقم ${barberId}`}
+      aria-label={t("slotDropZone.slotLabel", { slot, barberId })}
+      aria-keyshortcuts="Enter"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onDrop(barberId, slot);
+        }
+      }}
     >
       {!hasAppointment && highlighted && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -52,7 +62,7 @@ export function SlotDropZone({
             <Plus size={20} strokeWidth={3} />
           </div>
           <span className="text-[9px] font-black text-accent mt-2 tracking-widest">
-            أفلت هنا
+            {t("slotDropZone.dropHere")}
           </span>
         </div>
       )}

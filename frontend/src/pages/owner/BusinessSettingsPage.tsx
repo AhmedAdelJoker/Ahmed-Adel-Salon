@@ -25,8 +25,10 @@ import { Button } from "@/components/ui/button";
 import { PremiumCard, PageHeader } from "@/components/shared/PremiumUI";
 import { Badge } from "@/components/ui/badge";
 import { AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 export default function BusinessSettingsPage({ hideHeader = false }: { hideHeader?: boolean }) {
+  const { t, i18n } = useTranslation("owner");
   const [form, setForm] = useState({
     salon_name: "",
     shop_phone: "",
@@ -111,27 +113,27 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
   const setupChecklist = useMemo(
     () => [
       {
-        label: "هوية المحل",
+        label: t("businessSettings.c1"),
         done: Boolean(form.salon_name && form.logo_url),
-        hint: "الاسم والشعار",
+        hint: t("businessSettings.c1hint"),
       },
       {
-        label: "رابط الوصول",
+        label: t("businessSettings.c2"),
         done: Boolean(form.public_slug),
-        hint: "Slug مخصص",
+        hint: t("businessSettings.c2hint"),
       },
       {
-        label: "الموقع الجغرافي",
+        label: t("businessSettings.c3"),
         done: Boolean(form.google_maps_url || form.address),
-        hint: "خريطة أو عنوان",
+        hint: t("businessSettings.c3hint"),
       },
       {
-        label: "محتوى الموقع",
+        label: t("businessSettings.c4"),
         done: Object.keys(contentDraft).length > 0,
-        hint: "النصوص والصور",
+        hint: t("businessSettings.c4hint"),
       },
     ],
-    [form, contentDraft],
+    [form, contentDraft, i18n.language],
   );
 
   const completedCount = setupChecklist.filter((item) => item.done).length;
@@ -192,9 +194,7 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
       snapshot: data?.public_site_snapshot || data?.publicSiteSnapshot || null,
       publishedAt:
         data?.public_site_published_at || data?.publicSitePublishedAt || null,
-      hasDraftChanges: Boolean(
-        data?.public_site_has_draft_changes || data?.publicSiteHasDraftChanges,
-      ),
+      hasDraftChanges: Boolean(data?.publicSiteStale),
     });
   }, []);
 
@@ -205,7 +205,7 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
         const data = await businessSettingsService.get();
         syncSettingsState(data);
       } catch (_err) {
-        toast.error("تعذر تحميل إعدادات الموقع");
+        toast.error(t("businessSettings.loadFailed"));
       } finally {
         if (!options.silent) setLoading(false);
       }
@@ -222,19 +222,19 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
     try {
       const data = await businessSettingsService.publishSite();
       syncSettingsState(data);
-      toast.success("تم نشر التحديثات للجمهور");
+      toast.success(t("businessSettings.publishSuccess"));
       setPreviewVersion((v) => v + 1);
     } catch (_err) {
-      toast.error("فشل نشر الموقع");
+      toast.error(t("businessSettings.publishFailed"));
     } finally {
       setPublishing(false);
     }
   };
 
   const MAIN_TABS = [
-    { id: "website", label: "محتوى الموقع", icon: Globe },
-    { id: "share", label: "النشر والمشاركة", icon: Share2 },
-    { id: "preview", label: "المعاينة الحية", icon: Eye },
+    { id: "website", key: "businessSettings.tabWebsite", icon: Globe },
+    { id: "share", key: "businessSettings.tabShare", icon: Share2 },
+    { id: "preview", key: "businessSettings.tabPreview", icon: Eye },
   ];
 
   if (loading)
@@ -248,14 +248,14 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
     <div className={hideHeader ? "space-y-6" : "erp-page space-y-6 pb-10"}>
       {!hideHeader && (
         <PageHeader
-          title="الموقع العام والحجز"
-          subtitle="إدارة هويتك الرقمية وتصميم تجربة العميل على الويب."
-          badge="الموقع العام"
+          title={t("businessSettings.title")}
+          subtitle={t("businessSettings.subtitle")}
+          badge={t("businessSettings.badge")}
           icon={Globe}
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={completedCount === 4 ? "success" : completedCount >= 2 ? "warning" : "secondary"} className="rounded-full h-11 px-4 font-black tabular-nums">
-                {completedCount}/4 جاهزية
+                {t("businessSettings.ready", { done: completedCount })}
               </Badge>
               <Button
                 onClick={handlePublish}
@@ -264,7 +264,21 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
                 className="h-11 rounded-xl px-6 text-[11px] font-black"
                 loading={publishing}
               >
-                {publishing ? "جاري النشر..." : publication.hasDraftChanges ? "نشر التعديلات" : "الموقع محدث"}
+                {publishing ? t("businessSettings.publishing") : publication.hasDraftChanges ? t("businessSettings.publishChanges") : t("businessSettings.siteUpdated")}
+              </Button>
+              {/*
+                Open the public site in a new tab. The duplicate
+                `OwnerWebsiteSettingsPage` used to carry this button and nothing
+                else of value — it rendered the same `WebsiteSettingsPanel` this
+                page renders, so it is gone and this is the single place to open
+                the site from.
+              */}
+              <Button
+                variant="outline"
+                onClick={() => window.open(finalPublicSiteUrl, "_blank", "noopener")}
+                className="h-11 rounded-xl px-5 text-[11px] font-black"
+              >
+                <ExternalLink size={14} className="ms-2" /> {t("businessSettings.viewSite")}
               </Button>
             </div>
           }
@@ -283,12 +297,12 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
             }`}
           >
             <tab.icon size={14} />
-            {tab.label}
+            {t(tab.key)}
           </button>
         ))}
       </div>
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {activeMainTab === "website" && (
           <motion.div
             key="website"
@@ -313,27 +327,27 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
             className="grid gap-6 md:grid-cols-2"
           >
             <PublicLinkCard
-              title="رابط الموقع التعريفي"
+              title={t("businessSettings.siteLinkTitle")}
               url={finalPublicSiteUrl}
               qrCode={publicSiteQr}
               onCopy={() => {
                 navigator.clipboard.writeText(finalPublicSiteUrl);
-                toast.success("تم نسخ الرابط");
+                toast.success(t("businessSettings.copied"));
               }}
             />
             <PublicLinkCard
-              title="رابط الحجز المباشر"
+              title={t("businessSettings.bookingLinkTitle")}
               url={finalPublicBookingUrl}
               qrCode={publicBookingQr}
               onCopy={() => {
                 navigator.clipboard.writeText(finalPublicBookingUrl);
-                toast.success("تم نسخ الرابط");
+                toast.success(t("businessSettings.copied"));
               }}
             />
 
             <PremiumCard wrapperClassName="md:col-span-2 min-w-0">
               <h4 className="text-xs font-black uppercase tracking-widest mb-4">
-                إعدادات النطاق (Domain)
+                {t("businessSettings.domainTitle")}
               </h4>
               <div className="flex flex-col md:flex-row gap-4 items-center">
                 <input
@@ -351,14 +365,14 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
                       setPublicSiteBaseUrl("http://localhost:3000")
                     }
                   >
-                    بورت 3000
+                    {t("businessSettings.port3000")}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setPublicSiteBaseUrl(window.location.origin)}
                   >
-                    السيرفر الحالي
+                    {t("businessSettings.currentServer")}
                   </Button>
                 </div>
               </div>
@@ -381,14 +395,14 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
                   size="sm"
                   onClick={() => setPreviewTarget("site")}
                 >
-                  الموقع
+                  {t("businessSettings.site")}
                 </Button>
                 <Button
                   variant={previewTarget === "booking" ? "primary" : "outline"}
                   size="sm"
                   onClick={() => setPreviewTarget("booking")}
                 >
-                  الحجز
+                  {t("businessSettings.booking")}
                 </Button>
               </div>
               <div className="flex gap-2">
@@ -427,6 +441,7 @@ export default function BusinessSettingsPage({ hideHeader = false }: { hideHeade
 }
 
 function PublicLinkCard({ title, url, qrCode, onCopy }: { title: string; url: string; qrCode: string; onCopy: () => void }) {
+  const { t } = useTranslation("owner");
   return (
     <PremiumCard className="flex flex-col gap-6">
       <div className="flex justify-between items-start">
@@ -450,7 +465,7 @@ function PublicLinkCard({ title, url, qrCode, onCopy }: { title: string; url: st
         </div>
         <div className="space-y-2">
           <p className="text-xs font-bold text-muted leading-relaxed">
-            شارك هذا الرمز مع عملائك للوصول الفوري للخدمة.
+            {t("businessSettings.qrHint")}
           </p>
           <Button
             variant="outline"
@@ -463,14 +478,14 @@ function PublicLinkCard({ title, url, qrCode, onCopy }: { title: string; url: st
               a.click();
             }}
           >
-            <Download size={12} className="ml-1" /> تحميل QR
+            <Download size={12} className="ms-1" /> {t("businessSettings.downloadQr")}
           </Button>
         </div>
       </div>
 
       <div className="flex gap-2">
         <Button onClick={onCopy} className="flex-1 h-12 rounded-xl text-xs">
-          <Copy size={14} className="ml-2" /> نسخ الرابط
+          <Copy size={14} className="ms-2" /> {t("businessSettings.copyLink")}
         </Button>
         <Button
           variant="outline"

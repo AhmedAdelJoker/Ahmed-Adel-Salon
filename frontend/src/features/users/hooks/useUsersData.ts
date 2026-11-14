@@ -104,8 +104,15 @@ export function useUsersData() {
     if (!confirmDelete) return;
     try {
       setIsActionLoading(true);
-      await api.delete(`/users/${confirmDelete}`);
-      toast.success("تم سحب الصلاحيات وأرشفة الهوية");
+      // 204 = the row is gone; 200 = the account has related records, so the
+      // backend deactivated it instead. The old message claimed "archived"
+      // for both, hiding which one actually happened.
+      const res = await api.delete(`/users/${confirmDelete}`);
+      if (res.status === 200 && res.data?.deactivated) {
+        toast.success("الحساب عليه سجلات مرتبطة — تم إيقافه بدلاً من حذفه");
+      } else {
+        toast.success("تم حذف المستخدم نهائياً");
+      }
       fetchUsers();
     } catch (_err) {
       toast.error("فشل في حذف المستخدم");

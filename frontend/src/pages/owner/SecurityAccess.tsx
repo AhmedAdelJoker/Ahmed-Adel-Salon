@@ -27,8 +27,10 @@ import {
   PoliciesPanel,
   ActivityPanel,
 } from "@/features/security";
+import { useTranslation } from "react-i18next";
 
 export default function SecurityAccess({ embedded = false }: { embedded?: boolean }) {
+  const { t } = useTranslation("owner");
   const navigate = useNavigate();
   const {
     loading,
@@ -54,9 +56,9 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
     <div className={embedded ? "space-y-6" : "erp-page space-y-8 pb-12"}>
       {!embedded ? (
         <PageHeader
-          title="الأمان والوصول"
-          subtitle="مراقبة المستخدمين، الجلسات، الصلاحيات، وسياسات حماية العمليات المالية"
-          badge="الأمن والوصول"
+          title={t("security.title")}
+          subtitle={t("security.subtitle")}
+          badge={t("security.badge")}
           icon={ShieldCheck}
           className={undefined}
           actions={
@@ -70,9 +72,9 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
               >
                 <RefreshCw
                   size={16}
-                  className={cn("ml-2", refreshing && "animate-spin")}
+                  className={cn("ms-2", refreshing && "animate-spin")}
                 />
-                تحديث
+                {t("security.refresh")}
               </Button>
               <Button
                 type="button"
@@ -81,8 +83,8 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
                 onClick={exportSecurityReport}
                 className="h-11 rounded-2xl border-border bg-card/50"
               >
-                <Download size={16} className="ml-2" />
-                تصدير التقرير
+                <Download size={16} className="ms-2" />
+                {t("security.exportReport")}
               </Button>
               <Button
                 type="button"
@@ -90,8 +92,8 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
                 onClick={saveSettings}
                 className="h-11 rounded-2xl bg-accent text-white shadow-lg shadow-accent/20 hover:bg-accent/90"
               >
-                <Save size={16} className="ml-2" />
-                حفظ السياسات
+                <Save size={16} className="ms-2" />
+                {t("security.savePolicies")}
               </Button>
             </div>
           }
@@ -100,9 +102,9 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border">
           <div>
             <h3 className="text-sm font-black text-main flex items-center gap-2">
-              <ShieldCheck size={16} className="text-primary" /> الأمان والوصول
+              <ShieldCheck size={16} className="text-primary" /> {t("security.title")}
             </h3>
-            <p className="text-[11px] font-bold text-muted mt-1">سياسات الحماية والجلسات • مراقبة مباشرة</p>
+            <p className="text-[11px] font-bold text-muted mt-1">{t("security.embeddedDesc")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => loadSecurityData({ background: true })} className="h-9 rounded-xl">
@@ -112,7 +114,7 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
               <Download size={14} />
             </Button>
             <Button type="button" size="sm" disabled={loading} onClick={saveSettings} className="h-9 rounded-xl">
-              <Save size={14} className="ml-1.5" /> حفظ
+              <Save size={14} className="ms-1.5" /> {t("security.save")}
             </Button>
           </div>
         </div>
@@ -127,7 +129,7 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="مستخدمون نشطون"
+          label={t("security.activeUsers")}
           value={metrics.activeUsers}
           icon={UserCheck}
           variant="success"
@@ -135,7 +137,7 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
           trendValue={undefined}
         />
         <StatCard
-          label="جلسات نشطة"
+          label={t("security.activeSessions")}
           value={metrics.activeSessions}
           icon={Smartphone}
           variant="info"
@@ -143,7 +145,7 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
           trendValue={undefined}
         />
         <StatCard
-          label="عمليات حساسة"
+          label={t("security.sensitiveOps")}
           value={metrics.sensitiveLogs}
           icon={ShieldAlert}
           variant={metrics.sensitiveLogs > 0 ? "warning" : "success"}
@@ -151,7 +153,7 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
           trendValue={undefined}
         />
         <StatCard
-          label="حسابات غير نشطة"
+          label={t("security.inactiveUsers")}
           value={metrics.inactiveUsers}
           icon={XCircle}
           variant="secondary"
@@ -161,18 +163,18 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
       </div>
       )}
 
-      {/* شريط هوية — انتقال سريع (مرحلة 3) */}
+      {/* Quick nav strip (phase 3) */}
       {!embedded && (
         <PremiumCard className="p-0 overflow-hidden" hoverable={false} animate={false}>
           <div className="flex flex-wrap items-center gap-2 p-3 sm:p-4">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ml-2">
-              <ShieldCheck size={12} className="text-accent" /> انتقال سريع
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-black tracking-widest text-muted uppercase ms-2">
+              <ShieldCheck size={12} className="text-accent" /> {t("security.quickNav")}
             </span>
             {[
-              { label: "المستخدمون", desc: "إدارة الحسابات", icon: Users, href: "/owner/users", color: "bg-primary text-white" },
-              { label: "سجل النشاط", desc: "العمليات الحساسة", icon: Activity, href: "/activity-logs", color: "bg-info text-white" },
-              { label: "الموارد البشرية", desc: "الكادر والصلاحيات", icon: ShieldAlert, href: "/owner/hr", color: "bg-warning text-white" },
-              { label: "الرواتب", desc: "المستحقات والسلف", icon: Wallet, href: "/owner/payroll", color: "bg-success text-white" },
+              { label: t("security.navUsers"), desc: t("security.navUsersDesc"), icon: Users, href: "/owner/users", color: "bg-primary text-white" },
+              { label: t("security.navActivity"), desc: t("security.navActivityDesc"), icon: Activity, href: "/activity-logs", color: "bg-info text-white" },
+              { label: t("security.navHR"), desc: t("security.navHRDesc"), icon: ShieldAlert, href: "/manager/hr", color: "bg-warning text-white" },
+              { label: t("security.navPayroll"), desc: t("security.navPayrollDesc"), icon: Wallet, href: "/owner/payroll", color: "bg-success text-white" },
             ].map((l) => (
               <button
                 key={l.href}
@@ -197,8 +199,7 @@ export default function SecurityAccess({ embedded = false }: { embedded?: boolea
       syncStatus.usersAvailable &&
       syncStatus.logsAvailable ? (
         <InlineNotice tone="success">
-          البيانات متصلة بالخادم الآن، ويمكن حفظ السياسات ومراجعة الجلسات
-          والسجلات مباشرة.
+          {t("security.serverConnected")}
         </InlineNotice>
       ) : null}
 

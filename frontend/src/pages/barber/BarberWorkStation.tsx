@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/shared/PageShell";
+import { ErrorState } from "@/components/shared/AsyncState";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,8 +27,10 @@ import {
   ServiceDetailsPanel,
   QuickActionsPanel,
 } from "@/features/barber-workstation";
+import { useAppLocale } from "@/hooks/useAppLocale";
 
 const BarberWorkStation = () => {
+  const { locale } = useAppLocale();
   const {
     navigate,
     setSearchParams,
@@ -57,6 +61,7 @@ const BarberWorkStation = () => {
     handleAddProduct,
     totalProducts,
     formatCurrency,
+    loadError,
   } = useBarberWorkStation();
 
   if (loading) {
@@ -72,6 +77,20 @@ const BarberWorkStation = () => {
     );
   }
 
+  // The picker queue failed to load, so the barber would otherwise see a blank
+  // list and could conclude there is no work waiting.
+  if (loadError && !appointment) {
+    return (
+      <PageShell contained>
+        <ErrorState
+          title="تعذر تحميل قائمة الانتظار"
+          message={loadError}
+          onRetry={fetchAppointments}
+        />
+      </PageShell>
+    );
+  }
+
   if (!appointment) {
     if (loading) {
       return (
@@ -84,8 +103,8 @@ const BarberWorkStation = () => {
     }
     // Show appointment selection when no appointmentId
     return (
-      <div className="min-h-screen bg-slate-50 pb-12">
-        <div className="mx-auto max-w-3xl px-4 py-8">
+      <div>
+        <PageShell contained>
           <div className="text-center mb-8">
             <h1 className="text-2xl font-black text-main mb-2">محطة العمل</h1>
             <p className="text-muted">اختر حجزاً لبدء الخدمة</p>
@@ -100,7 +119,7 @@ const BarberWorkStation = () => {
                 عندما يتم حجز موعد لك، سيظهر هنا
               </p>
               <Button onClick={fetchAppointments} variant="outline">
-                <RefreshCw size={14} className="ml-1.5" /> تحديث
+                <RefreshCw size={14} className="ms-1.5" /> تحديث
               </Button>
             </div>
           ) : (
@@ -121,8 +140,7 @@ const BarberWorkStation = () => {
                     <p className="text-sm text-muted flex items-center gap-2">
                       <Calendar size={14} />
                       {apt.appointment_date
-                        ? new Date(apt.appointment_date).toLocaleDateString(
-                            "ar-EG",
+                        ? new Date(apt.appointment_date).toLocaleDateString(locale,
                             { weekday: "long", day: "numeric", month: "long" },
                           )
                         : ""}
@@ -148,19 +166,19 @@ const BarberWorkStation = () => {
               ))}
             </div>
           )}
-        </div>
+        </PageShell>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-12">
+    <div>
       <WorkStationHeader
         status={appointment.status}
         onBack={() => navigate("/barber")}
       />
 
-      <div className="mx-auto max-w-7xl space-y-4 px-4 py-4">
+      <PageShell contained>
         <TimerCard
           elapsedTime={elapsedTime}
           timerRunning={timerRunning}
@@ -192,11 +210,12 @@ const BarberWorkStation = () => {
             formatCurrency={formatCurrency}
             audioEnabled={audioEnabled}
             setAudioEnabled={setAudioEnabled}
-            onComplete={() => setShowCompleteDialog(true)}
-            onCancel={() => setShowCancelDialog(true)}
-          />
+onComplete={() => setShowCompleteDialog(true)}
+        onCancel={() => setShowCancelDialog(true)}
+        status={appointment.status}
+        />
         </div>
-      </div>
+      </PageShell>
 
       {/* Complete Dialog */}
       <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>

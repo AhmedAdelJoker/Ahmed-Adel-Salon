@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import {
   Phone,
   Clock3,
@@ -6,7 +6,6 @@ import {
   Scissors,
   StickyNote,
   User,
-  ArrowUpRight,
   Globe,
   Home,
 } from "lucide-react";
@@ -18,15 +17,22 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { cn, formatTime12h } from "@/lib/core/utils";
+import {
+  cn,
+  formatCurrency,
+  formatTime12h,
+} from "@/lib/core/utils";
 import { getStatusConfig } from "@/pages/cashier/schedule/scheduleUtils";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { toast } from "react-hot-toast";
+import api from "@/services/api";
 import { Badge } from "@/components/ui/badge";
 
-function getServiceList(appointment) {
+function getServiceList(appointment, t) {
   if (Array.isArray(appointment.services) && appointment.services.length > 0) {
     return appointment.services.map((s) => ({
-      name: s.service_name || s.name || "خدمة",
+      name: s.service_name || s.name || t("listView.service"),
       price: s.price || s.service_price,
     }));
   }
@@ -38,16 +44,84 @@ function getServiceList(appointment) {
   return [];
 }
 
-const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any) {
+const ScheduleModal = memo(function ScheduleModal({
+  appointment,
+  onClose,
+  onEdit,
+  onCancel,
+  onTransferPOS,
+  onStatusChange,
+}: any) {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation("schedule");
   if (!appointment) return null;
 
   const status = getStatusConfig(appointment.status);
-  const services = getServiceList(appointment);
+  const services = getServiceList(appointment, t);
   const isOnline = appointment.booking_source === "online";
   const phone = appointment.customer_phone || appointment.phone || "";
   const barberName =
     appointment.barber_name || appointment.employee_name || "—";
+  const [statusOpen, setStatusOpen] = useState(false);
+
+  const handleCancel = async () => {
+    try {
+      await api.patch(`/appointments/${appointment.id}/status`, {
+        status: "cancelled",
+        cancellation_reason: t("toasts.noReasonGiven"),
+      });
+      toast.success(t("toasts.cancelled"));
+      onClose?.();
+      onCancel?.();
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.detail || t("toasts.cancelFailed"),
+      );
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    try {
+      await api.patch(`/appointments/${appointment.id}/status`, {
+        status: newStatus,
+      });
+      toast.success(t("toasts.statusUpdated"));
+      onClose?.();
+      onStatusChange?.(newStatus);
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.detail || t("toasts.statusUpdateFailed"),
+      );
+    }
+  };
+
+  const handleTransferPOS = () => {
+    onClose?.();
+    navigate("/pos", {
+      state: {
+        appointmentId: appointment.id,
+        customerId: appointment.customer_id,
+        barberId: appointment.barber_id || appointment.employee_id,
+        services: appointment.services,
+      },
+    });
+    onTransferPOS?.();
+  };
+
+  const handleEdit = () => {
+    onClose?.();
+    navigate("/bookings", {
+      state: { appointmentId: appointment.id },
+    });
+    onEdit?.();
+  };
+
+  const statusOptions = [
+    { key: "waiting", label: t("scheduleModal.statusWaiting"), color: "text-blue-500" },
+    { key: "in_progress", label: t("scheduleModal.statusInProgress"), color: "text-indigo-500" },
+    { key: "done", label: t("scheduleModal.statusDone"), color: "text-emerald-600" },
+    { key: "cancelled", label: t("scheduleModal.statusCancelled"), color: "text-rose-500" },
+  ];
 
   return (
     <Dialog open={!!appointment} onOpenChange={(open) => !open && onClose?.()}>
@@ -56,10 +130,10 @@ const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any)
           <div>
             <DialogTitle className="text-lg font-black text-main flex items-center gap-2">
               <User size={18} className="text-accent" />
-              {appointment.customer_name || "عميل مجهول"}
+              {appointment.customer_name || t("appointmentCard.unknownCustomer")}
             </DialogTitle>
             <DialogDescription className="text-xs font-bold text-muted mt-1">
-              تفاصيل الموعد الكاملة
+              {t("scheduleModal.title")}
             </DialogDescription>
           </div>
           <Badge
@@ -69,7 +143,7 @@ const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any)
               status.bg,
             )}
           >
-            {status.label}
+            {i18n.t("schedule:" + status.label)}
           </Badge>
         </DialogHeader>
 
@@ -81,7 +155,7 @@ const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any)
               </div>
               <div>
                 <p className="text-[9px] font-black text-muted uppercase">
-                  الوقت
+                  {t("scheduleModal.time")}
                 </p>
                 <p className="text-sm font-black text-main tabular-nums">
                   {formatTime12h(
@@ -101,16 +175,19 @@ const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any)
               </div>
               <div>
                 <p className="text-[9px] font-black text-muted uppercase">
-                  التاريخ
+                  {t("scheduleModal.date")}
                 </p>
                 <p className="text-sm font-black text-main tabular-nums">
                   {new Date(
                     appointment.appointment_date + "T00:00:00",
-                  ).toLocaleDateString("ar-EG", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                  })}
+                  ).toLocaleDateString(
+                    i18n.language === "ar" ? "ar-EG" : "en-US",
+                    {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                    },
+                  )}
                 </p>
               </div>
             </div>
@@ -121,7 +198,7 @@ const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any)
               </div>
               <div>
                 <p className="text-[9px] font-black text-muted uppercase">
-                  الموظف
+                  {t("scheduleModal.barber")}
                 </p>
                 <p className="text-sm font-black text-main truncate">
                   {barberName}
@@ -135,7 +212,7 @@ const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any)
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] font-black text-muted uppercase">
-                  الهاتف
+                  {t("scheduleModal.phone")}
                 </p>
                 <p className="text-sm font-black text-main truncate" dir="ltr">
                   {phone || "—"}
@@ -149,7 +226,7 @@ const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any)
               <div className="flex items-center gap-2 px-4 py-3 bg-card/60 border-b border-border/60">
                 <Scissors size={14} className="text-accent" />
                 <p className="text-[10px] font-black text-main">
-                  الخدمات المطلوبة
+                  {t("scheduleModal.servicesRequired")}
                 </p>
               </div>
               <div className="divide-y divide-border/40">
@@ -163,7 +240,7 @@ const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any)
                     </span>
                     {s.price != null && (
                       <span className="text-[10px] font-black text-accent tabular-nums">
-                        {s.price} ج.م
+                        {formatCurrency(s.price)}
                       </span>
                     )}
                   </div>
@@ -176,10 +253,10 @@ const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any)
             <StickyNote size={16} className="text-accent mt-0.5 shrink-0" />
             <div className="min-w-0">
               <p className="text-[9px] font-black text-muted uppercase mb-1">
-                ملاحظات
+                {t("scheduleModal.notes")}
               </p>
               <p className="text-xs font-bold text-main leading-relaxed">
-                {appointment.notes || "لا توجد ملاحظات"}
+                {appointment.notes || t("scheduleModal.noNotes")}
               </p>
             </div>
           </div>
@@ -190,44 +267,101 @@ const ScheduleModal = memo(function ScheduleModal({ appointment, onClose }: any)
                 variant="outline"
                 className="text-sky-600 bg-sky-500/10 border-none gap-1.5"
               >
-                <Globe size={11} /> حجز أونلاين
+                <Globe size={11} /> {t("scheduleModal.bookingSourceOnline")}
               </Badge>
             ) : (
               <Badge
                 variant="outline"
                 className="text-amber-600 bg-amber-500/10 border-none gap-1.5"
               >
-                <Home size={11} /> حجز عادي
+                <Home size={11} /> {t("scheduleModal.bookingSourceRegular")}
               </Badge>
             )}
             {appointment.created_at && (
               <span className="text-[9px] font-bold text-muted">
-                أُنشئ في{" "}
-                {new Date(appointment.created_at).toLocaleDateString("ar-EG", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
+                {t("scheduleModal.createdAt")}{" "}
+                {new Date(appointment.created_at).toLocaleDateString(
+                  i18n.language === "ar" ? "ar-EG" : "en-US",
+                  {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  },
+                )}
               </span>
             )}
           </div>
         </div>
 
         <div className="flex items-center justify-between px-6 pb-6 gap-3">
-          <Button variant="outline" onClick={onClose} className="rounded-xl">
-            إغلاق
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              onClose?.();
-              navigate("/bookings");
-            }}
-            className="rounded-xl gap-2"
-          >
-            إدارة الحجز <ArrowUpRight size={16} />
-          </Button>
+          <div className="flex items-center gap-2">
+            {status.key !== "CANCELLED" && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleCancel}
+                className="rounded-xl"
+              >
+                {t("scheduleModal.cancel")}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTransferPOS}
+              className="rounded-xl gap-2"
+            >
+              {t("scheduleModal.transferPOS")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEdit}
+              className="rounded-xl gap-2"
+            >
+              {t("scheduleModal.edit")}
+            </Button>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStatusOpen(true)}
+              className="rounded-xl gap-1"
+            >
+              {t("scheduleModal.changeStatus")}
+            </Button>
+            <Button variant="outline" onClick={onClose} className="rounded-xl">
+              {t("scheduleModal.close")}
+            </Button>
+          </div>
         </div>
+
+        {/* Quick status change buttons */}
+        {statusOpen && (
+          <div className="absolute top-0 right-0 mt-2 w-48 bg-card border border-border rounded-2xl shadow-lg p-2 z-50">
+            <p className="text-xs font-black text-muted uppercase tracking-widest mb-2 px-2">
+              {t("scheduleModal.changeStatus")}
+            </p>
+            {statusOptions.map((opt) => (
+              <Button
+                key={opt.key}
+                variant={status.key === opt.key.toUpperCase() ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => {
+                  handleStatusChange(opt.key);
+                  setStatusOpen(false);
+                }}
+                className="w-full justify-between text-left rounded-xl gap-2"
+              >
+                <span className={`font-bold ${opt.color}`}>{opt.label}</span>
+                {status.key === opt.key.toUpperCase() && (
+                  <span className="text-[10px]">✓</span>
+                )}
+              </Button>
+            ))}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

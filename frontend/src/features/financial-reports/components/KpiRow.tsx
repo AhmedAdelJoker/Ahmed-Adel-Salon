@@ -1,6 +1,7 @@
 import { Target, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { CurrencyStatCard, StatCard as StatCardDisplay } from "@/components/shared/DisplayComponents";
 import { formatCurrency } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
 import { formatSignedPct } from "@/features/financial-reports/hooks/useFinancialReports";
 import type { FinancialsState } from "@/types/reports";
 
@@ -9,10 +10,11 @@ export interface KpiRowProps {
 }
 
 export function KpiRow({ financials }: KpiRowProps) {
+  const { t } = useTranslation("owner");
   return (
     <div data-stats-grid="true">
       <CurrencyStatCard
-        label="إجمالي الإيرادات"
+        label={t("finFeat.kpi.revenue")}
         value={financials.revenue}
         icon={TrendingUp}
         variant="success"
@@ -26,10 +28,10 @@ export function KpiRow({ financials }: KpiRowProps) {
         trendValue={
           financials.growth.revenue === null ? undefined : formatSignedPct(financials.growth.revenue)
         }
-        hint={`${financials.invoiceCount} فاتورة • متوسط ${formatCurrency(financials.avgTicket)}`}
+        hint={t("finFeat.kpi.revenueHint", { count: financials.invoiceCount, avg: formatCurrency(financials.avgTicket) })}
       />
       <CurrencyStatCard
-        label="إجمالي المصروفات"
+        label={t("finFeat.kpi.expenses")}
         value={financials.expenses}
         icon={TrendingDown}
         variant="danger"
@@ -43,10 +45,10 @@ export function KpiRow({ financials }: KpiRowProps) {
         trendValue={
           financials.growth.expenses === null ? undefined : formatSignedPct(financials.growth.expenses)
         }
-        hint={`${financials.expenseCount} بند • ${financials.expenseRatio.toFixed(1)}% من الإيراد`}
+        hint={t("finFeat.kpi.expensesHint", { count: financials.expenseCount, ratio: financials.expenseRatio.toFixed(1) })}
       />
       <CurrencyStatCard
-        label="صافي الربح"
+        label={t("finFeat.kpi.net")}
         value={financials.netProfit}
         icon={Wallet}
         trend={
@@ -60,19 +62,19 @@ export function KpiRow({ financials }: KpiRowProps) {
         }
         trendValue={financials.growth.net === null ? undefined : formatSignedPct(financials.growth.net)}
         variant="primary"
-        hint={`هامش ${financials.margin.toFixed(1)}%`}
+        hint={t("finFeat.kpi.netHint", { margin: financials.margin.toFixed(1) })}
       />
       <StatCardDisplay
-        label="هامش الربح"
+        label={t("finFeat.kpi.margin")}
         value={`${financials.margin.toFixed(1)}%`}
         icon={Target}
         variant="warning"
         hint={
           financials.growth.marginDelta === null
             ? financials.netProfit >= 0
-              ? "أداء موجب"
-              : "يحتاج مراجعة"
-            : `Δ ${formatSignedPct(financials.growth.marginDelta)} نقطة مئوية عن الفترة السابقة`
+              ? t("finFeat.kpi.positiveGain")
+              : t("finFeat.kpi.needsReview")
+            : t("finFeat.kpi.deltaHint", { delta: formatSignedPct(financials.growth.marginDelta) })
         }
       />
     </div>

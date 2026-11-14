@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/core/utils";
 import { ArrowLeft } from "lucide-react";
+import { STATUS_LABELS, STATUS_VARIANTS } from "@/lib/barberStatus";
 
 interface WorkStationHeaderProps {
   status: string;
@@ -9,23 +10,13 @@ interface WorkStationHeaderProps {
 }
 
 export const WorkStationHeader = ({ status, onBack }: WorkStationHeaderProps) => {
-  const statusLabels: Record<string, string> = {
-    waiting: "في الانتظار",
-    "in-service": "قيد الخدمة",
-    completed: "مكتمل",
-    ready_for_payment: "جاهز للدفع",
-    cancelled: "ملغي",
-    pending: "قيد التأكيد",
-  };
+  // Labels and colours come from the shared module. These two local copies
+  // covered six statuses while the API writes ten, so `confirmed`,
+  // `in_progress`, `done` and `no_show` rendered as the raw English key in a
+  // neutral grey. The copies also disagreed with each other on `pending`.
+  const statusLabels = STATUS_LABELS;
+  const statusColors = STATUS_VARIANTS;
 
-  const statusColors: Record<string, "warning" | "info" | "success" | "danger" | "secondary"> = {
-    waiting: "warning",
-    "in-service": "info",
-    completed: "success",
-    ready_for_payment: "success",
-    cancelled: "danger",
-    pending: "secondary",
-  };
 
   return (
     <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-border">

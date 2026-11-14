@@ -1,17 +1,19 @@
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from typing import List, Optional
 from datetime import datetime
 
 from app.db.session import get_db
-from app.api.deps import require_owner_or_manager, require_any_staff, require_roles
+from app.api.deps import require_owner_or_admin, require_owner_or_manager, require_any_staff, require_roles
 from app.models.user import User
 from app.models.employee import Employee
 from app.models.payroll_record import PayrollRecord
 from app.models.salary_advance import SalaryAdvance
 from app.models.expense import Expense
+from app.core.audit import audit_log
+from app.core.clock import utc_now_naive
 from app.schemas.payroll import (
     PayrollCreate, PayrollRead, PayrollUpdate, 
     PayrollSummary, PayrollArchiveResponse, PayrollCalculateRequest
@@ -152,6 +154,13 @@ def calculate_payroll(
         end_date = datetime(req.year + 1, 1, 1)
     else:
         end_date = datetime(req.year, req.month + 1, 1)
+
+    # Full-day absence penalties are generated as part of payroll calculation —
+    # this is the "automatic" half of the absence system. The manual backfill
+    # button in the penalties tab calls the same service. Idempotent.
+    from app.services.absence_service import ensure_absence_penalties
+
+    ensure_absence_penalties(db, year=req.year, month=req.month, created_by_user_id=current_user.id)
 
     # Fetch active employees
     employees = db.query(Employee).filter(Employee.is_active == True).all()
@@ -350,10 +359,13 @@ def pay_payroll(
     
     if record.status == "paid":
         raise HTTPException(status_code=400, detail="Payroll already paid")
-        
+
     try:
         record.status = "paid"
-        record.payment_date = datetime.now()
+        # UTC, like every other stored timestamp. `datetime.now()` wrote the
+        # *server's* zone, which is wrong by the offset whenever the server is not
+        # in Egypt -- and payroll figures are compared by date downstream.
+        record.payment_date = utc_now_naive()
         if payment_data and "payment_method" in payment_data:
             record.payment_method = payment_data["payment_method"]
         
@@ -372,28 +384,24 @@ def pay_payroll(
         db.add(new_expense)
         db.flush()
         
-        # ديناميكي: حركة خزنة لسحب الراتب (كاش/غير كاش حسب طريقة الدفع)
-        try:
-            from app.crud.core_business import create_cash_transaction
-            pm = str(new_expense.payment_method or "cash").strip().lower()
-            if new_expense.amount and float(new_expense.amount) > 0:
-                create_cash_transaction(
-                    db,
-                    direction="out",
-                    amount=float(new_expense.amount),
-                    transaction_type="payroll_payment",
-                    payment_method=pm or "cash",
-                    notes=f"صرف راتب: {record.employee_name_snapshot} {record.period_month}/{record.period_year}",
-                    user_id=current_user.id,
-                    reference_type="payroll",
-                    reference_id=record.id,
-                    reference_no=f"PAY-{record.id}",
-                    employee_id=record.employee_id,
-                    commit=False,
-                )
-        except Exception as _e:
-            print(f"[Cashbox] payroll auto-withdraw failed: {_e}")
-        
+        from app.crud.core_business import create_cash_transaction
+        pm = str(new_expense.payment_method or "cash").strip().lower()
+        if new_expense.amount and float(new_expense.amount) > 0:
+            create_cash_transaction(
+                db,
+                direction="out",
+                amount=float(new_expense.amount),
+                transaction_type="payroll_payment",
+                payment_method=pm or "cash",
+                notes=f"صرف راتب: {record.employee_name_snapshot} {record.period_month}/{record.period_year}",
+                user_id=current_user.id,
+                reference_type="payroll",
+                reference_id=record.id,
+                reference_no=f"PAY-{record.id}",
+                employee_id=record.employee_id,
+                commit=False,
+            )
+
         record.expense_id = new_expense.id
         
         # Mark advances as deducted
@@ -416,6 +424,10 @@ def pay_payroll(
         db.commit()
         db.refresh(record)
         return record
+    except ValueError as e:
+        # Overdraft / invalid movement — message for the user, not a 500.
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -438,18 +450,34 @@ def cancel_payroll(
 @router.delete("/{payroll_id}")
 def delete_payroll(
     payroll_id: int, 
+    request: Request = None,
     db: Session = Depends(get_db), 
-    current_user: User = Depends(require_owner_or_manager)
+    current_user: User = Depends(require_owner_or_admin)
 ):
     record = db.query(PayrollRecord).filter(PayrollRecord.id == payroll_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Payroll record not found")
     
     if record.status == "paid":
-        raise HTTPException(status_code=400, detail="Cannot delete paid payroll")
+        raise HTTPException(status_code=400, detail="لا يمكن رفض راتب مدفوع")
         
-    db.delete(record)
+    # Snapshot before cancel — after state change the ORM state is expunged.
+    snapshot = {
+        "employee_id": getattr(record, "employee_id", None),
+        "period": getattr(record, "period", None) or getattr(record, "month", None),
+        "base_salary": float(getattr(record, "base_salary", 0) or 0),
+        "status": record.status,
+    }
+    record.status = "cancelled"
+    db.add(record)
     db.commit()
+    audit_log(
+        db, request, current_user,
+        action="cancel_payroll",
+        entity_type="payroll_record",
+        entity_id=payroll_id,
+        description={"deleted": snapshot, "new_status": "cancelled"},
+    )
     return {"message": "Payroll record deleted successfully"}
 
 

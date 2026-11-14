@@ -142,7 +142,7 @@ export const StatCard = ({
   return (
     <PremiumCard
       delay={delay}
-      className={cn("group border-l-4", variants[variant] || variants.primary)}
+      className={cn("group border-s-4", variants[variant] || variants.primary)}
     >
       <div className="flex items-center gap-3 sm:gap-4">
         <div className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-card shadow-sm transition-transform group-hover:scale-105 border border-border/30">

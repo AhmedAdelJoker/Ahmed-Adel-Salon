@@ -1,4 +1,7 @@
 # Netlify config — https://docs.netlify.com/configure-builds/file-based-configuration/
+#
+# NOTE: this file and public/_headers must stay in sync with vercel.json.
+# `scripts/contracts.test.mjs` fails the build when they drift.
 
 [build]
   command = "npm run build"
@@ -7,9 +10,14 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# SPA fallback — all unknown routes serve index.html (for client-side routing)
+# SPA fallback.
+#
+# Scoped to /salon/* on purpose. Every other real route (/, /book, /offline)
+# is a pre-rendered document on disk, so a wildcard rewrite here would only
+# ever serve index.html with a 200 for genuine typos — a soft 404. Anything
+# outside /salon/* now falls through to dist/404.html with a real 404 status.
 [[redirects]]
-  from = "/*"
+  from = "/salon/*"
   to = "/index.html"
   status = 200
 
@@ -25,14 +33,25 @@
     Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
   for = "/salon/*"
   [headers.values]
     Cache-Control = "public, max-age=0, s-maxage=300, stale-while-revalidate=3600"
 
+# Security headers — apply to everything
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
     Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Resource-Policy = "same-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://plausible.io; worker-src 'self' blob:; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+

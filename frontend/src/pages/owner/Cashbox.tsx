@@ -33,12 +33,10 @@ import { StatCard as StatCardDisplay } from "@/components/shared/DisplayComponen
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCashbox, type CashDirectionTab } from "@/features/cashbox/hooks/useCashbox";
-import { CashboxCharts } from "@/features/cashbox/components/CashboxCharts";
-import { CashboxTable } from "@/features/cashbox/components/CashboxTable";
+import { CashboxCharts } from "@/features/cashbox";
+import { CashboxTable } from "@/features/cashbox";
 import {
   formatDateTimeLocal,
-  getTypeLabel,
-  PAYMENT_LABELS,
   isVoided,
   buildCashboxCsv,
   getCreator,
@@ -49,24 +47,63 @@ import {
 import type { Transaction } from "@/types/cashbox";
 import cashboxService from "@/services/cashboxService";
 import { staticURL } from "@/services/api";
+import { currencyLabel } from "@/lib/core/currency";
+import { useTranslation } from "react-i18next";
 
 const SYSTEM_LINKS = [
-  { label: "نقطة البيع", icon: Receipt, href: "/pos" },
-  { label: "المصروفات", icon: TrendingDown, href: "/expenses" },
-  { label: "الرواتب", icon: Users, href: "/owner/payroll" },
-  { label: "المخزون", icon: Package, href: "/inventory" },
+  { key: "cashbox.quickPos", icon: Receipt, href: "/pos" },
+  { key: "cashbox.quickExpenses", icon: TrendingDown, href: "/expenses" },
+  { key: "cashbox.quickPayroll", icon: Users, href: "/owner/payroll" },
+  { key: "cashbox.quickInventory", icon: Package, href: "/inventory" },
 ] as const;
 
 const PERIODS = [
-  { id: "all", label: "الكل" },
-  { id: "day", label: "اليوم" },
-  { id: "week", label: "أسبوع" },
-  { id: "month", label: "شهر" },
-  { id: "year", label: "سنة" },
+  { id: "all", key: "cashbox.periodAll" },
+  { id: "day", key: "cashbox.periodDay" },
+  { id: "week", key: "cashbox.periodWeek" },
+  { id: "month", key: "cashbox.periodMonth" },
+  { id: "year", key: "cashbox.periodYear" },
 ] as const;
 
 export default function Cashbox() {
+  const { t } = useTranslation("owner");
   const navigate = useNavigate();
+
+  const typeLabel = (type?: string | null): string => {
+    if (!type) return t("cashbox.unspecified");
+    const map: Record<string, string> = {
+      invoice_payment: t("cashbox.typeInvoice"),
+      expense_payment: t("cashbox.typeExpense"),
+      manual_deposit: t("cashbox.typeDeposit"),
+      manual_withdraw: t("cashbox.typeWithdraw"),
+      opening_balance: t("cashbox.typeOpening"),
+      closing_balance: t("cashbox.typeClosing"),
+      refund: t("cashbox.typeRefund"),
+      payroll_payment: t("cashbox.typePayroll"),
+      salary_advance: t("cashbox.typeAdvance"),
+    };
+    return map[type] ?? type;
+  };
+
+  const methodLabel = (pm?: string | null): string => {
+    const k = String(pm ?? "cash").trim().toLowerCase();
+    if (k === "cash") return t("cashbox.methodCash");
+    if (k === "card") return t("cashbox.methodCard");
+    if (k === "bank_transfer") return t("cashbox.methodBank");
+    if (k === "wallet") return t("cashbox.methodWallet");
+    if (k === "non_cash") return t("cashbox.methodNonCash");
+    return k;
+  };
+
+  const roleLabel = (role?: string | null): string => {
+    const r = String(role ?? "").toLowerCase();
+    if (["owner", "admin"].includes(r)) return t("cashbox.roleOwner");
+    if (r === "manager") return t("cashbox.roleManager");
+    if (r === "accountant") return t("cashbox.roleAccountant");
+    if (r === "cashier") return t("cashbox.roleCashier");
+    if (r === "barber") return t("cashbox.roleBarber");
+    return role ? String(role) : t("cashbox.roleUser");
+  };
   const {
     summary,
     transactions,
@@ -117,8 +154,8 @@ export default function Cashbox() {
   };
 
   const handleCreateCash = async () => {
-    if (!cashAmount || Number(cashAmount) <= 0) return toast.error("أدخل مبلغ صحيح");
-    if (!cashReason.trim() || cashReason.trim().length < 3) return toast.error("أدخل سبب واضح (3 أحرف على الأقل)");
+    if (!cashAmount || Number(cashAmount) <= 0) return toast.error(t("cashbox.amountDue"));
+    if (!cashReason.trim() || cashReason.trim().length < 3) return toast.error(t("cashbox.reasonRequired"));
     try {
       setIsSubmitting(true);
       const ok = await createTransaction({
@@ -143,11 +180,11 @@ export default function Cashbox() {
   };
 
   const handleExportCsv = async () => {
-    if (!transactions.length) return toast.error("لا توجد بيانات");
+    if (!transactions.length) return toast.error(t("cashbox.noData"));
     try {
       let rows = transactions;
       if (hasActiveFilters || totalCount > transactions.length) {
-        toast.loading("جاري التجهيز...", { id: "export-csv" });
+        toast.loading(t("cashbox.exporting"), { id: "export-csv" });
         const params: Record<string, unknown> = { limit: 500 };
         if (searchTerm.trim()) params.q = searchTerm.trim();
         if (direction !== "all") {
@@ -190,21 +227,21 @@ export default function Cashbox() {
         rows = adaptList<Transaction>(raw);
         toast.dismiss("export-csv");
       }
-      if (!rows.length) return toast.error("لا توجد بيانات");
+      if (!rows.length) return toast.error(t("cashbox.noData"));
       const csv = buildCashboxCsv(rows as Transaction[]);
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `الخزنة_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `cashbox-${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      toast.success(`تم تصدير ${rows.length} سجل`);
+      toast.success(t("cashbox.exportSuccess", { count: rows.length }));
     } catch {
       toast.dismiss("export-csv");
-      toast.error("فشل التصدير");
+      toast.error(t("cashbox.exportFailed"));
     }
   };
 
@@ -227,27 +264,27 @@ export default function Cashbox() {
 
   const isPeriod = period !== "all";
   const cashMain = isPeriod ? summary.period_cash_net : summary.cash_balance_detail;
-  const cashSub = isPeriod ? `${summary.period_label} • ${formatCurrency(summary.period_cash_in)} → ${formatCurrency(summary.period_cash_out)}` : `وارد ${formatCurrency(summary.cash_in)} • صادر ${formatCurrency(summary.cash_out)}`;
+  const cashSub = isPeriod ? `${summary.period_label} • ${formatCurrency(summary.period_cash_in)} → ${formatCurrency(summary.period_cash_out)}` : `${t("cashbox.inShort")} ${formatCurrency(summary.cash_in)} • ${t("cashbox.outShort")} ${formatCurrency(summary.cash_out)}`;
   const digitalMain = isPeriod ? summary.period_non_cash_net : summary.non_cash_balance;
   const totalMain = isPeriod ? summary.period_net : summary.cash_balance;
 
   return (
     <div className="erp-page space-y-5 pb-10">
       <PageHeader
-        title="الخزنة المركزية"
-        subtitle="الخزنة المركزية • نقدي و رقمي — كل وردية وكل حركة تسمع تلقائياً"
-        badge="الخزنة"
+        title={t("cashbox.title")}
+        subtitle={t("cashbox.subtitle")}
+        badge={t("cashbox.badge")}
         icon={Wallet}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleExportCsv} className="h-9 rounded-xl gap-1.5">
-              <Download size={14} /> تصدير
+              <Download size={14} /> {t("cashbox.export")}
             </Button>
             <Button size="sm" onClick={() => { setCashType("in"); setShowCashModal(true); }} className="h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 gap-1.5">
-              <ArrowUpCircle size={14} /> إيداع
+              <ArrowUpCircle size={14} /> {t("cashbox.deposit")}
             </Button>
             <Button size="sm" onClick={() => { setCashType("out"); setShowCashModal(true); }} className="h-9 rounded-xl bg-rose-600 hover:bg-rose-700 gap-1.5">
-              <ArrowDownCircle size={14} /> سحب
+              <ArrowDownCircle size={14} /> {t("cashbox.withdraw")}
             </Button>
             <Button variant="ghost" size="icon" onClick={() => refresh()} disabled={refreshing} className="h-9 w-9 rounded-xl border border-border">
               <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
@@ -264,12 +301,12 @@ export default function Cashbox() {
               onClick={() => setPeriod(p.id as typeof period)}
               className={cn("px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all", period === p.id ? "bg-slate-900 text-white" : "text-muted hover:text-main")}
             >
-              {p.label}
+              {t(p.key)}
             </button>
           ))}
           <div className="w-px h-5 bg-border mx-1" />
           <button onClick={() => setPeriod("custom")} className={cn("px-3 py-1.5 rounded-lg text-xs font-bold", period === "custom" ? "bg-slate-900 text-white" : "text-muted")}>
-            مخصص
+            {t("cashbox.custom")}
           </button>
         </div>
         {period === "custom" && (
@@ -284,36 +321,36 @@ export default function Cashbox() {
         </Badge>
         {hasActiveFilters && (
           <button onClick={clearFilters} className="text-xs font-bold text-muted hover:text-main flex items-center gap-1">
-            <X size={12} /> مسح
+            <X size={12} /> {t("cashbox.clearFilters")}
           </button>
         )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <button onClick={() => setPaymentMethod("cash")} className="text-right">
-          <PremiumCard className={cn("p-5 border-l-4 hover:shadow-md transition-all text-right", paymentMethod === "cash" ? "border-l-emerald-500 bg-emerald-50/40" : "border-l-emerald-500")}>
+          <PremiumCard className={cn("p-5 border-s-4 hover:shadow-md transition-all text-right", paymentMethod === "cash" ? "border-s-emerald-500 bg-emerald-50/40" : "border-s-emerald-500")}>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold tracking-widest uppercase text-muted flex items-center gap-1.5">
-                <Banknote size={12} className="text-emerald-600" /> نقدي
+                <Banknote size={12} className="text-emerald-600" /> {t("cashbox.cash")}
               </span>
               <Badge variant="outline" className="text-[10px] rounded-full h-5 px-2">
-                {paymentMethod === "cash" ? "نشط" : "نقدي فقط"}
+                {paymentMethod === "cash" ? t("cashbox.active") : t("cashbox.cashOnly")}
               </Badge>
             </div>
             <div className="text-2xl font-black tracking-tight mt-2 tabular-nums">{formatCurrency(cashMain)}</div>
             <div className="text-xs font-medium text-muted mt-1 truncate">{cashSub}</div>
-            <div className="text-[11px] font-bold mt-2 text-emerald-700">سحب و إيداع نقدي فقط</div>
+            <div className="text-[11px] font-bold mt-2 text-emerald-700">{t("cashbox.cashOnlyNote")}</div>
           </PremiumCard>
         </button>
 
         <button onClick={() => setPaymentMethod("non_cash")} className="text-right">
-          <PremiumCard className={cn("p-5 border-l-4 hover:shadow-md transition-all text-right", paymentMethod === "non_cash" ? "border-l-indigo-500 bg-indigo-50/40" : "border-l-indigo-500")}>
+          <PremiumCard className={cn("p-5 border-s-4 hover:shadow-md transition-all text-right", paymentMethod === "non_cash" ? "border-s-indigo-500 bg-indigo-50/40" : "border-s-indigo-500")}>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold tracking-widest uppercase text-muted flex items-center gap-1.5">
-                <CreditCard size={12} className="text-indigo-600" /> رقمي
+                <CreditCard size={12} className="text-indigo-600" /> {t("cashbox.nonCash")}
               </span>
               <Badge variant="outline" className="text-[10px] rounded-full h-5 px-2">
-                {paymentMethod === "non_cash" ? "نشط" : "بطاقة/محفظة"}
+                {paymentMethod === "non_cash" ? t("cashbox.active") : t("cashbox.nonCashLabel")}
               </Badge>
             </div>
             <div className="text-2xl font-black tracking-tight mt-2 tabular-nums">{formatCurrency(digitalMain)}</div>
@@ -324,33 +361,33 @@ export default function Cashbox() {
               <span className="mx-1.5">•</span>
               <span className="inline-flex items-center gap-1"><Smartphone size={10} /> {formatCurrency(byMethod.find((m) => m.method === "wallet")?.value ?? 0)}</span>
             </div>
-            <div className="text-[11px] font-bold mt-2 text-indigo-700">مبيعات غير نقدية</div>
+            <div className="text-[11px] font-bold mt-2 text-indigo-700">{t("cashbox.nonCashOnlyNote")}</div>
           </PremiumCard>
         </button>
 
-        <PremiumCard className="p-5 border-l-4 border-l-slate-900 bg-slate-900 text-white text-right">
-          <div className="text-[11px] font-bold tracking-widest uppercase text-white/60">الإجمالي</div>
+        <PremiumCard className="p-5 border-s-4 border-s-slate-900 bg-slate-900 text-white text-right">
+          <div className="text-[11px] font-bold tracking-widest uppercase text-white/60">{t("cashbox.totalLabel")}</div>
           <div className="text-2xl font-black tracking-tight mt-2 tabular-nums">{formatCurrency(totalMain)}</div>
           <div className="text-xs font-medium text-white/60 mt-1 truncate">
-            {isPeriod ? `الصافي ${formatCurrency(summary.period_net)} • ${summary.period_label}` : `وارد ${formatCurrency(summary.total_in)} • صادر ${formatCurrency(summary.total_out)}`}
+            {isPeriod ? `${t("cashbox.netPeriod")} ${formatCurrency(summary.period_net)} • ${summary.period_label}` : `${t("cashbox.inShort")} ${formatCurrency(summary.total_in)} • ${t("cashbox.outShort")} ${formatCurrency(summary.total_out)}`}
           </div>
-          <div className="text-[11px] font-bold mt-2 text-white/80">الخزنة المركزية • ديناميكي</div>
+          <div className="text-[11px] font-bold mt-2 text-white/80">{t("cashbox.dynamic")}</div>
         </PremiumCard>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {SYSTEM_LINKS.map((l) => (
-          <button key={l.label} onClick={() => navigate(l.href)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card text-xs font-bold hover:border-slate-900 hover:bg-soft transition-colors">
-            <l.icon size={12} /> {l.label}
+          <button key={l.key} onClick={() => navigate(l.href)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card text-xs font-bold hover:border-slate-900 hover:bg-soft transition-colors">
+            <l.icon size={12} /> {t(l.key)}
           </button>
         ))}
-        <span className="text-xs text-muted mr-2 hidden sm:inline-flex items-center">المبيعات • المصروفات • الرواتب • المشتريات ← الخزنة</span>
+        <span className="text-xs text-muted me-2 hidden sm:inline-flex items-center">{t("cashbox.autoFlow")}</span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <StatCardDisplay label={isPeriod ? `الصافي • ${summary.period_label}` : "الصافي • اليوم"} value={formatCurrency(isPeriod ? summary.period_net : summary.today_net)} icon={isPeriod ? TrendingUp : TrendingUp} variant={Number(isPeriod ? summary.period_net : summary.today_net) >= 0 ? "success" : "danger"} hint={isPeriod ? `نقدي ${formatCurrency(summary.period_cash_net)} • رقمي ${formatCurrency(summary.period_non_cash_net)}` : `نقدي ${formatCurrency(summary.cash_today_net)} • رقمي ${formatCurrency(summary.non_cash_today_net)}`} />
-        <StatCardDisplay label="حركة النقدي" value={`${formatCurrency(isPeriod ? summary.period_cash_in : summary.cash_in)} → ${formatCurrency(isPeriod ? summary.period_cash_out : summary.cash_out)}`} icon={Banknote} variant="primary" hint="وارد → صادر" />
-        <StatCardDisplay label="حركة الرقمي" value={`${formatCurrency(isPeriod ? summary.period_non_cash_in : summary.non_cash_in)} → ${formatCurrency(isPeriod ? summary.period_non_cash_out : summary.non_cash_out)}`} icon={CreditCard} variant="secondary" hint="بطاقة / تحويل / محفظة" />
+        <StatCardDisplay label={isPeriod ? `${t("cashbox.netPeriod")} • ${summary.period_label}` : t("cashbox.netToday")} value={formatCurrency(isPeriod ? summary.period_net : summary.today_net)} icon={isPeriod ? TrendingUp : TrendingUp} variant={Number(isPeriod ? summary.period_net : summary.today_net) >= 0 ? "success" : "danger"} hint={isPeriod ? `${t("cashbox.cash")} ${formatCurrency(summary.period_cash_net)} • ${t("cashbox.nonCash")} ${formatCurrency(summary.period_non_cash_net)}` : `${t("cashbox.cash")} ${formatCurrency(summary.cash_today_net)} • ${t("cashbox.nonCash")} ${formatCurrency(summary.non_cash_today_net)}`} />
+        <StatCardDisplay label={t("cashbox.cashMovement")} value={`${formatCurrency(isPeriod ? summary.period_cash_in : summary.cash_in)} → ${formatCurrency(isPeriod ? summary.period_cash_out : summary.cash_out)}`} icon={Banknote} variant="primary" hint={`${t("cashbox.inShort")} → ${t("cashbox.outShort")}`} />
+        <StatCardDisplay label={t("cashbox.nonCashMovement")} value={`${formatCurrency(isPeriod ? summary.period_non_cash_in : summary.non_cash_in)} → ${formatCurrency(isPeriod ? summary.period_non_cash_out : summary.non_cash_out)}`} icon={CreditCard} variant="secondary" hint={t("cashbox.cardTransferWallet")} />
       </div>
 
       <CashboxCharts trend={trend} breakdown={breakdown} todayNet={isPeriod ? summary.period_net : summary.today_net} byMethod={byMethod} />
@@ -358,36 +395,36 @@ export default function Cashbox() {
       <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-5">
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-bold tracking-widest uppercase text-muted">
-            <span>الفلترة</span>
+            <span>{t("cashbox.filterLabel")}</span>
             <span className="flex-1 h-px bg-border" />
           </div>
           <PremiumCard noPadding className="overflow-hidden">
             <div className="p-4 space-y-3">
               <div className="relative">
-                <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="بحث برقم العملية، ملاحظات..." className="h-9 pr-9 rounded-xl text-sm" />
+                <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={t("cashbox.searchPlaceholder")} className="h-9 pe-9 rounded-xl text-sm" />
                 <ArrowRightLeft size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted" />
               </div>
               <div className="flex gap-2">
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                   <SelectTrigger className="h-9 rounded-xl text-xs font-bold flex-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">كل الطرق</SelectItem>
-                    <SelectItem value="cash">نقدي</SelectItem>
-                    <SelectItem value="non_cash">رقمي</SelectItem>
-                    <SelectItem value="card">بطاقة</SelectItem>
-                    <SelectItem value="bank_transfer">تحويل</SelectItem>
-                    <SelectItem value="wallet">محفظة</SelectItem>
+                    <SelectItem value="all">{t("cashbox.methodAll")}</SelectItem>
+                    <SelectItem value="cash">{t("cashbox.methodCash")}</SelectItem>
+                    <SelectItem value="non_cash">{t("cashbox.methodNonCash")}</SelectItem>
+                    <SelectItem value="card">{t("cashbox.methodCard")}</SelectItem>
+                    <SelectItem value="bank_transfer">{t("cashbox.methodBank")}</SelectItem>
+                    <SelectItem value="wallet">{t("cashbox.methodWallet")}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
                   <SelectTrigger className="h-9 rounded-xl text-xs font-bold flex-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">كل الأنواع</SelectItem>
-                    <SelectItem value="invoice_payment">مبيعات</SelectItem>
-                    <SelectItem value="expense_payment">مصروفات</SelectItem>
-                    <SelectItem value="manual_deposit">إيداع</SelectItem>
-                    <SelectItem value="manual_withdraw">سحب</SelectItem>
-                    <SelectItem value="opening_balance">افتتاحي</SelectItem>
+                    <SelectItem value="all">{t("cashbox.typeAll")}</SelectItem>
+                    <SelectItem value="invoice_payment">{t("cashbox.typeInvoice")}</SelectItem>
+                    <SelectItem value="expense_payment">{t("cashbox.typeExpense")}</SelectItem>
+                    <SelectItem value="manual_deposit">{t("cashbox.typeDeposit")}</SelectItem>
+                    <SelectItem value="manual_withdraw">{t("cashbox.typeWithdraw")}</SelectItem>
+                    <SelectItem value="opening_balance">{t("cashbox.typeOpening")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -398,53 +435,53 @@ export default function Cashbox() {
                 </div>
               )}
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={clearFilters} className="flex-1 h-8 rounded-lg text-xs">مسح</Button>
-                <Button variant="ghost" size="sm" onClick={() => refresh()} className="h-8 rounded-lg text-xs">تحديث</Button>
+                <Button variant="outline" size="sm" onClick={clearFilters} className="flex-1 h-8 rounded-lg text-xs">{t("cashbox.clearFilters")}</Button>
+                <Button variant="ghost" size="sm" onClick={() => refresh()} className="h-8 rounded-lg text-xs">{t("cashbox.refreshBtn")}</Button>
               </div>
               <div className="text-[11px] text-muted font-medium pt-2 border-t border-border/40">
-                {totalCount} سجل • {transactions.length} معروض
+                {t("cashbox.resultsCount", { total: totalCount, shown: transactions.length })}
               </div>
             </div>
           </PremiumCard>
           <div className="rounded-xl bg-soft border border-border p-3 text-xs leading-relaxed text-muted font-medium">
-            المبيعات والمصروفات والمشتريات والرواتب تسجل تلقائياً في الخزنة حسب طريقة الدفع.
+            {t("cashbox.autoRegisterNote")}
           </div>
         </div>
 
         <div className="space-y-3 min-w-0">
           <div className="flex items-center gap-1.5 bg-soft border border-border p-1 rounded-xl w-fit">
             {[
-              { id: "all", label: "الكل", count: totalCount },
-              { id: "in", label: "وارد" },
-              { id: "out", label: "صادر" },
-              { id: "voided", label: "ملغاة" },
+              { id: "all", key: "cashbox.tabAll", count: totalCount },
+              { id: "in", key: "cashbox.tabIn" },
+              { id: "out", key: "cashbox.tabOut" },
+              { id: "voided", key: "cashbox.tabVoided" },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setDirection(tab.id as CashDirectionTab)}
                 className={cn("px-3.5 py-1.5 rounded-lg text-xs font-bold", direction === tab.id ? "bg-white shadow border border-border text-main" : "text-muted hover:text-main")}
               >
-                {tab.label} {tab.count !== undefined ? `(${tab.count})` : ""}
+                {t(tab.key)} {tab.count !== undefined ? `(${tab.count})` : ""}
               </button>
             ))}
           </div>
 
           <div className="flex gap-1.5">
             {[
-              { id: "all", label: "الكل" },
-              { id: "cash", label: "نقدي" },
-              { id: "non_cash", label: "رقمي" },
+              { id: "all", key: "cashbox.tabAll" },
+              { id: "cash", key: "cashbox.methodCash" },
+              { id: "non_cash", key: "cashbox.methodNonCash" },
             ].map((m) => (
               <button
                 key={m.id}
                 onClick={() => setPaymentMethod(m.id)}
                 className={cn("px-3 py-1 rounded-full text-xs font-bold border", paymentMethod === m.id ? "bg-slate-900 text-white border-slate-900" : "bg-card text-muted border-border")}
               >
-                {m.label}
+                {t(m.key)}
               </button>
             ))}
-            <button onClick={() => { setDirection("out"); setPaymentMethod("cash"); }} className="mr-auto text-xs font-bold text-rose-600 hover:underline hidden sm:block">
-              سحب نقدي فقط
+            <button onClick={() => { setDirection("out"); setPaymentMethod("cash"); }} className="me-auto text-xs font-bold text-rose-600 hover:underline hidden sm:block">
+              {t("cashbox.withdrawCashOnly")}
             </button>
           </div>
 
@@ -453,7 +490,7 @@ export default function Cashbox() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-2">
               <span className="text-xs font-bold text-muted">
-                صفحة {currentPage} / {totalPages} • {totalCount}
+                {t("cashbox.pageOf", { page: currentPage, total: totalPages, count: totalCount })}
               </span>
               <div className="flex gap-1.5">
                 <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
@@ -486,21 +523,21 @@ export default function Cashbox() {
                         {isIn ? <ArrowUpCircle size={20} /> : <ArrowDownCircle size={20} />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-black truncate">{viewTx.transaction_no || `#${viewTx.id}`} • {getTypeLabel(viewTx.type)}</div>
-                        <div className="text-xs font-bold text-white/80 truncate">{PAYMENT_LABELS[String(viewTx.payment_method ?? "cash")] ?? viewTx.payment_method} • {isIn ? "وارد" : "صادر"}</div>
+                        <div className="text-sm font-black truncate">{viewTx.transaction_no || `#${viewTx.id}`} • {typeLabel(viewTx.type)}</div>
+                        <div className="text-xs font-bold text-white/80 truncate">{methodLabel(viewTx.payment_method)} • {isIn ? t("cashbox.inShort") : t("cashbox.outShort")}</div>
                       </div>
                       <Badge className={cn("rounded-full px-3 py-1 text-[10px] font-black border-0 shrink-0", isIn ? "bg-white text-emerald-700" : "bg-white text-rose-700")}>
-                        {isIn ? "وارد" : "صادر"}
+                        {isIn ? t("cashbox.inShort") : t("cashbox.outShort")}
                       </Badge>
                     </div>
                   </div>
 
                   <div className="p-5 space-y-4 overflow-y-auto flex-1">
-                    {/* المنشئ — عالمي متوسط */}
+                    {/* Creator — org-wide average */}
                     <div className="rounded-xl border bg-soft/50 p-3 flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-white border flex items-center justify-center overflow-hidden shrink-0">
                         {creator.avatar ? (
-                          <img src={creator.avatar.startsWith("http") ? creator.avatar : `${staticURL}${creator.avatar}`} alt="" className="h-full w-full object-cover" />
+                          <img src={creator.avatar.startsWith("http") ? creator.avatar : `${staticURL}${creator.avatar}`} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                         ) : (
                           <User size={16} className="text-muted" />
                         )}
@@ -508,12 +545,12 @@ export default function Cashbox() {
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-black truncate flex items-center gap-2">
                           {creator.name}
-                          <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-black border", roleMeta.bg)}>{roleMeta.label}</span>
+                          <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-black border", roleMeta.bg)}>{roleLabel(creator.role)}</span>
                         </div>
                         <div className="text-xs font-bold text-muted flex items-center gap-1">
                           <Clock size={10} /> {formatDateTimeLocal(viewTx.created_at ?? viewTx.transaction_date)}
                           <span className="h-1 w-1 rounded-full bg-border mx-1" />
-                          {isVoided(viewTx) ? <span className="text-rose-600">ملغاة</span> : <span className="text-emerald-600">نشط</span>}
+                          {isVoided(viewTx) ? <span className="text-rose-600">{t("cashbox.voidedStatus")}</span> : <span className="text-emerald-600">{t("cashbox.activeStatus")}</span>}
                         </div>
                       </div>
                       <ShieldCheck size={16} className="text-emerald-500 shrink-0" />
@@ -521,26 +558,26 @@ export default function Cashbox() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="rounded-xl bg-soft p-3 border">
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-muted">المبلغ</div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-muted">{t("cashbox.amount")}</div>
                         <div className={cn("text-lg font-black", isIn ? "text-emerald-600" : "text-rose-600")}>{isIn ? "+" : "-"}{formatCurrency(viewTx.amount)}</div>
-                        <div className="text-[11px] font-bold text-muted">{PAYMENT_LABELS[String(viewTx.payment_method ?? "cash")] ?? viewTx.payment_method}</div>
+                        <div className="text-[11px] font-bold text-muted">{methodLabel(viewTx.payment_method)}</div>
                       </div>
                       <div className="rounded-xl bg-soft p-3 border">
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-muted">الرصيد بعد</div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-muted">{t("cashbox.balanceAfter")}</div>
                         <div className="text-lg font-black">{viewTx.balance_after != null ? formatCurrency(viewTx.balance_after) : "—"}</div>
-                        <div className="text-[11px] font-bold text-muted">بعد الحركة</div>
+                        <div className="text-[11px] font-bold text-muted">{t("cashbox.afterMovement")}</div>
                       </div>
                     </div>
 
                     <div className="rounded-xl border p-3 space-y-2.5 text-xs bg-card">
-                      <div className="flex justify-between"><span className="text-muted font-bold">النوع</span><span className="font-black">{getTypeLabel(viewTx.type)}</span></div>
-                      <div className="flex justify-between"><span className="text-muted font-bold">المرجع</span><span className="font-black">{reference || viewTx.reference_no || "—"}</span></div>
-                      {recipient && <div className="flex justify-between"><span className="text-muted font-bold">المستفيد</span><span className="font-black">{recipient}</span></div>}
-                      <div className="flex justify-between"><span className="text-muted font-bold">التاريخ</span><span className="font-bold">{formatDateTimeLocal(viewTx.transaction_date ?? viewTx.created_at)}</span></div>
-                      <div className="flex justify-between"><span className="text-muted font-bold">الخزنة</span><span className={cn("px-2 py-0.5 rounded-full text-[10px] font-black border", viewTx.payment_method === "cash" ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-indigo-50 border-indigo-200 text-indigo-700")}>{PAYMENT_LABELS[String(viewTx.payment_method ?? "cash")] ?? viewTx.payment_method}</span></div>
+                      <div className="flex justify-between"><span className="text-muted font-bold">{t("cashbox.typeLabel")}</span><span className="font-black">{typeLabel(viewTx.type)}</span></div>
+                      <div className="flex justify-between"><span className="text-muted font-bold">{t("cashbox.reference")}</span><span className="font-black">{reference || viewTx.reference_no || "—"}</span></div>
+                      {recipient && <div className="flex justify-between"><span className="text-muted font-bold">{t("cashbox.recipient")}</span><span className="font-black">{recipient}</span></div>}
+                      <div className="flex justify-between"><span className="text-muted font-bold">{t("cashbox.date")}</span><span className="font-bold">{formatDateTimeLocal(viewTx.transaction_date ?? viewTx.created_at)}</span></div>
+                      <div className="flex justify-between"><span className="text-muted font-bold">{t("cashbox.cashbox")}</span><span className={cn("px-2 py-0.5 rounded-full text-[10px] font-black border", viewTx.payment_method === "cash" ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-indigo-50 border-indigo-200 text-indigo-700")}>{methodLabel(viewTx.payment_method)}</span></div>
                       {linked && (
                         <div className="flex justify-between items-center">
-                          <span className="text-muted font-bold">الترابط</span>
+                          <span className="text-muted font-bold">{t("cashbox.linked")}</span>
                           <button onClick={() => linked.href && navigate(linked.href)} className="font-black text-indigo-600 hover:underline flex items-center gap-1 text-xs">
                             {linked.label} <ExternalLink size={10} />
                           </button>
@@ -549,7 +586,7 @@ export default function Cashbox() {
                     </div>
 
                     <div className="rounded-xl bg-soft p-3 border">
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted mb-1 flex items-center gap-1"><FileText size={10} /> الملاحظات</div>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted mb-1 flex items-center gap-1"><FileText size={10} /> {t("cashbox.notes")}</div>
                       <p className="text-sm leading-relaxed font-medium whitespace-pre-wrap">{cleanNotes || "—"}</p>
                     </div>
 
@@ -558,7 +595,7 @@ export default function Cashbox() {
                         <Download size={12} /> PDF
                       </Button>
                       <Button onClick={() => setIsViewOpen(false)} className="flex-1 h-9 rounded-xl bg-slate-900 text-white text-xs">
-                        إغلاق
+                        {t("cashbox.close")}
                       </Button>
                     </div>
                   </div>
@@ -576,45 +613,45 @@ export default function Cashbox() {
             <div className={cn("h-12 w-12 rounded-xl mx-auto flex items-center justify-center mb-2", cashType === "in" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600")}>
               {cashType === "in" ? <ArrowUpCircle size={20} /> : <ArrowDownCircle size={20} />}
             </div>
-            <DialogTitle className="text-base font-black">{cashType === "in" ? "إيداع" : "سحب"} • خزنة</DialogTitle>
-            <DialogDescription className="text-xs">إضافة تفاصيل أكثر — كل حركة مرتبطة بالمنشئ والخزنة</DialogDescription>
+            <DialogTitle className="text-base font-black">{cashType === "in" ? t("cashbox.depositTitle") : t("cashbox.withdrawTitle")}</DialogTitle>
+            <DialogDescription className="text-xs">{t("cashbox.moreDetails")}</DialogDescription>
           </DialogHeader>
           <div className="p-5 pt-0 space-y-3">
             <div className="flex bg-soft border rounded-xl p-1">
               <button onClick={() => setCashType("in")} className={cn("flex-1 h-8 rounded-lg text-xs font-bold", cashType === "in" ? "bg-emerald-600 text-white" : "text-muted")}>
-                إيداع
+                {t("cashbox.deposit")}
               </button>
               <button onClick={() => setCashType("out")} className={cn("flex-1 h-8 rounded-lg text-xs font-bold", cashType === "out" ? "bg-rose-600 text-white" : "text-muted")}>
-                سحب
+                {t("cashbox.withdraw")}
               </button>
             </div>
             <div className="relative">
-              <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} placeholder="0.00" className="h-12 text-xl font-black text-center pr-4 pl-10 rounded-xl" autoFocus />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted">ج.م</span>
+              <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} placeholder="0.00" className="h-12 text-xl font-black text-center pe-4 ps-10 rounded-xl" autoFocus />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted">{currencyLabel()}</span>
             </div>
-            <div className="text-xs text-muted">رصيد النقدي: <b className="text-main">{formatCurrency(summary.cash_balance_detail)}</b> • الرقمي: <b className="text-main">{formatCurrency(summary.non_cash_balance)}</b></div>
+            <div className="text-xs text-muted">{t("cashbox.cashBalanceCash")} <b className="text-main">{formatCurrency(summary.cash_balance_detail)}</b> • {t("cashbox.cashBalanceDigital")} <b className="text-main">{formatCurrency(summary.non_cash_balance)}</b></div>
 
             <Select value={cashMethod} onValueChange={setCashMethod}>
               <SelectTrigger className="h-9 rounded-xl text-xs font-bold"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="cash">نقدي — خزنة الكاش</SelectItem>
-                <SelectItem value="card">بطاقة — خزنة رقمية</SelectItem>
-                <SelectItem value="bank_transfer">تحويل بنكي</SelectItem>
-                <SelectItem value="wallet">محفظة</SelectItem>
+                <SelectItem value="cash">{t("cashbox.cashDeposit")}</SelectItem>
+                <SelectItem value="card">{t("cashbox.cardDigital")}</SelectItem>
+                <SelectItem value="bank_transfer">{t("cashbox.bankTransfer")}</SelectItem>
+                <SelectItem value="wallet">{t("cashbox.wallet")}</SelectItem>
               </SelectContent>
             </Select>
 
-            <Input value={cashRecipient} onChange={(e) => setCashRecipient(e.target.value)} placeholder="المستفيد / المودع (اختياري)" className="h-9 rounded-xl text-sm" />
-            <Input value={cashRef} onChange={(e) => setCashRef(e.target.value)} placeholder="رقم المرجع (اختياري)" className="h-9 rounded-xl text-sm" />
-            <textarea value={cashReason} onChange={(e) => setCashReason(e.target.value)} placeholder="السبب / التفاصيل..." className="w-full h-20 rounded-xl border bg-soft p-3 text-sm resize-none outline-none focus:border-slate-900" maxLength={300} />
-            <div className="text-[11px] text-muted">سيُحفظ مع اسمك ودورك ({/* role hint */} ) ويرتبط بالخزنة {cashMethod === "cash" ? "النقدية" : "الرقمية"}.</div>
+            <Input value={cashRecipient} onChange={(e) => setCashRecipient(e.target.value)} placeholder={t("cashbox.recipientPlaceholder")} className="h-9 rounded-xl text-sm" />
+            <Input value={cashRef} onChange={(e) => setCashRef(e.target.value)} placeholder={t("cashbox.refPlaceholder")} className="h-9 rounded-xl text-sm" />
+            <textarea value={cashReason} onChange={(e) => setCashReason(e.target.value)} placeholder={t("cashbox.reasonPlaceholder")} className="w-full h-20 rounded-xl border bg-soft p-3 text-sm resize-none outline-none focus:border-slate-900" maxLength={300} />
+            <div className="text-[11px] text-muted">{t("cashbox.savedWith", { target: cashMethod === "cash" ? t("cashbox.cashType") : t("cashbox.nonCashType") })}</div>
           </div>
           <DialogFooter className="p-4 pt-0 flex gap-2">
             <Button variant="outline" onClick={() => setShowCashModal(false)} className="flex-1 h-9 rounded-xl text-xs">
-              إلغاء
+              {t("cashbox.cancel")}
             </Button>
             <Button onClick={handleCreateCash} disabled={!cashAmount || Number(cashAmount) <= 0 || !cashReason.trim() || isSubmitting} className={cn("flex-1 h-9 rounded-xl text-xs text-white", cashType === "in" ? "bg-emerald-600" : "bg-rose-600")}>
-              {isSubmitting ? "..." : "تأكيد"}
+              {isSubmitting ? t("cashbox.submitting") : t("cashbox.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

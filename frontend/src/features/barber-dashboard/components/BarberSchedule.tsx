@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, Calendar, Clock, Clock3, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAppLocale } from "@/hooks/useAppLocale";
+import { STATUS_LABELS, STATUS_VARIANTS } from "@/lib/barberStatus";
 
 interface ScheduleWorkingHours {
   open_time?: string | null;
@@ -29,6 +31,7 @@ interface ScheduleData {
 }
 
 export const BarberSchedule = () => {
+  const { locale } = useAppLocale();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
 
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
@@ -52,23 +55,13 @@ export const BarberSchedule = () => {
     fetchSchedule();
   }, [fetchSchedule]);
 
-  const statusLabels: Record<string, string> = {
-    pending: "قيد الانتظار",
-    waiting: "في الانتظار",
-    "in-service": "قيد الخدمة",
-    completed: "مكتمل",
-    ready_for_payment: "جاهز للدفع",
-    cancelled: "ملغي",
-  };
+  // Labels and colours come from the shared module. These two local copies
+  // covered six statuses while the API writes ten, so `confirmed`,
+  // `in_progress`, `done` and `no_show` rendered as the raw English key in a
+  // neutral grey. The copies also disagreed with each other on `pending`.
+  const statusLabels = STATUS_LABELS;
+  const statusColors = STATUS_VARIANTS;
 
-  const statusColors: Record<string, "warning" | "info" | "success" | "danger" | "secondary"> = {
-    pending: "warning",
-    waiting: "warning",
-    "in-service": "info",
-    completed: "success",
-    ready_for_payment: "success",
-    cancelled: "danger",
-  };
 
   return (
     <div className="space-y-4">
@@ -112,7 +105,7 @@ export const BarberSchedule = () => {
         <div className="p-4 border-b border-border">
           <h3 className="text-sm font-black text-main flex items-center gap-2">
             <Calendar size={16} className="text-primary" /> مواعيد يوم{" "}
-            {new Date(selectedDate).toLocaleDateString("ar-EG", {
+            {new Date(selectedDate).toLocaleDateString(locale, {
               weekday: "long",
               day: "numeric",
               month: "long",
@@ -153,7 +146,7 @@ export const BarberSchedule = () => {
                     {statusLabels[apt.status] || apt.status}
                   </Badge>
                 </div>
-                {apt.notes && <p className="mt-2 text-[10px] font-bold text-muted mr-13">{apt.notes}</p>}
+                {apt.notes && <p className="mt-2 text-[10px] font-bold text-muted me-13">{apt.notes}</p>}
               </motion.div>
             ))
           ) : (

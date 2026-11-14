@@ -29,11 +29,48 @@ def create_session_from_appointment(db: Session, *, appointment: Appointment, cr
     db.add(session)
     db.flush()
 
-    appointment_services = db.query(AppointmentService).filter(AppointmentService.appointment_id == appointment.id).all()
+    # Phase 2: this was three levels of N+1 — one ServiceProduct query per
+    # appointment service, then one Product query per service product. An
+    # appointment with 3 services each using 2 products cost 1 + 3 + 6 = 10
+    # queries. Now it is always 3, regardless of the appointment's shape.
+    #
+    # Correctness note: the stock deduction below mutates `product.quantity`.
+    # Collecting them into a dict is safe because every row comes from the
+    # same session, so the identity map returns the *same* Product instance
+    # for a repeated id — the read-modify-write never clobbers itself.
+    appointment_services = (
+        db.query(AppointmentService)
+        .filter(AppointmentService.appointment_id == appointment.id)
+        .all()
+    )
+    if not appointment_services:
+        return session
+
+    service_ids = {s.service_id for s in appointment_services if s.service_id is not None}
+    if not service_ids:
+        return session
+
+    service_products = (
+        db.query(ServiceProduct)
+        .filter(ServiceProduct.service_id.in_(service_ids))
+        .all()
+    )
+    product_ids = {sp.product_id for sp in service_products if sp.product_id is not None}
+
+    products_by_id = {}
+    if product_ids:
+        products_by_id = {
+            p.id: p
+            for p in db.query(Product).filter(Product.id.in_(product_ids)).all()
+        }
+
+    products_by_service = {}
+    for service_product in service_products:
+        products_by_service.setdefault(service_product.service_id, []).append(service_product)
+
     for appointment_service in appointment_services:
-        service_products = db.query(ServiceProduct).filter(ServiceProduct.service_id == appointment_service.service_id).all()
-        for service_product in service_products:
-            product = db.query(Product).filter(Product.id == service_product.product_id).first()
+        for service_product in products_by_service.get(appointment_service.service_id, []):
+            product = products_by_id.get(service_product.product_id)
             if not product:
                 raise HTTPException(status_code=404, detail=f"المنتج المرتبط بالخدمة غير موجود: {service_product.product_id}")
             quantity_used = Decimal(str(service_product.amount_used or 0)) * Decimal(str(appointment_service.quantity or 1))

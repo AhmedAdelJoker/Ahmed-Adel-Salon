@@ -6,8 +6,10 @@ import {
   PermissionsMatrix,
   PermissionsModal,
 } from "@/features/permissions";
+import { useTranslation } from "react-i18next";
 
 const PermissionsManagement = () => {
+  const { t } = useTranslation("owner");
   const {
     loading,
     isActionLoading,
@@ -32,7 +34,7 @@ const PermissionsManagement = () => {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4 text-accent">
           <ShieldCheck className="w-10 h-10 animate-pulse" />
-          <p className="text-muted font-bold text-sm">جاري مراجعة مصفوفة الصلاحيات...</p>
+          <p className="text-muted font-bold text-sm">{t("permissions.loading")}</p>
         </div>
       </div>
     );
@@ -42,11 +44,11 @@ const PermissionsManagement = () => {
       <ConfirmDialog
         open={!!confirmAction}
         onOpenChange={(open) => !open && setConfirmAction(null)}
-        title={confirmAction?.type === "delete" ? "سحب صلاحيات الوصول؟" : "تغيير حالة الوصول؟"}
+        title={confirmAction?.type === "delete" ? t("permissions.revokeTitle") : t("permissions.changeTitle")}
         description={
           confirmAction?.type === "delete"
-            ? "هل أنت متأكد من سحب صلاحيات الوصول لهذا الحساب؟ سيتم أرشفة البيانات تلقائياً."
-            : "هل أنت متأكد من تغيير صلاحيات الدخول لهذا الحساب؟"
+            ? t("permissions.revokeDesc")
+            : t("permissions.changeDesc")
         }
         onConfirm={handleConfirmAction}
         loading={isActionLoading}

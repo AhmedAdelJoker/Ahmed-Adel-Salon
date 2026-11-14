@@ -1,15 +1,20 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
-import type { ExpenseFormData, ExpenseRecord, ExpenseSummary } from "@/types/expenses";
-import { PAYMENT_METHODS, CATEGORY_COLORS } from "@/features/expenses/constants";
+import type { ExpenseFormData, ExpenseRecord, ExpenseSummary, ExpenseTrendPoint } from "@/types/expenses";
+import { PAYMENT_METHODS, CATEGORY_COLORS, type ExpenseQuickRange, type ExpenseSort } from "@/features/expenses/constants";
 
 const PAGE_SIZE = 20;
+const EXPORT_PAGE_SIZE = 200;
+const EXPORT_MAX_ROWS = 5000;
 
 export function useExpensesData(isOwner: boolean) {
+  const { t } = useTranslation("owner");
   const invoiceInputRef = useRef<HTMLInputElement | null>(null);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [summary, setSummary] = useState<ExpenseSummary | null>(null);
+  const [trend, setTrend] = useState<ExpenseTrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -27,6 +32,9 @@ export function useExpensesData(isOwner: boolean) {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sort, setSort] = useState<ExpenseSort>("-expense_date");
+  const [quickRange, setQuickRange] = useState<ExpenseQuickRange>("all");
   const [formData, setFormData] = useState<ExpenseFormData>({
     title: "", description: "", amount: "", category: "أخرى",
     payment_method: "cash", expense_date: new Date().toISOString().split("T")[0],
@@ -39,16 +47,58 @@ export function useExpensesData(isOwner: boolean) {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  const buildFilterParams = useCallback((base: Record<string, unknown> = {}) => {
+    const params: Record<string, unknown> = { ...base };
+    if (categoryFilter !== "all") params.category = categoryFilter;
+    if (paymentFilter !== "all") params.payment_method = paymentFilter;
+    if (statusFilter !== "all") params.status = statusFilter;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    if (debouncedSearch) params.q = debouncedSearch;
+    if (sort) params.sort = sort;
+    return params;
+  }, [categoryFilter, paymentFilter, statusFilter, dateFrom, dateTo, debouncedSearch, sort]);
+
+  const onQuickRange = useCallback((range: ExpenseQuickRange) => {
+    setQuickRange(range);
+    setCurrentPage(1);
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const iso = (d: Date) => d.toISOString().split("T")[0];
+    if (range === "all") { setDateFrom(""); setDateTo(""); return; }
+    if (range === "thisMonth") { setDateFrom(iso(new Date(y, m, 1))); setDateTo(iso(now)); return; }
+    if (range === "lastMonth") {
+      setDateFrom(iso(new Date(y, m - 1, 1)));
+      setDateTo(iso(new Date(y, m, 0)));
+      return;
+    }
+    // thisYear
+    setDateFrom(iso(new Date(y, 0, 1)));
+    setDateTo(iso(new Date(y, m, now.getDate())));
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const skip = (currentPage - 1) * PAGE_SIZE;
-      const params: Record<string, unknown> = { limit: PAGE_SIZE, skip, q: debouncedSearch };
-      if (categoryFilter !== "all") params.category = categoryFilter;
-      if (paymentFilter !== "all") params.payment_method = paymentFilter;
-      if (dateFrom) params.date_from = dateFrom;
-      if (dateTo) params.date_to = dateTo;
-      const [listRes, summaryRes] = await Promise.all([api.get("/expenses", { params }), api.get("/expenses/summary")]);
+      const params = buildFilterParams({ limit: PAGE_SIZE, skip });
+      // Charts must aggregate the same range as the list, not the current
+      // page — otherwise every page flip redraws them differently.
+      const summaryParams: Record<string, unknown> = {};
+      if (dateFrom) summaryParams.from_date = dateFrom;
+      if (dateTo) summaryParams.to_date = dateTo;
+      // Charts must aggregate the same range as the list, not the current
+      // page — otherwise every page flip redraws them differently. The trend
+      // series is independent (last 12 months) and may not exist on older
+      // backends — a missing endpoint must not break the page.
+      const [listRes, summaryRes] = await Promise.all([
+        api.get("/expenses", { params }),
+        api.get("/expenses/summary", { params: summaryParams }),
+      ]);
+      api.get("/expenses/trend", { params: { months: 12 } })
+        .then((res) => { if (Array.isArray(res.data?.months)) setTrend(res.data.months); })
+        .catch(() => { /* trend unavailable — chart hides itself */ });
       const data = listRes.data;
       const items: ExpenseRecord[] = Array.isArray(data) ? data : data.items || data.data || [];
       setExpenses(items);
@@ -67,11 +117,11 @@ export function useExpensesData(isOwner: boolean) {
       }
       setSummary(summaryRes.data || null);
     } catch (_err) {
-      toast.error("فشل تحميل البيانات");
+      toast.error(t("expenses.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearch, categoryFilter, dateFrom, dateTo, paymentFilter]);
+  }, [currentPage, buildFilterParams, dateFrom, dateTo, t]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -82,35 +132,37 @@ export function useExpensesData(isOwner: boolean) {
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (!formData.title?.trim() || !formData.amount || !formData.category) { toast.error("يرجى إكمال البيانات الأساسية"); return; }
-    if (["إيجار", "مشتريات"].includes(formData.category) && !formData.recipient_name?.trim()) { toast.error("اسم المستفيد/المورد مطلوب لفئة الإيجار والمشتريات"); return; }
-    if (!isOwner && isEditing) return toast.error("التعديل متاح للمالك فقط");
+    if (!formData.title?.trim() || !formData.amount || !formData.category) { toast.error(t("expenses.completeBasicData")); return; }
+    const parsedAmount = Number(formData.amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) { toast.error(t("expenses.invalidAmount")); return; }
+    if (["إيجار", "مشتريات"].includes(formData.category) && !formData.recipient_name?.trim()) { toast.error(t("expenses.recipientRequired")); return; }
+    if (!isOwner && isEditing) return toast.error(t("expenses.ownerOnlyEdit"));
     try {
       setIsSubmitting(true);
       const payload: Record<string, unknown> = {
         ...formData,
-        amount: Math.abs(Number(formData.amount)),
+        amount: Number(formData.amount),
         expense_date: formData.expense_date ? new Date(formData.expense_date).toISOString() : new Date().toISOString(),
         recipient_name: formData.recipient_name?.trim() || null,
         reference_type: formData.reference_type || null,
         reference_id: formData.reference_id ? Number(formData.reference_id) : null,
         internal_notes: formData.internal_notes?.trim() || null,
       };
-      if (isEditing) { await api.put(`/expenses/${currentId}`, payload); toast.success("تم التحديث"); }
-      else { await api.post("/expenses", payload); toast.success("تم التسجيل"); }
+      if (isEditing) { await api.put(`/expenses/${currentId}`, payload); toast.success(t("expenses.updateSuccess")); }
+      else { await api.post("/expenses", payload); toast.success(t("expenses.createSuccess")); }
       setIsModalOpen(false); resetForm(); fetchData();
     } catch (_err) {
       const apiErr = _err as { response?: { data?: { detail?: unknown } } };
       const msg = apiErr?.response?.data?.detail;
-      toast.error(typeof msg === "string" ? msg : "فشل الحفظ");
+      toast.error(typeof msg === "string" ? msg : t("expenses.saveFailed"));
     } finally { setIsSubmitting(false); }
-  }, [formData, isOwner, isEditing, currentId, fetchData, resetForm]);
+  }, [formData, isOwner, isEditing, currentId, fetchData, resetForm, t]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteId) return;
-    try { await api.delete(`/expenses/${deleteId}`); toast.success("تم الحذف"); setDeleteId(null); fetchData(); }
-    catch (_err) { toast.error("حذف السجلات المالية غير مسموح به حالياً"); }
-  }, [deleteId, fetchData]);
+    try { await api.delete(`/expenses/${deleteId}`); toast.success(t("expenses.deleteSuccess")); setDeleteId(null); fetchData(); }
+    catch (_err) { toast.error(t("expenses.deleteFailed")); }
+  }, [deleteId, fetchData, t]);
 
   const handleEdit = useCallback((exp: ExpenseRecord) => {
     setViewItem(null);
@@ -134,10 +186,41 @@ export function useExpensesData(isOwner: boolean) {
 
   const handleView = useCallback((exp: ExpenseRecord) => { setViewItem(exp); setIsViewOpen(true); }, []);
 
+  const duplicateExpense = useCallback((exp: ExpenseRecord) => {
+    // Same title/category/amount/method — fresh date, fresh status flow,
+    // invoice kept so the user can clear it with one click if not wanted.
+    setFormData({
+      title: exp.title || "",
+      description: exp.description || "",
+      amount: exp.amount != null ? String(exp.amount) : "",
+      category: exp.category || "أخرى",
+      payment_method: exp.payment_method || "cash",
+      expense_date: new Date().toISOString().split("T")[0],
+      status: "recorded",
+      invoice_image_url: (exp.invoice_image_url as string) || "",
+      recipient_name: (exp.recipient_name as string) || "",
+      reference_type: (exp.reference_type as string) || "",
+      reference_id: exp.reference_id != null ? String(exp.reference_id) : "",
+      internal_notes: "",
+    });
+    setIsEditing(false);
+    setCurrentId(null);
+    setIsModalOpen(true);
+  }, []);
+
   const handleApprove = useCallback(async (id: number | string) => {
-    try { await api.post(`/expenses/${id}/approve`); toast.success("تم اعتماد المصروف"); fetchData(); }
-    catch (err) { toast.error("فشل الاعتماد"); }
-  }, [fetchData]);
+    try { await api.post(`/expenses/${id}/approve`); toast.success(t("expenses.approveSuccess")); fetchData(); }
+    catch (_err) { toast.error(t("expenses.approveFailed")); }
+  }, [fetchData, t]);
+
+  const handleReject = useCallback(async (id: number | string) => {
+    try { await api.post(`/expenses/${id}/reject`); toast.success(t("expenses.rejectSuccess")); fetchData(); }
+    catch (_err) {
+      const apiErr = _err as { response?: { data?: { detail?: unknown } } };
+      const msg = apiErr?.response?.data?.detail;
+      toast.error(typeof msg === "string" ? msg : t("expenses.rejectFailed"));
+    }
+  }, [fetchData, t]);
 
   const handleInvoiceUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -145,43 +228,80 @@ export function useExpensesData(isOwner: boolean) {
       setUploading(true);
       const fd = new FormData(); fd.append("file", file);
       const res = await api.post("/expenses/upload-invoice", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      setFormData((p) => ({ ...p, invoice_image_url: res.data?.url || "" })); toast.success("تم رفع الصورة");
-    } catch (err) { toast.error("فشل الرفع"); }
+      setFormData((p) => ({ ...p, invoice_image_url: res.data?.url || "" })); toast.success(t("expenses.uploadSuccess"));
+    } catch (err) { toast.error(t("expenses.uploadFailed")); }
     finally { setUploading(false); if (invoiceInputRef.current) invoiceInputRef.current.value = ""; }
-  }, []);
+  }, [t]);
 
-  const exportToCSV = useCallback(() => {
-    if (!expenses.length) return toast.error("لا توجد بيانات للتصدير");
-    const headers = ["العنوان", "التصنيف", "المبلغ", "طريقة الدفع", "التاريخ", "الوصف"];
-    const rows = expenses.map((exp) => [exp.title, exp.category, exp.amount, PAYMENT_METHODS.find((m) => m.value === exp.payment_method)?.label || exp.payment_method, new Date(String(exp.expense_date || "")).toLocaleDateString("ar-EG"), exp.description || ""]);
-    const csvContent = [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+  const exportToCSV = useCallback(async () => {
+    // CSV cell: always quoted, and neutralize spreadsheet formula injection
+    // for cells that start with = + - @ (Excel/LibreOffice evaluate them).
+    const csvCell = (v: unknown) => {
+      let s = String(v ?? "");
+      if (/^[=+\-@]/.test(s)) s = `'${s}`;
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    // Export ALL filtered rows, not the current page — a 20-row "export" of a
+    // financial ledger silently lies about completeness.
+    const collected: ExpenseRecord[] = [];
+    for (let skip = 0; skip < EXPORT_MAX_ROWS; skip += EXPORT_PAGE_SIZE) {
+      const res = await api.get("/expenses", {
+        params: buildFilterParams({ limit: EXPORT_PAGE_SIZE, skip }),
+      });
+      const data = res.data;
+      const items: ExpenseRecord[] = Array.isArray(data) ? data : data.items || data.data || [];
+      collected.push(...items);
+      if (items.length < EXPORT_PAGE_SIZE) break;
+    }
+    if (!collected.length) return toast.error(t("expenses.noDataExport"));
+    const headers = [t("expenses.csvColTitle"), t("expenses.csvColCategory"), t("expenses.csvColAmount"), t("expenses.csvColPaymentMethod"), t("expenses.csvColDate"), t("expenses.csvColStatus"), t("expenses.csvColDescription")];
+    const statusLabels: Record<string, string> = {
+      approved: t("expenses.statusApproved"),
+      pending_audit: t("expenses.statusPending"),
+      rejected: t("expenses.statusRejected"),
+    };
+    const rows = collected.map((exp) => [
+      exp.title, exp.category, exp.amount,
+      PAYMENT_METHODS.find((m) => m.value === exp.payment_method)?.label || exp.payment_method,
+      new Date(String(exp.expense_date || "")).toLocaleDateString("ar-EG"),
+      statusLabels[String(exp.status)] || exp.status,
+      exp.description || "",
+    ]);
+    const csvContent = [headers.map(csvCell).join(","), ...rows.map((r) => r.map(csvCell).join(","))].join("\r\n");
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
     link.download = `expenses-${new Date().toISOString().split("T")[0]}.csv`; link.click(); URL.revokeObjectURL(link.href);
-    toast.success("تم تصدير البيانات بنجاح");
-  }, [expenses]);
+    toast.success(t("expenses.exportSuccess", { count: collected.length }));
+  }, [buildFilterParams, t]);
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const expenseRows = Array.isArray(expenses) ? expenses : [];
   const categoryData = useMemo(() => {
-    if (!expenses.length) return [];
-    const grouped: Record<string, number> = {};
-    expenses.forEach((exp) => { const key = String(exp.category || "أخرى"); grouped[key] = (grouped[key] || 0) + Number(exp.amount || 0); });
-    return Object.entries(grouped).map(([name, value]) => ({ name, value, color: CATEGORY_COLORS[name] || "#6b7280" }));
-  }, [expenses]);
+    // Server-side aggregation for the active date range — the page-derived
+    // version changed on every page flip.
+    if (!summary?.categories?.length) return [];
+    return summary.categories.map((c) => ({
+      name: c.name,
+      value: Number(c.value || 0),
+      color: CATEGORY_COLORS[c.name] || "var(--text-muted)",
+    }));
+  }, [summary]);
   const paymentData = useMemo(() => {
-    if (!expenses.length) return [];
-    const grouped: Record<string, number> = {};
-    expenses.forEach((exp) => { const method = PAYMENT_METHODS.find((m) => m.value === exp.payment_method)?.label || exp.payment_method || "غير محدد"; grouped[method] = (grouped[method] || 0) + Number(exp.amount || 0); });
-    return Object.entries(grouped).map(([name, value]) => ({ name, value }));
-  }, [expenses]);
+    if (!summary?.payment_breakdown?.length) return [];
+    return summary.payment_breakdown.map((p) => ({
+      name: PAYMENT_METHODS.find((m) => m.value === p.method)?.label || p.method,
+      value: Number(p.amount || 0),
+    }));
+  }, [summary]);
   const totalAmount = expenseRows.reduce((s, e) => s + Number(e.amount || 0), 0);
-  const hasActiveFilters = categoryFilter !== "all" || paymentFilter !== "all" || !!dateFrom || !!dateTo || !!debouncedSearch;
+  const pendingTotal = Number(summary?.pending_total ?? 0);
+  const pendingCount = Number(summary?.pending_count ?? 0);
+  const hasActiveFilters = categoryFilter !== "all" || paymentFilter !== "all" || statusFilter !== "all" || !!dateFrom || !!dateTo || !!debouncedSearch || quickRange !== "all";
 
   return {
-    expenses, summary, loading, currentPage, setCurrentPage, totalCount, totalPages, expenseRows, categoryData, paymentData, totalAmount, hasActiveFilters,
+    expenses, summary, loading, currentPage, setCurrentPage, totalCount, totalPages, expenseRows, categoryData, paymentData, totalAmount, pendingTotal, pendingCount, hasActiveFilters,
     isModalOpen, setIsModalOpen, isEditing, isSubmitting, deleteId, setDeleteId, uploading, viewItem, isViewOpen, setIsViewOpen,
-    searchTerm, setSearchTerm, categoryFilter, setCategoryFilter, dateFrom, setDateFrom, dateTo, setDateTo, paymentFilter, setPaymentFilter,
-    formData, setFormData, invoiceInputRef, fetchData, handleSubmit, handleDelete, handleEdit, handleView, handleApprove, handleInvoiceUpload, resetForm, exportToCSV,
+    searchTerm, setSearchTerm, categoryFilter, setCategoryFilter, dateFrom, setDateFrom, dateTo, setDateTo, paymentFilter, setPaymentFilter, statusFilter, setStatusFilter, sort, setSort, quickRange, onQuickRange,
+    formData, setFormData, invoiceInputRef, fetchData, handleSubmit, handleDelete, handleEdit, handleView, handleApprove, handleReject, handleInvoiceUpload, resetForm, exportToCSV, duplicateExpense, trend,
   };
 }

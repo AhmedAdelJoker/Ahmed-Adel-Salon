@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/select";
 import type { POSRecord } from "@/features/pos/types";
 import type { ID } from "@/types/common";
+import { useTranslation } from "react-i18next";
 import { Zap } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 
@@ -27,11 +28,12 @@ export const BarberSelector = ({
   assignBarberToAll,
   cartLength,
 }: BarberSelectorProps) => {
+  const { t } = useTranslation("pos");
   return (
     <Card className="p-3 space-y-2 bg-card border-border/50 shadow-sm shrink-0">
       <div className="flex justify-between items-center">
         <label className="text-[10px] font-black uppercase text-muted flex items-center gap-1">
-          <Zap size={12} /> الخبير الافتراضي
+          <Zap size={12} /> {t("barber.default_label")}
         </label>
         <Button
           variant="ghost"
@@ -40,15 +42,15 @@ export const BarberSelector = ({
           onClick={() => assignBarberToAll(selectedBarberId)}
           disabled={!selectedBarberId || cartLength === 0}
         >
-          تعيين للكل
+          {t("barber.assign_all")}
         </Button>
       </div>
       <Select value={selectedBarberId} onValueChange={setSelectedBarberId}>
         <SelectTrigger
           className="h-12 rounded-xl bg-soft/50 border-none font-bold text-xs touch-target"
-          aria-label="اختر خبير للخدمات الجديدة"
+          aria-label={t("barber.select_ph")}
         >
-          <SelectValue placeholder="اختر خبير للخدمات الجديدة" />
+          <SelectValue placeholder={t("barber.select_ph")} />
         </SelectTrigger>
         <SelectContent>
           {barbers.map((b) => (

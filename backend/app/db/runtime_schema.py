@@ -3,9 +3,13 @@ from sqlalchemy import text
 import app.db.base  # noqa: F401
 from app.db.base_class import Base
 from app.db.session import engine
+from app.db.identifiers import assert_valid_identifier
 
 
 def _has_column(connection, table_name: str, column_name: str) -> bool:
+    # A PRAGMA's argument is an identifier, so it cannot be a bind parameter.
+    # Validated rather than trusted: see app/db/identifiers.py for why.
+    assert_valid_identifier(table_name, kind="table name")
     try:
         rows = connection.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
     except Exception:
@@ -19,8 +23,15 @@ def _ensure_column(connection, table_name: str, column_name: str, ddl: str) -> N
 
 
 def _ensure_index(connection, index_name: str, ddl: str) -> None:
+    # `sqlite_master.name` is a *value* in the WHERE clause, not a grammar
+    # element, so it binds as a parameter and no identifier is interpolated at
+    # all. The only identifier here is the DDL, which is a literal at every call
+    # site, so there is nothing to validate and nothing for a scanner to flag.
     try:
-        rows = connection.execute(text(f"SELECT name FROM sqlite_master WHERE type='index' AND name='{index_name}'")).fetchall()
+        rows = connection.execute(
+            text("SELECT name FROM sqlite_master WHERE type='index' AND name = :name"),
+            {"name": index_name},
+        ).fetchall()
         if not rows:
             connection.execute(text(ddl))
     except Exception:
@@ -102,6 +113,40 @@ def ensure_runtime_schema() -> None:
             "ALTER TABLE products ADD COLUMN weight NUMERIC(10, 2)",
         )
 
+        # Attendance policy columns (late threshold + penalty rate). The UI
+        # settings dialog edits both; without these the values it sent were
+        # dropped and the engine kept its hardcoded defaults.
+        _ensure_column(
+            connection,
+            "business_settings",
+            "late_threshold_minutes",
+            "ALTER TABLE business_settings ADD COLUMN late_threshold_minutes INTEGER NOT NULL DEFAULT 15",
+        )
+        _ensure_column(
+            connection,
+            "business_settings",
+            "late_penalty_per_minute",
+            "ALTER TABLE business_settings ADD COLUMN late_penalty_per_minute NUMERIC(10, 2) NOT NULL DEFAULT 0.5",
+        )
+        _ensure_column(
+            connection,
+            "business_settings",
+            "auto_penalty_enabled",
+            "ALTER TABLE business_settings ADD COLUMN auto_penalty_enabled BOOLEAN NOT NULL DEFAULT 1",
+        )
+        _ensure_column(
+            connection,
+            "attendance_penalties",
+            "source",
+            "ALTER TABLE attendance_penalties ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'auto'",
+        )
+        _ensure_column(
+            connection,
+            "business_settings",
+            "penalty_cancel_pin_hash",
+            "ALTER TABLE business_settings ADD COLUMN penalty_cancel_pin_hash VARCHAR(255)",
+        )
+
         _ensure_column(
             connection,
             "invoices",
@@ -132,6 +177,12 @@ def ensure_runtime_schema() -> None:
             "draft_saved_at",
             "ALTER TABLE invoices ADD COLUMN draft_saved_at DATETIME",
         )
+        _ensure_column(
+            connection,
+            "invoices",
+            "customer_name_snapshot",
+            "ALTER TABLE invoices ADD COLUMN customer_name_snapshot VARCHAR(200)",
+        )
 
         # Add user_id to notifications table
         _ensure_column(
@@ -139,6 +190,19 @@ def ensure_runtime_schema() -> None:
             "notifications",
             "user_id",
             "ALTER TABLE notifications ADD COLUMN user_id INTEGER",
+        )
+
+        # Granular per-event notification preferences.
+        #
+        # `preferences` only had a single `notifications_enabled` boolean, so
+        # the six switches in the barber's notification settings had nowhere to
+        # go: the endpoint could only ever write the master flag. This JSON
+        # column holds the individual events.
+        _ensure_column(
+            connection,
+            "preferences",
+            "notification_preferences",
+            "ALTER TABLE preferences ADD COLUMN notification_preferences TEXT",
         )
 
         _ensure_column(
@@ -221,6 +285,56 @@ def ensure_runtime_schema() -> None:
             "ALTER TABLE customers ADD COLUMN loyalty_points_earned_at TIMESTAMP",
         )
 
+        # When the barber started the service. The workstation rebuilds its
+        # timer from this, so without it a refresh mid-service reset the clock.
+        _ensure_column(
+            connection,
+            "appointments",
+            "started_at",
+            "ALTER TABLE appointments ADD COLUMN started_at DATETIME",
+        )
+
+        # The employee's own email. `users.email` is the *login* address and is
+        # NULL for staff without an account, so there was nowhere to record an
+        # address for most of the roster.
+        _ensure_column(
+            connection,
+            "employees",
+            "email",
+            "ALTER TABLE employees ADD COLUMN email VARCHAR(255)",
+        )
+        # Contract end date for temporary/part-time hires. A DATE, not DATETIME:
+        # a contract ends on a day, and there is no time of day to mean anything.
+        _ensure_column(
+            connection,
+            "employees",
+            "contract_end_date",
+            "ALTER TABLE employees ADD COLUMN contract_end_date DATE",
+        )
+        # Archive trail: when someone left, why, and who decided. `status` alone
+        # could not answer any of the three, so the archive page printed a hire
+        # date and no departure date. Nullable with no backfill — a row that was
+        # already `resigned` never had an agreed leaving date to carry over.
+        _ensure_column(
+            connection,
+            "employees",
+            "archived_at",
+            "ALTER TABLE employees ADD COLUMN archived_at DATETIME",
+        )
+        _ensure_column(
+            connection,
+            "employees",
+            "archive_reason",
+            "ALTER TABLE employees ADD COLUMN archive_reason VARCHAR(500)",
+        )
+        _ensure_column(
+            connection,
+            "employees",
+            "archived_by_user_id",
+            "ALTER TABLE employees ADD COLUMN archived_by_user_id INTEGER "
+            "REFERENCES users(id)",
+        )
+
         _ensure_index(connection, "ix_invoices_created_at", "CREATE INDEX ix_invoices_created_at ON invoices (created_at)")
         _ensure_index(connection, "ix_invoices_barber_created", "CREATE INDEX ix_invoices_barber_created ON invoices (barber_id, created_at)")
         _ensure_index(connection, "ix_expenses_expense_date", "CREATE INDEX ix_expenses_expense_date ON expenses (expense_date)")
@@ -229,6 +343,142 @@ def ensure_runtime_schema() -> None:
         _ensure_index(connection, "ix_customers_is_deleted", "CREATE INDEX ix_customers_is_deleted ON customers (is_deleted)")
         _ensure_index(connection, "ix_invoice_items_invoice_id", "CREATE INDEX ix_invoice_items_invoice_id ON invoice_items (invoice_id)")
         _ensure_index(connection, "ix_cash_transactions_date", "CREATE INDEX ix_cash_transactions_date ON cash_transactions (transaction_date)")
+
+        # ── POS attribution + tax (Phase 1) ────────────────────────────────
+        #
+        # New columns on an existing SQLite database. `create_all` covers a
+        # fresh one; these ALTERs bring an old database up to the models.
+        _ensure_column(
+            connection,
+            "invoice_items",
+            "employee_id",
+            "ALTER TABLE invoice_items ADD COLUMN employee_id INTEGER REFERENCES employees(id)",
+        )
+        _ensure_column(
+            connection,
+            "invoices",
+            "shift_id",
+            "ALTER TABLE invoices ADD COLUMN shift_id INTEGER REFERENCES pos_shifts(id)",
+        )
+        _ensure_column(
+            connection,
+            "invoices",
+            "tax_rate",
+            "ALTER TABLE invoices ADD COLUMN tax_rate NUMERIC(5,2) DEFAULT 0 NOT NULL",
+        )
+        _ensure_column(
+            connection,
+            "invoices",
+            "tax_amount",
+            "ALTER TABLE invoices ADD COLUMN tax_amount NUMERIC(10,2) DEFAULT 0 NOT NULL",
+        )
+        _ensure_column(
+            connection,
+            "business_settings",
+            "tax_rate",
+            "ALTER TABLE business_settings ADD COLUMN tax_rate NUMERIC(5,2) DEFAULT 0 NOT NULL",
+        )
+        _ensure_column(
+            connection,
+            "appointments",
+            "total_estimated_price",
+            "ALTER TABLE appointments ADD COLUMN total_estimated_price NUMERIC(10,2) DEFAULT 0 NOT NULL",
+        )
+        _ensure_column(
+            connection,
+            "appointments",
+            "total_estimated_duration_minutes",
+            "ALTER TABLE appointments ADD COLUMN total_estimated_duration_minutes INTEGER DEFAULT 30 NOT NULL",
+        )
+
+        _ensure_index(
+            connection,
+            "ix_pos_shifts_status",
+            "CREATE INDEX ix_pos_shifts_status ON pos_shifts (status)",
+        )
+        _ensure_index(
+            connection,
+            "ix_pos_shifts_user_id_opened_at",
+            "CREATE INDEX ix_pos_shifts_user_id_opened_at ON pos_shifts (user_id, opened_at)",
+        )
+        _ensure_index(
+            connection,
+            "ix_invoice_items_employee_id",
+            "CREATE INDEX ix_invoice_items_employee_id ON invoice_items (employee_id)",
+        )
+        _ensure_index(
+            connection,
+            "ix_invoices_shift_id",
+            "CREATE INDEX ix_invoices_shift_id ON invoices (shift_id)",
+        )
+        _ensure_index(
+            connection,
+            "ix_invoice_payments_shift_id",
+            "CREATE INDEX ix_invoice_payments_shift_id ON invoice_payments (shift_id)",
+        )
+
+        # ── Barber earnings queries ────────────────────────────────────────
+        #
+        # `/barber/earnings-summary` runs three period aggregates, each shaped
+        # as `barber_id = ? AND is_draft = 0 AND created_at >= ?`. The existing
+        # `ix_invoices_barber_created` is `(barber_id, created_at)`, so the
+        # `is_draft` equality has to be applied as a residual filter and the date
+        # range can only be evaluated per row — every non-draft invoice for that
+        # barber is fetched and then discarded.
+        #
+        # `(barber_id, is_draft, created_at)` puts the two equalities first so
+        # all three period queries become pure range scans. The column order is
+        # the whole point; swapping any pair makes it unusable again.
+        _ensure_index(
+            connection,
+            "ix_invoices_barber_draft_created",
+            "CREATE INDEX ix_invoices_barber_draft_created "
+            "ON invoices (barber_id, is_draft, created_at)",
+        )
+
+        # `selectinload(Appointment.services)` issues
+        # `SELECT ... WHERE appointment_services.appointment_id IN (...)`.
+        # Four barber endpoints rely on it (`/queue`, `/calendar`, `/schedule`,
+        # `/appointments/{id}`), and the column had no index, so each of those
+        # did a full scan of the join table.
+        _ensure_index(
+            connection,
+            "ix_appointment_services_appointment",
+            "CREATE INDEX ix_appointment_services_appointment "
+            "ON appointment_services (appointment_id)",
+        )
+
+        # `/barber/stats` sums undeducted advances by employee. The existing
+        # `(employee_id)` index served that, but left `is_deducted` as a residual
+        # filter; both equalities now lead the key.
+        _ensure_index(
+            connection,
+            "ix_salary_advances_employee_deducted",
+            "CREATE INDEX ix_salary_advances_employee_deducted "
+            "ON salary_advances (employee_id, is_deducted)",
+        )
+
+        # ── One person, one identity ───────────────────────────────────────
+        #
+        # The API answers 409 for a duplicate phone or national id; these
+        # indexes are the last line of defence, so no future endpoint can store
+        # what the rules forbid. A database that still holds duplicates simply
+        # keeps working: the CREATE fails, `_ensure_index` swallows it, boot is
+        # never blocked, and the index is retried on the next start once the
+        # data is fixed. (`national_id` allows multiple NULLs on SQLite, so the
+        # many staff without a recorded id are no conflict.)
+        _ensure_index(
+            connection,
+            "ix_employees_phone_primary_unique",
+            "CREATE UNIQUE INDEX ix_employees_phone_primary_unique "
+            "ON employees (phone_primary)",
+        )
+        _ensure_index(
+            connection,
+            "ix_employees_national_id_unique",
+            "CREATE UNIQUE INDEX ix_employees_national_id_unique "
+            "ON employees (national_id)",
+        )
 
         # Create new tables for attendance archives and penalties
         from app.models.employee_presence_log import AttendanceArchive, AttendancePenalty

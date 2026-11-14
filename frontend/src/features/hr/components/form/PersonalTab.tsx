@@ -2,12 +2,26 @@
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 import type { EmployeeRecord } from "@/types/employee";
 import { Input } from "@/components/ui/input";
-import { User, Phone, ShieldCheck, Calendar, MapPin, FileText, ImageIcon, Activity, Plus, X } from "lucide-react";
+import { User, Phone, ShieldCheck, Calendar, MapPin, FileText, ImageIcon, Activity, Plus, X, CheckCircle2, Mail } from "lucide-react";
 import {
   FIELD_LABEL_CLASS,
   FIELD_INPUT_CLASS,
   FIELD_TEXTAREA_CLASS,
 } from "@/features/hr";
+import {
+  validatePhone,
+  validateEmployeeEmail,
+  normalizePhoneTyping,
+  MAX_PHONE_DIGITS,
+} from "@/features/hr/utils/phone";
+import {
+  analyzeNationalId,
+  NATIONAL_ID_LENGTH,
+} from "@/features/hr/utils/nationalId";
+import { normalizeNumericInput } from "@/features/hr/utils/digits";
+import { validatePersonName, NAME_MAX } from "@/features/hr/utils/validators";
+import FieldError from "./FieldError";
+import { useTranslation } from "react-i18next";
 
 export default function PersonalTab({
   formData,
@@ -26,6 +40,43 @@ export default function PersonalTab({
   onImageChange: (e: ChangeEvent<HTMLInputElement>) => void;
   blueprint: { title: string };
 }) {
+  const { t } = useTranslation("owner");
+  // An empty field is not an error while the owner is still filling it in; only
+  // speak up once something has been typed and looks wrong.
+  const typedName = String(formData.fullName ?? "").trim();
+  const nameError = typedName ? validatePersonName(typedName, t) : null;
+  const typedPhone = String(formData.phonePrimary ?? "").trim();
+  const phoneError = typedPhone ? validatePhone(typedPhone, t) : null;
+  const typedEmail = String(formData.email ?? "").trim();
+  const emailError = typedEmail ? validateEmployeeEmail(typedEmail, t) : null;
+
+  const idAnalysis = analyzeNationalId(formData.nationalId, t);
+  const idError = idAnalysis.error;
+  /*
+    The id knows the birth date. When both are present and disagree, one of them
+    was mistyped — say which date the id implies rather than just "mismatch", so
+    the fix does not require decoding the number by hand.
+  */
+  const birthMismatch =
+    idAnalysis.info && formData.birthDate && formData.birthDate !== idAnalysis.info.birthDate
+      ? t("hr.idBirthDateMismatch")
+      : null;
+
+  const handleNationalIdChange = (raw: string) => {
+    const value = normalizeNumericInput(raw, NATIONAL_ID_LENGTH);
+    const analysis = analyzeNationalId(value);
+    setFormData((prev) => ({
+      ...prev,
+      nationalId: value,
+      // Fill the birth date only when it is empty: an owner who deliberately
+      // corrected it must not have their correction overwritten on a re-type.
+      birthDate:
+        analysis.info && !String(prev.birthDate ?? "").trim()
+          ? analysis.info.birthDate
+          : prev.birthDate,
+    }));
+  };
+
   return (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col items-center gap-5">
@@ -35,7 +86,7 @@ export default function PersonalTab({
                     <img
                       src={imagePreview}
                       className="h-full w-full object-cover"
-                      alt={formData?.fullName || "صورة الموظف"}
+                      alt={formData?.fullName || t("hr.employeeImage")}
                       onError={(e) => {
                         e.currentTarget.style.display = "none";
                         setImagePreview(null);
@@ -46,13 +97,13 @@ export default function PersonalTab({
                       <div className="h-14 w-14 rounded-2xl bg-card border border-border flex items-center justify-center shadow-sm">
                         <ImageIcon size={26} className="text-muted/30" />
                       </div>
-                      <span className="text-xs font-black uppercase tracking-widest">أضف صورة</span>
+                      <span className="text-xs font-black uppercase tracking-widest">{t("hr.addPhoto")}</span>
                     </div>
                   )}
                   {uploading && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-sm">
                       <div className="h-8 w-8 rounded-full border-2 border-accent/20 border-t-accent animate-spin" />
-                      <span className="text-xs font-black text-accent animate-pulse">جاري الرفع...</span>
+                      <span className="text-xs font-black text-accent animate-pulse">{t("hr.uploading")}</span>
                     </div>
                   )}
                 </div>
@@ -68,7 +119,7 @@ export default function PersonalTab({
                       setFormData((p) => ({ ...p, profileImageUrl: "" }));
                     }}
                     className="absolute -top-2 -left-2 h-8 w-8 rounded-full bg-danger-soft text-danger shadow-sm flex items-center justify-center hover:bg-danger/15 transition-colors border-2 border-card"
-                    title="إزالة الصورة"
+                    title={t("hr.removePhoto")}
                   >
                     <X size={14} strokeWidth={3} />
                   </button>
@@ -76,74 +127,150 @@ export default function PersonalTab({
               </div>
               <div className="text-center space-y-1">
                 <h3 className="text-[17px] font-black text-main leading-tight">
-                  {formData.fullName || "اسم الموظف الجديد"}
+                  {formData.fullName || t("hr.noName")}
                 </h3>
                 <p className="text-[11px] font-bold text-accent uppercase tracking-widest flex items-center justify-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent" /> {blueprint.title}
                 </p>
-                <p className="text-xs font-bold text-muted">يُفضل صورة مربعة 500×500 بصيغة JPG أو PNG</p>
+                <p className="text-xs font-bold text-muted">{t("hr.photoHint")}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <User size={14} /> الاسم الكامل
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-full-name">
+                  <User size={14} /> {t("hr.fullName")}
                 </label>
                 <Input
+                  id="employee-full-name"
                   value={formData.fullName}
                   onChange={(e) =>
                     setFormData({ ...formData, fullName: e.target.value })
                   }
                   className={FIELD_INPUT_CLASS}
-                  placeholder="أدخل الاسم الثلاثي..."
+                  placeholder={t("hr.employeeName")}
+                  maxLength={NAME_MAX}
+                  aria-invalid={Boolean(nameError)}
+                  aria-describedby={nameError ? "employee-name-error" : undefined}
                 />
+                {nameError && (
+                  <FieldError id="employee-name-error">{nameError}</FieldError>
+                )}
               </div>
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <Phone size={14} /> الجوال الأساسي
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-phone-primary">
+                  <Phone size={14} /> {t("hr.phonePrimary")}
                 </label>
                 <Input
+                  id="employee-phone-primary"
                   value={formData.phonePrimary}
                   onChange={(e) =>
-                    setFormData({ ...formData, phonePrimary: e.target.value })
+                    setFormData({
+                      ...formData,
+                      phonePrimary: normalizePhoneTyping(e.target.value),
+                    })
                   }
                   className={FIELD_INPUT_CLASS}
                   dir="ltr"
+                  inputMode="numeric"
+                  maxLength={MAX_PHONE_DIGITS}
+                  autoComplete="off"
                   placeholder="01xxxxxxxxx"
+                  aria-invalid={Boolean(phoneError)}
+                  aria-describedby={phoneError ? "phone-primary-error" : undefined}
                 />
+                {/*
+                  Validate as they type rather than only at submit: a mistyped
+                  number used to look exactly like a correct one until the save
+                  bounced, and the owner had no idea which of eleven digits was
+                  wrong. Only shown once there is something to say.
+                */}
+                {phoneError && (
+                  <FieldError id="phone-primary-error">{phoneError}</FieldError>
+                )}
               </div>
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <ShieldCheck size={14} /> رقم الهوية
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-email">
+                  <Mail size={14} /> {t("hr.email")}
                 </label>
                 <Input
-                  value={formData.nationalId}
+                  id="employee-email"
+                  type="email"
+                  value={String(formData.email ?? "")}
                   onChange={(e) =>
-                    setFormData({ ...formData, nationalId: e.target.value })
+                    setFormData({ ...formData, email: e.target.value })
                   }
                   className={FIELD_INPUT_CLASS}
                   dir="ltr"
+                  placeholder="name@example.com"
+                  aria-invalid={Boolean(emailError)}
+                  aria-describedby={emailError ? "employee-email-error" : undefined}
                 />
+                {emailError && (
+                  <FieldError id="employee-email-error">{emailError}</FieldError>
+                )}
               </div>
               <div className="space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <Calendar size={14} /> تاريخ الميلاد
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-national-id">
+                  <ShieldCheck size={14} /> {t("hr.nationalId")}
                 </label>
                 <Input
+                  id="employee-national-id"
+                  value={formData.nationalId}
+                  onChange={(e) => handleNationalIdChange(e.target.value)}
+                  className={FIELD_INPUT_CLASS}
+                  dir="ltr"
+                  inputMode="numeric"
+                  maxLength={NATIONAL_ID_LENGTH}
+                  autoComplete="off"
+                  placeholder="xxxxxxxxxxxxxx"
+                  aria-invalid={Boolean(idError)}
+                  aria-describedby={idError ? "national-id-error" : undefined}
+                />
+                {idError ? (
+                  <FieldError id="national-id-error">{idError}</FieldError>
+                ) : idAnalysis.info ? (
+                  /*
+                    A valid id already carries the birth date and the issuing
+                    governorate. Showing them back is proof the number was read
+                    as intended — and a free way to catch a wrong governorate.
+                  */
+                  <p className="flex items-center gap-1.5 text-xs font-bold text-success">
+                    <CheckCircle2 size={13} className="shrink-0" aria-hidden="true" />
+                    {t("hr.birthDateAuto", { date: idAnalysis.info.birthDate, governorate: idAnalysis.info.governorateName })}
+                  </p>
+                ) : (
+                  <p className="text-[11px] font-bold text-muted">
+                    {t("hr.idInfo")}
+
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-birth-date">
+                  <Calendar size={14} /> {t("hr.birthDate")}
+                </label>
+                <Input
+                  id="employee-birth-date"
                   type="date"
                   value={formData.birthDate}
                   onChange={(e) =>
                     setFormData({ ...formData, birthDate: e.target.value })
                   }
                   className={FIELD_INPUT_CLASS}
+                  aria-invalid={Boolean(birthMismatch)}
+                  aria-describedby={birthMismatch ? "birth-date-error" : undefined}
                 />
+                {birthMismatch && (
+                  <FieldError id="birth-date-error">{birthMismatch}</FieldError>
+                )}
               </div>
               <div className="md:col-span-2 space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <MapPin size={14} /> العنوان التفصيلي
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-address">
+                  <MapPin size={14} /> {t("hr.address")}
                 </label>
                 <Input
+                  id="employee-address"
                   value={formData.detailedAddress}
                   onChange={(e) =>
                     setFormData({
@@ -155,10 +282,11 @@ export default function PersonalTab({
                 />
               </div>
               <div className="md:col-span-2 space-y-2">
-                <label className={FIELD_LABEL_CLASS}>
-                  <FileText size={14} /> نبذة مهنية (بالعربية)
+                <label className={FIELD_LABEL_CLASS} htmlFor="employee-bio-ar">
+                  <FileText size={14} /> {t("hr.professionalBioAr")}
                 </label>
                 <textarea
+                  id="employee-bio-ar"
                   value={formData.bioAr}
                   onChange={(e) =>
                     setFormData({ ...formData, bioAr: e.target.value })

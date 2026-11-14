@@ -20,6 +20,8 @@
  *   );
  */
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+// RTL note: "first" points right and "last" points left, but each uses the
+// double-chevron icon so it is visually distinct from prev/next.
 import { useMemo } from "react";
 
 export interface PaginationState {
@@ -178,7 +180,7 @@ export function Pagination({
           disabled={page === 1}
           aria-label={labels.first}
         >
-          {locale === "ar" ? <ChevronRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+          {locale === "en" ? <ChevronsLeft className="h-4 w-4" /> : <ChevronsRight className="h-4 w-4" />}
         </PageBtn>
 
         {/* Previous */}
@@ -187,7 +189,7 @@ export function Pagination({
           disabled={page === 1}
           aria-label={labels.prev}
         >
-          <ChevronRight className="h-4 w-4" />
+          {locale === "en" ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </PageBtn>
 
         {/* Page numbers */}
@@ -219,7 +221,7 @@ export function Pagination({
           disabled={page === totalPages}
           aria-label={labels.next}
         >
-          <ChevronLeft className="h-4 w-4" />
+          {locale === "en" ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </PageBtn>
 
         {/* Last page */}
@@ -228,7 +230,7 @@ export function Pagination({
           disabled={page === totalPages}
           aria-label={labels.last}
         >
-          {locale === "ar" ? <ChevronLeft className="h-4 w-4" /> : <ChevronsRight className="h-4 w-4" />}
+          {locale === "en" ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
         </PageBtn>
       </div>
 

@@ -28,7 +28,7 @@ export default function PermissionsHeader({ onCreate }: Props) {
         onClick={onCreate}
         className="rounded-xl font-black px-10 h-14 shadow-lg shadow-accent/20 text-lg"
       >
-        <Plus className="ml-2" size={20} strokeWidth={2.5} /> إضافة مستخدم
+        <Plus className="ms-2" size={20} strokeWidth={2.5} /> إضافة مستخدم
       </Button>
     </div>
   );

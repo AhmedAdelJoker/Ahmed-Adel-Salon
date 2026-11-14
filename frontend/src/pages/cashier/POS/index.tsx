@@ -1,34 +1,102 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocation, useNavigate } from "react-router-dom";
 import { POSProvider, usePOS } from "@/pages/cashier/POS/POSContext";
-import ShiftSidebar from "@/pages/cashier/POS/components/ShiftSidebar";
 import SessionsQueue from "@/pages/cashier/POS/components/SessionsQueue";
 import ItemSelection from "@/pages/cashier/POS/components/ItemSelection";
 import CheckoutBar from "@/pages/cashier/POS/components/CheckoutBar";
+import POSStartPanel from "@/pages/cashier/POS/components/POSStartPanel";
+import POSHeader from "@/pages/cashier/POS/components/POSHeader";
 import SuccessOverlay from "@/pages/cashier/POS/components/SuccessOverlay";
+import ManagerApprovalModal from "@/pages/cashier/POS/components/ManagerApprovalModal";
 import POSBottomNav from "@/pages/cashier/POS/components/POSBottomNav";
-import { Grid, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { toast } from "react-hot-toast";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Clock, RefreshCw } from "lucide-react";
+import { RefreshCw, UploadCloud, WifiOff } from "lucide-react";
+import { ErrorState } from "@/components/shared/AsyncState";
+import InlineNotice from "@/components/shared/InlineNotice";
+import { PageShell } from "@/components/shared/PageShell";
+import { useOfflineSync } from "@/lib/offline/useOfflineSync";
+import type { ID } from "@/types/common";
+import type { POSRecord } from "@/features/pos/types";
+
+/**
+ * Navigation state `/bookings` passes with `handleTransferToPOS`. A booking
+ * that arrives here must land as a prepared session — cart, customer and
+ * barber pre-filled — not as a plain route change.
+ */
+interface BookingHandoffState {
+  bookingId?: ID;
+  customerId?: ID;
+  barberId?: ID;
+  services?: POSRecord[];
+}
 
 const POSLayout = () => {
+  const { t } = useTranslation("pos");
   const {
     loading,
     readyAppointments,
-    activeInvoiceId,
-    activeAppointmentId,
     cart,
+    shiftError,
+    readyAppointmentsError,
+    catalogError,
+    saleMode,
+    loadSession,
   } = usePOS();
-  const [activeTab, setActiveTab] = useState("sessions"); // "sessions" or "items"
-  const [mobileView, setMobileView] = useState("ops"); // "ops" (Shift/Sessions), "items", "cart"
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [mobileView, setMobileView] = useState("ops"); // "ops" | "items" | "cart"
+
+  // Offline money-safety: LAN/server down keeps the till alive — invoices are
+  // queued locally under their idempotency key and auto-replayed on reconnect.
+  const { isOffline, pendingCount, replaying, replay } = useOfflineSync();
+
+  const handoff = (location.state ?? null) as BookingHandoffState | null;
+  const handoffBookingId = handoff?.bookingId ?? null;
+  const consumedHandoff = useRef(false);
+
+  // Mobile follows the sale: a loaded session lands on the cart, a product
+  // sale lands on the catalogue, finishing/resetting returns to the queue.
+  useEffect(() => {
+    if (saleMode === "idle") setMobileView("ops");
+    else if (saleMode === "session") setMobileView("cart");
+    else if (saleMode === "products") setMobileView("items");
+  }, [saleMode]);
+
+  // Consume the `/bookings` handoff once the catalogue has loaded (the barber
+  // list arrives in phase 1), then clear the navigation state so a browser
+  // refresh does not re-apply it.
+  useEffect(() => {
+    if (loading || !handoffBookingId || consumedHandoff.current) return;
+    consumedHandoff.current = true;
+
+    const services = handoff?.services ?? [];
+    loadSession(
+      {
+        id: handoffBookingId,
+        barber_id: handoff?.barberId ?? "",
+        customer_id: handoff?.customerId ?? null,
+        services,
+      },
+      { notify: false },
+    );
+
+    if (services.length > 0) {
+      toast.success(t("logic.handoff_loaded"));
+    } else {
+      toast(t("logic.handoff_no_services"), { icon: "⚠️" });
+    }
+    setMobileView("cart");
+    navigate("/pos", { replace: true, state: null });
+  }, [loading, handoffBookingId, handoff, loadSession, navigate, t]);
 
   // Global keyboard shortcut: Ctrl+Enter = Checkout
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        e.preventDefault();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
         // Find and click the checkout button
         const checkoutBtn = document.querySelector(
           'button[data-pos-checkout="true"]',
@@ -37,10 +105,8 @@ const POSLayout = () => {
           checkoutBtn.click();
         }
       }
-      if (e.key === "Escape") {
-        // Escape clears selection / closes modals
-        // Could trigger resetPOS or close modals
-      }
+      // Escape intentionally does nothing here: Radix dialogs close it
+      // themselves, and no custom selection-clearing is wired.
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -48,165 +114,137 @@ const POSLayout = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <PageShell fixed className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-primary">
           <RefreshCw className="h-10 w-10 animate-spin" />
-          <p className="text-sm font-bold tracking-widest text-muted uppercase">
-            تنشيط محطة الـ POS الآمنة...
+          <p className="text-sm font-bold uppercase tracking-widest text-muted">
+            {t("boot.activating")}
           </p>
         </div>
-      </div>
+      </PageShell>
+    );
+  }
+
+  // A dead catalogue means the till has nothing to sell, so block rather than
+  // present an empty grid the cashier could mistake for a stocked-but-quiet day.
+  if (catalogError) {
+    return (
+      <PageShell fixed className="flex h-[60vh] items-center justify-center">
+        <div className="w-full p-4">
+          <ErrorState
+            title={t("boot.load_failed_title")}
+            message={catalogError}
+            onRetry={() => window.location.reload()}
+          />
+        </div>
+      </PageShell>
     );
   }
 
   return (
-    <div
-      className="flex h-full max-h-[calc(100vh-80px)] flex-col gap-4 relative overflow-hidden"
-    >
+    <PageShell fixed>
       {/* Success Overlay & Modals */}
       <SuccessOverlay />
+      <ManagerApprovalModal />
 
-      {/* Edit Mode Badge - Fixed at top */}
-      {activeInvoiceId && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60]">
-          <Badge
-            variant="warning"
-            size="lg"
-            className="shadow-premium px-4 py-1.5 flex gap-2 items-center text-xs"
-          >
-            <ShieldCheck size={14} /> نمط التعديل نشط: الفاتورة #
-            {activeInvoiceId}
-          </Badge>
+      <POSHeader
+        isOffline={isOffline}
+        pendingCount={pendingCount}
+        onSaleStarted={() => setMobileView("items")}
+      />
+
+      {/* Load failures that must not be mistaken for "nothing to do". */}
+      {(shiftError || readyAppointmentsError) && (
+        <div className="px-2 lg:px-0">
+          <InlineNotice tone="error">
+            {shiftError ?? readyAppointmentsError}
+          </InlineNotice>
         </div>
       )}
 
-      {/* Desktop Layout (Grid) / Mobile Layout (Conditional Rendering) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr_1.5fr] xl:grid-cols-[1.2fr_2.5fr_1.8fr] gap-4 flex-1 min-h-0 overflow-hidden px-2 lg:px-0 pb-[80px] lg:pb-0">
-        {/* Right Column: Shift & Quick Stats (Always on Desktop, Tabbed on Mobile) */}
-        <div
-          className={cn(
-            "flex flex-col gap-4 overflow-y-auto no-scrollbar pb-4",
-            mobileView !== "ops" && "hidden lg:flex",
-          )}
-        >
-          <ShiftSidebar />
-          {/* On mobile, Sessions Queue is part of 'ops' view */}
-          <div className="lg:hidden flex-1 min-h-0">
-            <Card className="h-full p-4 overflow-hidden flex flex-col gap-4">
-              <SessionsQueue />
-            </Card>
-          </div>
-        </div>
-
-        {/* Middle Column: Selection Area (Always on Desktop, Tabbed on Mobile) */}
-        <Card
-          className={cn(
-            "flex flex-col gap-4 overflow-hidden p-4 sm:p-6 shadow-sm border-border/50",
-            mobileView !== "items" &&
-              (mobileView !== "ops" || true) &&
-              "hidden lg:flex",
-          )}
-        >
-          {/* Tab Switcher - Only visible on Desktop or when needed */}
-          <div className="hidden lg:flex items-center gap-2 p-1 bg-soft/50 rounded-xl self-center border border-border/40">
-            <button
-              onClick={() => setActiveTab("sessions")}
-              className={`px-4 sm:px-6 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${
-                activeTab === "sessions"
-                  ? "bg-white dark:bg-slate-800 text-primary shadow-sm"
-                  : "text-muted hover:text-main"
-              }`}
-            >
-              <Clock size={16} />
-              <span>الجلسات من الاستقبال</span>
-              <Badge
-                variant={activeTab === "sessions" ? "primary" : "outline"}
-                size="sm"
-                className="rounded-full px-1.5 min-w-[20px] justify-center"
-              >
-                {readyAppointments.length}
-              </Badge>
-            </button>
-            <button
-              onClick={() => {
-                if (!activeAppointmentId) {
-                  toast.error("يرجى اختيار جلسة أولاً لإضافة خدمات إضافية");
-                  return;
-                }
-                setActiveTab("items");
-              }}
-              className={`px-4 sm:px-6 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${
-                activeTab === "items"
-                  ? "bg-white dark:bg-slate-800 text-primary shadow-sm"
-                  : activeAppointmentId
-                    ? "text-muted hover:text-main"
-                    : "opacity-40 cursor-not-allowed"
-              }`}
-            >
-              <Grid size={16} />
-              <span>إضافة خدمات إضافية</span>
-            </button>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-hidden">
-            {/* Logic for what to show in middle column based on desktop tabs or mobile view */}
-            <div className="h-full">
-              <div
-                className={cn(
-                  "h-full",
-                  activeTab === "sessions" || mobileView === "ops"
-                    ? "block"
-                    : "hidden lg:block",
-                )}
-              >
-                {activeTab === "sessions" && <SessionsQueue />}
-              </div>
-              <div
-                className={cn(
-                  "h-full",
-                  activeTab === "items" || mobileView === "items"
-                    ? "block"
-                    : "hidden",
-                )}
-              >
-                {activeAppointmentId ? (
-                  <ItemSelection />
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
-                    <Clock size={48} className="text-primary mb-4" />
-                    <h3 className="text-base font-black text-main">
-                      بانتظار اختيار جلسة
-                    </h3>
-                    <p className="text-xs font-bold text-muted mt-2">
-                      يرجى اختيار جلسة من قائمة الاستقبال للبدء.
-                    </p>
-                  </div>
-                )}
-              </div>
+      {/* Offline banner: queued invoices + auto-replay on reconnect. */}
+      {(isOffline || pendingCount > 0) && (
+        <div className="px-2 lg:px-0">
+          <InlineNotice tone="warning">
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <span className="flex min-w-0 items-start gap-2">
+                <WifiOff size={16} className="mt-0.5 shrink-0" />
+                <span className="min-w-0">
+                  {isOffline
+                    ? t("offline.offline")
+                    : t("offline.pending", { count: pendingCount })}
+                </span>
+              </span>
+              {pendingCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void replay()}
+                  disabled={replaying || isOffline}
+                  className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-warning/30 bg-soft px-3 text-[11px] font-black transition-all hover:bg-soft/70 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {replaying ? (
+                    <RefreshCw size={13} className="animate-spin" />
+                  ) : (
+                    <UploadCloud size={13} />
+                  )}
+                  {t("offline.send_now")}
+                </button>
+              )}
             </div>
-          </div>
-        </Card>
+          </InlineNotice>
+        </div>
+      )}
 
-        {/* Left Column: Cart & Checkout (Always on Desktop, Tabbed on Mobile) */}
-        <div
+      {/* Desktop: sessions | catalogue | cart. On lg (900px–1279px) we show 2
+          columns so the checkout CTA is never clipped; on xl (≥1280px) we show
+          all 3. Mobile: one panel at a time via bottom nav. */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden px-2 pb-2 lg:grid-cols-[1fr_1.3fr] lg:px-0 lg:pb-0 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(28rem,2.1fr)_minmax(21rem,1.3fr)]">
+        {/* Right column: the reception queue, shown only on xl desktop. */}
+        <aside
+          aria-label={t("sessions.title")}
           className={cn(
-            "flex flex-col gap-4 min-h-0 overflow-hidden",
-            mobileView !== "cart" && "hidden lg:flex",
+            "min-h-0 overflow-hidden",
+            "hidden xl:block",
+            mobileView !== "ops" && "hidden",
+          )}
+        >
+          <Card className="flex h-full min-h-0 flex-col overflow-hidden border-border/60 bg-card p-3 shadow-sm">
+            <SessionsQueue />
+          </Card>
+        </aside>
+
+        {/* Middle column: start panel when idle, catalogue during a sale. */}
+        <section
+          className={cn(
+            "min-h-0 overflow-hidden",
+            mobileView !== "items" && "hidden lg:block",
+          )}
+        >
+          <Card className="flex h-full min-h-0 flex-col overflow-hidden border-border/60 bg-card p-3 shadow-sm">
+            {saleMode === "idle" ? <POSStartPanel /> : <ItemSelection />}
+          </Card>
+        </section>
+
+        {/* Left column: buyer, cart, payment. */}
+        <aside
+          aria-label={t("cart.title")}
+          className={cn(
+            "min-h-0 overflow-hidden",
+            mobileView !== "cart" && "hidden lg:block",
           )}
         >
           <CheckoutBar />
-        </div>
+        </aside>
       </div>
 
       {/* Mobile Bottom Navigation (POS-specific 3-tab) */}
       <POSBottomNav
         activeView={mobileView}
         setActiveView={setMobileView}
-        activeAppointmentId={activeAppointmentId}
         cartLength={cart.length}
         readyAppointmentsLength={readyAppointments.length}
       />
-    </div>
+    </PageShell>
   );
 };
 

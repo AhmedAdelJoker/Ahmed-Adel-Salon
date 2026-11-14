@@ -9,22 +9,27 @@ import {
 import {
   PointerSensor,
   TouchSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
 import { toast } from "react-hot-toast";
-import { scheduleService } from "@/features/bookings/services/scheduleService";
+import { scheduleService } from "@/features/bookings";
 import { businessSettingsService } from "@/services/businessSettingsService";
 import { useSocket } from "@/context/SocketContext";
 import { useDebounce, shiftDate } from "@/pages/cashier/schedule/Toolbar";
+import i18n from "@/i18n";
 import {
   exportScheduleCSV,
   exportSchedulePDF,
 } from "@/pages/cashier/schedule/exportSchedule";
 import {
   buildSlots,
+  getAppointmentDuration,
   normalizeStatus,
   slotLabelToTime24,
+  timeToMinutes,
+  SLOT_MINUTES,
 } from "@/pages/cashier/schedule/scheduleUtils";
 import {
   DEFAULT_END_HOUR,
@@ -93,27 +98,29 @@ export function useSchedule() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      const weekStart = selectedDate;
+      const weekEnd = new Date(selectedDate + "T00:00:00");
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const weekEndStr = formatDateInput(weekEnd);
       const [appointmentsData, barbersData, settingsData] = await Promise.all([
-        scheduleService.listAppointments(),
+        scheduleService.listAppointments({
+          startDate: weekStart,
+          endDate: weekEndStr,
+        }),
         scheduleService.listBarbers(),
         businessSettingsService.get(),
       ]);
       setAppointments(appointmentsData);
       setBarbers(barbersData);
       setSettings(settingsData);
-      setLastUpdated(
-        new Date().toLocaleTimeString("ar-EG", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      );
+      setLastUpdated(Date.now());
     } catch (err) {
       console.error("Load schedule data error:", err);
-      toast.error("تعذر تحميل جدول المواعيد");
+      toast.error(i18n.t("toasts.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedDate, i18n]);
 
   const refresh = useCallback(() => {
     if (draggingRef.current) {
@@ -202,6 +209,10 @@ export function useSchedule() {
           item.employee_name,
           item.customer_phone,
           item.service_name,
+          item.notes,
+          ...(Array.isArray(item.services)
+            ? item.services.map((s) => s.service_name || s.name || "")
+            : []),
         ].some((v) =>
           String(v || "")
             .toLowerCase()
@@ -277,7 +288,12 @@ export function useSchedule() {
       total += 1;
       if (["WAITING", "CONFIRMED"].includes(status)) confirmed += 1;
       else if (status === "IN_PROGRESS") inProgress += 1;
-      else if (status === "AT_RECEPTION") reception += 1;
+      // normalizeStatus maps "completed" → AT_RECEPTION and
+      // "ready_for_payment" → AT_CASHIER. The reception bucket is that whole
+      // group (service finished or waiting at the till); AT_CASHIER used to
+      // fall through uncounted, so paid-pending bookings vanished from stats.
+      else if (["AT_RECEPTION", "AT_CASHIER"].includes(status))
+        reception += 1;
       else if (status === "DONE") done += 1;
       else if (status === "CANCELLED") cancelled += 1;
     }
@@ -290,10 +306,10 @@ export function useSchedule() {
     try {
       await scheduleService.moveAppointment(last.id, last.before);
       lastMoveRef.current = null;
-      toast.success("تم التراجع عن النقل بنجاح");
+      toast.success(i18n.t("toasts.undoSuccess"));
       loadData();
     } catch (_err) {
-      toast.error("فشل التراجع عن النقل");
+      toast.error(i18n.t("toasts.undoFailed"));
     }
   }, [loadData]);
 
@@ -309,19 +325,37 @@ export function useSchedule() {
     const targetDate =
       payload.appointment_date || appt.appointment_date || appt.appointmentDate;
 
-    const conflict = appointments.some(
-      (a) =>
-        String(a.id) !== String(id) &&
-        Number(a.barber_id || a.employee_id) === targetBarber &&
-        (a.appointment_time || a.appointmentTime) === targetTime &&
-        (a.appointment_date || a.appointmentDate) === targetDate &&
-        !["CANCELLED", "DONE", "NO_SHOW"].includes(normalizeStatus(a.status)),
-    );
+    const sourceBarber = Number(appt.barber_id || appt.employee_id);
+    const sourceTime = appt.appointment_time || appt.appointmentTime;
+    const sourceDate = appt.appointment_date || appt.appointmentDate;
+
+    // No-op: same expert, same day, same time — nothing to persist.
+    if (targetBarber === sourceBarber && targetTime === sourceTime && targetDate === sourceDate)
+      return;
+
+    const targetStart = timeToMinutes(targetTime);
+    if (targetStart === null) return;
+    const targetDur =
+      getAppointmentDuration(appt) ?? SLOT_MINUTES;
+    const targetEnd = targetStart + targetDur;
+
+    const conflict = appointments.some((a) => {
+      if (String(a.id) === String(id)) return false;
+      if (Number(a.barber_id || a.employee_id) !== targetBarber) return false;
+      if ((a.appointment_date || a.appointmentDate) !== targetDate) return false;
+      if (
+        ["CANCELLED", "DONE", "NO_SHOW"].includes(normalizeStatus(a.status))
+      )
+        return false;
+      const aStart = timeToMinutes(a.appointment_time || a.appointmentTime);
+      const aDur = getAppointmentDuration(a) ?? SLOT_MINUTES;
+      const aEnd = aStart + aDur;
+      if (targetStart === null || aStart === null) return false;
+      return aStart < targetEnd && targetStart < aEnd;
+    });
 
     if (conflict) {
-      toast.error(
-        "تعارض: يوجد موعد آخر في نفس التوقيت والتاريخ مع هذا الموظف. اختر خانة فارغة.",
-      );
+      toast.error(i18n.t("toasts.conflict"));
       return;
     }
 
@@ -336,16 +370,18 @@ export function useSchedule() {
       lastMoveRef.current = { id: String(id), before };
       const targetLabel =
         payload.appointment_time && !payload.appointment_date
-          ? ` الساعة ${payload.appointment_time}`
+          ? i18n.t("toasts.movedTime", { time: payload.appointment_time })
           : payload.appointment_date
-            ? ` إلى ${payload.appointment_date === appt.appointment_date ? "نفس اليوم" : new Date(payload.appointment_date + "T00:00:00").toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}`
+            ? `${i18n.t("toasts.movedTo")} ${payload.appointment_date === appt.appointment_date ? i18n.t("toasts.movedSameDay") : new Date(payload.appointment_date + "T00:00:00").toLocaleDateString(i18n.language === "ar" ? "ar-EG" : "en-US", { day: "numeric", month: "short" })}`
             : "";
       toast(
         (t) => (
           <div className="flex items-center gap-3">
             <span className="text-xs font-black">
-              تم نقل موعد {appt.customer_name || "العميل"}
-              {targetLabel}
+              {i18n.t("toasts.moved", {
+                customer: appt.customer_name || i18n.t("appointmentCard.unknownCustomer"),
+                label: targetLabel,
+              })}
             </span>
             <button
               onClick={() => {
@@ -354,7 +390,7 @@ export function useSchedule() {
               }}
               className="shrink-0 px-3 py-1.5 rounded-lg bg-accent text-white text-[10px] font-black hover:bg-accent/90 transition-colors"
             >
-              تراجع
+              {i18n.t("toasts.undo")}
             </button>
           </div>
         ),
@@ -363,7 +399,7 @@ export function useSchedule() {
       loadData();
     } catch (err) {
       const apiErr = err as { response?: { data?: { detail?: unknown } } };
-      toast.error((apiErr?.response?.data?.detail as string) || "فشل تحديث الموعد");
+      toast.error((apiErr?.response?.data?.detail as string) || i18n.t("toasts.updateFailed"));
     }
   }
 
@@ -407,6 +443,7 @@ export function useSchedule() {
     useSensor(TouchSensor, {
       activationConstraint: { delay: 200, tolerance: 8 },
     }),
+    useSensor(KeyboardSensor),
   );
 
   const handleExport = useCallback(
@@ -417,10 +454,10 @@ export function useSchedule() {
         } else {
           exportScheduleCSV({ appointments: dayAppointments, selectedDate });
         }
-        toast.success("تم تصدير الجدول بنجاح");
+        toast.success(i18n.t("toasts.exportSuccess"));
       } catch (err) {
         console.error("Export error:", err);
-        toast.error("فشل تصدير الجدول");
+        toast.error(i18n.t("toasts.exportFailed"));
       }
     },
     [dayAppointments, selectedDate],

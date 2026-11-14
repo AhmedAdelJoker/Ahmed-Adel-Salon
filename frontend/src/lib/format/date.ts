@@ -27,6 +27,26 @@ export function getToday() {
 }
 
 /**
+ * Parse a backend timestamp into a real Date, or null.
+ *
+ * The backend stores naive UTC ("2026-10-25 22:35:18" -- no zone marker), per
+ * the storage convention. `new Date()` would read that as the *browser's*
+ * zone, which is only correct for a browser sitting on UTC; a Cairo browser
+ * would shift it three hours and print a close that happened at 01:35 as
+ * 22:35. Stamps that already carry a zone marker ("Z" or "+HH:MM") are left
+ * exactly as parsed.
+ */
+export function parseBackendStamp(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const normalized =
+    raw.includes("Z") || raw.includes("+") ? raw : raw.replace(" ", "T") + "Z";
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
  * Format a Date/string to YYYY-MM-DD string.
  */
 export function formatDateISO(date: unknown): string {

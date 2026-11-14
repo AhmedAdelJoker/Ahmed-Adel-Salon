@@ -9,6 +9,10 @@ class Invoice(Base):
     __tablename__ = "invoices"
     __table_args__ = (
         Index("ix_invoices_barber_created", "barber_id", "created_at"),
+        # Equality columns first, then the range column. The barber earnings
+        # aggregates filter `barber_id = ? AND is_draft = 0 AND created_at >= ?`,
+        # so only this ordering lets the planner satisfy all three from the index.
+        Index("ix_invoices_barber_draft_created", "barber_id", "is_draft", "created_at"),
         Index("ix_invoices_created_draft", "created_at", "is_draft"),
         UniqueConstraint(
             "created_by_user_id",
@@ -20,13 +24,42 @@ class Invoice(Base):
     id = Column(Integer, primary_key=True, index=True)
     invoice_no = Column(String(50), unique=True, nullable=False, index=True)
 
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True, index=True)
+    # Shift this invoice was raised on. Null for rows predating the link — the
+    # shift totals still work off the (user_id, window) fallback, so existing
+    # reports are unaffected.
+    shift_id = Column(Integer, ForeignKey("pos_shifts.id"), nullable=True, index=True)
+
+    # One invoice per appointment. `index=True` alone cannot express this: it
+    # answers "which invoices point here" and not "at most one may", and the two
+    # look identical in a model file. Without the unique part, two concurrent
+    # issuances both pass the endpoint's pre-check and both insert.
+    #
+    # `unique=True` without `index=True` is deliberate -- SQLAlchemy would
+    # otherwise emit a second, redundant non-unique index over the same column.
+    #
+    # The NULL case is what makes this safe: an invoice raised at the till has
+    # no appointment behind it, and several of those is normal. Both supported
+    # engines treat NULLs as distinct under a unique constraint, so the manual
+    # invoices are unaffected. The migration `f8b3c5d7e9a2` makes the intent
+    # explicit with a partial index for databases where that NULL behaviour is
+    # configured rather than guaranteed.
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True, unique=True)
     customer_id = Column(Integer, ForeignKey("customers.customer_id"), nullable=False, index=True)
+    # Name as typed at the till for this sale. The customer row stays the
+    # loyalty/contact record; the snapshot is what this invoice printed, so a
+    # later rename (or a family member using the same phone) cannot rewrite an
+    # old receipt.
+    customer_name_snapshot = Column(String(200), nullable=True)
     barber_id = Column(Integer, ForeignKey("employees.id"), nullable=True, index=True)
 
     payment_method = Column(String(30), nullable=False, default="cash")
     subtotal_amount = Column(Numeric(10, 2), nullable=False, default=0)
     discount_amount = Column(Numeric(10, 2), nullable=False, default=0)
+    # Snapshot of the settings' tax_rate at the time of sale, and the amount it
+    # added. Storing both (rather than recomputing from today's rate) is what
+    # keeps a year-old invoice reconciling after the owner changes the rate.
+    tax_rate = Column(Numeric(5, 2), nullable=False, default=0, server_default="0")
+    tax_amount = Column(Numeric(10, 2), nullable=False, default=0, server_default="0")
     total_amount = Column(Numeric(10, 2), nullable=False, default=0)
 
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
 import { cn, formatTime12h } from "@/lib/core/utils";
 import { formatWait, getWaitMinutes } from "@/features/reception/utils/wait";
+import { useTranslation } from "react-i18next";
 
 export default function AppointmentCard({
   appt,
@@ -17,6 +18,7 @@ export default function AppointmentCard({
   onReassign,
   onUpdateStatus,
 }: any) {
+  const { t } = useTranslation("reception");
   const isOnline = appt.booking_source === "online";
   const status = String(appt.status || "").toLowerCase();
   const waitMins = getWaitMinutes(appt, now);
@@ -57,12 +59,12 @@ export default function AppointmentCard({
       <div className="flex justify-between items-start gap-3 pt-1">
         <div className="min-w-0 space-y-2 flex-1">
           <h4 className="font-black text-base text-main truncate leading-tight group-hover:text-accent transition-colors">
-            {appt.customer_name || "عميل مجهول"}
+            {appt.customer_name || t("card.unknown_customer")}
           </h4>
           <div className="flex items-center gap-2 text-[11px] font-bold text-muted min-w-0">
             <Phone size={12} className="text-muted/60 shrink-0" />
-            <span className="truncate" dir="ltr">
-              {appt.customer_phone || "غير متوفر"}
+            <span className="truncate" dir="ltr" title={appt.customer_phone || ""}>
+              {appt.customer_phone || t("card.phone_unavailable")}
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -71,9 +73,10 @@ export default function AppointmentCard({
                 key={i}
                 variant="outline"
                 className="text-[10px] font-black text-muted flex items-center gap-1.5 uppercase tracking-tighter bg-soft border-border/40 px-2 py-0.5 rounded-lg"
+                title={s.service_name_snapshot || t("card.service_general")}
               >
                 <Zap size={10} className="text-accent" />{" "}
-                {s.service_name_snapshot || "خدمة عامة"}
+                {s.service_name_snapshot || t("card.service_general")}
               </Badge>
             ))}
             {appt.services?.length > 1 && (
@@ -108,7 +111,7 @@ export default function AppointmentCard({
                     : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
               )}
             >
-              <Timer size={10} className="ml-1" />
+              <Timer size={10} className="ms-1" />
               {waitLabel}
             </Badge>
           )}
@@ -124,14 +127,14 @@ export default function AppointmentCard({
             className="h-8 w-8 shrink-0"
            imageUrl={undefined} role={undefined} />
           <div className="min-w-0">
-            <p className="text-[9px] font-black text-muted uppercase leading-none mb-1 tracking-widest">
-              الخبير
+            <p className="text-[9px] font-black text-muted uppercase leading-none mb-1 tracking-widest" title={t("card.barber_label")}>
+              {t("card.barber_label")}
             </p>
             <p
               className="text-xs font-black text-main truncate group-hover:text-accent transition-colors"
-              title={appt.barber_name}
+              title={appt.barber_name || t("card.barber_auto")}
             >
-              {appt.barber_name || "توزيع تلقائي"}
+              {appt.barber_name || t("card.barber_auto")}
             </p>
           </div>
         </div>
@@ -152,15 +155,14 @@ export default function AppointmentCard({
                   onClick={() => onUpdateStatus(appt.id, "in_progress")}
                   className="w-full h-11 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 font-black text-xs hover:scale-[1.02] transition-all"
                 >
-                  <Play size={15} className="ml-2" fill="currentColor" /> توجيه
-                  للخبير
+                  <Play size={15} className="ms-2" fill="currentColor" /> {t("card.action_direct_barber")}
                 </Button>
               ) : (
                 <Button
                   onClick={() => onUpdateStatus(appt.id, "waiting")}
                   className="w-full h-11 rounded-xl bg-amber-500 text-white shadow-lg shadow-amber-500/20 font-black text-xs hover:scale-[1.02] transition-all"
                 >
-                  <UserCheck size={15} className="ml-2" /> تأكيد الوصول
+                  <UserCheck size={15} className="ms-2" /> {t("card.action_confirm_arrival")}
                 </Button>
               )}
 
@@ -170,14 +172,14 @@ export default function AppointmentCard({
                   onClick={onEdit}
                   className="flex-1 h-10 rounded-xl bg-white dark:bg-white/5 text-muted hover:text-primary border border-border/40 transition-all flex items-center justify-center gap-2 text-[11px] font-black"
                 >
-                  <Edit3 size={13} className="text-primary" /> تعديل
+                  <Edit3 size={13} className="text-primary" /> {t("card.action_edit")}
                 </Button>
                 <Button
                   variant="ghost"
                   onClick={onCancel}
                   className="flex-1 h-10 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-600 hover:text-white border border-rose-500/10 transition-all flex items-center justify-center gap-2 text-[11px] font-black"
                 >
-                  <Trash2 size={13} /> إلغاء
+                  <Trash2 size={13} /> {t("card.action_cancel")}
                 </Button>
               </div>
             </>
@@ -188,7 +190,7 @@ export default function AppointmentCard({
             onClick={() => onUpdateStatus(appt.id, "completed")}
             className="w-full h-11 rounded-xl bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 font-black text-xs hover:scale-[1.02] transition-all"
           >
-            <CheckCircle2 size={15} className="ml-2" /> إنهاء وإرسال للاستقبال
+            <CheckCircle2 size={15} className="ms-2" /> {t("card.action_complete")}
           </Button>
         )}
 
@@ -197,7 +199,7 @@ export default function AppointmentCard({
             onClick={() => onUpdateStatus(appt.id, "ready_for_payment")}
             className="w-full h-11 rounded-xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 font-black text-xs hover:scale-[1.02] transition-all"
           >
-            تأكيد جاهزية الدفع <ArrowUpRight size={15} className="mr-2" />
+            {t("card.action_ready_payment")} <ArrowUpRight size={15} className="me-2" />
           </Button>
         )}
 
@@ -205,7 +207,7 @@ export default function AppointmentCard({
           <div className="w-full h-11 rounded-xl bg-sky-500/5 border border-sky-500/20 flex items-center justify-center gap-3">
             <div className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
             <span className="text-[10px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-widest">
-              قيد التحصيل الآن
+              {t("card.status_collecting")}
             </span>
           </div>
         )}
@@ -215,7 +217,7 @@ export default function AppointmentCard({
           onClick={onReassign}
           className="w-full h-10 text-[11px] font-black text-muted hover:text-accent hover:bg-white/5 rounded-xl border border-dashed border-border/40 hover:border-accent/40 transition-all"
         >
-          <RefreshCw size={13} className="ml-2" /> تغيير خبير الخدمة
+          <RefreshCw size={13} className="ms-2" /> {t("card.action_reassign")}
         </Button>
       </div>
     </motion.div>

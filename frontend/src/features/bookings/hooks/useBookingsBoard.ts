@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import api from "@/services/api";
 import {
@@ -29,7 +30,10 @@ export function useBookingsBoard() {
   const [startDate, setStartDate] = useState(TODAY);
   const [endDate, setEndDate] = useState(TODAY);
   const [activeTab, setActiveTab] = useState("الكل");
-  const [quickFilter, setQuickFilter] = useState("all");
+  const [searchParams] = useSearchParams();
+  const [quickFilter, setQuickFilter] = useState(
+    () => searchParams.get("quickFilter") ?? "all",
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
@@ -181,12 +185,12 @@ export function useBookingsBoard() {
           apptTime < now &&
           (status === "WAITING" || status === "CONFIRMED");
         matchesQuick = isLate;
-      } else if (quickFilter === "walkin") {
-        matchesQuick = b.booking_source === "walkin";
       } else if (quickFilter === "pending") {
         matchesQuick = ["pending", "confirmed"].includes(rawStatus(b));
       } else if (quickFilter === "online") {
         matchesQuick = b.booking_source === "online";
+      } else if (quickFilter === "cancelled") {
+        matchesQuick = rawStatus(b) === "cancelled";
       }
 
       const matchesSearch =

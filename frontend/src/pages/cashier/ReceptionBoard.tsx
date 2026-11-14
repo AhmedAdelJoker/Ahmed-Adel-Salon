@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import api from "@/services/api";
 import { useSocket } from "@/context/SocketContext";
+import { PageShell } from "@/components/shared/PageShell";
+import { useTranslation } from "react-i18next";
 import {
   useAppointments,
   useEmployees,
@@ -25,16 +27,30 @@ import {
   ReceptionActionDialogs,
 } from "@/features/reception";
 
+/**
+ * normalizeArabic — يزيلiformات الهمزة ويوحد الألف للعثور على العملاء
+ * بغض النظر عن كتابة الهمزة (أ، إ، آ، ا) في قاعدة البيانات أو البحث.
+ */
+function normalizeArabic(text: string): string {
+  return text
+    .replace(/[أإآ]/g, "ا")
+    .replace(/[ة]/g, "ه")
+    .replace(/[ى]/g, "ي")
+    .toLowerCase()
+    .trim();
+}
+
 export default function ReceptionBoard() {
+  const { t } = useTranslation("reception");
   const navigate = useNavigate();
   const socketCtx = useSocket();
   const socket = socketCtx?.socket ?? null;
   const connected = socketCtx?.connected ?? false;
   const queryClient = useQueryClient();
   const [isFastClientModalOpen, setIsFastClientModalOpen] = useState(false);
+  const [fastClientSaving, setFastClientSaving] = useState(false);
 
   const [assigningAppt, setAssigningAppt] = useState<any>(null);
-
   const [cancelAppt, setCancelAppt] = useState<any>(null);
 
   const [fastClientData, setFastClientData] = useState<any>({
@@ -43,13 +59,17 @@ export default function ReceptionBoard() {
     serviceIds: [],
     employeeId: "none",
     notes: "",
+    appointmentTime: "", // اختيار الوقت يدوياً
   });
 
   const [foundCustomer, setFoundCustomer] = useState<any>(null);
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
-  const [activeCategory, setActiveCategory] = useState("الكل");
+  const [activeCategory, setActiveCategory] = useState(t("fast_client.category_all"));
 
-  const { data: appointments = [], isFetching: appointmentsFetching } =
+  // ---- Error state for API failures ----
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  const { data: appointments = [], isFetching: appointmentsFetching, error: appointmentsError } =
     useAppointments({ dateFilter: "today" });
   const { data: barbers = [] } = useEmployees();
   const { data: services = [] } = useServices();
@@ -58,7 +78,15 @@ export default function ReceptionBoard() {
   const statusMutation = useUpdateAppointmentStatus();
   const assignMutation = useAssignBarber();
 
-  const loading = appointmentsFetching && appointments.length === 0;
+  useEffect(() => {
+    if (appointmentsError) {
+      setApiError(appointmentsError.message);
+    } else {
+      setApiError(null);
+    }
+  }, [appointmentsError]);
+
+  const loading = appointmentsFetching && appointments.length === 0 && !apiError;
   const {
     searchTerm,
     setSearchTerm,
@@ -80,6 +108,7 @@ export default function ReceptionBoard() {
   } = useReceptionBoard(appointments);
 
   const refresh = useCallback(() => {
+    setApiError(null);
     queryClient.invalidateQueries();
   }, [queryClient]);
 
@@ -118,7 +147,7 @@ export default function ReceptionBoard() {
               ...prev,
               firstName: customerData.first_name ?? prev.firstName ?? "",
             }));
-            toast.success(`تم العثور على العميل: ${customerData.first_name}`, {
+            toast.success(t("fast_client.customer_found", { name: customerData.first_name }), {
               icon: "👋",
             });
           } else {
@@ -134,16 +163,16 @@ export default function ReceptionBoard() {
     } else {
       setFoundCustomer(null);
     }
-  }, [fastClientData.phone]);
+  }, [fastClientData.phone, t]);
 
   const filteredServices = useMemo(() => {
-    if (activeCategory === "الكل") return services;
+    if (activeCategory === t("fast_client.category_all")) return services;
     return services.filter(
       (s) =>
         s.category_name === activeCategory ||
         String(s.category_id) === String(activeCategory),
     );
-  }, [services, activeCategory]);
+  }, [services, activeCategory, t]);
 
   const toggleService = (serviceId) => {
     setFastClientData((prev) => {
@@ -180,11 +209,11 @@ export default function ReceptionBoard() {
   const handleUpdateStatus = async (apptId, newStatus) => {
     try {
       await statusMutation.mutateAsync({ id: apptId, status: newStatus });
-      toast.success("تم تحديث الحالة");
+      toast.success(t("board.refresh"));
     } catch (error) {
       const apiErr = error as { response?: { data?: { detail?: unknown } } };
       toast.error(
-        (apiErr?.response?.data?.detail as string) || "فشل تحديث الحالة",
+        (apiErr?.response?.data?.detail as string) || t("board.error_message"),
       );
     }
   };
@@ -225,16 +254,28 @@ export default function ReceptionBoard() {
     }
   };
 
+  const handleTimeChange = (time: string) => {
+    setFastClientData((prev) => ({ ...prev, appointmentTime: time }));
+  };
+
   const handleFastClientSubmit = async (e) => {
     e.preventDefault();
     if (!fastClientData.serviceIds.length) {
-      toast.error("يرجى اختيار خدمة واحدة على الأقل");
+      toast.error(t("fast_client.validation_service"));
       return;
     }
     if (!fastClientData.phone?.trim() || !fastClientData.firstName?.trim()) {
-      toast.error("يرجى إدخال رقم الهاتف واسم العميل");
+      toast.error(t("fast_client.validation_phone_name"));
       return;
     }
+    // التحقق من صحة رقم الموبايل (مصري: يبدأ بـ 01 ומكون من 11 رقم)
+    const phoneRegex = /^01[0-2,5]\d{8}$/;
+    if (!phoneRegex.test(fastClientData.phone.trim())) {
+      toast.error(t("fast_client.validation_phone_invalid"));
+      return;
+    }
+    if (fastClientSaving) return;
+    setFastClientSaving(true);
     try {
       const payload = {
         phone: String(fastClientData.phone).trim(),
@@ -246,9 +287,10 @@ export default function ReceptionBoard() {
             : Number(fastClientData.employeeId),
         notes: fastClientData.notes?.trim() || null,
         booking_source: "shop",
+        appointment_time: fastClientData.appointmentTime || undefined,
       };
       await api.post("/appointments/fast-walkin", payload);
-      toast.success("تم تسجيل العميل بنجاح");
+      toast.success(t("fast_client.success"));
       setIsFastClientModalOpen(false);
       setFastClientData({
         phone: "",
@@ -256,13 +298,21 @@ export default function ReceptionBoard() {
         serviceIds: [],
         employeeId: "none",
         notes: "",
+        appointmentTime: "",
       });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.appointments });
     } catch (error) {
-      const apiErr = error as { response?: { data?: { detail?: unknown } } };
-      toast.error(
-        (apiErr?.response?.data?.detail as string) || "فشل تسجيل العميل",
-      );
+      const apiErr = error as { response?: { status?: number; data?: { detail?: unknown } } };
+      // خطأ 409 يعني أن الخبير محجوز في هذا التوقيت
+      if (apiErr?.response?.status === 409) {
+        toast.error(t("fast_client.error_barber_busy"));
+      } else {
+        toast.error(
+          (apiErr?.response?.data?.detail as string) || t("fast_client.error"),
+        );
+      }
+    } finally {
+      setFastClientSaving(false);
     }
   };
 
@@ -273,8 +323,35 @@ export default function ReceptionBoard() {
     cashier: atCashierList,
   };
 
+  // ---- Error UI ----
+  if (apiError) {
+    return (
+      <PageShell className="relative">
+        <ReceptionHeader
+          connected={connected}
+          appointmentsFetching={false}
+          onRefresh={refresh}
+          onNewClient={() => setIsFastClientModalOpen(true)}
+        />
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 sm:p-12">
+          <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">⚠️</span>
+          </div>
+          <h2 className="text-xl font-black text-main mb-2">{t("board.error_title")}</h2>
+          <p className="text-muted mb-6 max-w-sm">{t("board.error_message")}</p>
+          <button
+            onClick={refresh}
+            className="px-6 py-3 rounded-xl font-black bg-primary text-white hover:bg-accent-strong transition-all shadow-lg shadow-primary/20"
+          >
+            {t("board.error_retry")}
+          </button>
+        </div>
+      </PageShell>
+    );
+  }
+
   return (
-    <div className="erp-page-container space-y-6 pb-16 relative">
+    <PageShell className="relative">
       <ReceptionHeader
         connected={connected}
         appointmentsFetching={appointmentsFetching}
@@ -328,7 +405,11 @@ export default function ReceptionBoard() {
         totalPrice={totalPrice}
         totalDuration={totalDuration}
         barbers={barbers}
+        appointmentTime={fastClientData.appointmentTime}
+        onTimeChange={handleTimeChange}
         onSubmit={handleFastClientSubmit}
+        saving={fastClientSaving}
+        t={t}
       />
 
       <ReceptionActionDialogs
@@ -339,7 +420,8 @@ export default function ReceptionBoard() {
         cancelAppt={cancelAppt}
         setCancelAppt={setCancelAppt}
         onConfirmCancel={confirmCancel}
+        t={t}
       />
-    </div>
+    </PageShell>
   );
 }

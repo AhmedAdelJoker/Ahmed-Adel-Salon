@@ -1,12 +1,17 @@
-import { Calendar, Clock, Scissors, CheckCircle, Play } from "lucide-react";
+import { Calendar, Clock, Scissors, CheckCircle } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/core/utils";
+import {
+  cn,
+  formatCurrency,
+} from "@/lib/core/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { AppointmentStatusActions } from "@/components/shared/AppointmentStatusActions";
 import type {
   BarberAppointment,
   StatusVariant,
 } from "@/features/barber-bookings/hooks/useBarberBookings";
+import { useAppLocale } from "@/hooks/useAppLocale";
 
 interface AppointmentsListProps {
   loading: boolean;
@@ -25,6 +30,8 @@ export const AppointmentsList = ({
   statusLabels,
   statusColors,
 }: AppointmentsListProps) => {
+  const { locale } = useAppLocale();
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -40,13 +47,7 @@ export const AppointmentsList = ({
 
   if (filteredAppointments.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-16 text-center">
-        <Calendar size={40} className="mb-3 text-muted" />
-        <p className="text-base font-black text-main">لا توجد مواعيد</p>
-        <p className="mt-1 text-xs font-bold text-muted">
-          لا توجد مواعيد مطابقة للفلاتر المحددة
-        </p>
-      </div>
+      <EmptyState variant="section" icon={Calendar} title="لا توجد مواعيد" message="لا توجد مواعيد مطابقة للفلاتر المحددة" />
     );
   }
 
@@ -57,7 +58,7 @@ export const AppointmentsList = ({
         .map(([date, dayApps]) => (
           <div key={date} className="space-y-2">
             <p className="text-xs font-black text-muted px-1">
-              {new Date(date).toLocaleDateString("ar-EG", {
+              {new Date(date).toLocaleDateString(locale, {
                 weekday: "long",
                 day: "numeric",
                 month: "long",
@@ -114,7 +115,7 @@ export const AppointmentsList = ({
                             ? apt.total_amount
                             : Number(apt.total_amount || 0)) > 0 && (
                             <span className="text-[10px] font-bold text-primary">
-                              {String(apt.total_amount)} ج.م
+                              {formatCurrency(String(apt.total_amount))}
                             </span>
                           )}
                         </div>
@@ -127,29 +128,14 @@ export const AppointmentsList = ({
                       >
                         {statusLabels[apt.status] || apt.status}
                       </Badge>
-                      {apt.status === "waiting" && (
-                        <Button
-                          size="sm"
-                          className="h-8 rounded-lg px-3 text-[10px] font-black"
-                          onClick={() => handleStatusChange(apt.id, "in-service")}
-                        >
-                          <Play size={10} className="ml-1" /> بدء
-                        </Button>
-                      )}
-                      {apt.status === "in-service" && (
-                        <Button
-                          size="sm"
-                          variant="success"
-                          className="h-8 rounded-lg px-3 text-[10px] font-black"
-                          onClick={() => handleStatusChange(apt.id, "completed")}
-                        >
-                          <CheckCircle size={10} className="ml-1" /> إنهاء
-                        </Button>
-                      )}
+                      <AppointmentStatusActions
+                        status={apt.status}
+                        onChange={(next) => handleStatusChange(apt.id, next)}
+                      />
                     </div>
                   </div>
                   {apt.notes && (
-                    <p className="mt-2 text-[10px] font-bold text-muted mr-13">
+                    <p className="mt-2 text-[10px] font-bold text-muted me-13">
                       📝 {String(apt.notes)}
                     </p>
                   )}

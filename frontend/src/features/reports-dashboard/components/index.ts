@@ -10,3 +10,6 @@ export { ServiceDistribution } from "@/features/reports-dashboard/components/Ser
 export type { ServiceDistributionProps } from "@/features/reports-dashboard/components/ServiceDistribution";
 export { SmartInsights } from "@/features/reports-dashboard/components/SmartInsights";
 export type { SmartInsightsProps } from "@/features/reports-dashboard/components/SmartInsights";
+
+export { NeedsAttention } from "@/features/reports-dashboard/components/NeedsAttention";
+export type { NeedsAttentionProps } from "@/features/reports-dashboard/components/NeedsAttention";

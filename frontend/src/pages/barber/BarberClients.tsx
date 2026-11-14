@@ -1,4 +1,6 @@
 import { useAuth } from "@/context/AuthContext";
+import { PageShell } from "@/components/shared/PageShell";
+import { EmptyState } from "@/components/shared/EmptyState";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,10 +36,24 @@ import { Textarea } from "@/components/ui/textarea";
 import api from "@/services/api";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { isManagementLike } from "@/lib/access/roles";
 
 const BarberClients = () => {
   const { user } = useAuth();
-   
+
+  /**
+   * `Customer` is a shop-wide record, so writing to one is management-only --
+   * `PUT /barber/clients/{id}` answers 403 for a barber, deliberately: one
+   * appointment used to be enough to earn permanent write access to the address
+   * book every other barber and the cashier read from.
+   *
+   * The edit button used to render for everyone, so a barber could fill in the
+   * dialog, press save, and be handed a 403 with their typing discarded. It now
+   * only renders for the roles the API accepts, which is the same set as the
+   * backend's `_SUPERVISOR_ROLES` (`manager`, `admin`, `owner`).
+   */
+  const canEditClients = isManagementLike(user?.role);
+
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -118,8 +134,8 @@ const BarberClients = () => {
   );
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <PageHeader
           title="عملائي"
           subtitle="إدارة العملاء وتاريخهم وتفضيلاتهم"
@@ -144,7 +160,7 @@ const BarberClients = () => {
                 setIsModalOpen(true);
               }}
             >
-              <Plus size={14} className="ml-1.5" /> إضافة عميل
+              <Plus size={14} className="ms-1.5" /> إضافة عميل
             </Button>
           }
         />
@@ -160,7 +176,7 @@ const BarberClients = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="بحث بالاسم أو الهاتف..."
-              className="h-10 w-full pr-9 text-sm"
+              className="h-10 w-full pe-9 text-sm"
             />
           </div>
         </div>
@@ -175,13 +191,7 @@ const BarberClients = () => {
               />
             ))
           ) : filteredClients.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-16 text-center">
-              <Users size={40} className="mb-3 text-muted" />
-              <p className="text-base font-black text-main">لا توجد عملاء</p>
-              <p className="mt-1 text-xs font-bold text-muted">
-                ابدأ بإضافة أول عميل
-              </p>
-            </div>
+            <EmptyState variant="section" icon={Users} title="لا توجد عملاء" message="ابدأ بإضافة أول عميل" />
           ) : (
             filteredClients.map((client, i) => (
               <motion.div
@@ -200,14 +210,17 @@ const BarberClients = () => {
                       <p className="text-sm font-black text-main truncate">
                         {client.name}
                       </p>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handleEdit(client)}
-                      >
-                        <Edit2 size={12} />
-                      </Button>
+                      {canEditClients && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleEdit(client)}
+                          aria-label={`تعديل بيانات ${client.name}`}
+                        >
+                          <Edit2 size={12} />
+                        </Button>
+                      )}
                     </div>
                     <p className="text-[10px] font-bold text-muted mt-0.5">
                       {client.phone}
@@ -373,11 +386,10 @@ const BarberClients = () => {
                 {isEditing ? "حفظ" : "إضافة"}
               </Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DialogContent>
+          </Dialog>
+      </PageShell>
     </div>
   );
 };
-
 export default BarberClients;

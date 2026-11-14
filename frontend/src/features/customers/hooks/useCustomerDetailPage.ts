@@ -3,6 +3,7 @@
  */
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import {
@@ -12,9 +13,12 @@ import {
   useCustomerInvoices,
 } from "@/hooks/useCustomer";
 import { getTierInfo } from "@/features/customers/utils/customer";
+import { useTranslation } from "react-i18next";
 
 export function useCustomerDetailPage(customerId: number) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { t } = useTranslation("customers");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
@@ -49,16 +53,31 @@ export function useCustomerDetailPage(customerId: number) {
     const avgSpend = visits > 0 ? totalSpend / visits : 0;
     const noShowRate =
       visits > 0 ? Math.round((cancellations / visits) * 100) : 0;
-    const paidInvoices = invoices.filter(
-      (i) => i.status?.toUpperCase() === "PAID",
-    );
-    const totalPaid = paidInvoices.reduce(
-      (sum, i) => sum + Number(i.total_amount || i.amount || 0),
-      0,
-    );
+    // "المدفوع" = الفواتير الصادرة غير الملغاة. `is_closed` علامة إلغاء
+    // الفاتورة منفردة، وقفل الشهر في جدول مستقل لا يمر على الفاتورة أصلًا.
+    const totalPaid = invoices
+      .filter((i) => !i.is_closed)
+      .reduce((sum, i) => sum + Number(i.total_amount || i.amount || 0), 0);
     const upcomingAppts = appointments.filter((a) =>
-      ["PENDING", "CONFIRMED"].includes(a.status?.toUpperCase()),
+      ["pending", "confirmed", "waiting"].includes(
+        String(a.status || "").toLowerCase(),
+      ),
     );
+    // Last visit = most recent completed/done appointment date
+    const completedAppts = appointments.filter((a) =>
+      ["completed", "done", "checked_out", "paid"].includes(
+        String(a.status || "").toLowerCase(),
+      ),
+    );
+    const sortedCompleted = [...completedAppts].sort(
+      (a, b) =>
+        new Date(b.appointment_date || b.created_at || 0).getTime() -
+        new Date(a.appointment_date || a.created_at || 0).getTime(),
+    );
+    const lastVisit = sortedCompleted[0]
+      ? sortedCompleted[0].appointment_date ||
+        sortedCompleted[0].created_at
+      : null;
     return {
       totalSpend,
       visits,
@@ -67,6 +86,7 @@ export function useCustomerDetailPage(customerId: number) {
       noShowRate,
       totalPaid,
       upcomingCount: upcomingAppts.length,
+      lastVisit,
     };
   }, [customer, appointments, invoices]);
 
@@ -76,7 +96,7 @@ export function useCustomerDetailPage(customerId: number) {
       last_name: customer?.last_name || "",
       phone: customer?.phone || "",
       email: customer?.email || "",
-      phone2: customer?.phone2 || customer?.alternate_phone || "",
+      phone2: customer?.second_phone || "",
       notes: customer?.notes || "",
     });
     setIsEditOpen(true);
@@ -84,21 +104,26 @@ export function useCustomerDetailPage(customerId: number) {
 
   async function handleSaveEdit() {
     if (!editForm.first_name.trim() || !editForm.phone.trim()) {
-      toast.error("الاسم والهاتف مطلوبان");
+      toast.error(t("toasts.namePhoneRequired"));
       return;
     }
     try {
       setIsSaving(true);
-      const payload = { ...editForm };
-      if (!payload.phone2?.trim()) delete payload.phone2;
-      await api.put(`/customers/${customerId}`, payload);
-      toast.success("تم تحديث بيانات العميل بنجاح");
+      await api.put(`/customers/${customerId}`, {
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        phone: editForm.phone,
+        second_phone: editForm.phone2?.trim() || null,
+        email: editForm.email?.trim() || null,
+        notes: editForm.notes || null,
+      });
+      toast.success(t("toasts.updateSuccess"));
       setIsEditOpen(false);
-      window.location.reload();
+      await queryClient.invalidateQueries({ queryKey: ["customers"] });
     } catch (err) {
-       
+
       const apiErr = err as { response?: { data?: { detail?: unknown } } };
-      toast.error((apiErr.response?.data?.detail as string) || "فشل تحديث البيانات");
+      toast.error((apiErr.response?.data?.detail as string) || t("toasts.saveFailed"));
     } finally {
       setIsSaving(false);
     }
@@ -106,11 +131,17 @@ export function useCustomerDetailPage(customerId: number) {
 
   async function handleDelete() {
     try {
-      await api.delete(`/customers/${customerId}`);
-      toast.success("تم حذف العميل بنجاح");
+      const name =
+        `${customer?.first_name || ""} ${customer?.last_name || ""}`.trim() ||
+        t("customer.unknown");
+      await api.delete(`/customers/${customerId}`, {
+        data: { archive_reason: t("customerDetail.archive") },
+      });
+      toast.success(t("toasts.deleteSuccess"));
+      await queryClient.invalidateQueries({ queryKey: ["customers"] });
       navigate("/customers");
-    } catch (err) {
-      toast.error("فشل حذف العميل");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || t("toasts.deleteFailed"));
     }
   }
 

@@ -3,6 +3,7 @@ External data directory resolver - يحل مسار المجلد الخارجي �
 كل ملفات البرنامج (DB + uploads + invoices) تروح هناك وما تتمسح مع المشروع.
 """
 import os
+import re
 from pathlib import Path
 
 
@@ -36,10 +37,21 @@ def get_external_data_dir() -> Path:
         pass
 
     # 3. مجلد خارج المشروع - sibling لـ Salon-Management-Pro (المختار من المستخدم)
-    # backend/app/core/paths.py -> parents[3] == Salon-Management-Pro parent (Downloads)
+    # paths.py:  core -> app -> backend -> Salon-Management-Pro -> Downloads
+    # i.e. __file__ = Salon-Management-Pro\backend\app\core\paths.py, so
+    #   parents[0] = core, parents[1] = app, parents[2] = backend,
+    #   parents[3] = Salon-Management-Pro, parents[4] = Downloads.
+    # The previous index was parents[3], which is the project folder itself —
+    # the comment above it claimed "Downloads". The data therefore lived
+    # INSIDE the repo (Salon-Management-Pro\SalonPro_External), defeating the
+    # whole point of this module (gitignored data that survives repo delete).
+    # parents[4] puts the data home next to the project, which is also the
+    # layout the packaged app builds into (frontend/build-external.ps1 ->
+    # Downloads\SalonPro_External, sharing the same Data folder since Windows
+    # paths are case-insensitive).
     cur = Path(__file__).resolve()
     try:
-        project_parent = cur.parents[3]  # .../Salon-Management-Pro/.. -> Downloads
+        project_parent = cur.parents[4]  # Downloads — sibling of the project
         # المسار المحدد من المستخدم
         chosen = project_parent / "SalonPro_External"
         if chosen.exists():
@@ -67,17 +79,11 @@ def get_data_dir() -> Path:
 
 
 def get_uploads_dir() -> Path:
-    """Single canonical uploads location — UPLOADS_DIR env > Docker > external data dir."""
+    """Single canonical uploads location — UPLOADS_DIR env > external data dir."""
     # يحترم UPLOADS_DIR أولاً (يضبطه Electron)
     env = os.getenv("UPLOADS_DIR")
     if env:
         p = Path(env)
-        p.mkdir(parents=True, exist_ok=True)
-        return p
-    # Docker: /app is the container workdir
-    cur = Path(__file__).resolve()
-    if cur.as_posix().startswith("/app/"):
-        p = Path("/app/uploads")
         p.mkdir(parents=True, exist_ok=True)
         return p
     p = get_data_dir() / "uploads"
@@ -99,6 +105,35 @@ def get_db_path() -> Path:
         except Exception:
             pass
     return get_data_dir() / "salon_pro.db"
+
+
+def resolve_database_url(url: str) -> str:
+    """Point a *relative* sqlite URL at the canonical external database.
+
+    The guard this replaces was `":/" in url`, meant to spot an absolute path.
+    Every sqlite URL contains `:/` inside its own `sqlite:///` prefix, so the
+    guard was always true and the redirect below never ran. A relative URL
+    therefore stayed relative and SQLAlchemy resolved it against the working
+    directory: the dev backend wrote `backend/salon_pro.db` while its uploads
+    went to the external data dir, and the packaged app (Electron passes an
+    absolute URL) used a second, divergent database. Two databases, one uploads
+    folder -- which is how a photo the database still referenced was missing
+    from disk.
+
+    Left alone: absolute paths (`sqlite:///C:/x.db`, `sqlite:////abs/x.db`),
+    in-memory databases, and anything that is not sqlite.
+    """
+    if not url.startswith("sqlite"):
+        return url
+    if "sqlite:///" not in url:
+        # `sqlite://` — the SQLAlchemy spelling for an in-memory database.
+        return url
+    rest = url.split("sqlite:///", 1)[1]
+    if rest.startswith("/") or re.match(r"^[A-Za-z]:[\\/]", rest):
+        return url
+    if rest.startswith(":") or "mode=memory" in rest:
+        return url
+    return f"sqlite:///{get_db_path().as_posix()}"
 
 
 def get_pdf_dir() -> Path:
@@ -143,13 +178,12 @@ def migrate_legacy_data():
     import logging
     logger = logging.getLogger("paths.migrate")
     cur = Path(__file__).resolve()
-    # مواقع قديمة
     project_root = None
     try:
-        project_root = cur.parents[3]  # Downloads
-        # actually Salon-Management-Pro is at parents[3]? let's compute
-        # paths.py at backend/app/core/paths.py
-        # parents[0]=core,1=app,2=backend,3=Salon-Management-Pro
+        # parents[3] here is the project root (Salon-Management-Pro): all
+        # path segments below (uploads/, backend/salon_pro.db, ...) are
+        # project-relative. Do NOT "fix" this to parents[4] like
+        # get_external_data_dir — the two mean different things.
         project_root = cur.parents[3]
     except Exception:
         return
@@ -159,7 +193,7 @@ def migrate_legacy_data():
         cur.parents[2] / "uploads",  # backend/uploads
         Path.cwd() / "uploads",
     ]
-    # أيضاً legacy من parents[3]/uploads القديم الخاطئ (Downloads/uploads)
+    # وأيضاً uploads القديم المبعثر بجانب المشروع (Downloads/uploads)
     try:
         legacy_roots.append(cur.parents[4] / "uploads")
     except Exception:

@@ -71,17 +71,28 @@ def update_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    if payload.full_name is not None:
+    """
+    Apply a profile edit.
+
+    An absent key means "leave it alone"; a key that was actually sent — even
+    as `""` or `null` — means "set it to that", so clearing an optional field
+    clears it instead of silently resurrecting the old value. Every one of
+    these fields is optional on the form, and `null` is what the frontend
+    already sends for the two it knew about.
+    """
+    touched = payload.model_fields_set
+
+    if "full_name" in touched:
         current_user.full_name = payload.full_name
 
-    if payload.email is not None:
+    if "email" in touched:
         current_user.email = payload.email
 
     # Update employee details if linked
     if current_user.employee:
-        if payload.display_name is not None:
+        if "display_name" in touched:
             current_user.employee.display_name = payload.display_name
-        if payload.bio_ar is not None:
+        if "bio_ar" in touched:
             current_user.employee.bio_ar = payload.bio_ar
         db.add(current_user.employee)
 

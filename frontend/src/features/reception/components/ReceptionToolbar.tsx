@@ -1,4 +1,4 @@
-/** Reception toolbar (moved from ReceptionBoard page, no logic changes). */
+/** Reception toolbar (moved from ReceptionBoard page). */
 import { History, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useTranslation } from "react-i18next";
 
 export default function ReceptionToolbar({
   searchTerm,
@@ -29,6 +30,7 @@ export default function ReceptionToolbar({
   onToggleDone: () => void;
   doneCount: number;
 }) {
+  const { t } = useTranslation("reception");
   return (
     <div className="surface-toolbar flex flex-col md:flex-row flex-wrap gap-2 md:items-center justify-between">
       <div className="relative w-full lg:w-auto lg:flex-1 lg:max-w-md min-w-0">
@@ -39,15 +41,15 @@ export default function ReceptionToolbar({
         <Input
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="بحث فوري بالاسم أو الهاتف..."
-          className="h-11 pr-11 pl-4 rounded-xl"
-          aria-label="بحث في المواعيد"
+          placeholder={t("board.toolbar_search_placeholder")}
+          className="h-11 pe-11 ps-4 rounded-xl"
+          aria-label={t("board.toolbar_search_placeholder")}
         />
         {searchTerm && (
           <button
             onClick={() => onSearchChange("")}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-main transition-colors"
-            aria-label="مسح البحث"
+            aria-label={t("board.toolbar_clear")}
           >
             <X size={14} />
           </button>
@@ -57,13 +59,13 @@ export default function ReceptionToolbar({
       <div className="flex items-center gap-3 flex-wrap w-full lg:w-auto">
         <Select value={barberFilter} onValueChange={onBarberFilter}>
           <SelectTrigger className="h-11 w-full lg:w-52 bg-soft border-border rounded-xl font-bold text-xs">
-            <SelectValue placeholder="كل الخبراء" />
+            <SelectValue placeholder={t("board.toolbar_all_barbers")} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all" className="font-bold">
-              كل الخبراء
+              {t("board.toolbar_all_barbers")}
             </SelectItem>
-            {barbers.map((b) => (
+            {barbers.filter((b) => b.display_name && b.display_name.trim()).map((b) => (
               <SelectItem
                 key={b.id}
                 value={String(b.id)}
@@ -80,8 +82,8 @@ export default function ReceptionToolbar({
           onClick={onToggleDone}
           className="h-11 px-4 rounded-xl font-black text-xs flex-1 lg:flex-none"
         >
-          <History size={15} className="ml-1" />
-          مكتمل اليوم ({doneCount})
+          <History size={15} className="ms-1" />
+          {t("board.toolbar_done_today", { count: doneCount })}
         </Button>
       </div>
     </div>

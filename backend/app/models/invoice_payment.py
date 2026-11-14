@@ -1,6 +1,6 @@
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -15,7 +15,7 @@ class InvoicePayment(Base):
     
     payment_method = Column(String(30), nullable=False, default="cash") # cash, vodafone_cash, instapay, bank_card
     amount = Column(Numeric(10, 2), nullable=False, default=0)
-    shift_id = Column(Integer, ForeignKey("pos_shifts.id"), nullable=True)
+    shift_id = Column(Integer, ForeignKey("pos_shifts.id"), nullable=True, index=True)
     
     reference_no = Column(String(100), nullable=True)
     external_channel = Column(String(100), nullable=True) # e.g. Vodafone Cash Transaction ID

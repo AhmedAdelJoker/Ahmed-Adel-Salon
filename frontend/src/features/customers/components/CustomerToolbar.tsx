@@ -4,6 +4,14 @@ import { Input } from "@/components/ui";
 import { Card } from "@/components/ui";
 import { cn } from "@/lib/core/utils";
 import { CUSTOMER_FILTER_TABS } from "@/features/customers/constants";
+import { useTranslation } from "react-i18next";
+
+const COUNT_KEY_BY_TAB: Record<string, string> = {
+  "الكل": "total",
+  VIP: "vip_count",
+  "منتظم": "regular_count",
+  "جديد": "new_count",
+};
 
 export default function CustomerToolbar({
   activeFilter,
@@ -13,6 +21,7 @@ export default function CustomerToolbar({
   viewMode,
   onViewMode,
   loading,
+  counts = {},
 }: {
   activeFilter: string;
   onFilter: (tab: string) => void;
@@ -21,28 +30,57 @@ export default function CustomerToolbar({
   viewMode: string;
   onViewMode: (v: string) => void;
   loading: boolean;
+  counts?: Record<string, number>;
 }) {
+  const { t } = useTranslation("customers");
+  const tabKey = (tab: string) =>
+    tab === "الكل"
+      ? "all"
+      : tab === "VIP"
+        ? "vip"
+        : tab === "منتظم"
+          ? "regular"
+          : "new";
   return (
       <Card className="border-border p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
           <div className="chip-scroller">
-            {CUSTOMER_FILTER_TABS.map((tab) => (
-              <button
-                type="button"
-                key={tab}
-                disabled={loading}
-                onClick={() => onFilter(tab)}
-                className={`whitespace-nowrap rounded-xl px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeFilter === tab ? "bg-primary text-white shadow-lg shadow-primary/30" : "bg-soft text-muted hover:text-main"}`}
-              >
-                {tab}
-              </button>
-            ))}
+            {CUSTOMER_FILTER_TABS.map((tab) => {
+              const active = activeFilter === tab;
+              const count = counts[COUNT_KEY_BY_TAB[tab]];
+              return (
+                <button
+                  type="button"
+                  key={tab}
+                  aria-pressed={activeFilter === tab}
+                  onClick={() => onFilter(tab)}
+                  className={cn(
+                    "flex items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all",
+                    active
+                      ? "bg-primary text-white shadow-lg shadow-primary/30"
+                      : "bg-soft text-muted hover:text-main",
+                  )}
+                >
+                  {t(`filterTabs.${tabKey(tab)}`)}
+                  <span
+                    className={cn(
+                      "rounded-md px-1.5 py-0.5 text-[8px] font-black leading-none",
+                      active
+                        ? "bg-white/20"
+                        : "bg-card border border-border/60",
+                    )}
+                  >
+                    {count ?? "—"}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <div className="relative flex-1">
             <Search className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <Input
-              placeholder="البحث بالاسم أو رقم الجوال..."
-              className="pr-11 h-12 rounded-xl bg-soft border-border/60 font-bold"
+              placeholder={t("toolbar.search")}
+              className="pe-11 h-12 rounded-xl bg-soft border-border/60 font-bold"
               value={searchTerm || ""}
               onChange={(event) => onSearch(event.target.value)}
             />
@@ -57,7 +95,7 @@ export default function CustomerToolbar({
                   ? "bg-primary text-white shadow-sm"
                   : "text-muted hover:text-main",
               )}
-              title="عرض بطاقات"
+              title={t("toolbar.cardsView")}
             >
               <svg
                 width="14"
@@ -82,7 +120,7 @@ export default function CustomerToolbar({
                   ? "bg-primary text-white shadow-sm"
                   : "text-muted hover:text-main",
               )}
-              title="عرض جدول"
+              title={t("toolbar.tableView")}
             >
               <svg
                 width="14"

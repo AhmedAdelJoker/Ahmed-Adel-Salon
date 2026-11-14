@@ -1,6 +1,7 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/core/utils";
 
 const Dialog = DialogPrimitive.Root;
@@ -32,29 +33,35 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
 >(
-  ({ className, children, showCloseButton = true, ...props }, ref) => (
-    <DialogPortal>
-      <DialogOverlay />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-[4vh]">
-        <DialogPrimitive.Content
-          ref={ref}
-          className={cn(
-            "relative z-50 flex max-h-[min(92dvh,62rem)] w-[min(96vw,72rem)] max-w-[72rem] flex-col overflow-hidden rounded-[1.5rem] border border-border bg-white/96 text-slate-900 shadow-premium duration-300 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95 sm:rounded-[1.9rem] dark:border-slate-800/60 dark:bg-slate-950/96 dark:text-slate-50",
-            className,
-          )}
-          {...props}
-        >
-          {children}
-          {showCloseButton ? (
-            <DialogPrimitive.Close className="absolute left-4 top-4 z-20 rounded-xl p-2 text-slate-400 opacity-80 transition-all hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-600/10 sm:left-5 sm:top-5 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-50 dark:focus:ring-sky-400/10">
-              <XIcon className="h-[1.2rem] w-[1.2rem]" />
-              <span className="sr-only">إغلاق</span>
-            </DialogPrimitive.Close>
-          ) : null}
-        </DialogPrimitive.Content>
-      </div>
-    </DialogPortal>
-  ),
+  ({ className, children, showCloseButton = true, ...props }, ref) => {
+    // The close button's name is what a screen reader announces, so it has to
+    // be in the reader's language: an English dialog whose only way out
+    // announced itself in Arabic left the user guessing.
+    const { t } = useTranslation("common");
+    return (
+      <DialogPortal>
+        <DialogOverlay />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:[4vh]">
+          <DialogPrimitive.Content
+            ref={ref}
+            className={cn(
+              "relative z-50 flex max-h-[min(92dvh,62rem)] w-[min(96vw,72rem)] max-w-[72rem] flex-col overflow-hidden rounded-[1.5rem] border border-border bg-white/96 text-slate-900 shadow-premium duration-300 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95 sm:rounded-[1.9rem] dark:border-slate-800/60 dark:bg-slate-950/96 dark:text-slate-50",
+              className,
+            )}
+            {...props}
+          >
+            {children}
+            {showCloseButton ? (
+              <DialogPrimitive.Close className="absolute left-4 top-4 z-20 rounded-xl p-2 text-slate-400 opacity-80 transition-all hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-600/10 sm:left-5 sm:top-5 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-50 dark:focus:ring-sky-400/10">
+                <XIcon className="h-[1.2rem] w-[1.2rem]" />
+                <span className="sr-only">{t("actions.close")}</span>
+              </DialogPrimitive.Close>
+            ) : null}
+          </DialogPrimitive.Content>
+        </div>
+      </DialogPortal>
+    );
+  },
 );
 
 function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

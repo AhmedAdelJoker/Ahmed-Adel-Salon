@@ -9,7 +9,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/core/utils";
-import { DATE_FILTERS, TAB_CATEGORIES } from "@/features/bookings";
+import { useTranslation } from "react-i18next";
+import { DATE_FILTERS, TAB_CATEGORIES, TODAY } from "@/features/bookings";
+
+/** Tab IDs are Arabic domain tokens (persisted state); labels resolve via i18n. */
+const TAB_LABEL_KEYS: Record<string, string> = {
+  "الكل": "tabs.all",
+  "بانتظار الخدمة": "tabs.waiting",
+  "عند الاستقبال": "tabs.atReception",
+  "أونلاين": "tabs.online",
+  "الأرشيف": "tabs.archive",
+  "الملغاة": "tabs.cancelled",
+};
 
 export default function BookingsToolbar({
   searchTerm,
@@ -34,6 +45,7 @@ export default function BookingsToolbar({
   refreshBookings,
   searchInputRef,
 }: any) {
+  const { t } = useTranslation("bookings");
   return (
     <div className="p-4 sm:p-6 border-b border-border space-y-4">
       <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
@@ -46,8 +58,8 @@ export default function BookingsToolbar({
             />
             <Input
               ref={searchInputRef}
-              placeholder="بحث باسم العميل أو الهاتف (/)..."
-              className="h-10 sm:h-11 pr-10 text-xs font-bold rounded-xl bg-soft/50 border-border focus:bg-card"
+              placeholder={t("toolbar.search")}
+              className="h-10 sm:h-11 pe-10 text-xs font-bold rounded-xl bg-soft/50 border-border focus:bg-card"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -55,7 +67,7 @@ export default function BookingsToolbar({
               <button
                 onClick={() => setSearchTerm("")}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-main"
-                aria-label="مسح البحث"
+                aria-label={t("toolbar.clearSearch")}
               >
                 <X size={14} />
               </button>
@@ -68,11 +80,11 @@ export default function BookingsToolbar({
             onValueChange={setSelectedEmployeeId}
           >
             <SelectTrigger className="h-10 sm:h-11 bg-soft/50 border-border font-bold text-xs rounded-xl w-full sm:w-48">
-              <SelectValue placeholder="كل الخبراء" />
+              <SelectValue placeholder={t("toolbar.allExperts")} />
             </SelectTrigger>
             <SelectContent className="rounded-xl border-border shadow-premium">
               <SelectItem value="all" className="font-bold text-xs py-2.5">
-                كل الخبراء
+                {t("toolbar.allExperts")}
               </SelectItem>
               {employees.map((emp: any) => (
                 <SelectItem
@@ -101,7 +113,7 @@ export default function BookingsToolbar({
                     : "text-muted hover:text-main",
                 )}
               >
-                {f.label}
+                {t(`dateFilters.${f.id}`)}
               </button>
             ))}
           </div>
@@ -114,7 +126,7 @@ export default function BookingsToolbar({
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
               />
-              <span className="text-xs font-bold text-muted">إلى</span>
+              <span className="text-xs font-bold text-muted">{t("toolbar.to")}</span>
               <Input
                 type="date"
                 className="h-8 px-2 text-xs font-bold w-32 bg-card rounded-lg"
@@ -128,30 +140,30 @@ export default function BookingsToolbar({
 
       {/* Status Tabs with Live Counters (wrap so all tabs stay visible) */}
       <div className="flex flex-wrap bg-soft p-1 rounded-xl border border-border w-full">
-        {TAB_CATEGORIES.map((t: any) => (
+        {TAB_CATEGORIES.map((tab: any) => (
           <button
-            key={t.id}
+            key={tab.id}
             onClick={() => {
-              setActiveTab(t.id);
+              setActiveTab(tab.id);
               setQuickFilter("all");
             }}
             className={cn(
               "flex-1 min-w-[7rem] px-3 sm:px-4 py-2 rounded-lg text-xs font-black transition-all whitespace-nowrap text-center flex items-center justify-center gap-1.5",
-              activeTab === t.id
+              activeTab === tab.id
                 ? "bg-card text-primary shadow-sm"
                 : "text-muted hover:text-main",
             )}
           >
-            <span>{t.label}</span>
+            <span>{t(TAB_LABEL_KEYS[tab.id] ?? tab.id)}</span>
             <span
               className={cn(
                 "text-[10px] font-black px-1.5 py-0.5 rounded-md leading-none tabular-nums",
-                activeTab === t.id
+                activeTab === tab.id
                   ? "bg-primary/10 text-primary"
                   : "bg-soft/80 text-muted",
               )}
             >
-              {tabCounts[t.id] ?? 0}
+              {tabCounts[tab.id] ?? 0}
             </span>
           </button>
         ))}
@@ -160,15 +172,32 @@ export default function BookingsToolbar({
       {/* SMART QUICK CHIPS FILTER ROW (wrap so all chips stay visible) */}
       <div className="flex items-center flex-wrap gap-2 pt-2 border-t border-border/40">
         <span className="text-[10px] font-black text-muted uppercase flex items-center gap-1 shrink-0">
-          <Filter size={12} /> فلترة سريعة:
+          <Filter size={12} /> {t("toolbar.quickFilter")}
         </span>
 
+        {(searchTerm || quickFilter !== "all" || activeTab !== TAB_CATEGORIES[0].id || selectedEmployeeId !== "all" || dateFilter !== "today") && (
+          <button
+            onClick={() => {
+              setSearchTerm("");
+              setQuickFilter("all");
+              setActiveTab(TAB_CATEGORIES[0].id);
+              setSelectedEmployeeId("all");
+              setDateFilter("today");
+              setStartDate(TODAY);
+              setEndDate(TODAY);
+            }}
+            className="px-3 py-1 rounded-full text-[10px] font-black transition-all whitespace-nowrap border bg-rose-500/10 text-rose-600 border-rose-500/30 hover:bg-rose-500/20 flex items-center gap-1"
+          >
+            <X size={12} /> {t("toolbar.clearFilters")}
+          </button>
+        )}
+
         {[
-          { id: "all", label: "الكل" },
-          { id: "walkin", label: "مشاة" },
-          { id: "late", label: "المتأخرة" },
-          { id: "pending", label: "قيد التأكيد" },
-          { id: "online", label: "أونلاين" },
+          { id: "all" },
+          { id: "late" },
+          { id: "pending" },
+          { id: "online" },
+          { id: "cancelled" },
         ].map((chip) => (
           <button
             key={chip.id}
@@ -180,7 +209,7 @@ export default function BookingsToolbar({
                 : "bg-soft/60 text-muted border-border hover:border-primary/40 hover:text-main",
             )}
           >
-            {chip.label}
+            {t(`chips.${chip.id}`)}
           </button>
         ))}
       </div>
@@ -197,24 +226,29 @@ export default function BookingsToolbar({
             )}
           >
             {connected ? <Wifi size={12} /> : <WifiOff size={12} />}
-            {connected ? "الاتصال الحي يعمل" : "إعادة الاتصال..."}
+            {connected ? t("toolbar.liveConnected") : t("toolbar.liveReconnecting")}
           </span>
-          <span className="truncate">
-            آخر تحديث:{" "}
-            {lastUpdated.toLocaleTimeString("ar-EG", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+          <span className="truncate" aria-live="polite">
+            {refreshing
+              ? t("toolbar.refreshing")
+              : t("toolbar.lastUpdated", {
+                  time: lastUpdated.toLocaleTimeString("ar-EG", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }),
+                })}
           </span>
         </div>
         <Button
           variant="ghost"
           onClick={refreshBookings}
           disabled={refreshing}
+          aria-label={t("toolbar.refreshAria")}
+          aria-busy={refreshing}
           className="h-8 px-3 rounded-lg text-[11px] font-black text-muted hover:text-primary gap-1.5 shrink-0"
         >
           <RefreshCw size={13} className={cn(refreshing && "animate-spin")} />
-          تحديث
+          {t("toolbar.refresh")}
         </Button>
       </div>
     </div>

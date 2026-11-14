@@ -1,4 +1,4 @@
-/** Reassign-barber + cancel-appointment dialogs (moved from ReceptionBoard page, no logic changes). */
+/** Reassign-barber + cancel-appointment dialogs (moved from ReceptionBoard page). */
 import { AlertCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useTranslation } from "react-i18next";
 
 export default function ReceptionActionDialogs({
   assigningAppt,
@@ -18,6 +19,7 @@ export default function ReceptionActionDialogs({
   cancelAppt,
   setCancelAppt,
   onConfirmCancel,
+  t,
 }: any) {
   return (
     <>
@@ -28,10 +30,10 @@ export default function ReceptionActionDialogs({
         <DialogContent className="sm:max-w-[400px] bg-card border-none text-main rounded-[2rem] shadow-premium">
           <DialogHeader>
             <DialogTitle className="text-xl font-black">
-              تغيير الخبير
+              {t("dialogs.reassign_title")}
             </DialogTitle>
             <DialogDescription className="text-muted font-bold">
-              اختر خبيراً آخراً لهذا الموعد
+              {t("dialogs.reassign_desc")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-3 py-4 max-h-[300px] overflow-y-auto custom-scrollbar text-right">
@@ -47,9 +49,11 @@ export default function ReceptionActionDialogs({
                 </div>
                 <div className="text-right flex-1">
                   <p className="font-black text-sm">{b.display_name}</p>
-                  <p className="text-[10px] font-bold text-muted uppercase">
-                    {b.job_title || "خبير"}
-                  </p>
+                  {b.job_title && (
+                    <p className="text-[10px] font-bold text-muted uppercase mt-0.5">
+                      {b.job_title}
+                    </p>
+                  )}
                 </div>
               </Button>
             ))}
@@ -62,14 +66,10 @@ export default function ReceptionActionDialogs({
           <DialogHeader>
             <DialogTitle className="text-xl font-black flex items-center gap-2">
               <AlertCircle size={20} className="text-rose-500" />
-              تأكيد إلغاء الحجز
+              {t("dialogs.cancel_title")}
             </DialogTitle>
             <DialogDescription className="text-muted font-bold">
-              هل أنت متأكد من إلغاء حجز{" "}
-              <span className="text-main">
-                {cancelAppt?.customer_name || "العميل"}
-              </span>
-              ؟ لا يمكن التراجع عن هذا الإجراء.
+              {t("dialogs.cancel_desc", { name: cancelAppt?.customer_name || t("card.unknown_customer") })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-3 pt-2">
@@ -78,14 +78,14 @@ export default function ReceptionActionDialogs({
               onClick={() => setCancelAppt(null)}
               className="flex-1 h-12 rounded-xl font-black text-xs"
             >
-              تراجع
+              {t("dialogs.cancel_back")}
             </Button>
             <Button
               variant="danger"
               onClick={onConfirmCancel}
               className="flex-1 h-12 rounded-xl font-black text-xs"
             >
-              <Trash2 size={15} /> تأكيد الإلغاء
+              <Trash2 size={15} /> {t("dialogs.cancel_confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

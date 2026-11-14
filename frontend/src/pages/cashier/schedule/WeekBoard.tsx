@@ -1,4 +1,5 @@
 import { memo, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { cn, formatTime12h } from "@/lib/core/utils";
 import { getStatusConfig } from "@/pages/cashier/schedule/scheduleUtils";
 import { Badge } from "@/components/ui/badge";
@@ -22,10 +23,11 @@ const WeekBoard = memo(function WeekBoard({
   selectedDate,
   onOpenDetails,
 }: any) {
+  const { t, i18n } = useTranslation("schedule");
   const weekStart = useMemo(() => {
     const d = parseDateInput(selectedDate);
     const day = d.getDay();
-    const diff = (day === 0 ? -6 : 1) - day;
+    const diff = day === 6 ? 0 : -(day + 1);
     d.setDate(d.getDate() + diff);
     return d;
   }, [selectedDate]);
@@ -37,11 +39,17 @@ const WeekBoard = memo(function WeekBoard({
         d.setDate(d.getDate() + i);
         return {
           date: formatDateInput(d),
-          label: d.toLocaleDateString("ar-EG", { weekday: "long" }),
-          shortLabel: d.toLocaleDateString("ar-EG", {
-            day: "2-digit",
-            month: "short",
-          }),
+          label: d.toLocaleDateString(
+            i18n.language === "ar" ? "ar-EG" : "en-US",
+            { weekday: "long" },
+          ),
+          shortLabel: d.toLocaleDateString(
+            i18n.language === "ar" ? "ar-EG" : "en-US",
+            {
+              day: "2-digit",
+              month: "short",
+            },
+          ),
         };
       }),
     [weekStart],
@@ -75,6 +83,16 @@ const WeekBoard = memo(function WeekBoard({
         {weekDays.map((day) => {
           const dayAppts = groupedByDay[day.date];
           const isToday = day.date === todayStr;
+          const count = dayAppts.length;
+          const countLabel = count === 0
+            ? t("dayBoard.zeroCount")
+            : count === 1
+              ? t("dayBoard.oneCount")
+              : count === 2
+                ? t("dayBoard.twoCount")
+                : count <= 10
+                  ? t("dayBoard.manyCount", { count })
+                  : t("dayBoard.manyAboveTen", { count });
 
           return (
             <div
@@ -97,15 +115,17 @@ const WeekBoard = memo(function WeekBoard({
                 </p>
                 <p className="text-lg font-black text-main">{day.shortLabel}</p>
                 <p className="text-[9px] font-bold text-muted">
-                  {dayAppts.length} موعد
+                  {countLabel}
                 </p>
               </div>
 
-              <div className="flex-1 space-y-2.5 overflow-y-auto custom-scrollbar pr-0.5">
+              <div className="flex-1 space-y-2.5 overflow-y-auto custom-scrollbar pe-0.5">
                 {dayAppts.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center opacity-30">
                     <CalendarDays size={32} className="text-muted" />
-                    <p className="text-[10px] font-bold mt-2">لا يوجد مواعيد</p>
+                    <p className="text-[10px] font-bold mt-2">
+                      {t("weekBoard.noAppointments")}
+                    </p>
                   </div>
                 ) : (
                   dayAppts.map((appt) => {
@@ -129,7 +149,7 @@ const WeekBoard = memo(function WeekBoard({
                         )}
                         <div className="flex justify-between items-start gap-2 min-w-0">
                           <p className="text-xs font-black text-main truncate">
-                            {appt.customer_name || "عميل مجهول"}
+                            {appt.customer_name || t("appointmentCard.unknownCustomer")}
                           </p>
                           <span className="text-[10px] font-black text-accent bg-accent/5 px-2 py-0.5 rounded-lg tabular-nums shrink-0">
                             {formatTime12h(
@@ -148,7 +168,7 @@ const WeekBoard = memo(function WeekBoard({
                               status.bg,
                             )}
                           >
-                            {status.label}
+                            {i18n.t("schedule:" + status.label)}
                           </Badge>
                           <p className="text-[9px] font-bold text-muted truncate max-w-[90px]">
                             {appt.barber_name || appt.employee_name || "—"}

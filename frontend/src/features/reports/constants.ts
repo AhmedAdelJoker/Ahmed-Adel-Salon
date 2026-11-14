@@ -8,8 +8,8 @@ export const LINK_COLORS: Record<string, string> = {
 };
 
 export const SYSTEM_LINKS = [
-  { label: "الموارد البشرية", icon: Users, desc: "بيانات الموظف والعمولة", color: "primary", href: "/owner/hr" },
-  { label: "الفواتير", icon: Receipt, desc: "مصدر المبيعات والخدمات", color: "success", href: "/invoices" },
-  { label: "الرواتب", icon: Wallet, desc: "المستحقات والمكافآت", color: "warning", href: "/owner/payroll" },
-  { label: "الحضور", icon: Clock, desc: "الانضباط وتأثيره على الحافز", color: "info", href: "/attendance" },
+  { labelKey: "empReports.quickHR", descKey: "empReports.quickHRDesc", icon: Users, color: "primary", href: "/manager/hr" },
+  { labelKey: "empReports.quickInvoices", descKey: "empReports.quickInvoicesDesc", icon: Receipt, color: "success", href: "/invoices" },
+  { labelKey: "empReports.quickPayroll", descKey: "empReports.quickPayrollDesc", icon: Wallet, color: "warning", href: "/owner/payroll" },
+  { labelKey: "empReports.quickAttendance", descKey: "empReports.quickAttendanceDesc", icon: Clock, color: "info", href: "/attendance" },
 ];

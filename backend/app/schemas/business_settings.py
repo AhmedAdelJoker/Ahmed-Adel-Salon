@@ -1,8 +1,11 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
+
+from app.core.working_hours import WorkingHoursError, validate_working_hours
 
 
 class BusinessSettingsBase(BaseModel):
@@ -76,6 +79,11 @@ class BusinessSettingsUpdate(BaseModel):
     landing_testimonials_title: Optional[str] = None
     landing_testimonials_subtitle: Optional[str] = None
     landing_cover_image_url: Optional[str] = None
+    landing_hero_video_url: Optional[str] = None
+    landing_video_poster_url: Optional[str] = None
+    landing_video_autoplay: Optional[bool] = None
+    landing_video_muted: Optional[bool] = None
+    landing_motion_enabled: Optional[bool] = None
     landing_theme_id: Optional[str] = None
     landing_show_staff: Optional[bool] = None
     landing_show_staff_bio: Optional[bool] = None
@@ -95,8 +103,24 @@ class BusinessSettingsUpdate(BaseModel):
     loyalty_settings: Optional[dict[str, Any]] = None
     monthly_revenue_target: Optional[float] = Field(default=None, ge=0)
 
+    # VAT percentage on invoices, 0–100. 0 disables the tax line entirely —
+    # the POS hides it and the invoice endpoint adds nothing.
+    tax_rate: Optional[Decimal] = Field(default=None, ge=0, le=100)
+
     # Snapshot
     public_site_snapshot: Optional[dict[str, Any]] = None
+    # Optimistic concurrency: the version the client last read.
+    expected_version: Optional[int] = Field(default=None, ge=1)
+
+    @field_validator("working_hours")
+    @classmethod
+    def _check_working_hours(cls, value: Optional[dict[str, Any]]):
+        if value is None:
+            return None
+        try:
+            return validate_working_hours(value)
+        except WorkingHoursError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 class BusinessSettingsRead(BaseModel):
@@ -159,6 +183,11 @@ class BusinessSettingsRead(BaseModel):
     landing_testimonials_title: Optional[str] = None
     landing_testimonials_subtitle: Optional[str] = None
     landing_cover_image_url: Optional[str] = None
+    landing_hero_video_url: Optional[str] = None
+    landing_video_poster_url: Optional[str] = None
+    landing_video_autoplay: Optional[bool] = None
+    landing_video_muted: Optional[bool] = None
+    landing_motion_enabled: Optional[bool] = None
     landing_theme_id: Optional[str] = None
     landing_show_staff: Optional[bool] = True
     landing_show_staff_bio: Optional[bool] = True
@@ -178,9 +207,24 @@ class BusinessSettingsRead(BaseModel):
     loyalty_settings: Optional[dict[str, Any]] = None
     monthly_revenue_target: float = 500000
 
+    # The discount a cashier may apply without a manager's approval. The POS
+    # needs these to tell the cashier what the limit is BEFORE the server
+    # refuses the invoice — the rule itself lives in `app.core.pos`.
+    cashier_discount_limit_type: Optional[str] = None
+    cashier_discount_limit_value: Optional[float] = None
+
+    # VAT percentage on invoices (0–100), so the POS shows the same tax line
+    # the invoice endpoint will compute. camelCase alias: taxRate.
+    tax_rate: Decimal = Decimal("0")
+
     # Snapshot
     public_site_snapshot: Optional[dict[str, Any]] = None
     public_site_published_at: Optional[datetime] = None
+
+    # Concurrency + publish state
+    version: int = 1
+    public_site_published_version: Optional[int] = None
+    public_site_stale: bool = False
 
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

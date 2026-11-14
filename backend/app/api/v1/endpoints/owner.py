@@ -107,19 +107,29 @@ def get_dashboard_stats(
     month_goal = min(int((month_revenue / revenue_target) * 100), 100)
 
     # 6b. occupancy: appointments vs capacity (employees * 8 slots/day)
+    #
+    # `None` means "could not be computed", which is not the same as zero. A
+    # failed query used to fall back to 72 -- a plausible-looking number that
+    # rendered next to six real figures as though it had been measured. On a
+    # dashboard, a fabricated figure that matches the shape of the real ones is
+    # the hardest kind to notice, because nothing about it looks wrong.
+    #
+    # Callers must distinguish the two; see ServiceDistribution, which renders
+    # "—" rather than 0% for a null occupancy.
+    occupancy: int | None
     try:
         emp_count = db.query(func.count(Employee.id)).filter(Employee.status == "active", Employee.is_active == True).scalar() or 1
         # capacity per period: 8 appointments per barber per day
         days_in_period = max(1, (end_date.date() - start_date.date()).days + 1)
         capacity = max(1, emp_count * 8 * days_in_period)
-        occupancy = min(100, int((today_appointments / capacity) * 100)) if capacity else 72
+        occupancy = min(100, int((today_appointments / capacity) * 100))
         # ensure at least 10% if there is any activity
         if today_appointments > 0 and occupancy < 10:
             occupancy = 10
         if today_appointments == 0:
             occupancy = 0
     except Exception:
-        occupancy = 72
+        occupancy = None
 
     # 7. weekly_data — optimized: 2 grouped queries instead of 14
     weekly_data = []
@@ -263,17 +273,19 @@ def get_dashboard_stats(
         if employee_id:
             prev_inv_cnt = db.query(func.count(Invoice.id)).filter(Invoice.is_draft == False, Invoice.created_at >= prev_start, Invoice.created_at <= prev_end, Invoice.barber_id == employee_id).scalar() or 0
         prev_avg = (prev_rev / prev_inv_cnt) if prev_inv_cnt else 0
-        # Previous occupancy
-        prev_occupancy = 0
+        # Previous occupancy. Same rule as above: None when it cannot be
+        # computed, because _trend(0, ...) reports a confident +100% against a
+        # baseline that was never measured.
+        prev_occupancy: int | None = 0
         try:
             prev_capacity = max(1, emp_count * 8 * period_days)
-            prev_occupancy = min(100, int((prev_app / prev_capacity) * 100)) if prev_capacity else 0
+            prev_occupancy = min(100, int((prev_app / prev_capacity) * 100))
             if prev_app > 0 and prev_occupancy < 10:
                 prev_occupancy = 10
             if prev_app == 0:
                 prev_occupancy = 0
         except Exception:
-            prev_occupancy = 0
+            prev_occupancy = None
 
         todayRevenueTrend = _trend(today_revenue, prev_rev)
         todayExpensesTrend = _trend(today_expenses, prev_exp)

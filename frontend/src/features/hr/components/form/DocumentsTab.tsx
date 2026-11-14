@@ -1,12 +1,16 @@
 /** HR DocumentsTab (moved from HRManagement page, no logic changes). */
 import { toast } from "react-hot-toast";
+import { EmptyState } from "@/components/shared/EmptyState";
 import type { EmployeeRecord, DocumentRecord } from "@/types/employee";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Archive, FileText, Clock, Eye, Trash2, Plus, Activity } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { staticURL } from "@/services/api";
+import { useTranslation } from "react-i18next";
 import employeeDocumentService from "@/features/hr/services/employeeDocumentService";
+import { formatEmployeeDate } from "@/features/hr/utils/helpers";
+import { getIntlLocale } from "@/lib/format/locale";
 
 export default function DocumentsTab({
   editingEmp,
@@ -21,26 +25,28 @@ export default function DocumentsTab({
   setDocLoading: (v: boolean) => void;
   onRefreshDocs: (empId: string | number | undefined) => void;
 }) {
+  const { t, i18n } = useTranslation("owner");
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
   return (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="p-6 rounded-[2rem] bg-accent/5 border border-accent/10 flex flex-col md:flex-row items-center gap-6">
               <div className="h-16 w-16 shrink-0 rounded-2xl bg-primary-soft text-primary flex items-center justify-center">
                 <Archive size={32} />
               </div>
-              <div className="flex-1 text-center md:text-right">
+              <div className="flex-1 text-center md:text-start">
                 <h3 className="text-xl font-black text-main">
-                  الخزنة الرقمية (Digital Vault)
+                   {t("hr.digitalVault")}
                 </h3>
                 <p className="text-xs font-bold text-muted mt-1">
-                  أرشفة احترافية لعقود الموظفين، الهويات، والشهادات الصحية مع
-                  تتبع تلقائي للصلاحية.
+                   {t("hr.digitalVaultDesc")}
+
                 </p>
               </div>
               <Button
                 onClick={() => (document.getElementById("doc-upload") as HTMLInputElement | null)?.click()}
                 className="h-12 px-6 rounded-xl bg-accent font-black text-xs uppercase tracking-widest shadow-lg shadow-accent/20"
               >
-                <Plus size={18} className="ml-2" /> رفع مستند جديد
+                 <Plus size={18} className="ms-2" /> {t("hr.uploadDoc")}
                 <input
                   id="doc-upload"
                   type="file"
@@ -49,14 +55,14 @@ export default function DocumentsTab({
                     const file = e.target.files?.[0];
                     if (file) {
                       const title = prompt(
-                        "عنوان المستند (مثلاً: عقد العمل 2026):",
+                         t("hr.docTitle"),
                       );
                       const type = prompt(
-                        "نوع المستند (ID, CONTRACT, HEALTH, CERTIFICATE):",
+                         t("hr.docType"),
                         "CONTRACT",
                       );
                       const expiry = prompt(
-                        "تاريخ الانتهاء (YYYY-MM-DD) - اختياري:",
+                         t("hr.docExpiry"),
                       );
 
                       const fd = new FormData();
@@ -66,16 +72,16 @@ export default function DocumentsTab({
                       if (expiry) fd.append("expiry_date", expiry);
 
                       if (!editingEmp?.id) {
-                        toast.error("اختر موظفًا أولًا");
+                         toast.error(t("hr.selectEmployeeFirst"));
                         return;
                       }
                       try {
                         setDocLoading(true);
                         await employeeDocumentService.upload(editingEmp.id, fd);
-                        toast.success("تم أرشفة المستند بنجاح");
+                         toast.success(t("hr.docUploaded"));
                         onRefreshDocs(editingEmp?.id);
                       } catch (_err) {
-                        toast.error("فشل رفع المستند");
+                         toast.error(t("hr.docUploadFailed"));
                       } finally {
                         setDocLoading(false);
                       }
@@ -120,10 +126,9 @@ export default function DocumentsTab({
                                   : "text-success",
                               )}
                             >
-                              <Clock size={10} /> ينتهي في:{" "}
-                              {new Date(doc.expiry_date).toLocaleDateString(
-                                "ar-EG",
-                              )}
+                               <Clock size={10} /> {t("hr.expiresOn")}{" "}
+                              {formatEmployeeDate(doc.expiry_date, locale) ??
+                                doc.expiry_date}
                             </div>
                           )}
                         </div>
@@ -144,13 +149,13 @@ export default function DocumentsTab({
                         variant="ghost"
                         size="icon"
                         onClick={async () => {
-                          if (confirm("هل أنت متأكد من حذف هذا المستند؟")) {
+                           if (confirm(t("hr.deleteDocConfirm"))) {
                             try {
                               await employeeDocumentService.remove(doc.id);
-                              toast.success("تم الحذف");
+                               toast.success(t("hr.docDeleted"));
                               if (editingEmp?.id) onRefreshDocs(editingEmp?.id);
                             } catch (_err) {
-                              toast.error("فشل الحذف");
+                               toast.error(t("hr.docDeleteFailed"));
                             }
                           }
                         }}
@@ -162,12 +167,7 @@ export default function DocumentsTab({
                   </div>
                 ))
               ) : (
-                <div className="text-center p-12 rounded-[2rem] border-2 border-dashed border-border/40">
-                  <Archive className="mx-auto text-muted/20 mb-4" size={48} />
-                  <p className="text-xs font-bold text-muted">
-                    لا يوجد مستندات مؤرشفة لهذا الموظف حتى الآن.
-                  </p>
-                </div>
+                 <EmptyState variant="section" icon={Archive} title={t("hr.noDocs")} />
               )}
             </div>
           </div>

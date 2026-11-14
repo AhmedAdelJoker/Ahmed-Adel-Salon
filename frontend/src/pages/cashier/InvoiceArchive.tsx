@@ -1,182 +1,256 @@
-import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
+  AlertTriangle,
   Archive,
+  Printer,
   Receipt,
   Search,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { useAuth } from "@/context/AuthContext";
+import { useSalon } from "@/context/SalonContext";
+import { printThermalReceipt } from "@/lib/print/receipt";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/PremiumUI";
-import { AnimatePresence } from "framer-motion";
+import { PageShell } from "@/components/shared/PageShell";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import InlineNotice from "@/components/shared/InlineNotice";
+import { InvoiceDetailsDialog } from "@/features/invoices";
 import {
-  useInvoiceArchive,
+  ArchiveInsights,
   ArchiveSummaryCards,
   ArchiveToolbar,
-  MonthArchiveRow,
   CloseReopenDialogs,
+  DeleteDraftDialog,
+  MonthArchiveRow,
+  useInvoiceArchive,
 } from "@/features/invoice-archive";
 
 function InvoiceArchive() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { settings } = useSalon();
   const {
     months,
     loading,
-    closingMonth,
-    confirmClose,
-    setConfirmClose,
+    error,
+    refresh,
     search,
     setSearch,
     statusFilter,
     setStatusFilter,
     expandedKey,
     monthInvoices,
+    monthDrafts,
+    draftsLoading,
+    busyDraftId,
+    confirmDeleteDraft,
+    setConfirmDeleteDraft,
     invoicesLoading,
     loadingMoreKey,
+    confirmClose,
+    setConfirmClose,
     confirmReopen,
     setConfirmReopen,
+    closingMonth,
     reopeningMonth,
     toggleExpand,
     loadMoreInvoices,
     handleReopenMonth,
+    handleCloseMonth,
+    handleFinalizeDraft,
+    handleDeleteDraft,
     summary,
-    maxRevenue,
     comparison,
     filteredMonths,
     handleExportPDF,
-    handleCloseMonth,
     daysInMonth,
-    PAYMENT_LABELS,
-    fmtTime,
+    selectedInvoice,
+    setSelectedInvoice,
+    openInvoicePdf,
   } = useInvoiceArchive();
 
+  const canManageArchive = ["OWNER", "ADMIN", "MANAGER"].includes(
+    String(user?.role ?? "").toUpperCase(),
+  );
+
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-6">
-        <PageHeader className={undefined}
-          title="الأرشيف الشهري للفواتير"
-          subtitle="استعرض وأغلق فواتير الأشهر المنتهية أو أعدها للمراجعة — كل الفلاتر والإجراءات من هنا"
-          badge="الأرشيف المالي"
-          icon={Archive}
-          actions={
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                className="h-10 rounded-xl px-4"
-                onClick={() => navigate("/invoices")}
-              >
-                <Receipt size={16} className="ml-2" /> الفواتير الحالية
-              </Button>
-              <Button
-                onClick={handleExportPDF}
-                className="h-10 rounded-xl bg-emerald-600 px-4 hover:bg-emerald-700"
-              >
-                <DownloadIcon /> تصدير PDF
-              </Button>
-            </div>
-          }
-        />
+    <PageShell contained>
+      <PageHeader
+        title="أرشيف الفواتير"
+        subtitle={
+          <span className="hidden sm:inline">
+            دفتر الأشهر المنتهية — راجع الفواتير، اقفل الشهر، أو أعد فتحه
+            للمراجعة
+          </span>
+        }
+        badge="الأرشيف المالي"
+        icon={Archive}
+        className="mb-4 sm:mb-6"
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl px-3"
+              onClick={() => navigate("/invoices")}
+            >
+              <Receipt size={15} className="ms-1.5" />
+              الفواتير الحالية
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl px-3"
+              onClick={handleExportPDF}
+              disabled={loading || filteredMonths.length === 0}
+            >
+              <Printer size={15} className="ms-1.5" />
+              طباعة / PDF
+            </Button>
+          </div>
+        }
+      />
 
-        <ArchiveSummaryCards
-          loading={loading}
-          summary={summary}
-          months={months}
-          maxRevenue={maxRevenue}
-          comparison={comparison}
-          expandedKey={expandedKey}
-          onToggleExpand={toggleExpand}
-        />
+      <ArchiveSummaryCards
+        loading={loading}
+        summary={summary}
+        months={months}
+        comparison={comparison}
+      />
 
-        {months.length > 0 && (
+      <div className="mt-3 grid gap-4 xl:grid-cols-[minmax(0,1fr)_310px]">
+        <div className="min-w-0">
           <ArchiveToolbar
             search={search}
             onSearchChange={setSearch}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
+            onRefresh={() => refresh()}
+            refreshing={loading}
+            resultCount={filteredMonths.length}
+            totalCount={months.length}
           />
-        )}
 
-        {loading ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div
-                key={i}
-                className="h-56 rounded-2xl bg-card border border-border/70 p-5"
-              >
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="h-12 w-12 rounded-xl bg-soft animate-pulse" />
-                  <div className="space-y-2 flex-1">
-                    <div className="h-3 w-2/3 rounded bg-soft animate-pulse" />
-                    <div className="h-2 w-1/3 rounded bg-soft animate-pulse" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mb-5">
-                  <div className="h-16 rounded-xl bg-soft animate-pulse" />
-                  <div className="h-16 rounded-xl bg-soft animate-pulse" />
-                </div>
-                <div className="h-9 w-full rounded-lg bg-soft animate-pulse" />
-              </div>
-            ))}
-          </div>
-        ) : months.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-24 text-center"
-          >
-            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-soft">
-              <Archive size={40} className="text-muted" />
+          {error && months.length > 0 && (
+            <div className="mt-2">
+              <InlineNotice tone="warning">
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={() => refresh()}
+                  className="ms-2 font-black underline"
+                >
+                  إعادة المحاولة
+                </button>
+              </InlineNotice>
             </div>
-            <h3 className="mb-2 text-xl font-black text-main">
-              لا توجد أشهر مؤرشفة بعد
-            </h3>
-            <p className="mb-6 text-sm font-bold text-muted">
-              ستنتقل الفواتير تلقائيًا إلى الأرشيف بعد انتهاء الشهر.
-            </p>
-            <Button
-              onClick={() => navigate("/invoices")}
-              className="h-11 rounded-xl px-6"
-            >
-              عرض فواتير الشهر الحالي
-            </Button>
-          </motion.div>
-        ) : filteredMonths.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-20 text-center">
-            <Search size={32} className="mb-3 text-muted" />
-            <h3 className="mb-1 text-lg font-black text-main">
-              لا نتائج مطابقة
-            </h3>
-            <p className="text-sm font-bold text-muted">
-              جرّب تعديل البحث أو الفلتر.
-            </p>
+          )}
+
+          <div className="mt-3">
+            {loading && months.length === 0 ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((item) => (
+                  <div
+                    key={item}
+                    className="h-28 animate-pulse rounded-3xl border border-border/70 bg-card"
+                  />
+                ))}
+              </div>
+            ) : error && months.length === 0 ? (
+              <div className="flex flex-col items-center rounded-3xl border border-danger/20 bg-danger-soft/40 px-5 py-10 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-danger-soft text-danger">
+                  <AlertTriangle size={22} />
+                </div>
+                <p className="mt-3 text-sm font-black text-main">
+                  تعذر تحميل الأرشيف
+                </p>
+                <p className="mt-1 max-w-sm text-[11px] font-bold text-muted">
+                  {error}
+                </p>
+                <Button
+                  className="mt-4 h-10 rounded-xl px-5"
+                  onClick={() => refresh()}
+                >
+                  إعادة المحاولة
+                </Button>
+              </div>
+            ) : months.length === 0 ? (
+              <EmptyState
+                variant="page"
+                icon={Archive}
+                title="لا توجد أشهر مؤرشفة بعد"
+                message="ستنتقل الفواتير تلقائيًا إلى الأرشيف بعد انتهاء الشهر."
+                action={
+                  <Button
+                    onClick={() => navigate("/invoices")}
+                    className="h-11 rounded-xl px-6"
+                  >
+                    عرض فواتير الشهر الحالي
+                  </Button>
+                }
+              />
+            ) : filteredMonths.length === 0 ? (
+              <EmptyState
+                variant="page"
+                icon={Search}
+                title="لا نتائج مطابقة"
+                message="جرّب تعديل كلمة البحث أو فلتر الحالة."
+              />
+            ) : (
+              <div className="space-y-3">
+                {filteredMonths.map((month, index) => (
+                  <MonthArchiveRow
+                    key={month.key}
+                    month={month}
+                    index={index}
+                    isExpanded={expandedKey === month.key}
+                    monthData={monthInvoices[month.key]}
+                    drafts={monthDrafts[month.key] || []}
+                    draftsLoading={draftsLoading}
+                    busyDraftId={busyDraftId}
+                    invoicesLoading={invoicesLoading}
+                    loadingMoreKey={loadingMoreKey}
+                    closingMonth={closingMonth}
+                    reopeningMonth={reopeningMonth}
+                    canManage={canManageArchive}
+                    onToggleExpand={toggleExpand}
+                    onLoadMore={loadMoreInvoices}
+                    onConfirmClose={setConfirmClose}
+                    onConfirmReopen={setConfirmReopen}
+                    onSelectInvoice={setSelectedInvoice}
+                    onFinalizeDraft={handleFinalizeDraft}
+                    onDeleteDraft={(monthKey, draft) =>
+                      setConfirmDeleteDraft({ monthKey, draft })
+                    }
+                    onOpenLedger={(monthKey) => navigate(`/invoices?month=${monthKey}`)}
+                    daysInMonth={daysInMonth}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="space-y-4">
-            <AnimatePresence mode="popLayout">
-              {filteredMonths.map((month, idx) => (
-                <MonthArchiveRow
-                  key={month.key}
-                  month={month}
-                  index={idx}
-                  isExpanded={expandedKey === month.key}
-                  monthData={monthInvoices[month.key]}
-                  invoicesLoading={invoicesLoading}
-                  loadingMoreKey={loadingMoreKey}
-                  closingMonth={closingMonth}
-                  reopeningMonth={reopeningMonth}
-                  paymentLabels={PAYMENT_LABELS}
-                  onToggleExpand={toggleExpand}
-                  onLoadMore={loadMoreInvoices}
-                  onConfirmClose={setConfirmClose}
-                  onConfirmReopen={setConfirmReopen}
-                  daysInMonth={daysInMonth}
-                  formatTime={fmtTime}
-                />
-              ))}
-            </AnimatePresence>
+        </div>
+
+        <div className="hidden xl:block">
+          <div className="sticky top-4">
+            <ArchiveInsights summary={summary} comparison={comparison} />
           </div>
-        )}
+        </div>
       </div>
+
+      <InvoiceDetailsDialog
+        selectedInvoice={selectedInvoice}
+        onClose={() => setSelectedInvoice(null)}
+        onPrintSelected={() => {
+          if (selectedInvoice) {
+            printThermalReceipt(selectedInvoice, settings);
+          }
+        }}
+        onOpenPdfSelected={() => {
+          if (selectedInvoice) {
+            openInvoicePdf(selectedInvoice);
+          }
+        }}
+      />
 
       <CloseReopenDialogs
         confirmClose={confirmClose}
@@ -188,25 +262,18 @@ function InvoiceArchive() {
         onConfirmClose={handleCloseMonth}
         onConfirmReopen={handleReopenMonth}
       />
-    </div>
-  );
-}
 
-function DownloadIcon() {
-  return (
-    <svg
-      className="h-4 w-4"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth="2.5"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+      <DeleteDraftDialog
+        draft={confirmDeleteDraft?.draft ?? null}
+        busy={busyDraftId === confirmDeleteDraft?.draft?.id}
+        onCancel={() => setConfirmDeleteDraft(null)}
+        onConfirm={() => {
+          if (confirmDeleteDraft) {
+            handleDeleteDraft(confirmDeleteDraft.monthKey, confirmDeleteDraft.draft);
+          }
+        }}
       />
-    </svg>
+    </PageShell>
   );
 }
 

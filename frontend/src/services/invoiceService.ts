@@ -38,11 +38,6 @@ export const invoiceService = {
     return normalizeItemResponse(response);
   },
 
-  createDiscountRequest: async (payload) => {
-    const response = await api.post("/discount-approvals", payload);
-    return normalizeItemResponse(response);
-  },
-
   issueFromAppointment: async (
     appointmentId,
     paymentMethod = "cash",

@@ -2,19 +2,27 @@
 import { motion } from "framer-motion";
 import { History, Trash2 } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
-import { formatCurrency } from "@/lib/core/utils";
-import { customerId, customerName, getInitials } from "@/features/customers/utils/customer";
-import { EmptyState } from "@/components/shared";
+import { cn, formatCurrency } from "@/lib/core/utils";
+import {
+  customerId,
+  customerName,
+  getInitials,
+  getTierInfo,
+} from "@/features/customers/utils/customer";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { useTranslation } from "react-i18next";
 
 export default function CustomerCards({
   rows,
   isOwner,
   onOpenDetails,
   onDelete,
-  emptyTitle = "لا يوجد عملاء مطابقين",
+  emptyTitle,
   emptyHint,
   showClearFilter = false,
   onClearFilter,
+  selectedIds = new Set(),
+  onSelect,
 }: {
   rows: any[];
   isOwner: boolean;
@@ -24,57 +32,84 @@ export default function CustomerCards({
   emptyHint?: string;
   showClearFilter?: boolean;
   onClearFilter?: () => void;
+  selectedIds?: Set<number | string>;
+  onSelect?: (id: number | string) => void;
 }) {
+  const { t } = useTranslation("customers");
   const visitsOf = (customer: any) =>
     Number(customer.visits_count || customer.visits || 0);
-  const visitsVariant = (customer: any): "warning" | "info" | "outline" => {
-    const visits = visitsOf(customer);
-    if (visits > 10) return "warning";
-    if (visits >= 2) return "info";
-    return "outline";
-  };
   return (
           <div className="p-3 sm:p-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {rows.map((customer, index) => (
+              {rows.map((customer, index) => {
+                const tier = getTierInfo(customer.current_tier);
+                const visits = visitsOf(customer);
+                const visitsVariant: "warning" | "info" | "outline" =
+                  visits > 10 ? "warning" : visits >= 2 ? "info" : "outline";
+                return (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.03 }}
+                  transition={{ delay: 0 }}
                   key={customerId(customer) || index}
                   onClick={() => onOpenDetails(customer)}
-                  className="group flex flex-col rounded-2xl border border-border/60 bg-card p-4 hover:border-primary/40 hover:shadow-premium transition-all cursor-pointer active:scale-[0.98]"
+                  className={cn(
+                    "group flex flex-col rounded-2xl border border-border/60 bg-card p-4 hover:border-primary/40 hover:shadow-premium transition-all cursor-pointer active:scale-[0.98]",
+                    selectedIds.has(customerId(customer)) &&
+                      "ring-2 ring-primary",
+                  )}
                 >
                   <div className="flex items-start justify-between mb-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(customerId(customer))}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        onSelect?.(customerId(customer));
+                      }}
+                      aria-label={t("cards.record")}
+                      className="mt-0.5"
+                    />
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-sm font-black text-primary">
                         {getInitials(customerName(customer))}
                       </div>
                       <div>
-                        <h3 className="font-black text-sm text-main leading-tight">
-                          {customerName(customer)}
-                        </h3>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-black text-sm text-main leading-tight">
+                            {customerName(customer)}
+                          </h3>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[8px] font-black",
+                              tier.bg,
+                              tier.color,
+                            )}
+                          >
+                            <tier.icon size={9} /> {t(tier.label)}
+                          </span>
+                        </div>
                         <p className="text-[9px] font-bold text-muted">
                           #{customerId(customer) || "---"}
                         </p>
                       </div>
                     </div>
                     <Badge
-                      variant={visitsVariant(customer)}
+                      variant={visitsVariant}
                       className="rounded-md px-2 py-0.5 text-[8px] font-black shrink-0"
                     >
-                      {visitsOf(customer)} زيارة
+                      {t("table.visitBadge", { count: visits })}
                     </Badge>
                   </div>
                   <div className="space-y-2 text-xs mb-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-muted font-bold">الهاتف:</span>
+                      <span className="text-muted font-bold">{t("cards.phoneLabel")}:</span>
                       <span className="font-black text-main" dir="ltr">
                         {customer.phone || "---"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-muted font-bold">الإنفاق:</span>
+                      <span className="text-muted font-bold">{t("cards.spendLabel")}:</span>
                       <span className="font-black text-success">
                         {formatCurrency(
                           customer.lifetime_spend ||
@@ -94,12 +129,13 @@ export default function CustomerCards({
                         onOpenDetails(customer);
                       }}
                     >
-                      <History className="h-3.5 w-3.5 ml-1.5" /> السجل
+                      <History className="h-3.5 w-3.5 ms-1.5" /> {t("cards.record")}
                     </Button>
                     {isOwner && (
                       <Button
                         variant="ghost"
                         className="w-9 h-9 rounded-xl text-danger/60 hover:text-danger hover:bg-danger/10"
+                        aria-label={t("cards.archive")}
                         onClick={(e) => {
                           e.stopPropagation();
                           onDelete(customer);
@@ -109,12 +145,13 @@ export default function CustomerCards({
                       </Button>
                     )}
                   </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
             {rows.length === 0 && (
               <EmptyState
-                title={emptyTitle}
+                title={emptyTitle || t("cards.emptyTitle")}
                 message={emptyHint}
                 variant="section"
                 action={
@@ -122,10 +159,11 @@ export default function CustomerCards({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={onClearFilter}
+                      aria-label={t("toolbar.clearFilters")}
+onClick={onClearFilter}
                       className="mt-2 rounded-xl text-xs font-black"
                     >
-                      مسح البحث والفلتر
+                      {t("toolbar.clearFilters")}
                     </Button>
                   ) : undefined
                 }

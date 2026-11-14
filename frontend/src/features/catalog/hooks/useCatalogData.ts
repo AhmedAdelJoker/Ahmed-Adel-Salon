@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
 import { normalizeListResponse } from "@/services/apiAdapter";
+import { loadErrorMessage } from "@/lib/core/asyncError";
 import serviceCategoryService from "@/features/catalog/services/serviceCategoryService";
 import offerService from "@/features/catalog/services/offerService";
 import type {
@@ -29,6 +30,9 @@ export function useCatalogData(searchTerm: string) {
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  // Categories and offers failed silently, so the owner saw an empty tab with
+  // no way to tell it apart from "nothing configured yet".
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [offersLoading, setOffersLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -60,7 +64,8 @@ export function useCatalogData(searchTerm: string) {
       const res = await serviceCategoryService.list();
       setCategories(Array.isArray(res.items) ? res.items : []);
     } catch (err) {
-      console.error("Failed to fetch categories");
+      console.error("Failed to fetch categories", err);
+      setLoadError(loadErrorMessage(err, "التصنيفات"));
     } finally {
       setCategoriesLoading(false);
     }
@@ -72,7 +77,8 @@ export function useCatalogData(searchTerm: string) {
       const res = await offerService.list();
       setOffers(Array.isArray(res.items) ? res.items : []);
     } catch (err) {
-      console.error("Failed to fetch offers");
+      console.error("Failed to fetch offers", err);
+      setLoadError(loadErrorMessage(err, "العروض"));
     } finally {
       setOffersLoading(false);
     }
@@ -84,7 +90,7 @@ export function useCatalogData(searchTerm: string) {
       const data = normalizeListResponse(res);
       setProducts(data.items || []);
     } catch (err) {
-      console.error("Failed to fetch products for ingredients");
+      console.error("Failed to fetch products for ingredients", err);
     }
   }, []);
 
@@ -240,6 +246,7 @@ export function useCatalogData(searchTerm: string) {
     servicesLoading,
     categoriesLoading,
     offersLoading,
+    loadError,
     refreshing,
     refreshAllData,
     serviceRows,

@@ -38,10 +38,12 @@ from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
 from app.models.payroll_record import PayrollRecord
 from app.models.product import Product
+from app.models.inventory_log import InventoryLog
 from app.models.service import Service
 from app.models.user import User
 from app.services.activity_service import log_activity
 from app.utils.arabic_pdf import fix_arabic, ensure_pdf_font
+from app.core.clock import salon_day_bounds_utc, salon_now
 
 router = APIRouter(prefix="/exports", tags=["Exports"])
 
@@ -123,7 +125,7 @@ def _matches_term(term: str | None, *values) -> bool:
 
 
 def _build_filename(base_name: str, extension: str, suffix: str | None = None) -> str:
-    effective_suffix = suffix or date.today().isoformat()
+    effective_suffix = suffix or salon_now().date().isoformat()
     return f"{base_name}_{effective_suffix}.{extension}"
 
 
@@ -319,6 +321,17 @@ def _invoice_status_label(invoice: Invoice) -> str:
     return "صادرة"
 
 
+def _invoice_customer_name(invoice: Invoice) -> str:
+    """Name the invoice was issued under, not the customer's current name."""
+    snapshot = _clean_text(getattr(invoice, "customer_name_snapshot", ""))
+    if snapshot:
+        return snapshot
+    if invoice.customer:
+        return f"{invoice.customer.first_name} {invoice.customer.last_name}".strip()
+    return ""
+
+
+
 def _query_employees(
     db: Session,
     *,
@@ -375,10 +388,17 @@ def _query_customers(
     start_date: date | None,
     end_date: date | None,
     status: str | None,
+    segment: str | None,
 ) -> list[list]:
     term = _optional_text(search) or _optional_text(q)
     status_filter = _optional_text(status)
-    customers = db.query(Customer).order_by(Customer.customer_id.desc()).all()
+    segment_filter = _optional_text(segment)
+    customers = (
+        db.query(Customer)
+        .filter(Customer.is_deleted == False)
+        .order_by(Customer.customer_id.desc())
+        .all()
+    )
 
     visit_stats = {
         row[0]: {"visits": row[1], "last_visit": row[2]}
@@ -414,6 +434,16 @@ def _query_customers(
             customer.phone,
             customer.email,
         ):
+            continue
+
+        # Segment follows the same visits_count thresholds the customers
+        # page filters by (vip > 10, regular 2–10, new <= 1).
+        visits_count = int(customer.visits_count or 0)
+        if segment_filter == "vip" and visits_count <= 10:
+            continue
+        if segment_filter == "regular" and not 2 <= visits_count <= 10:
+            continue
+        if segment_filter == "new" and visits_count > 1:
             continue
 
         stats = visit_stats.get(customer.customer_id, {"visits": 0, "last_visit": None})
@@ -457,7 +487,7 @@ def _query_invoices(
         db.query(Invoice)
         .options(
             joinedload(Invoice.customer),
-            joinedload(Invoice.employee),
+            joinedload(Invoice.barber),
             joinedload(Invoice.appointment),
             joinedload(Invoice.created_by_user),
             joinedload(Invoice.items),
@@ -482,9 +512,7 @@ def _query_invoices(
             if raw_status != status_filter.lower():
                 continue
 
-        customer_name = ""
-        if invoice.customer:
-            customer_name = f"{invoice.customer.first_name} {invoice.customer.last_name}".strip()
+        customer_name = _invoice_customer_name(invoice)
         employee_name = (
             _clean_text(getattr(invoice.employee, "display_name", ""))
             or _clean_text(getattr(invoice.created_by_user, "full_name", ""))
@@ -506,9 +534,7 @@ def _query_invoices(
 def _invoice_rows(invoices: list[Invoice]) -> list[list]:
     rows = []
     for invoice in invoices:
-        customer_name = ""
-        if invoice.customer:
-            customer_name = f"{invoice.customer.first_name} {invoice.customer.last_name}".strip()
+        customer_name = _invoice_customer_name(invoice)
         employee_name = (
             _clean_text(getattr(invoice.employee, "display_name", ""))
             or _clean_text(getattr(invoice.created_by_user, "full_name", ""))
@@ -561,18 +587,43 @@ def _service_rows(services: list[Service]) -> list[list]:
 
 
 def _query_products(
-    db: Session, *, search: str | None, q: str | None, status: str | None
+    db: Session,
+    *,
+    search: str | None,
+    q: str | None,
+    status: str | None,
+    is_archived: str | None = None,
 ) -> list[Product]:
+    """
+    The products behind the inventory screen, filtered the way it filters them.
+
+    The screen shows one tab at a time -- the active rows, or the archived
+    ones -- and searches by name, SKU, category or company. The export used to
+    match only name/SKU/unit and ignore the tab entirely, so exporting from
+    the active tab handed the owner a file that also contained everything that
+    had been archived, and a category search exported the whole catalogue.
+    """
     term = _optional_text(search) or _optional_text(q)
     status_filter = _optional_text(status)
+    archived_filter = _optional_text(is_archived)
     products = db.query(Product).order_by(Product.id.desc()).all()
     result = []
     for product in products:
-        if not _matches_term(term, product.name, product.sku, product.unit):
+        if not _matches_term(
+            term,
+            product.name,
+            product.sku,
+            product.category,
+            product.company_name,
+        ):
             continue
         if status_filter == "active" and not product.is_active:
             continue
         if status_filter == "inactive" and product.is_active:
+            continue
+        if archived_filter in {"true", "1", "yes"} and not product.is_archived:
+            continue
+        if archived_filter in {"false", "0", "no"} and product.is_archived:
             continue
         result.append(product)
     return result
@@ -607,7 +658,7 @@ def _query_bookings(
         db.query(Appointment)
         .options(
             joinedload(Appointment.customer),
-            joinedload(Appointment.employee),
+            joinedload(Appointment.barber),
             joinedload(Appointment.services),
         )
         .order_by(Appointment.id.desc())
@@ -758,7 +809,7 @@ def _payroll_rows(records: list[PayrollRecord]) -> list[list]:
 
 def _revenue_date_window(
 period: str | None, start_date: date | None, end_date: date | None):
-    today = date.today()
+    today = salon_now().date()
     normalized_period = _clean_text(period).lower()
     if start_date or end_date:
         return start_date, end_date, normalized_period or "custom"
@@ -787,18 +838,18 @@ def _revenue_rows(
     # 1. Fetch Invoices
     inv_query = db.query(Invoice).options(joinedload(Invoice.appointment))
     if effective_start:
-        inv_query = inv_query.filter(Invoice.created_at >= datetime.combine(effective_start, datetime.min.time()))
+        inv_query = inv_query.filter(Invoice.created_at >= salon_day_bounds_utc(effective_start)[0])
     if effective_end:
-        inv_query = inv_query.filter(Invoice.created_at <= datetime.combine(effective_end, datetime.max.time()))
+        inv_query = inv_query.filter(Invoice.created_at <= salon_day_bounds_utc(effective_end)[1])
     
     invoices = inv_query.order_by(Invoice.created_at.asc()).all()
 
     # 2. Fetch Expenses
     exp_query = db.query(Expense)
     if effective_start:
-        exp_query = exp_query.filter(Expense.expense_date >= datetime.combine(effective_start, datetime.min.time()))
+        exp_query = exp_query.filter(Expense.expense_date >= salon_day_bounds_utc(effective_start)[0])
     if effective_end:
-        exp_query = exp_query.filter(Expense.expense_date <= datetime.combine(effective_end, datetime.max.time()))
+        exp_query = exp_query.filter(Expense.expense_date <= salon_day_bounds_utc(effective_end)[1])
     
     expenses_list = exp_query.all()
 
@@ -838,7 +889,7 @@ def _report_suffix(start_date: date | None, end_date: date | None, period_label:
         return f"{start_date.isoformat()}_{end_date.isoformat()}"
     if start_date:
         return start_date.isoformat()
-    return f"{period_label}_{date.today().isoformat()}"
+    return f"{period_label}_{salon_now().date().isoformat()}"
 
 
 EMPLOYEE_COLUMNS = [
@@ -971,6 +1022,7 @@ def export_customers_excel(
     start_date: str | None = Query(default=None),
     end_date: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    segment: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
@@ -982,6 +1034,7 @@ def export_customers_excel(
         start_date=_parse_optional_date(start_date),
         end_date=_parse_optional_date(end_date),
         status=status,
+        segment=segment,
     )
     log_activity(db, user_id=current_user.id, action="export", entity_type="customer", description="تصدير قائمة العملاء (Excel)")
     return _make_excel_response(
@@ -999,6 +1052,7 @@ def export_customers_csv(
     start_date: str | None = Query(default=None),
     end_date: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    segment: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
@@ -1010,6 +1064,7 @@ def export_customers_csv(
         start_date=_parse_optional_date(start_date),
         end_date=_parse_optional_date(end_date),
         status=status,
+        segment=segment,
     )
     log_activity(db, user_id=current_user.id, action="export", entity_type="customer", description="تصدير قائمة العملاء (CSV)")
     return _make_csv_response(columns=CUSTOMER_COLUMNS, rows=rows, base_name="customers")
@@ -1330,10 +1385,13 @@ def export_products_excel(
     search: str | None = Query(default=None),
     q: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    is_archived: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    rows = _product_rows(_query_products(db, search=search, q=q, status=status))
+    rows = _product_rows(
+        _query_products(db, search=search, q=q, status=status, is_archived=is_archived)
+    )
     log_activity(db, user_id=current_user.id, action="export", entity_type="product", description="تصدير قائمة المنتجات (Excel)")
     return _make_excel_response(
         sheet_name="Products",
@@ -1348,12 +1406,110 @@ def export_products_csv(
     search: str | None = Query(default=None),
     q: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    is_archived: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner),
 ):
-    rows = _product_rows(_query_products(db, search=search, q=q, status=status))
+    rows = _product_rows(
+        _query_products(db, search=search, q=q, status=status, is_archived=is_archived)
+    )
     log_activity(db, user_id=current_user.id, action="export", entity_type="product", description="تصدير قائمة المنتجات (CSV)")
     return _make_csv_response(columns=PRODUCT_COLUMNS, rows=rows, base_name="products")
+
+
+
+
+INVENTORY_LOG_COLUMNS = [
+    ("id", "Movement ID"),
+    ("created_at", "Date"),
+    ("type", "Type"),
+    ("product_name", "Product"),
+    ("product_category", "Category"),
+    ("change_amount", "Change"),
+    ("product_unit", "Unit"),
+    ("created_by", "Created By"),
+    ("note", "Note"),
+]
+
+
+def _query_inventory_logs(
+    db: Session,
+    *,
+    type_filter: str | None = None,
+    q: str | None = None,
+    product_id: int | None = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
+):
+    query = (
+        db.query(InventoryLog)
+        .options(joinedload(InventoryLog.product), joinedload(InventoryLog.created_by_user))
+        .order_by(InventoryLog.created_at.desc(), InventoryLog.id.desc())
+    )
+    if type_filter and type_filter not in {"", "all"}:
+        query = query.filter(InventoryLog.type == type_filter)
+    if product_id:
+        query = query.filter(InventoryLog.product_id == product_id)
+    if q and q.strip():
+        s = f"%{q.strip()}%"
+        query = query.join(Product, Product.id == InventoryLog.product_id).filter(
+            or_(Product.name.ilike(s), InventoryLog.note.ilike(s))
+        )
+    fd = _parse_optional_date(from_date)
+    td = _parse_optional_date(to_date)
+    if fd:
+        query = query.filter(InventoryLog.created_at >= datetime.combine(fd, datetime.min.time()))
+    if td:
+        query = query.filter(InventoryLog.created_at <= datetime.combine(td, datetime.max.time()))
+    return query.limit(50000).all()
+
+
+def _inventory_log_rows(logs):
+    rows = []
+    for log in logs:
+        creator = getattr(log, "created_by_user", None)
+        rows.append([
+            log.id,
+            log.created_at.isoformat() if log.created_at else "",
+            log.type,
+            getattr(log.product, "name", None) or f"Product #{log.product_id}",
+            getattr(log.product, "category", None) or "",
+            _safe_float(log.change_amount),
+            getattr(log.product, "unit", None) or "",
+            getattr(creator, "full_name", None) or getattr(creator, "username", None) or (f"User #{log.created_by_user_id}" if log.created_by_user_id else "System"),
+            _clean_text(log.note),
+        ])
+    return rows
+
+
+@router.get("/inventory-logs/excel")
+def export_inventory_logs_excel(
+    type: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+    product_id: int | None = Query(default=None),
+    from_date: str | None = Query(default=None),
+    to_date: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+):
+    logs = _query_inventory_logs(db, type_filter=type, q=q, product_id=product_id, from_date=from_date, to_date=to_date)
+    log_activity(db, user_id=current_user.id, action="export", entity_type="inventory_log", description="Export inventory logs (Excel)")
+    return _make_excel_response(sheet_name="InventoryLogs", columns=INVENTORY_LOG_COLUMNS, rows=_inventory_log_rows(logs), base_name="inventory_logs")
+
+
+@router.get("/inventory-logs/csv")
+def export_inventory_logs_csv(
+    type: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+    product_id: int | None = Query(default=None),
+    from_date: str | None = Query(default=None),
+    to_date: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+):
+    logs = _query_inventory_logs(db, type_filter=type, q=q, product_id=product_id, from_date=from_date, to_date=to_date)
+    log_activity(db, user_id=current_user.id, action="export", entity_type="inventory_log", description="Export inventory logs (CSV)")
+    return _make_csv_response(columns=INVENTORY_LOG_COLUMNS, rows=_inventory_log_rows(logs), base_name="inventory_logs")
 
 
 @router.get("/reports/revenue/excel")
@@ -1422,7 +1578,7 @@ def export_daily_report_pdf(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
-    parsed_start = _parse_optional_date(start_date) or date.today()
+    parsed_start = _parse_optional_date(start_date) or salon_now().date()
     parsed_end = _parse_optional_date(end_date) or parsed_start
     rows, _ = _revenue_rows(
         db,
@@ -1452,16 +1608,16 @@ def export_strategic_growth_report_pdf(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner),
 ):
-    parsed_start = _parse_optional_date(start_date) or (date.today() - timedelta(days=30))
-    parsed_end = _parse_optional_date(end_date) or date.today()
+    parsed_start = _parse_optional_date(start_date) or (salon_now().date() - timedelta(days=30))
+    parsed_end = _parse_optional_date(end_date) or salon_now().date()
     
     settings = db.query(BusinessSettings).first()
     salon_name = settings.salon_name if settings else "SalonPro"
     
     # 1. Financial Stats
     invoices = db.query(Invoice).options(joinedload(Invoice.appointment)).filter(
-        Invoice.created_at >= datetime.combine(parsed_start, datetime.min.time()),
-        Invoice.created_at <= datetime.combine(parsed_end, datetime.max.time())
+        Invoice.created_at >= salon_day_bounds_utc(parsed_start)[0],
+        Invoice.created_at <= salon_day_bounds_utc(parsed_end)[1]
     ).all()
     
     # Filter out cancelled in Python
@@ -1478,8 +1634,8 @@ def export_strategic_growth_report_pdf(
         func.count(InvoiceItem.id).label('count'),
         func.coalesce(func.sum(InvoiceItem.total_price), 0).label('revenue')
     ).join(Invoice).outerjoin(Appointment).filter(
-        Invoice.created_at >= datetime.combine(parsed_start, datetime.min.time()),
-        Invoice.created_at <= datetime.combine(parsed_end, datetime.max.time()),
+        Invoice.created_at >= salon_day_bounds_utc(parsed_start)[0],
+        Invoice.created_at <= salon_day_bounds_utc(parsed_end)[1],
         or_(Appointment.status != "cancelled", Appointment.id.is_(None)),
         InvoiceItem.service_id.isnot(None)
     ).group_by(InvoiceItem.service_name).order_by(func.count(InvoiceItem.id).desc()).limit(5).all()
@@ -1490,8 +1646,8 @@ def export_strategic_growth_report_pdf(
         func.count(Invoice.id).label('count'),
         func.coalesce(func.sum(Invoice.total_amount), 0).label('revenue')
     ).join(Invoice, Invoice.barber_id == Employee.id).outerjoin(Appointment, Invoice.appointment_id == Appointment.id).filter(
-        Invoice.created_at >= datetime.combine(parsed_start, datetime.min.time()),
-        Invoice.created_at <= datetime.combine(parsed_end, datetime.max.time()),
+        Invoice.created_at >= salon_day_bounds_utc(parsed_start)[0],
+        Invoice.created_at <= salon_day_bounds_utc(parsed_end)[1],
         or_(Appointment.status != "cancelled", Appointment.id.is_(None))
     ).group_by(Employee.id, Employee.full_name).order_by(func.sum(Invoice.total_amount).desc()).all()
 
@@ -1575,7 +1731,7 @@ def export_invoice_pdf(
         db.query(Invoice)
         .options(
             joinedload(Invoice.customer),
-            joinedload(Invoice.employee),
+            joinedload(Invoice.barber),
             joinedload(Invoice.items),
         )
         .filter(Invoice.id == invoice_id)

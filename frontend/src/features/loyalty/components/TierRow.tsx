@@ -53,7 +53,7 @@ export function TierRow({ tier, index, canRemove, onChange, onRemove }: TierRowP
               min={0}
               value={tier.discount_percent}
               onChange={(e) => onChange(index, "discount_percent", Number(e.target.value))}
-              className="h-11 rounded-xl bg-card pl-9 font-bold tabular-nums"
+              className="h-11 rounded-xl bg-card ps-9 font-bold tabular-nums"
             />
           </div>
         </div>

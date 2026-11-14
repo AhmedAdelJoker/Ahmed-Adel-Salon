@@ -1,8 +1,8 @@
-/** Reception DoneCard (moved from ReceptionBoard page, no logic changes). */
+/** Reception DoneCard (moved from ReceptionBoard page). */
 import { CheckCheck } from "lucide-react";
 import { formatCurrency, formatTime12h } from "@/lib/core/utils";
 
-export default function DoneCard({ appt }: any) {
+export default function DoneCard({ appt, t }: { appt: any; t: any }) {
   return (
     <div className="p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border border-emerald-500/15 bg-emerald-500/5 flex items-center gap-2 sm:gap-3">
       <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
@@ -10,11 +10,11 @@ export default function DoneCard({ appt }: any) {
         <CheckCheck size={16} className="hidden sm:block" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] sm:text-xs font-black text-main truncate">
-          {appt.customer_name || "عميل مجهول"}
+        <p className="text-[10px] sm:text-xs font-black text-main truncate" title={appt.customer_name || ""}>
+          {appt.customer_name || t("card.unknown_customer")}
         </p>
-        <p className="text-[8px] sm:text-[10px] font-bold text-muted truncate">
-          {appt.barber_name || "توزيع تلقائي"}
+        <p className="text-[8px] sm:text-[10px] font-bold text-muted truncate" title={appt.barber_name || ""}>
+          {appt.barber_name || t("card.barber_auto")}
         </p>
       </div>
       <div className="text-left shrink-0">

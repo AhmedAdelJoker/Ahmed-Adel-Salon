@@ -6,8 +6,6 @@ import {
   Award,
   BarChart3,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Download,
   History,
@@ -36,10 +34,10 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -50,6 +48,7 @@ import {
 } from "@/components/ui/table";
 import AIInsights from "@/components/AIInsights";
 import { PageHeader, ContentPanel, SkeletonCard } from "@/components/shared/PremiumUI";
+import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import {
   ChartCard,
   CurrencyStatCard,
@@ -64,30 +63,31 @@ import {
   formatSignedPct,
 } from "@/features/financial-reports";
 import {
-  OP_HISTORY_PAGE_SIZE,
   useOperationalReports,
   type OpTabId,
 } from "@/features/operational-reports";
 import { cn, formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "@/lib/format/locale";
 
 /** Tooltip for count-based charts: shows count + revenue without a currency suffix on the count. */
-function ServiceTooltip({ active, payload, label }: any) {
+function ServiceTooltip({ active, payload, label, t }: any) {
   if (!active || !payload?.length) return null;
   const row = payload[0]?.payload;
   return (
     <div className="min-w-[200px] rounded-2xl border border-border bg-card/95 p-4 shadow-premium backdrop-blur-md">
       <p className="mb-2 truncate text-[10px] font-black uppercase tracking-widest text-muted">
-        {row?.name || label || "خدمة"}
+        {row?.name || label || t("opRep.tooltip.fallback")}
       </p>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-6">
-          <span className="text-xs font-bold text-muted">مرات التنفيذ</span>
+          <span className="text-xs font-bold text-muted">{t("opRep.tooltip.executions")}</span>
           <span className="text-sm font-black tabular-nums text-main">
             {formatNumber(row?.count ?? payload[0]?.value ?? 0)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
-          <span className="text-xs font-bold text-muted">الإيراد</span>
+          <span className="text-xs font-bold text-muted">{t("opRep.tooltip.revenue")}</span>
           <span className="text-sm font-black tabular-nums text-main">
             {formatCurrency(row?.revenue ?? 0)}
           </span>
@@ -98,15 +98,15 @@ function ServiceTooltip({ active, payload, label }: any) {
 }
 
 /** Tooltip for the hourly distribution (pure counts — no currency). */
-function HourTooltip({ active, payload, label }: any) {
+function HourTooltip({ active, payload, label, t }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="min-w-[150px] rounded-2xl border border-border bg-card/95 p-4 shadow-premium backdrop-blur-md">
       <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-muted">
-        الساعة {label}
+        {t("opRep.tooltip.hour", { hour: label })}
       </p>
       <p className="text-sm font-black tabular-nums text-main">
-        {formatNumber(payload[0]?.value ?? 0)} عملية
+        {t("opRep.tooltip.count", { count: formatNumber(payload[0]?.value ?? 0) })}
       </p>
     </div>
   );
@@ -120,12 +120,14 @@ function safeTime(v: unknown): string {
 }
 
 const TABS: Array<{ id: OpTabId; label: string; icon: typeof Activity }> = [
-  { id: "finance", label: "التحليل المالي", icon: TrendingUp },
-  { id: "operations", label: "كفاءة التشغيل", icon: Activity },
-  { id: "history", label: "سجل العمليات", icon: History },
+  { id: "finance", label: "opRep.tabs.finance", icon: TrendingUp },
+  { id: "operations", label: "opRep.tabs.operations", icon: Activity },
+  { id: "history", label: "opRep.tabs.history", icon: History },
 ];
 
 export default function OperationalReports() {
+  const { t, i18n } = useTranslation("owner");
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
   const {
     activeTab,
     setActiveTab,
@@ -146,6 +148,8 @@ export default function OperationalReports() {
     setSearchQuery,
     historyPage,
     setHistoryPage,
+    historyPageSize,
+    setHistoryPageSize,
     historyTotal,
     historyTotalPages,
     financialMetrics,
@@ -163,7 +167,7 @@ export default function OperationalReports() {
         <div className="flex flex-col items-center gap-4 py-16 text-center">
           <Sparkles className="h-10 w-10 animate-pulse text-primary" />
           <p className="text-[11px] font-black uppercase tracking-[0.3em] text-muted">
-            جاري بناء اللوحة التشغيلية...
+            {t("opRep.loading")}
           </p>
         </div>
         <div data-stats-grid="true">
@@ -184,26 +188,12 @@ export default function OperationalReports() {
 
   if (loadError && !hasData && hasLoaded) {
     return (
-      <div className="erp-page-container space-y-6 pb-16">
-        <PageHeader
-          title="التقارير التشغيلية"
-          subtitle="تحليل الأداء التشغيلي المتقدم."
-          badge="التقارير التشغيلية"
-          icon={BarChart3}
-        />
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-            <p className="text-lg font-black text-main">تعذر تحميل البيانات التشغيلية</p>
-            <p className="max-w-md text-sm font-bold text-muted">
-              تحقق من الاتصال بالخادم ثم أعد المحاولة. النطاق الحالي: {startDate} إلى{" "}
-              {endDate}.
-            </p>
-            <Button onClick={fetchData} loading={refreshing}>
-              <RefreshCw size={16} /> إعادة المحاولة
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <EmptyState
+        variant="section"
+        icon={RefreshCw}
+        title={t("opRep.loadFailedTitle")}
+        message={t("opRep.loadFailedMessage", { from: startDate, to: endDate })}
+      />
     );
   }
 
@@ -214,25 +204,17 @@ export default function OperationalReports() {
   const topServiceByRevenue = [...operationalMetrics.topServices].sort(
     (a, b) => b.revenue - a.revenue,
   )[0];
-  const rangeStart = (safeHistoryPageStart() - 1) * OP_HISTORY_PAGE_SIZE + 1;
-
-  function safeHistoryPageStart(): number {
-    return historyTotal === 0 ? 0 : historyPage;
-  }
-
-  const rangeEnd = Math.min(historyTotal, historyPage * OP_HISTORY_PAGE_SIZE);
-  const rangeFrom = historyTotal === 0 ? 0 : rangeStart;
 
   return (
     <div className="erp-page-container space-y-6 pb-16">
       <PageHeader
-        title="التقارير التشغيلية"
-        subtitle="تحليل الأداء التشغيلي المتقدم: التدفقات، كفاءة الخدمات، وسجل الحركات."
-        badge="التقارير التشغيلية"
+        title={t("opRep.title")}
+        subtitle={t("opRep.subtitle")}
+        badge={t("opRep.badge")}
         icon={BarChart3}
         actions={
           <div className="flex w-full flex-col gap-3 print:hidden xl:w-auto">
-            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="نطاقات زمنية سريعة">
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("opRep.filters.quickRanges")}>
               {PRESETS.map((p) => (
                 <button
                   key={p.id}
@@ -246,7 +228,7 @@ export default function OperationalReports() {
                       : "border-border bg-card text-muted hover:border-primary/40 hover:text-main",
                   )}
                 >
-                  {p.label}
+                  {t(p.label)}
                 </button>
               ))}
             </div>
@@ -254,7 +236,7 @@ export default function OperationalReports() {
               <div className="flex flex-1 items-center gap-2 rounded-xl border border-border bg-card p-2 shadow-sm xl:flex-none">
                 <label className="flex items-center gap-2 px-2">
                   <Calendar size={14} className="shrink-0 text-muted" />
-                  <span className="sr-only">من تاريخ</span>
+                  <span className="sr-only">{t("opRep.filters.from")}</span>
                   <input
                     type="date"
                     value={startDate}
@@ -262,14 +244,14 @@ export default function OperationalReports() {
                     onChange={(e) => {
                       setStartDate(e.target.value);
                     }}
-                    aria-label="من تاريخ"
+                    aria-label={t("opRep.filters.from")}
                     className="w-32 bg-transparent text-[11px] font-black tabular-nums text-main outline-none"
                   />
                 </label>
                 <span className="h-5 w-px bg-border" aria-hidden="true" />
                 <label className="flex items-center gap-2 px-2">
                   <Calendar size={14} className="shrink-0 text-muted" />
-                  <span className="sr-only">إلى تاريخ</span>
+                  <span className="sr-only">{t("opRep.filters.to")}</span>
                   <input
                     type="date"
                     value={endDate}
@@ -277,26 +259,26 @@ export default function OperationalReports() {
                     onChange={(e) => {
                       setEndDate(e.target.value);
                     }}
-                    aria-label="إلى تاريخ"
+                    aria-label={t("opRep.filters.to")}
                     className="w-32 bg-transparent text-[11px] font-black tabular-nums text-main outline-none"
                   />
                 </label>
               </div>
               <Button onClick={fetchData} loading={refreshing} className="h-11 gap-2 px-6 text-xs font-black">
-                <RefreshCw size={15} /> تحديث
+                <RefreshCw size={15} /> {t("opRep.filters.refresh")}
               </Button>
               <Button onClick={handlePrint} variant="outline" className="h-11 gap-2 px-5 text-xs font-black print:hidden">
-                <Printer size={15} /> طباعة / PDF
+                <Printer size={15} /> {t("opRep.filters.print")}
               </Button>
               <label className="flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-[11px] font-black text-muted print:hidden">
-                <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} aria-label="تحديث تلقائي" />
-                تحديث تلقائي
+                <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} aria-label={t("opRep.filters.autoSwitch")} />
+                {t("opRep.filters.auto")}
               </label>
             </div>
             <p className="text-[10px] font-bold tabular-nums text-muted">
-              آخر تحديث: {formatDateTime(lastUpdated)}
+              {t("opRep.filters.lastUpdated", { time: lastUpdated.toLocaleString(locale, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true }) })}
               {financialMetrics.prevRange
-                ? ` • تُقارن النسب بالفترة ${financialMetrics.prevRange.from} إلى ${financialMetrics.prevRange.to}`
+                ? t("opRep.filters.compare", { from: financialMetrics.prevRange.from, to: financialMetrics.prevRange.to })
                 : ""}
             </p>
           </div>
@@ -305,7 +287,7 @@ export default function OperationalReports() {
 
       <div data-stats-grid="true">
         <CurrencyStatCard
-          label="صافي الأرباح التشغيلية"
+          label={t("opRep.stats.netProfit")}
           value={financialMetrics.net}
           icon={Wallet}
           variant="primary"
@@ -321,10 +303,10 @@ export default function OperationalReports() {
               ? undefined
               : formatSignedPct(financialMetrics.growth.net)
           }
-          hint={`هامش ${margin.toFixed(1)}% من الدخل`}
+          hint={t("opRep.stats.netHint", { pct: margin.toFixed(1) })}
         />
         <CurrencyStatCard
-          label="إجمالي الدخل"
+          label={t("opRep.stats.income")}
           value={financialMetrics.income}
           icon={TrendingUp}
           variant="success"
@@ -340,10 +322,10 @@ export default function OperationalReports() {
               ? undefined
               : formatSignedPct(financialMetrics.growth.income)
           }
-          hint={`${financialMetrics.timeline.length} يوم نشط في الفترة`}
+          hint={t("opRep.stats.incomeHint", { count: financialMetrics.timeline.length })}
         />
         <CurrencyStatCard
-          label="إجمالي المصروفات"
+          label={t("opRep.stats.expenses")}
           value={financialMetrics.expenses}
           icon={TrendingDown}
           variant="danger"
@@ -359,10 +341,10 @@ export default function OperationalReports() {
               ? undefined
               : formatSignedPct(financialMetrics.growth.expenses)
           }
-          hint={`${financialMetrics.categories.length} بند تكلفة مصنف`}
+          hint={t("opRep.stats.expensesHint", { count: financialMetrics.categories.length })}
         />
         <StatCardDisplay
-          label="الخدمات المنفذة"
+          label={t("opRep.stats.services")}
           value={formatNumber(operationalMetrics.totalServices)}
           icon={Scissors}
           variant="info"
@@ -378,7 +360,7 @@ export default function OperationalReports() {
               ? undefined
               : formatSignedPct(operationalMetrics.growth.services)
           }
-          hint={`${formatNumber(operationalMetrics.totalCustomers)} عميل • ${formatNumber(operationalMetrics.totalInvoices)} فاتورة`}
+          hint={t("opRep.stats.servicesHint", { customers: formatNumber(operationalMetrics.totalCustomers), invoices: formatNumber(operationalMetrics.totalInvoices) })}
         />
       </div>
 
@@ -413,12 +395,12 @@ export default function OperationalReports() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <ChartCard
                 className="lg:col-span-2"
-                title="ديناميكية التدفقات النقدية"
-                subtitle={`مقارنة الدخل بالمصروفات • ${financialMetrics.timeline.length} نقطة زمنية من حركات الخزينة`}
+                title={t("opRep.financeChart.title")}
+                subtitle={t("opRep.financeChart.subtitle", { count: financialMetrics.timeline.length })}
                 data={financialMetrics.timeline}
                 height={320}
-                emptyTitle="لا توجد حركات في هذه الفترة"
-                emptyHint="وسّع النطاق الزمني أو اختر preset مختلف لعرض التدفقات."
+                emptyTitle={t("opRep.financeChart.emptyTitle")}
+                emptyHint={t("opRep.financeChart.emptyHint")}
                 actions={
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="gap-1.5">
@@ -435,12 +417,12 @@ export default function OperationalReports() {
                     <AreaChart data={financialMetrics.timeline} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                       <defs>
                         <linearGradient id="opIncome" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.28} />
-                          <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                          <stop offset="5%" stopColor="var(--chart-3)" stopOpacity={0.28} />
+                          <stop offset="95%" stopColor="var(--chart-3)" stopOpacity={0} />
                         </linearGradient>
                         <linearGradient id="opExpenses" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.28} />
-                          <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
+                          <stop offset="5%" stopColor="var(--chart-7)" stopOpacity={0.28} />
+                          <stop offset="95%" stopColor="var(--chart-7)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="var(--border)" opacity={0.5} />
@@ -449,7 +431,7 @@ export default function OperationalReports() {
                         axisLine={false}
                         tickLine={false}
                         minTickGap={24}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                         dy={8}
                       />
                       <YAxis
@@ -457,28 +439,28 @@ export default function OperationalReports() {
                         tickLine={false}
                         width={56}
                         tickFormatter={compactTick}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                       />
                       <ReTooltip content={<FinanceTooltip />} cursor={{ stroke: "var(--border)" }} />
                       <Area
                         type="monotone"
                         dataKey="income"
-                        name="الدخل"
-                        stroke="#10B981"
+                        name={t("opRep.financeChart.income")}
+                        stroke="var(--chart-3)"
                         strokeWidth={2.5}
                         fill="url(#opIncome)"
                         dot={false}
-                        activeDot={{ r: 5, strokeWidth: 2, stroke: "#10B981", fill: "#fff" }}
+                        activeDot={{ r: 5, strokeWidth: 2, stroke: "var(--chart-3)", fill: "var(--bg-card)" }}
                       />
                       <Area
                         type="monotone"
                         dataKey="expenses"
-                        name="المصروفات"
-                        stroke="#F43F5E"
+                        name={t("opRep.financeChart.expenses")}
+                        stroke="var(--chart-7)"
                         strokeWidth={2.5}
                         fill="url(#opExpenses)"
                         dot={false}
-                        activeDot={{ r: 5, strokeWidth: 2, stroke: "#F43F5E", fill: "#fff" }}
+                        activeDot={{ r: 5, strokeWidth: 2, stroke: "var(--chart-7)", fill: "var(--bg-card)" }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -486,12 +468,12 @@ export default function OperationalReports() {
               </ChartCard>
 
               <ChartCard
-                title="هيكلية المصروفات"
-                subtitle="بنود التكلفة الحقيقية (المصروفات فقط) خلال الفترة"
+                title={t("opRep.expenseChart.title")}
+                subtitle={t("opRep.expenseChart.subtitle")}
                 data={financialMetrics.categories}
                 height={220}
-                emptyTitle="لا توجد مصروفات مصنفة"
-                emptyHint="سجّل المصروفات مبوبة لتظهر هنا بالتفصيل."
+                emptyTitle={t("opRep.expenseChart.emptyTitle")}
+                emptyHint={t("opRep.expenseChart.emptyHint")}
                 actions={
                   topExpense ? <Badge className="shrink-0">{formatCurrency(topExpense.value)}</Badge> : undefined
                 }
@@ -517,7 +499,7 @@ export default function OperationalReports() {
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-[10px] font-black uppercase tracking-widest text-muted">
-                      إجمالي المصروف
+                      {t("opRep.expenseChart.total")}
                     </span>
                     <span className="max-w-[170px] truncate-1 text-lg font-black tabular-nums text-main">
                       {formatCurrency(financialMetrics.expenseTotal)}
@@ -558,8 +540,8 @@ export default function OperationalReports() {
             </div>
 
             <ContentPanel
-              title="الرؤى التشغيلية الذكية"
-              subtitle="توصيات مولدة تلقائياً من حركات الفترة الحالية"
+              title={t("opRep.insights.title")}
+              subtitle={t("opRep.insights.subtitle")}
             >
               <AIInsights data={aiInsights} />
             </ContentPanel>
@@ -570,12 +552,12 @@ export default function OperationalReports() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <ChartCard
-                title="كفاءة الخدمات"
-                subtitle="الخدمات الأكثر طلباً وإيرادها خلال الفترة"
+                title={t("opRep.services.title")}
+                subtitle={t("opRep.services.subtitle")}
                 data={operationalMetrics.topServices}
                 height={340}
-                emptyTitle="لا توجد خدمات منفذة"
-                emptyHint="ستظهر الخدمات فور تسجيل الفواتير في الفترة."
+                emptyTitle={t("opRep.services.emptyTitle")}
+                emptyHint={t("opRep.services.emptyHint")}
               >
                 <div className="h-[320px] w-full sm:h-[340px]" dir="ltr">
                   <ResponsiveContainer width="100%" height="100%">
@@ -586,11 +568,11 @@ export default function OperationalReports() {
                         type="category"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 11, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 11, fontWeight: 800, fill: "var(--text-muted)" }}
                         width={120}
                       />
-                      <ReTooltip content={<ServiceTooltip />} cursor={{ fill: "var(--border)", opacity: 0.25 }} />
-                      <Bar dataKey="count" name="مرات التنفيذ" radius={[0, 10, 10, 0]} barSize={26}>
+                      <ReTooltip content={<ServiceTooltip t={t} />} cursor={{ fill: "var(--border)", opacity: 0.25 }} />
+                      <Bar dataKey="count" name={t("opRep.services.barName")} radius={[0, 10, 10, 0]} barSize={26}>
                         {operationalMetrics.topServices.map((_, i) => (
                           <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                         ))}
@@ -601,12 +583,12 @@ export default function OperationalReports() {
               </ChartCard>
 
               <ContentPanel
-                title="إنتاجية الفريق"
-                subtitle="ترتيب الموظفين بعدد العمليات والإيراد المحقق"
+                title={t("opRep.team.title")}
+                subtitle={t("opRep.team.subtitle")}
                 actions={
                   operationalMetrics.topBarbers.length > 0 ? (
                     <Badge variant="outline" className="gap-1.5">
-                      <Award size={12} /> {operationalMetrics.topBarbers.length} موظف نشط
+                      <Award size={12} /> {t("opRep.team.badge", { count: operationalMetrics.topBarbers.length })}
                     </Badge>
                   ) : undefined
                 }
@@ -631,7 +613,7 @@ export default function OperationalReports() {
                           <div className="flex items-center justify-between gap-2">
                             <span className="truncate text-xs font-black text-main">{b.name}</span>
                             <span className="shrink-0 text-[10px] font-black tabular-nums text-muted">
-                              {formatNumber(b.count)} عملية • {formatCurrency(b.revenue)}
+                              {t("opRep.team.memberLine", { count: b.count, revenue: formatCurrency(b.revenue) })}
                             </span>
                           </div>
                           <div className="mt-2">
@@ -648,12 +630,12 @@ export default function OperationalReports() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <ChartCard
                 className="lg:col-span-2"
-                title="توزيع النشاط خلال اليوم"
-                subtitle="عدد العمليات لكل ساعة من الفواتير الحقيقية"
+                title={t("opRep.hourly.title")}
+                subtitle={t("opRep.hourly.subtitle")}
                 data={hasHourly ? operationalMetrics.hourlyData : []}
                 height={230}
-                emptyTitle="لا يوجد نشاط مسجل بالساعة"
-                emptyHint="ستظهر الذروة فور تسجيل فواتير بتوقيتاتها."
+                emptyTitle={t("opRep.hourly.emptyTitle")}
+                emptyHint={t("opRep.hourly.emptyHint")}
               >
                 <div className="h-[210px] w-full sm:h-[230px]" dir="ltr">
                   <ResponsiveContainer width="100%" height="100%">
@@ -664,7 +646,7 @@ export default function OperationalReports() {
                         axisLine={false}
                         tickLine={false}
                         interval={2}
-                        tick={{ fontSize: 9, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 9, fontWeight: 800, fill: "var(--text-muted)" }}
                         dy={8}
                       />
                       <YAxis
@@ -672,14 +654,14 @@ export default function OperationalReports() {
                         tickLine={false}
                         width={40}
                         allowDecimals={false}
-                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--muted)" }}
+                        tick={{ fontSize: 10, fontWeight: 800, fill: "var(--text-muted)" }}
                       />
-                      <ReTooltip content={<HourTooltip />} cursor={{ fill: "var(--border)", opacity: 0.25 }} />
-                      <Bar dataKey="count" name="العمليات" radius={[5, 5, 0, 0]} maxBarSize={22}>
+                      <ReTooltip content={<HourTooltip t={t} />} cursor={{ fill: "var(--border)", opacity: 0.25 }} />
+                      <Bar dataKey="count" name={t("opRep.hourly.barName")} radius={[5, 5, 0, 0]} maxBarSize={22}>
                         {operationalMetrics.hourlyData.map((h, i) => (
                           <Cell
                             key={i}
-                            fill={operationalMetrics.peakHour?.hour === h.hour ? "#6366F1" : "#C7D2FE"}
+                            fill={operationalMetrics.peakHour?.hour === h.hour ? "var(--primary)" : "var(--primary-soft)"}
                             fillOpacity={operationalMetrics.peakHour?.hour === h.hour ? 1 : 0.65}
                           />
                         ))}
@@ -690,7 +672,7 @@ export default function OperationalReports() {
               </ChartCard>
 
               <div className="space-y-6">
-                <ContentPanel title="ساعات الذروة" subtitle="أعلى ضغط تشغيلي">
+                <ContentPanel title={t("opRep.peak.title")} subtitle={t("opRep.peak.subtitle")}>
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                       <Clock size={20} />
@@ -698,18 +680,18 @@ export default function OperationalReports() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-black text-main">
                         {operationalMetrics.peakHour
-                          ? `الساعة ${operationalMetrics.peakHour.hour} — ${formatNumber(operationalMetrics.peakHour.count)} عملية`
-                          : "لا توجد ذروة بعد"}
+                          ? t("opRep.peak.line", { hour: operationalMetrics.peakHour.hour, count: operationalMetrics.peakHour.count })
+                          : t("opRep.peak.none")}
                       </p>
                       <p className="mt-0.5 text-xs font-bold leading-relaxed text-muted">
                         {operationalMetrics.peakHour
                           ? "يُنصح بتفعيل الحجز المسبق وتوزيع الفريق على هذه الساعة."
-                          : "سجّل الفواتير لاكتشاف ساعات الذروة تلقائياً."}
+                          : t("opRep.peak.hintNone")}
                       </p>
                     </div>
                   </div>
                 </ContentPanel>
-                <ContentPanel title="فرص النمو" subtitle="أعلى خدمة إيراداً">
+                <ContentPanel title={t("opRep.growth.title")} subtitle={t("opRep.growth.subtitle")}>
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
                       <TrendingUp size={20} />
@@ -718,24 +700,24 @@ export default function OperationalReports() {
                       <p className="truncate text-sm font-black text-main">
                         {topServiceByRevenue
                           ? `${topServiceByRevenue.name} — ${formatCurrency(topServiceByRevenue.revenue)}`
-                          : "لا توجد بيانات كافية"}
+                          : t("opRep.growth.none")}
                       </p>
                       <p className="mt-0.5 text-xs font-bold leading-relaxed text-muted">
                         {topServiceByRevenue
-                          ? `نُفذت ${formatNumber(topServiceByRevenue.count)} مرة — استهدف العملاء الجدد بعروض عليها.`
-                          : "ستظهر الفرص فور تسجيل الخدمات."}
+                          ? t("opRep.growth.hint", { count: topServiceByRevenue.count })
+                          : t("opRep.growth.hintNone")}
                       </p>
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <div className="rounded-2xl border border-border/60 bg-soft/60 p-3 text-center">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-muted">متوسط الفاتورة</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-muted">{t("opRep.growth.avgTicket")}</p>
                       <p className="mt-1 truncate text-sm font-black tabular-nums text-main">
                         {formatCurrency(operationalMetrics.avgTicket)}
                       </p>
                     </div>
                     <div className="rounded-2xl border border-border/60 bg-soft/60 p-3 text-center">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-muted">عملاء نشطون</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-muted">{t("opRep.growth.activeCustomers")}</p>
                       <p className="mt-1 truncate text-sm font-black tabular-nums text-main">
                         {formatNumber(operationalMetrics.totalCustomers)}
                       </p>
@@ -749,8 +731,8 @@ export default function OperationalReports() {
 
         {activeTab === "history" && (
           <ContentPanel
-            title="سجل الحركات التشغيلية"
-            subtitle={`${formatNumber(historyTotal)} حركة موثقة في الفترة • تُستبعد الملغاة تلقائياً`}
+            title={t("opRep.history.title")}
+            subtitle={t("opRep.history.subtitle", { count: historyTotal })}
             actions={
               <Button
                 variant="outline"
@@ -759,7 +741,7 @@ export default function OperationalReports() {
                 disabled={!historyTotal}
                 className="gap-2 text-[11px] font-black"
               >
-                <Download size={14} /> تصدير CSV
+                <Download size={14} /> {t("opRep.history.exportCsv")}
               </Button>
             }
           >
@@ -769,9 +751,9 @@ export default function OperationalReports() {
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="بحث بالبيان، التصنيف، المبلغ، أو التاريخ (YYYY-MM-DD)..."
-                  aria-label="بحث في سجل العمليات"
-                  className="h-11 rounded-xl pr-10 text-xs font-bold"
+                  placeholder={t("opRep.history.searchPlaceholder")}
+                  aria-label={t("opRep.history.searchAria")}
+                  className="h-11 rounded-xl pe-10 text-xs font-bold"
                 />
               </div>
             </div>
@@ -780,12 +762,12 @@ export default function OperationalReports() {
               <div className="flex flex-col items-center gap-2 py-14 text-center">
                 <History size={28} className="text-muted" />
                 <p className="text-sm font-black text-main">
-                  {historyTotal === 0 && !searchQuery ? "لا توجد حركات في هذه الفترة" : "لا توجد سجلات تطابق البحث"}
+                  {historyTotal === 0 && !searchQuery ? t("opRep.history.emptyTitle") : t("opRep.history.emptyTitleSearch")}
                 </p>
                 <p className="max-w-sm text-xs font-bold text-muted">
                   {historyTotal === 0 && !searchQuery
                     ? "جرّب توسيع النطاق الزمني أو اختيار preset مختلف."
-                    : "جرّب كلمة أخرى أو امسح البحث لعرض كل الحركات."}
+                    : t("opRep.history.emptyHintSearch")}
                 </p>
               </div>
             ) : (
@@ -793,11 +775,11 @@ export default function OperationalReports() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-right">التاريخ</TableHead>
-                      <TableHead className="text-right">البيان</TableHead>
-                      <TableHead className="text-right">التصنيف</TableHead>
-                      <TableHead className="text-center">النوع</TableHead>
-                      <TableHead className="text-left">القيمة</TableHead>
+                      <TableHead className="text-right">{t("opRep.history.thDate")}</TableHead>
+                      <TableHead className="text-right">{t("opRep.history.thNote")}</TableHead>
+                      <TableHead className="text-right">{t("opRep.history.thCategory")}</TableHead>
+                      <TableHead className="text-center">{t("opRep.history.thType")}</TableHead>
+                      <TableHead className="text-left">{t("opRep.history.thValue")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -818,12 +800,12 @@ export default function OperationalReports() {
                           </TableCell>
                           <TableCell className="max-w-[280px]">
                             <p className="truncate text-xs font-bold text-main" title={String(t.note || "")}>
-                              {String(t.note || "عملية تشغيلية")}
+                              {String(t.note || t("opRep.history.noteFallback"))}
                             </p>
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="text-[10px] font-black">
-                              {String(t.category || "عام")}
+                              {String(t.category || t("opRep.history.categoryFallback"))}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
@@ -836,7 +818,7 @@ export default function OperationalReports() {
                               )}
                             >
                               {isIn ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-                              {isIn ? "إيداع" : "مصروف"}
+                              {isIn ? t("opRep.history.deposit") : t("opRep.history.expense")}
                             </span>
                           </TableCell>
                           <TableCell className="text-left">
@@ -856,35 +838,26 @@ export default function OperationalReports() {
                   </TableBody>
                 </Table>
 
-                <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
-                  <p className="text-[11px] font-bold tabular-nums text-muted">
-                    عرض {formatNumber(rangeFrom)}–{formatNumber(rangeEnd)} من {formatNumber(historyTotal)}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setHistoryPage(Math.max(1, historyPage - 1))}
-                      disabled={historyPage <= 1}
-                      className="gap-1 text-[11px] font-black"
-                      aria-label="الصفحة السابقة"
-                    >
-                      <ChevronRight size={14} /> السابق
-                    </Button>
-                    <span className="min-w-[90px] text-center text-[11px] font-black tabular-nums text-main">
-                      {formatNumber(historyPage)} / {formatNumber(historyTotalPages)}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setHistoryPage(Math.min(historyTotalPages, historyPage + 1))}
-                      disabled={historyPage >= historyTotalPages}
-                      className="gap-1 text-[11px] font-black"
-                      aria-label="الصفحة التالية"
-                    >
-                      التالي <ChevronLeft size={14} />
-                    </Button>
-                  </div>
+                <div className="mt-2 border-t border-border pt-3">
+                  {historyTotal > 0 && (() => {
+                    const paginator = createPaginationState({
+                      page: historyPage,
+                      size: historyPageSize,
+                      total: historyTotal,
+                    });
+                    return (
+                      <Pagination
+                        paginator={paginator}
+                        onPageChange={setHistoryPage}
+                        onSizeChange={(s) => {
+                          setHistoryPageSize(s);
+                          setHistoryPage(1);
+                        }}
+                        sizeOptions={[10, 15, 25, 50]}
+                        locale="ar"
+                      />
+                    );
+                  })()}
                 </div>
               </>
             )}
@@ -896,10 +869,10 @@ export default function OperationalReports() {
         <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 print:hidden dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
           <AlertTriangle size={18} className="shrink-0" />
           <p className="flex-1 text-xs font-bold">
-            تعذر تحديث الفترة السابقة — الأرقام المعروضة للفترة الحالية فقط والنسب قد تكون غائبة.
+            {t("opRep.refreshFail")}
           </p>
           <Button variant="outline" size="sm" onClick={fetchData} loading={refreshing} className="shrink-0">
-            إعادة المحاولة
+            {t("opRep.retry")}
           </Button>
         </div>
       )}

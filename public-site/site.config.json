@@ -1,0 +1,39 @@
+{
+  "$comment": "Single source of truth for public-site identity, canonical URL and SEO defaults. Consumed by scripts/prerender.mjs (Node) and src/lib/site.ts (browser). Override the origin at build time with VITE_SITE_URL.",
+  "siteUrl": "https://salon-pro.com",
+  "brand": {
+    "name": "Salon Pro",
+    "legalName": "Salon Pro",
+    "tagline": "نظام إدارة الصالونات الاحترافي",
+    "titleTemplate": "%s | Salon Pro",
+    "defaultTitle": "Salon Pro | نظام إدارة الصالونات الاحترافي",
+    "description": "منصة متكاملة لإدارة محلات الحلاقة: حجوزات، خدمات، عملاء، فريق، ومخزون — في مكان واحد.",
+    "shortDescription": "أدر صالونك باحترافية: خدمات، حجوزات، عملاء، ومخزون في منصة واحدة."
+  },
+  "locale": {
+    "default": "ar",
+    "dir": "rtl",
+    "htmlLang": "ar",
+    "openGraph": "ar_EG",
+    "alternate": "en_US",
+    "hreflang": { "ar": "ar", "en": "en" }
+  },
+  "theme": {
+    "colorScheme": "light dark",
+    "light": "#FAFAF7",
+    "dark": "#09090B",
+    "gold": "#D4AF37"
+  },
+  "assets": {
+    "ogImage": "/og-image.png",
+    "ogImageWidth": 1200,
+    "ogImageHeight": 630,
+    "appleTouchIcon": "/apple-touch-icon.png",
+    "favicon": "/favicon.ico"
+  },
+  "routes": {
+    "home": "/",
+    "book": "/book",
+    "offline": "/offline"
+  }
+}

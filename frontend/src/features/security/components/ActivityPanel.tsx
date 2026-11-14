@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TableEmptyState } from "@/components/shared/TableEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { riskKeywords, formatDate } from "@/features/security/utils";
 
 type SecurityLog = {
@@ -76,10 +76,10 @@ export default function ActivityPanel({ logs }: ActivityPanelProps) {
             {sensitiveLogs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4}>
-                  <TableEmptyState
+                  <EmptyState variant="table"
                     icon={ShieldCheck}
                     title="لا توجد عمليات حساسة"
-                    description="لم يتم العثور على أحداث عالية المخاطر ضمن آخر السجلات."
+                    message="لم يتم العثور على أحداث عالية المخاطر ضمن آخر السجلات."
                   />
                 </TableCell>
               </TableRow>

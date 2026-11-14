@@ -29,7 +29,24 @@ class BusinessSettings(Base):
     allow_vodafone_cash = Column(Boolean, nullable=False, default=True)
     allow_instapay = Column(Boolean, nullable=False, default=True)
     allow_bank_card = Column(Boolean, nullable=False, default=True)
+    # VAT percentage applied to invoices, e.g. 5 (means 5%). 0 disables tax.
+    tax_rate = Column(Numeric(5, 2), nullable=False, default=0, server_default="0")
     working_hours = Column(JSON, nullable=True)
+    # Attendance policy. These two used to be hardcoded in barber_presence.py
+    # (15 minutes / 0.5 EGP) while the UI's settings dialog exposed an editable
+    # "late threshold" field that was silently dropped — the dialog promised a
+    # control the backend never had. Persisting them here makes the dialog and
+    # the engine agree, and lets GET /barber-presence/working-hours hand both
+    # constants to the frontend so payroll maths uses the same numbers.
+    late_threshold_minutes = Column(Integer, nullable=False, default=15, server_default="15")
+    late_penalty_per_minute = Column(Numeric(10, 2), nullable=False, default=0.5, server_default="0.5")
+    # Master switch for automatic late-arrival penalties. Some salons prefer to
+    # track lateness without deducting; with this false the punch engine still
+    # records is_late/late_minutes, it just skips the AttendancePenalty row.
+    auto_penalty_enabled = Column(Boolean, nullable=False, default=True, server_default="1")
+    # 4-digit PIN authorising a penalty waiver. Stored as a hash; never echoed
+    # back in any response. An unset PIN disables waivers entirely.
+    penalty_cancel_pin_hash = Column(String(255), nullable=True)
     shift_auto_close_grace_period = Column(Integer, nullable=False, default=30)  # Minutes after closing time before auto-close
     landing_hero_title = Column(String(500), nullable=True)
     landing_hero_subtitle = Column(Text, nullable=True)
@@ -67,6 +84,17 @@ class BusinessSettings(Base):
     landing_testimonials_title = Column(String(500), nullable=True)
     landing_testimonials_subtitle = Column(Text, nullable=True)
     landing_cover_image_url = Column(String(500), nullable=True)
+    # Hero video. The poster is separate from the clip on purpose: it is what
+    # renders before the video is ready, and the permanent fallback when the
+    # clip is unsupported, blocked from autoplay, or suppressed because the
+    # visitor asked for reduced motion. Browsers refuse autoplay on an unmuted
+    # clip, hence the muted default — the clip is decoration, never content.
+    landing_hero_video_url = Column(String(500), nullable=True)
+    landing_video_poster_url = Column(String(500), nullable=True)
+    landing_video_autoplay = Column(Boolean, nullable=True, default=True, server_default="1")
+    landing_video_muted = Column(Boolean, nullable=True, default=True, server_default="1")
+    # Master switch for scroll-reveal and hover motion on the public site.
+    landing_motion_enabled = Column(Boolean, nullable=True, default=True, server_default="1")
     landing_theme_id = Column(String(50), nullable=True, default="gold")
     landing_show_staff = Column(Boolean, nullable=True, default=True)
     landing_show_staff_bio = Column(Boolean, nullable=True, default=True)
@@ -88,6 +116,11 @@ class BusinessSettings(Base):
     
     public_site_snapshot = Column(JSON, nullable=True)
     public_site_published_at = Column(DateTime(timezone=True), nullable=True)
+    # Settings revision counter. Bumped on every accepted write so concurrent
+    # editors can detect a lost update instead of clobbering each other.
+    version = Column(Integer, nullable=False, default=1, server_default="1")
+    # Which settings.version the public_site_snapshot was captured from.
+    public_site_published_version = Column(Integer, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

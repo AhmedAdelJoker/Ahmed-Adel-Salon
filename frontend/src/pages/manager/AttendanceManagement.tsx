@@ -1,19 +1,18 @@
-import { useAuth } from "@/context/AuthContext";
-import React, { useState, useEffect, useCallback } from "react";
-import type {
-  AttendanceNotification,
-  AttendanceRecord,
-  AttendanceSettingsForm,
-  LeaveRecord,
-} from "@/types/attendance";
-
-
-import { useNavigate } from "react-router-dom";
-import { useAttendanceData } from "@/features/attendance/hooks/useAttendanceData";
-import {
-  X,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "react-hot-toast";
+import { PageShell } from "@/components/shared/PageShell";
+import InlineNotice from "@/components/shared/InlineNotice";
+import { cn } from "@/lib/core/utils";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -21,36 +20,50 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { motion } from "framer-motion";
 import api from "@/services/api";
-import { toast } from "react-hot-toast";
-
-
-
-
-import { Input } from "@/components/ui/input";
+import { getIntlLocale } from "@/lib/format/locale";
+import { useAuth } from "@/context/AuthContext";
+import { useUI } from "@/context/UIContext";
+import { useSocket } from "@/context/SocketContext";
 import {
+  ArchiveView,
+  AttendanceDashboardView,
+  AttendanceLoading,
   AttendancePageHeader,
   AttendanceStatsCards,
   AttendanceViewTabs,
-} from "@/features/attendance/components/AttendanceHeader";
-import AttendanceDashboardView from "@/features/attendance/components/AttendanceDashboardView";
-import AttendanceLoading from "@/features/attendance/components/AttendanceLoading";
-import type { AttendanceViewMode } from "@/features/attendance/types";
-import PulseView from "@/features/attendance/components/PulseView";
-import MonthlyView from "@/features/attendance/components/MonthlyView";
-import LeavesView from "@/features/attendance/components/LeavesView";
-import CalendarView from "@/features/attendance/components/CalendarView";
-import ArchiveView from "@/features/attendance/components/ArchiveView";
+  CalendarView,
+  LeavesView,
+  MonthlyView,
+  PenaltiesView,
+  RegisterView,
+  useAttendanceData,
+} from "@/features/attendance";
+import type { AttendanceSettingsForm, AttendanceViewMode, WorkingHours } from "@/features/attendance/types";
+import { emptyLeaveForm } from "@/features/attendance/types";
+import { exportAttendancePDF } from "@/features/attendance/utils/attendance";
 
 const AttendanceManagement = () => {
-  const navigate = useNavigate();
+  const { t, i18n } = useTranslation("owner");
+  const language = i18n.resolvedLanguage || i18n.language || "ar";
+  const locale = getIntlLocale(language);
   const { user } = useAuth();
+  const { openEmployeeQuickView } = useUI();
+
+  const data = useAttendanceData({ t: t as any });
   const {
-    records,
+    historyRecords,
     employees,
     workingHours,
+    penaltyRate,
+    lateThreshold,
+    autoPenaltyEnabled,
+    penaltyPinConfigured,
+    leaves,
     loading,
+    leavesLoading,
+    loadError,
+    secondaryError,
     searchTerm,
     setSearchTerm,
     startDate,
@@ -59,292 +72,267 @@ const AttendanceManagement = () => {
     setEndDate,
     calendarMonth,
     setCalendarMonth,
+    leaveFilter,
+    setLeaveFilter,
+    archivePage,
+    setArchivePage,
+    archiveTotalPages,
+    archiveTotal,
+    pageSize,
     fetchAttendance,
-    fetchEmployees,
-    fetchWorkingHours,
+    fetchLeaves,
     todayRecords,
     processedData,
     archiveRecords,
+    filteredArchiveRecords,
     lateEmployees,
-  } = useAttendanceData();
-  const [activeViewMode, setActiveViewMode] =
-    useState<AttendanceViewMode>("dashboard");
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
-  const [regEmployeeId, setRegEmployeeId] = useState("");
-  const [regStatus, setRegStatus] = useState("in");
-  const [regTime, setRegTime] = useState(new Date().toISOString().slice(0, 16));
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
-  const [showLeaveForm, setShowLeaveForm] = useState(false);
-  const [leaveForm, setLeaveForm] = useState({
-    employee_id: "",
-    type: "vacation",
-    start_date: "",
-    end_date: "",
-    reason: "",
-  });
-  const [leaveFilter, setLeaveFilter] = useState("all");
-  const [notifications, setNotifications] = useState<AttendanceNotification[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [notifPermission, setNotifPermission] = useState(
-    Notification?.permission || "default",
-  );
+  } = data;
+
+  const [activeViewMode, setActiveViewMode] = useState<AttendanceViewMode>("today");
   const [showSettings, setShowSettings] = useState(false);
   const [settingsForm, setSettingsForm] = useState<AttendanceSettingsForm>({
     open_time: "09:00",
     close_time: "22:00",
     late_threshold: 15,
+    late_penalty_per_minute: 0.5,
+    auto_penalty_enabled: true,
   });
-  const isOwner = ["OWNER", "ADMIN"].includes(
+  // Per-day editor state — seeded from the live working hours, saved as-is.
+  const [daysForm, setDaysForm] = useState<WorkingHours>({});
+  // 4-digit cancellation PIN — write-only: the field stays empty unless the
+  // user types a new PIN. The configured state comes from the server.
+  const [pinForm, setPinForm] = useState("");
+  const [showLeaveForm, setShowLeaveForm] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({ ...emptyLeaveForm });
+
+  // Live refresh: the backend broadcasts an event on every punch (manual,
+  // fingerprint, leave decision). POS wired this up a while ago; the attendance
+  // page never listened, so a punch made at the register only appeared after a
+  // manual reload.
+  const socketContext = useSocket();
+  const lastSocketEvent = socketContext?.notifications?.[0];
+  useEffect(() => {
+    const event = (lastSocketEvent as { event?: string } | undefined)?.event;
+    if (event === "attendance_update" || event === "attendance_refresh") {
+      void data.fetchAttendance();
+      void data.fetchHistory();
+    }
+     
+  }, [lastSocketEvent]);
+
+  const canApproveLeaves = ["OWNER", "ADMIN", "MANAGER", "ACCOUNTANT"].includes(
     String(user?.role || "").toUpperCase(),
   );
 
-
-
-  const handleManualRegister = async () => {
-    if (!regEmployeeId) return toast.error("يرجى اختيار الموظف");
-    setIsRegistering(true);
-    try {
-      await api.post("/barber-presence/register", null, {
-        params: {
-          employee_id: regEmployeeId,
-          status_type: regStatus,
-          timestamp: regTime,
-        },
-      });
-      toast.success("تم تسجيل العملية بنجاح");
-      fetchAttendance();
-    } catch (err) {
-      const apiErr = err as { response?: { data?: { detail?: unknown } }; message?: string };
-      toast.error((apiErr?.response?.data?.detail as string) || apiErr?.message || "فشل تسجيل العملية");
-    } finally {
-      setIsRegistering(false);
+  useEffect(() => {
+    if (activeViewMode === "leaves") {
+      void fetchLeaves(leaveFilter);
     }
-  };
+  }, [activeViewMode, leaveFilter, fetchLeaves]);
 
-  const handleFileUpload = async (e, type) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    setIsImporting(true);
-    const endpoint =
-      type === "excel"
-        ? "/barber-presence/import-excel"
-        : "/barber-presence/import-biometric";
-    try {
-      const res = await api.post(endpoint, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      toast.success(res.data?.message || "تم الاستيراد بنجاح");
-      fetchAttendance();
-    } catch (_err) {
-      toast.error("فشل استيراد الملف");
-    } finally {
-      setIsImporting(false);
-      e.target.value = "";
-    }
-  };
+  // Seed settings + the per-day editor from the live working-hours response.
+  useEffect(() => {
+    const hours = workingHours || {};
+    setDaysForm(hours);
+    const openDay = Object.values(hours).find((d) => d?.is_open && d.open_time && d.close_time);
+    setSettingsForm((s) => ({
+      ...s,
+      open_time: openDay?.open_time || s.open_time,
+      close_time: openDay?.close_time || s.close_time,
+      late_threshold: lateThreshold,
+      late_penalty_per_minute: penaltyRate,
+      auto_penalty_enabled: autoPenaltyEnabled,
+    }));
+  }, [workingHours, lateThreshold, penaltyRate, autoPenaltyEnabled]);
+
+  const exportRows = useMemo(() => {
+    if (activeViewMode === "analytics") return processedData;
+    if (activeViewMode === "archive") return filteredArchiveRecords;
+    return todayRecords;
+  }, [activeViewMode, processedData, filteredArchiveRecords, todayRecords]);
 
   const handleExportPDF = async () => {
-    // Lazy-load the heavy PDF libs only when the user actually exports (~430KB saved).
-    const { jsPDF } = await import("jspdf");
-    const { default: autoTable } = await import("jspdf-autotable");
-    const doc = new jsPDF();
-    doc.setFont("helvetica", "bold");
-    doc.text("Barber Luxe OS - Attendance Report", 14, 20);
-    let dataToExport: AttendanceRecord[] = [];
-    if (activeViewMode === "dashboard") dataToExport = todayRecords;
-    else if (activeViewMode === "monthly") dataToExport = processedData;
-    else dataToExport = archiveRecords;
-    const tableData = dataToExport.map((r) => [
-      r.employee_name || r.full_name || "Unknown",
-      r.status || (r.stats ? "Aggregated" : "N/A"),
-      r.created_at
-        ? new Date(r.created_at).toLocaleString("ar-EG")
-        : "Report Data",
-    ]);
-    autoTable(doc, {
-      startY: 30,
-      head: [["Employee", "Status", "Timestamp"]],
-      body: tableData,
-    });
-    doc.save(
-      `attendance_${activeViewMode}_${new Date().toISOString().slice(0, 10)}.pdf`,
-    );
-    toast.success("تم تحميل تقرير PDF");
+    try {
+      await exportAttendancePDF({
+        activeViewMode,
+        rows: exportRows,
+        locale,
+        t: t as any,
+      });
+    } catch {
+      toast.error(t("attendance.exportPdfFailed"));
+    }
   };
 
-  // Leave Management
-  const fetchLeaves = useCallback(async () => {
+  const DAY_KEYS = [
+    "saturday",
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+  ] as const;
+
+  const updateDay = (
+    day: string,
+    patch: Partial<{ is_open: boolean; open_time: string; close_time: string }>,
+  ) =>
+    setDaysForm((prev) => ({
+      ...prev,
+      [day]: {
+        is_open: patch.is_open ?? prev[day]?.is_open ?? true,
+        open_time: patch.open_time ?? prev[day]?.open_time ?? "09:00",
+        close_time: patch.close_time ?? prev[day]?.close_time ?? "22:00",
+      },
+    }));
+
+  // Copy the first open day's times onto every open day — the common case of
+  // "same hours every day" without retyping seven times.
+  const applyToAllOpenDays = () => {
+    const template = DAY_KEYS.map((d) => daysForm[d]).find((d) => d?.is_open);
+    if (!template) return;
+    setDaysForm((prev) => {
+      const next: WorkingHours = { ...prev };
+      for (const day of DAY_KEYS) {
+        if (next[day]?.is_open) {
+          next[day] = { ...next[day], open_time: template.open_time, close_time: template.close_time };
+        }
+      }
+      return next;
+    });
+    toast.success(t("attendance.timesAppliedToAll"));
+  };
+
+  const detailOf = (err: unknown): string | null => {
+    const e = err as { response?: { data?: { detail?: unknown } } };
+    const d = e?.response?.data?.detail;
+    return typeof d === "string" ? d : null;
+  };
+
+  const handleSaveSettings = async () => {
     try {
-      const res = await api.get("/barber-presence/leaves", {
-        params: { status: leaveFilter === "all" ? undefined : leaveFilter },
-      });
-      setLeaves(res.data || []);
+      const workingHoursPayload: Record<string, unknown> = {};
+      for (const day of DAY_KEYS) {
+        const current = daysForm[day];
+        const isOpen = current?.is_open !== false;
+        workingHoursPayload[day] = {
+          is_open: isOpen,
+          open_time: current?.open_time || settingsForm.open_time,
+          close_time: current?.close_time || settingsForm.close_time,
+        };
+      }
+      const payload: Record<string, unknown> = {
+        working_hours: workingHoursPayload,
+        late_threshold: settingsForm.late_threshold,
+        late_penalty_per_minute: settingsForm.late_penalty_per_minute,
+        auto_penalty_enabled: settingsForm.auto_penalty_enabled,
+      };
+      // Send the PIN only when the user typed a new one — empty means keep.
+      if (pinForm && !/^\d{4}$/.test(pinForm)) {
+        toast.error(t("attendance.penaltyPinInvalid"));
+        return;
+      }
+      if (/^\d{4}$/.test(pinForm)) {
+        payload.penalty_cancel_pin = pinForm;
+      }
+      await api.post("/barber-presence/working-hours", payload);
+      setPinForm("");
+      toast.success(t("attendance.settingsSaved"));
+      setShowSettings(false);
+      await fetchAttendance();
     } catch (err) {
-      /* ignore */
+      // Surface the backend's validation message (invalid window, short day...)
+      toast.error(detailOf(err) || t("attendance.settingsFailed"));
     }
-  }, [leaveFilter]);
+  };
 
   const handleCreateLeave = async () => {
-    if (
-      !leaveForm.employee_id ||
-      !leaveForm.start_date ||
-      !leaveForm.end_date
-    ) {
-      return toast.error("يرجى إكمال جميع الحقول المطلوبة");
+    if (!leaveForm.employee_id || !leaveForm.start_date || !leaveForm.end_date) {
+      return toast.error(t("attendance.completeFields"));
     }
     try {
       await api.post("/barber-presence/leaves", leaveForm);
-      toast.success("تم إرسال طلب الإجازة");
+      toast.success(t("attendance.leaveSent"));
       setShowLeaveForm(false);
-      setLeaveForm({
-        employee_id: "",
-        type: "vacation",
-        start_date: "",
-        end_date: "",
-        reason: "",
-      });
-      fetchLeaves();
+      setLeaveForm({ ...emptyLeaveForm });
+      await fetchLeaves(leaveFilter);
     } catch (err) {
       const apiErr = err as { response?: { data?: { detail?: unknown } }; message?: string };
-      toast.error((apiErr?.response?.data?.detail as string) || apiErr?.message || "فشل إرسال الطلب");
+      toast.error(
+        (typeof apiErr?.response?.data?.detail === "string" && apiErr.response.data.detail) ||
+          apiErr?.message ||
+          t("attendance.leaveFailed"),
+      );
     }
   };
 
-  const handleLeaveAction = async (leaveId, action) => {
+  const handleLeaveAction = async (leaveId: string | number | undefined, action: string) => {
+    if (!canApproveLeaves) {
+      toast.error(t("attendance.leaveApproveNoPermission"));
+      return;
+    }
     try {
       await api.patch(`/barber-presence/leaves/${leaveId}`, { status: action });
-      toast.success(action === "approved" ? "تم قبول الطلب" : "تم رفض الطلب");
-      fetchLeaves();
-    } catch (err) {
-      toast.error("فشل تحديث الطلب");
+      toast.success(action === "approved" ? t("attendance.leaveApproved") : t("attendance.leaveRejected"));
+      await fetchLeaves(leaveFilter);
+    } catch {
+      toast.error(t("attendance.leaveFailed"));
     }
   };
-
-  // Notifications
-  const requestNotificationPermission = async () => {
-    if (!("Notification" in window))
-      return toast.error("المتصفح لا يدعم الإشعارات");
-    const permission = await Notification.requestPermission();
-    setNotifPermission(permission);
-    if (permission === "granted") toast.success("تم تفعيل الإشعارات");
-  };
-
-  const sendNotification = (title, body) => {
-    if (notifPermission === "granted")
-      new Notification(title, { body, icon: "/favicon.ico" });
-  };
-
-  // Settings
-  const handleSaveSettings = async () => {
-    try {
-      const workingHoursPayload = {};
-      const days = [
-        "sunday",
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-      ];
-      days.forEach((day) => {
-        workingHoursPayload[day] = {
-          is_open: true,
-          open_time: settingsForm.open_time,
-          close_time: settingsForm.close_time,
-        };
-      });
-      await api.post("/barber-presence/working-hours", {
-        working_hours: workingHoursPayload,
-      });
-      toast.success("تم حفظ الإعدادات");
-      setShowSettings(false);
-      fetchWorkingHours();
-    } catch (err) {
-      toast.error("فشل حفظ الإعدادات");
-    }
-  };
-
-
-
-  // Alert check
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      if (now.getHours() === 22) {
-        const stillIn = todayRecords.filter(
-          (p) => Number(p.stats?.totalHours) > 0 && !p.isComplete,
-        );
-        if (stillIn.length > 0) {
-          sendNotification(
-            "تذكير الانصراف",
-            ` ${stillIn.length} موظف لم يسجلوا انصراف بعد`,
-          );
-          setNotifications((prev) => [
-            ...prev,
-            {
-              id: Date.now(),
-              title: "تذكير الانصراف",
-              message: `${stillIn.length} موظف لم يسجلوا انصراف`,
-              time: new Date(),
-              read: false,
-            },
-          ]);
-        }
-      }
-    }, 3600000);
-    return () => clearInterval(interval);
-  }, [todayRecords, notifPermission]);
 
   if (loading) {
-    return <AttendanceLoading />;
+    return (
+      <PageShell contained>
+        <AttendanceLoading />
+      </PageShell>
+    );
   }
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
+        <div className="space-y-4">
         <AttendancePageHeader
           onShowSettings={() => setShowSettings(true)}
           onExportPDF={handleExportPDF}
-          onRefresh={fetchAttendance}
+          onRefresh={() => {
+            void fetchAttendance();
+            void data.fetchHistory();
+          }}
+          loading={loading}
+          t={t as any}
         />
 
-        {/* Stats Cards */}
-        <AttendanceStatsCards
-          todayRecords={todayRecords}
-          lateEmployees={lateEmployees}
-        />
-
-        {/* Tab Navigation */}
-        <AttendanceViewTabs
-          activeViewMode={activeViewMode}
-          onChange={setActiveViewMode}
-        />
-
-        {/* Dashboard View */}
-        {activeViewMode === "dashboard" && (
-          <AttendanceDashboardView todayRecords={todayRecords} />
+        {loadError && (
+          <InlineNotice tone="error">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-black">{t("attendance.loadFailed")}</p>
+                <p className="mt-0.5 text-xs font-semibold opacity-90">{loadError}</p>
+              </div>
+              <Button size="sm" variant="outline" className="h-9 rounded-xl border-current/20" onClick={() => void fetchAttendance()}>
+                {t("attendance.retry")}
+              </Button>
+            </div>
+          </InlineNotice>
         )}
+        {secondaryError && <InlineNotice tone="warning">{secondaryError}</InlineNotice>}
 
-        {/* Pulse View */}
-        {activeViewMode === "pulse" && (
-          <PulseView
+        <AttendanceStatsCards todayRecords={todayRecords} lateEmployees={lateEmployees} t={t as any} />
+        <AttendanceViewTabs activeViewMode={activeViewMode} onChange={setActiveViewMode} t={t as any} />
+
+        {activeViewMode === "today" && (
+          <AttendanceDashboardView
             todayRecords={todayRecords}
-            lateEmployees={lateEmployees}
-            employees={employees}
+            t={t as any}
+            locale={locale}
+            onOpenEmployeeFile={(id) => openEmployeeQuickView(String(id))}
           />
         )}
-
-        {/* Monthly View */}
-        {activeViewMode === "monthly" && (
-          <MonthlyView processedData={processedData} />
+        {activeViewMode === "register" && (
+          <RegisterView employees={employees} onRefresh={fetchAttendance} t={t as any} />
         )}
-
-        {/* Leaves View */}
         {activeViewMode === "leaves" && (
           <LeavesView
             leaves={leaves}
@@ -352,20 +340,28 @@ const AttendanceManagement = () => {
             setLeaveFilter={setLeaveFilter}
             onNewLeave={() => setShowLeaveForm(true)}
             onLeaveAction={handleLeaveAction}
+            canApprove={canApproveLeaves}
+            loading={leavesLoading}
+            t={t as any}
+            locale={locale}
           />
         )}
-
-        {/* Calendar View */}
         {activeViewMode === "calendar" && (
           <CalendarView
-            records={records}
+            records={historyRecords}
             calendarMonth={calendarMonth}
             setCalendarMonth={setCalendarMonth}
             workingHours={workingHours}
+            t={t as any}
+            locale={locale}
           />
         )}
-
-        {/* Archive View */}
+        {activeViewMode === "analytics" && (
+          <MonthlyView processedData={processedData} t={t as any} locale={locale} language={language} />
+        )}
+        {activeViewMode === "penalties" && (
+          <PenaltiesView t={t as any} locale={locale} language={language} employees={employees} />
+        )}
         {activeViewMode === "archive" && (
           <ArchiveView
             archiveRecords={archiveRecords}
@@ -375,255 +371,220 @@ const AttendanceManagement = () => {
             setStartDate={setStartDate}
             endDate={endDate}
             setEndDate={setEndDate}
+            page={archivePage}
+            setPage={setArchivePage}
+            totalPages={archiveTotalPages}
+            total={archiveTotal}
+            pageSize={pageSize}
+            t={t as any}
+            locale={locale}
+            language={language}
           />
         )}
-      </div>
-
-      {/* Settings Modal */}
-      {showSettings && (
-         <div
-           role="button"
-           tabIndex={0}
-           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-           onClick={() => setShowSettings(false)}
-           onKeyDown={(event) => {
-             if (event.key === "Escape") {
-               setShowSettings(false);
-             }
-           }}
-         >
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-             className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl"
-             role="dialog"
-             aria-modal="true"
-             tabIndex={-1}
-             onClick={(e) => e.stopPropagation()}
-             onKeyDown={(e) => e.stopPropagation()}
-
-          >
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-black text-main">إعدادات الحضور</h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setShowSettings(false)}
-              >
-                <X size={16} />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                  وقت الافتتاح
-                </label>
-                <Input
-                  type="time"
-                  value={settingsForm.open_time}
-                  onChange={(e) =>
-                    setSettingsForm({
-                      ...settingsForm,
-                      open_time: e.target.value,
-                    })
-                  }
-                  className="h-10 rounded-xl mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                  وقت الإغلاق
-                </label>
-                <Input
-                  type="time"
-                  value={settingsForm.close_time}
-                  onChange={(e) =>
-                    setSettingsForm({
-                      ...settingsForm,
-                      close_time: e.target.value,
-                    })
-                  }
-                  className="h-10 rounded-xl mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                  حد التأخير (دقائق)
-                </label>
-                <Input
-                  type="number"
-                  value={settingsForm.late_threshold}
-                  onChange={(e) =>
-                    setSettingsForm({
-                      ...settingsForm,
-                      late_threshold: Number(e.target.value),
-                    })
-                  }
-                  className="h-10 rounded-xl mt-1"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2 mt-6">
-              <Button
-                variant="outline"
-                className="h-10 flex-1 rounded-xl"
-                onClick={() => setShowSettings(false)}
-              >
-                إلغاء
-              </Button>
-              <Button
-                className="h-10 flex-1 rounded-xl"
-                onClick={handleSaveSettings}
-              >
-                حفظ
-              </Button>
-            </div>
-          </motion.div>
         </div>
-      )}
+      </PageShell>
 
-      {/* Leave Form Modal */}
-      {showLeaveForm && (
-         <div
-           role="button"
-           tabIndex={0}
-           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-           onClick={() => setShowLeaveForm(false)}
-           onKeyDown={(event) => {
-             if (event.key === "Escape") {
-               setShowLeaveForm(false);
-             }
-           }}
-         >
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-             className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl"
-             role="dialog"
-             aria-modal="true"
-             tabIndex={-1}
-             onClick={(e) => e.stopPropagation()}
-             onKeyDown={(e) => e.stopPropagation()}
-
-          >
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-black text-main">طلب إجازة جديد</h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setShowLeaveForm(false)}
-              >
-                <X size={16} />
-              </Button>
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black">{t("attendance.settingsTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[70vh] space-y-5 overflow-y-auto pe-1">
+            {/* ===== ساعات العمل لكل يوم ===== */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-black uppercase tracking-wide text-muted">{t("attendance.hoursPerDay")}</p>
+                <Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] font-bold" onClick={applyToAllOpenDays}>
+                  {t("attendance.applyToAllDays")}
+                </Button>
+              </div>
+              {DAY_KEYS.map((day) => {
+                const dayForm = daysForm[day];
+                const isOpen = dayForm?.is_open !== false;
+                return (
+                  <div
+                    key={day}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl border border-border bg-muted/5 p-2",
+                      !isOpen && "opacity-60",
+                    )}
+                  >
+                    <Switch
+                      checked={isOpen}
+                      onCheckedChange={(v: boolean) => updateDay(day, { is_open: v })}
+                      aria-label={t("workingHours.toggleAria", { day: t(`workingHours.day.${day}`) })}
+                    />
+                    <span className="w-16 shrink-0 text-xs font-black text-main">
+                      {t(`workingHours.day.${day}`)}
+                    </span>
+                    <Input
+                      type="time"
+                      value={dayForm?.open_time || "09:00"}
+                      onChange={(e) => updateDay(day, { open_time: e.target.value })}
+                      disabled={!isOpen}
+                      aria-label={t("attendance.openingTime")}
+                      className="h-9 rounded-lg text-sm"
+                    />
+                    <span className="text-muted">←</span>
+                    <Input
+                      type="time"
+                      value={dayForm?.close_time || "22:00"}
+                      onChange={(e) => updateDay(day, { close_time: e.target.value })}
+                      disabled={!isOpen}
+                      aria-label={t("attendance.closingTime")}
+                      className="h-9 rounded-lg text-sm"
+                    />
+                  </div>
+                );
+              })}
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                  الموظف
-                </label>
-                <Select
-                  value={leaveForm.employee_id}
-                  onValueChange={(v) =>
-                    setLeaveForm({ ...leaveForm, employee_id: v })
-                  }
-                >
-                  <SelectTrigger className="h-10 rounded-xl mt-1">
-                    <SelectValue placeholder="اختر الموظف" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees.map((emp) => (
-                      <SelectItem key={emp.id} value={String(emp.id)}>
-                        {emp.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                  نوع الإجازة
-                </label>
-                <Select
-                  value={leaveForm.type}
-                  onValueChange={(v) => setLeaveForm({ ...leaveForm, type: v })}
-                >
-                  <SelectTrigger className="h-10 rounded-xl mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="vacation">إجازة سنوية</SelectItem>
-                    <SelectItem value="sick">إجازة مرضية</SelectItem>
-                    <SelectItem value="other">أخرى</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+
+            {/* ===== سياسة التأخير ===== */}
+            <div className="space-y-3 border-t border-border pt-4">
+              <p className="text-[11px] font-black uppercase tracking-wide text-muted">{t("attendance.policyTitle")}</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                    من
+                  <label htmlFor="set-late" className="mb-1 block text-[11px] font-bold text-muted">
+                    {t("attendance.lateLimit")}
                   </label>
-                  <Input
-                    type="date"
-                    value={leaveForm.start_date}
-                    onChange={(e) =>
-                      setLeaveForm({ ...leaveForm, start_date: e.target.value })
-                    }
-                    className="h-10 rounded-xl mt-1"
-                  />
+                  <Input id="set-late" type="number" min={0} max={240} value={settingsForm.late_threshold} onChange={(e) => setSettingsForm({ ...settingsForm, late_threshold: Number(e.target.value) })} className="h-11 rounded-xl" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                    إلى
+                  <label htmlFor="set-penalty" className="mb-1 block text-[11px] font-bold text-muted">
+                    {t("attendance.penaltyPerMinute")}
                   </label>
-                  <Input
-                    type="date"
-                    value={leaveForm.end_date}
-                    onChange={(e) =>
-                      setLeaveForm({ ...leaveForm, end_date: e.target.value })
-                    }
-                    className="h-10 rounded-xl mt-1"
-                  />
+                  <Input id="set-penalty" type="number" min={0} max={100} step="0.25" value={settingsForm.late_penalty_per_minute} onChange={(e) => setSettingsForm({ ...settingsForm, late_penalty_per_minute: Number(e.target.value) })} className="h-11 rounded-xl" />
                 </div>
               </div>
-              <div>
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                  السبب
-                </label>
-                <textarea
-                  value={leaveForm.reason}
-                  onChange={(e) =>
-                    setLeaveForm({ ...leaveForm, reason: e.target.value })
-                  }
-                  className="w-full h-20 rounded-xl border border-border bg-soft p-3 text-sm font-bold resize-none mt-1"
-                  placeholder="اختياري..."
+              <p className="text-[11px] font-medium text-muted">{t("attendance.penaltyPerMinuteHint")}</p>
+              <label htmlFor="set-auto-penalty" className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-muted/10 p-3">
+                <Switch
+                  id="set-auto-penalty"
+                  checked={settingsForm.auto_penalty_enabled}
+                  onCheckedChange={(v: boolean) => setSettingsForm({ ...settingsForm, auto_penalty_enabled: v })}
                 />
+                <span className="min-w-0">
+                  <span className="block text-xs font-black text-main">{t("attendance.autoPenaltyLabel")}</span>
+                  <span className="mt-0.5 block text-[11px] font-medium text-muted">{t("attendance.autoPenaltyHint")}</span>
+                </span>
+              </label>
+
+              {/* ===== رقم إلغاء الجزاء (4 أرقام) ===== */}
+              <div className="space-y-1.5 rounded-xl border border-border bg-muted/10 p-3">
+                <label htmlFor="set-pin" className="flex items-center justify-between gap-2 text-xs font-black text-main">
+                  <span>{t("attendance.penaltyPinLabel")}</span>
+                  <span className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-black",
+                    penaltyPinConfigured ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-800",
+                  )}>
+                    {penaltyPinConfigured ? t("attendance.penaltyPinSet") : t("attendance.penaltyPinMissing")}
+                  </span>
+                </label>
+                <Input
+                  id="set-pin"
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  autoComplete="new-password"
+                  value={pinForm}
+                  onChange={(e) => setPinForm(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder={penaltyPinConfigured ? "••••" : "1234"}
+                  className="h-11 rounded-xl tracking-[0.5em]"
+                  aria-label={t("attendance.penaltyPinLabel")}
+                />
+                <p className="text-[11px] font-medium text-muted">{t("attendance.penaltyPinHint")}</p>
               </div>
             </div>
-            <div className="flex gap-2 mt-6">
-              <Button
-                variant="outline"
-                className="h-10 flex-1 rounded-xl"
-                onClick={() => setShowLeaveForm(false)}
-              >
-                إلغاء
+
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="h-11 flex-1 rounded-xl" onClick={() => setShowSettings(false)}>
+                {t("attendance.cancel")}
               </Button>
-              <Button
-                className="h-10 flex-1 rounded-xl"
-                onClick={handleCreateLeave}
-              >
-                إرسال
+              <Button className="h-11 flex-1 rounded-xl" onClick={handleSaveSettings}>
+                {t("attendance.save")}
               </Button>
             </div>
-          </motion.div>
-        </div>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLeaveForm} onOpenChange={setShowLeaveForm}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black">{t("attendance.newLeave")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="lv-emp" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                {t("attendance.employee")}
+              </label>
+              <Select value={leaveForm.employee_id} onValueChange={(v) => setLeaveForm({ ...leaveForm, employee_id: v })}>
+                <SelectTrigger id="lv-emp" className="h-11 rounded-xl">
+                  <SelectValue placeholder={t("attendance.selectEmployeeLabel")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={String(emp.id)}>
+                      {emp.full_name || emp.name || `#${emp.id}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label htmlFor="lv-type" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                {t("attendance.leaveType")}
+              </label>
+              <Select value={leaveForm.type} onValueChange={(v) => setLeaveForm({ ...leaveForm, type: v })}>
+                <SelectTrigger id="lv-type" className="h-11 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vacation">{t("attendance.vacation")}</SelectItem>
+                  <SelectItem value="sick">{t("attendance.sick")}</SelectItem>
+                  <SelectItem value="other">{t("attendance.other")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="lv-from" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                  {t("attendance.from")}
+                </label>
+                <Input id="lv-from" type="date" value={leaveForm.start_date} onChange={(e) => setLeaveForm({ ...leaveForm, start_date: e.target.value })} className="h-11 rounded-xl" />
+              </div>
+              <div>
+                <label htmlFor="lv-to" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                  {t("attendance.to")}
+                </label>
+                <Input id="lv-to" type="date" value={leaveForm.end_date} onChange={(e) => setLeaveForm({ ...leaveForm, end_date: e.target.value })} className="h-11 rounded-xl" />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="lv-reason" className="mb-1 block text-[11px] font-black uppercase tracking-wide text-muted">
+                {t("attendance.reason")}
+              </label>
+              <textarea
+                id="lv-reason"
+                value={leaveForm.reason}
+                onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
+                className="mt-1 min-h-[88px] w-full rounded-xl border border-border bg-card p-3 text-sm font-medium"
+                placeholder={t("attendance.reasonPlaceholder")}
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="h-11 flex-1 rounded-xl" onClick={() => setShowLeaveForm(false)}>
+                {t("attendance.cancel")}
+              </Button>
+              <Button className="h-11 flex-1 rounded-xl" onClick={handleCreateLeave}>
+                {t("attendance.send")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
 export default AttendanceManagement;
-

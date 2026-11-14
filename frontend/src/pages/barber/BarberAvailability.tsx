@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { PageShell } from "@/components/shared/PageShell";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +36,7 @@ import { PageHeader } from "@/components/shared/PremiumUI";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { useAppLocale } from "@/hooks/useAppLocale";
 
 const DAYS_AR = [
   { key: "sunday", label: "الأحد", short: "أحد" },
@@ -47,6 +49,7 @@ const DAYS_AR = [
 ];
 
 const BarberAvailability = () => {
+  const { locale } = useAppLocale();
   const { user } = useAuth();
    
   const [workingHours, setWorkingHours] = useState<Record<string, any>>({});
@@ -150,8 +153,8 @@ const BarberAvailability = () => {
   const today = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <PageHeader
           title="ساعات العمل والإجازات"
           subtitle="إدارة جدول عملك وإجازاتك"
@@ -164,7 +167,7 @@ const BarberAvailability = () => {
               onClick={handleSaveHours}
               loading={saving}
             >
-              <Save size={14} className="ml-1.5" /> حفظ التغييرات
+              <Save size={14} className="ms-1.5" /> حفظ التغييرات
             </Button>
           }
         />
@@ -276,7 +279,7 @@ const BarberAvailability = () => {
                 setShowTimeOffModal(true);
               }}
             >
-              <Plus size={14} className="ml-1.5" /> إضافة إجازة
+              <Plus size={14} className="ms-1.5" /> إضافة إجازة
             </Button>
           </div>
 
@@ -321,13 +324,13 @@ const BarberAvailability = () => {
                           (item.type === "vacation" ? "إجازة" : "راحة")}
                       </p>
                       <p className="text-[10px] font-bold text-muted">
-                        {new Date(item.start_date).toLocaleDateString("ar-EG", {
+                        {new Date(item.start_date).toLocaleDateString(locale, {
                           weekday: "long",
                           day: "numeric",
                           month: "long",
                         })}
                         {item.end_date !== item.start_date &&
-                          ` - ${new Date(item.end_date).toLocaleDateString("ar-EG", { day: "numeric", month: "long" })}`}
+                          ` - ${new Date(item.end_date).toLocaleDateString(locale, { day: "numeric", month: "long" })}`}
                       </p>
                     </div>
                   </div>
@@ -360,7 +363,7 @@ const BarberAvailability = () => {
             </div>
           )}
         </div>
-      </div>
+      </PageShell>
 
       {/* Time Off Modal */}
       <Dialog open={showTimeOffModal} onOpenChange={setShowTimeOffModal}>
@@ -460,10 +463,9 @@ const BarberAvailability = () => {
               {editingTimeOff ? "حفظ" : "إضافة"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
     </div>
   );
 };
-
 export default BarberAvailability;

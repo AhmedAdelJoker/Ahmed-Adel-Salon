@@ -104,7 +104,7 @@ export default function Login() {
             </div>
             <div>
               <div className="text-2xl font-black tracking-tighter text-main leading-tight">
-                Barber Luxe
+                Salon Pro
               </div>
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-accent/70">
                 Premium Management Suite
@@ -159,7 +159,7 @@ export default function Login() {
           <div className="flex items-center gap-6">
             <div className="h-[1px] w-12 bg-accent/20" />
             <div className="text-[11px] font-black text-muted/40 uppercase tracking-[0.4em]">
-              Barber Luxe Elite · MMXXVI
+              Salon Pro Elite · MMXXVI
             </div>
           </div>
         </section>
@@ -177,7 +177,7 @@ export default function Login() {
                 <Scissors size={32} strokeWidth={2.5} />
               </div>
               <div className="text-2xl font-black tracking-tighter text-main">
-                Barber Luxe
+                Salon Pro
               </div>
               <div className="text-[9px] font-black uppercase tracking-[0.3em] text-accent/70 mt-1">
                 Premium Suite
@@ -208,7 +208,7 @@ export default function Login() {
               <CardContent className="mt-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-2">
-                    <span className="text-[11px] font-black text-muted uppercase tracking-widest mr-2">
+                    <span className="text-[11px] font-black text-muted uppercase tracking-widest me-2">
                       اسم المستخدم
                     </span>
                     <div className="relative group">
@@ -218,7 +218,7 @@ export default function Login() {
                       <Input
                         value={username || ""}
                         onChange={(event) => setUsername(event.target.value)}
-                        className="h-14 pr-14 bg-bg-main/50 border-border/40 focus:border-accent/40 rounded-2xl text-[14px] font-bold"
+                        className="h-14 pe-14 bg-bg-main/50 border-border/40 focus:border-accent/40 rounded-2xl text-[14px] font-bold"
                         placeholder="أدخل اسم المستخدم..."
                         autoComplete="username"
                         required
@@ -227,7 +227,7 @@ export default function Login() {
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between mr-2">
+                    <div className="flex items-center justify-between me-2">
                       <span className="text-[11px] font-black text-muted uppercase tracking-widest">
                         كلمة المرور
                       </span>
@@ -249,7 +249,7 @@ export default function Login() {
                         type="password"
                         value={password || ""}
                         onChange={(event) => setPassword(event.target.value)}
-                        className="h-14 pr-14 bg-bg-main/50 border-border/40 focus:border-accent/40 rounded-2xl text-[14px] font-bold"
+                        className="h-14 pe-14 bg-bg-main/50 border-border/40 focus:border-accent/40 rounded-2xl text-[14px] font-bold"
                         placeholder="••••••••••••"
                         autoComplete="current-password"
                         required
@@ -259,7 +259,7 @@ export default function Login() {
 
                   {totpRequired && (
                     <div className="space-y-2">
-                      <span className="text-[11px] font-black text-muted uppercase tracking-widest mr-2">
+                      <span className="text-[11px] font-black text-muted uppercase tracking-widest me-2">
                         رمز التحقق (6 أرقام)
                       </span>
                       <div className="relative group">
@@ -271,7 +271,7 @@ export default function Login() {
                           onChange={(event) =>
                             setTotp(event.target.value.replace(/\D/g, "").slice(0, 6))
                           }
-                          className="h-14 pr-14 bg-bg-main/50 border-border/40 focus:border-accent/40 rounded-2xl text-[14px] font-bold text-center tracking-[0.5em]"
+                          className="h-14 pe-14 bg-bg-main/50 border-border/40 focus:border-accent/40 rounded-2xl text-[14px] font-bold text-center tracking-[0.5em]"
                           placeholder="••••••"
                           autoComplete="one-time-code"
                           inputMode="numeric"
@@ -288,7 +288,7 @@ export default function Login() {
                     loading={isSubmitting}
                     className="h-14 w-full rounded-2xl bg-accent hover:bg-accent-strong text-bg-main font-black text-[15px] shadow-xl shadow-accent/20 transition-all active:scale-[0.98]"
                   >
-                    دخول المنصة <Zap size={18} className="mr-2 fill-current" />
+                    دخول المنصة <Zap size={18} className="me-2 fill-current" />
                   </Button>
                 </form>
 
@@ -306,7 +306,7 @@ export default function Login() {
 
             <div className="mt-8 text-center">
               <p className="text-[10px] font-bold text-muted/40 uppercase tracking-[0.2em]">
-                Powered by Barber Luxe Digital Architecture
+                Powered by Salon Pro Digital Architecture
               </p>
             </div>
           </motion.div>

@@ -46,12 +46,12 @@ def upgrade() -> None:
             sa.Column("status", sa.String(length=30), nullable=False, server_default="active"),
             sa.Column("work_days_json", sa.JSON(), nullable=True),
             sa.Column("work_hours_json", sa.JSON(), nullable=True),
-            sa.Column("show_in_pos", sa.Boolean(), nullable=False, server_default=sa.text("1")),
-            sa.Column("show_in_booking", sa.Boolean(), nullable=False, server_default=sa.text("1")),
-            sa.Column("allow_online_booking", sa.Boolean(), nullable=False, server_default=sa.text("1")),
-            sa.Column("allow_walk_in_assignment", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+            sa.Column("show_in_pos", sa.Boolean(), nullable=False, server_default=sa.true()),
+            sa.Column("show_in_booking", sa.Boolean(), nullable=False, server_default=sa.true()),
+            sa.Column("allow_online_booking", sa.Boolean(), nullable=False, server_default=sa.true()),
+            sa.Column("allow_walk_in_assignment", sa.Boolean(), nullable=False, server_default=sa.true()),
             sa.Column("display_order", sa.Integer(), nullable=False, server_default="0"),
-            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
             sa.Column("base_salary", sa.Numeric(precision=10, scale=2), nullable=False, server_default="0"),
             sa.Column("commission_rate", sa.Numeric(precision=5, scale=2), nullable=False, server_default="0"),
             sa.Column("fixed_bonus", sa.Numeric(precision=10, scale=2), nullable=False, server_default="0"),
@@ -61,9 +61,9 @@ def upgrade() -> None:
             sa.Column("bank_account", sa.String(length=100), nullable=True),
             sa.Column("assistant_of_barber_id", sa.Integer(), sa.ForeignKey("employees.id"), nullable=True),
             sa.Column("assistant_tasks_json", sa.JSON(), nullable=True),
-            sa.Column("receives_commission", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+            sa.Column("receives_commission", sa.Boolean(), nullable=False, server_default=sa.false()),
             sa.Column("assistant_commission_rate", sa.Numeric(precision=5, scale=2), nullable=False, server_default="0"),
-            sa.Column("has_login_account", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+            sa.Column("has_login_account", sa.Boolean(), nullable=False, server_default=sa.false()),
             sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=True),
             sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
             sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
@@ -100,8 +100,8 @@ def upgrade() -> None:
             sa.Column("discount_percentage", sa.Numeric(precision=10, scale=2), nullable=True),
             sa.Column("start_date", sa.Date(), nullable=True),
             sa.Column("end_date", sa.Date(), nullable=True),
-            sa.Column("is_public", sa.Boolean(), nullable=False, server_default=sa.text("1")),
-            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+            sa.Column("is_public", sa.Boolean(), nullable=False, server_default=sa.true()),
+            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
             sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
             sa.PrimaryKeyConstraint("id"),
         )
@@ -211,7 +211,7 @@ def upgrade() -> None:
             "expense_date": sa.Column("expense_date", sa.DateTime(timezone=True), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=True),
         },
         "products": {
-            "is_archived": sa.Column("is_archived", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+            "is_archived": sa.Column("is_archived", sa.Boolean(), nullable=False, server_default=sa.false()),
         },
         "customers": {
             "cancellation_count": sa.Column("cancellation_count", sa.Integer(), nullable=True, server_default="0"),
@@ -220,7 +220,7 @@ def upgrade() -> None:
             "booking_source": sa.Column("booking_source", sa.String(length=50), nullable=True, server_default=sa.text("'shop'")),
         },
         "invoices": {
-            "is_draft": sa.Column("is_draft", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+            "is_draft": sa.Column("is_draft", sa.Boolean(), nullable=False, server_default=sa.false()),
         },
     }
     for table_name, additions in column_additions.items():

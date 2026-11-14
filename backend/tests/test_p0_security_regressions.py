@@ -4,11 +4,13 @@ from decimal import Decimal
 import pytest
 from starlette.websockets import WebSocketDisconnect
 
+from app.models.appointment import Appointment
 from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.employee_document import EmployeeDocument
 from app.models.invoice import Invoice
 from app.models.notification import Notification
+from app.models.pos_shift import PosShift
 from tests.helpers import auth_headers, login, make_user
 
 
@@ -295,3 +297,94 @@ def test_employee_document_is_private_and_path_safe(
     )
     assert downloaded.status_code == 200, downloaded.text
     assert downloaded.content == pdf
+
+
+def test_barber_cannot_access_another_employees_appointment(client, db_session):
+    barber_user = make_user(db_session, username="barberp0", role="barber")
+    own_employee = Employee(
+        full_name="Scoped Barber",
+        phone_primary="01000005555",
+        job_title="barber",
+    )
+    db_session.add(own_employee)
+    db_session.flush()
+    barber_user.barber_id = own_employee.id
+    other_employee = _employee(db_session)
+    customer = Customer(first_name="Scoped", last_name="Customer", phone="01000004444")
+    db_session.add(customer)
+    db_session.flush()
+    appointment = Appointment(
+        customer_id=customer.customer_id,
+        barber_id=other_employee.id,
+        appointment_date=datetime.now().date(),
+        appointment_time=datetime.now().time(),
+        status="confirmed",
+    )
+    db_session.add(appointment)
+    db_session.commit()
+    db_session.refresh(appointment)
+
+    response = client.post(
+        f"/api/v1/barber/appointments/{appointment.id}/tip",
+        headers=auth_headers(client, username="barberp0"),
+        json={"amount": 20},
+    )
+    assert response.status_code == 403
+
+
+def test_cashier_cannot_close_another_users_shift(client, db_session):
+    first = make_user(db_session, username="shiftone", role="cashier")
+    make_user(db_session, username="shifttwo", role="cashier")
+    shift = PosShift(user_id=first.id, opening_cash=Decimal("0"), status="open")
+    db_session.add(shift)
+    db_session.commit()
+    db_session.refresh(shift)
+
+    response = client.post(
+        f"/api/v1/pos-shifts/{shift.id}/close",
+        headers=auth_headers(client, username="shifttwo"),
+        json={"countedCash": 0},
+    )
+    assert response.status_code == 403
+
+
+def test_barber_cannot_register_fingerprint_for_another_employee(client, db_session):
+    make_user(db_session, username="barberp0", role="barber")
+    employee = _employee(db_session)
+
+    response = client.post(
+        "/api/v1/attendance/fingerprint",
+        headers=auth_headers(client, username="barberp0"),
+        params={"employee_id": employee.id, "type": "in"},
+    )
+    assert response.status_code == 403
+
+
+def test_health_endpoint_checks_database(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "database": "ok"}
+
+
+def test_meta_webhook_requires_valid_signature(client, monkeypatch):
+    import hashlib
+    import hmac
+    import json
+
+    monkeypatch.setattr("app.core.config.settings.META_WA_APP_SECRET", "webhook-secret")
+    body = json.dumps({"entry": []}, separators=(",", ":")).encode()
+
+    invalid = client.post(
+        "/api/v1/integrations/whatsapp/webhook",
+        content=body,
+        headers={"X-Hub-Signature-256": "sha256=invalid"},
+    )
+    assert invalid.status_code == 403
+
+    signature = hmac.new(b"webhook-secret", body, hashlib.sha256).hexdigest()
+    valid = client.post(
+        "/api/v1/integrations/whatsapp/webhook",
+        content=body,
+        headers={"X-Hub-Signature-256": f"sha256={signature}"},
+    )
+    assert valid.status_code == 200, valid.text

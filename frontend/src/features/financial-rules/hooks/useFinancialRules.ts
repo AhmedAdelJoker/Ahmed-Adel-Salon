@@ -3,6 +3,7 @@ import { toast } from "react-hot-toast";
 
 import api from "@/services/api";
 import { formatCurrency as formatCurrencyShared } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
 
 const DEFAULT_FINANCIAL_RULES = {
   cashierDiscountLimit: 50,
@@ -42,11 +43,11 @@ const DEFAULT_FINANCIAL_SYNC_STATUS = {
 };
 
 export const paymentLabels: Record<string, string> = {
-  cash: "نقدي",
-  card: "فيزا / شبكة",
-  wallet: "محفظة كاش",
-  instapay: "إنستا باي",
-  mada: "مدى",
+  cash: "finRulesHook.pay.cash",
+  card: "finRulesHook.pay.card",
+  wallet: "finRulesHook.pay.wallet",
+  instapay: "finRulesHook.pay.instapay",
+  mada: "finRulesHook.pay.mada",
 };
 
 type AnyRecord = Record<string, any>;
@@ -63,10 +64,10 @@ export function formatCurrency(value: number) {
   return formatCurrencyShared(value);
 }
 
-export function formatDate(value: string | null | undefined) {
+export function formatDate(value: string | null | undefined, locale = "ar") {
   if (!value) return "---";
   try {
-    return new Date(value).toLocaleString("ar-EG", {
+    return new Date(value).toLocaleString(locale, {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -182,6 +183,7 @@ async function captureRequest(request: Promise<unknown>): Promise<CapturedSucces
 }
 
 export default function useFinancialRules() {
+  const { t } = useTranslation("owner");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -245,8 +247,8 @@ export default function useFinancialRules() {
       if (!settingsRes.ok) {
         lastMessage =
           settingsRes.error?.response?.status === 404
-            ? "القواعد المالية تُعرض من النسخة المحلية مؤقتًا حتى يكتمل النظام أو يعاد تشغيل الخادم."
-            : "تعذر الوصول إلى خادم القواعد المالية، لذلك يتم استخدام آخر نسخة محلية محفوظة.";
+            ? t("finRulesHook.localFallback")
+            : t("finRulesHook.serverUnreachable");
       } else if (
         !invoicesRes.ok ||
         !expensesRes.ok ||
@@ -254,7 +256,7 @@ export default function useFinancialRules() {
         !auditRes.ok
       ) {
         lastMessage =
-          "تم تحميل مركز القواعد المالية جزئيًا، لكن بعض بيانات الفواتير أو المصروفات أو الرقابة لم تصل من الخادم.";
+          t("finRulesHook.partialLoad");
       }
 
       setSyncStatus({
@@ -267,7 +269,7 @@ export default function useFinancialRules() {
       });
     } catch (error) {
       console.error("Financial rules load error:", error);
-      toast.error("تعذر تحميل القواعد المالية");
+      toast.error(t("finRulesHook.loadFailedToast"));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -385,7 +387,7 @@ export default function useFinancialRules() {
         rulesSource: "server",
         lastMessage: "",
       }));
-      toast.success("تم حفظ القواعد المالية بنجاح");
+      toast.success(t("finRulesHook.saveSuccess"));
     } catch (error) {
       console.error("Financial rules save error:", error);
       const sanitizedRules = sanitizeFinancialRules(rules);
@@ -399,9 +401,9 @@ export default function useFinancialRules() {
         ...current,
         rulesSource: "local",
         lastMessage:
-          "تعذر الحفظ على الخادم، لذلك تم الاحتفاظ بالتعديلات محليًا حتى تعود المزامنة.",
+          t("finRulesHook.savedLocally"),
       }));
-      toast.error("تم الاحتفاظ بالقيم محليًا للعمل بها أوفلاين مؤقتاً.");
+      toast.error(t("finRulesHook.offlineToast"));
     } finally {
       setSaving(false);
     }
@@ -423,10 +425,10 @@ export default function useFinancialRules() {
       link.click();
       link.remove();
       globalThis.URL.revokeObjectURL(url);
-      toast.success("تم تصدير تقرير القواعد المالية");
+      toast.success(t("finRulesHook.exportSuccess"));
     } catch (error) {
       console.error("Financial rules export error:", error);
-      toast.error("تعذر تصدير تقرير القواعد المالية");
+      toast.error(t("finRulesHook.exportFailed"));
     }
   }
 

@@ -281,6 +281,14 @@ const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
           : null,
         start_date: offerForm.start_date || null,
         end_date: offerForm.end_date || null,
+        // Validated above and loaded on edit, but previously dropped here: the
+        // backend `_sync_offer_services` deletes before re-inserting, so the
+        // offer came back with every service removed. `products` is left out on
+        // purpose — this form has no product picker, and omitting it now leaves
+        // a bundle's products alone instead of wiping them.
+        service_ids: offerForm.service_ids,
+        is_public: offerForm.is_public ?? true,
+        is_active: offerForm.is_active ?? true,
       };
       if (editingOffer) {
         await offerService.update(editingOffer.id, payload);

@@ -1,0 +1,241 @@
+{
+  "page": {
+    "title": "Smart Schedule",
+    "subtitle": "Manage daily appointments with precision and professionalism",
+    "badge": "Scheduling"
+  },
+  "toolbar": {
+    "shortcuts": "Shortcuts",
+    "shortcutsLabel": "Keyboard shortcuts",
+    "navDays": "Navigate between days",
+    "today": "Back to today",
+    "viewDay": "Day",
+    "viewWeek": "Week",
+    "viewList": "List",
+    "toggleSidebar": "Show/hide sidebar",
+    "backToBookings": "Back to bookings",
+    "newBooking": "New appointment",
+    "search": "Quick search (name, service, phone)...",
+    "searchAria": "Search for an appointment",
+    "clearSearch": "Clear search",
+    "allBarbers": "All experts",
+    "allStatuses": "All statuses",
+    "period": "Period",
+    "rangeAll": "All hours",
+    "rangeMorning": "Morning (until 2 PM)",
+    "rangeEvening": "Evening (from 2 PM)",
+    "clearFilters": "Clear all filters",
+    "clearFiltersShort": "Clear",
+    "prevDay": "Previous day",
+    "prevDayTitle": "Previous day (left arrow)",
+    "pickDate": "Choose date",
+    "nextDay": "Next day",
+    "nextDayTitle": "Next day (right arrow)",
+    "viewMode": "View {{label}}",
+    "viewDayTitle": "Day view (D)",
+    "refresh": "Refresh data",
+    "refreshAria": "Refresh the appointments list manually",
+    "refreshTitle": "Manual refresh",
+    "liveConnectedTitle": "Connected to server - live automatic updates",
+    "liveDisconnectedTitle": "Disconnected - data not updated",
+    "liveConnected": "Live",
+    "liveDisconnected": "Offline",
+    "lastUpdated": "Last updated: {{time}}",
+    "toggleSidebarAria": "Show/hide sidebar",
+    "toggleSidebarTitle": "Sidebar (L)",
+    "export": "Export",
+    "exportLabel": "Export options",
+    "pdf": "PDF for today's schedule",
+    "csv": "CSV (appointment data)"
+  },
+  "stats": {
+    "today": "Today's appointments",
+    "waiting": "Waiting for service",
+    "inProgress": "In progress",
+    "reception": "At reception",
+    "done": "Completed today",
+    "cancelled": "Cancelled today"
+  },
+  "contentPanel": {
+    "title": "Operational map of appointments",
+    "subtitleDay": "A precise timeline reflecting the duration of each service. Drag appointments to redistribute them among staff.",
+    "subtitleWeek": "A comprehensive weekly overview of appointment distribution.",
+    "subtitleList": "A detailed list of today's appointments with all details."
+  },
+  "status": {
+    "WAITING": "Coming",
+    "CONFIRMED": "Confirmed",
+    "IN_PROGRESS": "In progress",
+    "AT_RECEPTION": "At reception",
+    "AT_CASHIER": "At cashier",
+    "DONE": "Completed",
+    "CANCELLED": "Cancelled",
+    "NO_SHOW": "No show",
+    "LATE": "Late"
+  },
+  "dayBoard": {
+    "appointmentCount": "{{count}} appointment",
+    "zeroCount": "No appointments",
+    "oneCount": "one appointment",
+    "twoCount": "two appointments",
+    "manyCount": "{{count}} appointments",
+    "manyAboveTen": "{{count}} appointments",
+    "loadPercent": "{{percent}}%",
+    "headerLabel": "Timeline",
+    "noStaffTitle": "No staff data",
+    "noStaffMessage": "Please choose a different filter or make sure experts and their work schedules are added to the system."
+  },
+  "appointmentCard": {
+    "aria": "Appointment for {{customer}} at {{time}}, status {{status}}",
+    "details": "Tap for details or drag",
+    "unknownCustomer": "Unknown customer"
+  },
+  "weekBoard": {
+    "weeklyOverview": "A comprehensive weekly overview of appointment distribution.",
+    "noAppointments": "No appointments",
+    "appointmentCount": "{{count}} appointment"
+  },
+  "listView": {
+    "title": "A detailed list of today's appointments with all details.",
+    "coming": "Coming: {{count}}",
+    "time": "Time",
+    "customer": "Customer",
+    "barber": "Expert",
+    "phone": "Phone",
+    "service": "Service",
+    "status": "Status",
+    "minuteShort": "min",
+    "onlineBooking": "Online booking"
+  },
+  "empty": {
+    "title": "No appointments today",
+    "message": "Use the \"New appointment\" button to add your first appointment today."
+  },
+  "miniCalendar": {
+    "days": {
+      "saturday": "Saturday",
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday"
+    },
+    "monthYear": "November 2026",
+    "dayLabel": "Day {{day}}",
+    "totalAppointments": "{{total}} appointments{{confirmedSuffix}}",
+    "confirmedSuffix": " ({{count}} confirmed)",
+    "noAppointments": "No appointments",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month"
+  },
+  "scheduleModal": {
+    "title": "Full appointment details",
+    "status": "Status",
+    "time": "Time",
+    "date": "Date",
+    "barber": "Expert",
+    "phone": "Phone",
+    "notes": "Notes",
+    "noNotes": "No notes",
+    "createdAt": "Created at",
+    "close": "Close",
+    "manage": "Manage appointment",
+    "servicesRequired": "Required services",
+    "bookingSourceOnline": "Online booking",
+    "bookingSourceRegular": "Regular booking",
+    "edit": "Edit details",
+    "cancel": "Cancel appointment",
+    "transferPOS": "Transfer to POS",
+    "changeStatus": "Change status",
+    "statusWaiting": "Waiting for service",
+    "statusInProgress": "In progress",
+    "statusDone": "Completed",
+    "statusCancelled": "Cancelled"
+  },
+  "agenda": {
+    "sidebarAria": "Schedule sidebar",
+    "quickNav": "Quick navigation",
+    "closeSidebar": "Close sidebar",
+    "total": "Total appointments",
+    "active": "Active",
+    "done": "Completed",
+    "todayAgenda": "Today's agenda",
+    "coming": "{{count}} coming",
+    "noUpcoming": "No upcoming appointments"
+  },
+  "export": {
+    "title": "Today's appointment schedule",
+    "date": "Date: {{date}}",
+    "page": "Page {{page}} of {{total}}",
+    "time": "Time",
+    "customerName": "Customer name",
+    "phone": "Phone",
+    "barber": "Expert",
+    "status": "Status",
+    "notes": "Notes",
+    "source": "Source",
+    "bookingSource": {
+      "online": "Online booking",
+      "walkin": "Walk-in",
+      "phone": "Phone booking",
+      "regular": "Regular booking"
+    }
+  },
+  "headerActions": {
+    "shortcuts": "Shortcuts",
+    "shortcutsLabel": "Keyboard shortcuts",
+    "navDays": "Navigate between days",
+    "today": "Back to today",
+    "viewDay": "Day",
+    "viewWeek": "Week",
+    "viewList": "List",
+    "toggleSidebar": "Show/hide sidebar",
+    "backToBookings": "Back to bookings",
+    "newBooking": "New appointment"
+  },
+  "dragPreview": {
+    "badge": "Moving...",
+    "unknownCustomer": "Unknown customer",
+    "noBarber": "No expert",
+    "instruction": "Drop onto an expert or a slot to move the appointment, or onto a day in the side calendar"
+  },
+  "slotDropZone": {
+    "slotLabel": "Slot {{slot}} - Expert {{barberId}}",
+    "dropHere": "Drop here"
+  },
+  "toasts": {
+    "loadFailed": "Could not load schedule",
+    "undoSuccess": "Move undone successfully",
+    "undoFailed": "Failed to undo move",
+    "moved": "Moved appointment {{customer}}{{label}}",
+    "movedTo": "to",
+    "movedSameDay": "same day",
+    "movedTime": "at {{time}}",
+    "undo": "Undo",
+    "conflict": "Conflict: another appointment exists for this expert at the same time. Choose a different slot.",
+    "updateFailed": "Failed to update appointment",
+    "exportSuccess": "Schedule exported successfully",
+    "exportFailed": "Failed to export schedule",
+    "noReasonGiven": "No reason given",
+    "cancelled": "Appointment cancelled successfully",
+    "cancelFailed": "Failed to cancel appointment",
+    "statusUpdated": "Appointment status updated",
+    "statusUpdateFailed": "Failed to update appointment status"
+  },
+  "conflict": {
+    "generic": "This appointment conflicts with another appointment for the same expert at the same time. Pick a different time or expert."
+  },
+  "time": {
+    "am": "AM",
+    "pm": "PM"
+  },
+  "dateFilters": {
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "after_tomorrow": "Day after tomorrow",
+    "this_week": "This week",
+    "all": "All",
+    "custom": "Custom range"
+  }
+}

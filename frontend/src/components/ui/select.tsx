@@ -23,11 +23,11 @@ const SelectTrigger = React.forwardRef<
       data-size={size}
       className={cn(
         "select premium-control-surface flex h-12 w-full items-center justify-between gap-2 rounded-2xl border px-5 py-2 text-sm font-bold outline-none transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50",
-        "text-gray-900 data-[placeholder]:text-gray-500",
-        "focus-visible:border-[#6D28D9]/50 focus-visible:ring-4 focus-visible:ring-[#6D28D9]/10",
-        "dark:text-gray-100 dark:data-[placeholder]:text-gray-400",
-        "dark:focus-visible:border-[#22D3EE]/50 dark:focus-visible:ring-[#22D3EE]/10",
-        "[&>span]:min-w-0 [&>span]:truncate [&>span]:text-gray-900 dark:[&>span]:text-gray-100",
+        // Stock shadcn purple/cyan replaced with the brand tokens so selects
+        // match the rest of the form controls in both modes.
+        "text-main data-[placeholder]:text-muted",
+        "focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10",
+        "[&>span]:min-w-0 [&>span]:truncate [&>span]:text-main",
         "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
@@ -101,15 +101,14 @@ const SelectItem = React.forwardRef<
     <SelectPrimitive.Item
       ref={ref}
       className={cn(
-        "relative flex w-full cursor-pointer select-none items-center rounded-xl py-3 pl-4 pr-10 text-sm font-bold outline-none transition-[background-color,color,transform] duration-200 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "text-gray-800 focus:bg-purple-50 focus:text-[#6D28D9]",
-        "dark:text-gray-100 dark:focus:bg-cyan-400/10 dark:focus:text-[#22D3EE]",
+        "relative flex w-full cursor-pointer select-none items-center rounded-xl py-3 ps-4 pe-10 text-sm font-bold outline-none transition-[background-color,color,transform] duration-200 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "text-main focus:bg-primary-soft focus:text-primary",
         "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}
     >
-      <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center text-[#6D28D9] dark:text-[#22D3EE]">
+      <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center text-primary">
         <SelectPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />
         </SelectPrimitive.ItemIndicator>

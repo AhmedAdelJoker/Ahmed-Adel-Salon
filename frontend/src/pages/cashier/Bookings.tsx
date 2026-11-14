@@ -1,5 +1,7 @@
 import { Calendar } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { PageHeader, PremiumCard } from "@/components/shared/PremiumUI";
+import { PageShell } from "@/components/shared/PageShell";
 
 import {
   SalonCapacityBanner,
@@ -8,7 +10,6 @@ import {
   BookingsToolbar,
   BookingsBoardContent,
   BookingFormDialog,
-  WalkInDialog,
   CancelBookingDialog,
 } from "@/features/bookings/components";
 import { useBookingsData } from "@/features/bookings/hooks/useBookingsData";
@@ -48,15 +49,6 @@ export default function Bookings() {
     refreshBookings,
     phoneInputRef,
     searchInputRef,
-    isWalkInOpen,
-    setIsWalkInOpen,
-    walkInData,
-    setWalkInData,
-    walkInSaving,
-    walkInCustomer,
-    setWalkInCustomer,
-    walkInSuggestions,
-    setWalkInSuggestions,
     isModalOpen,
     setIsModalOpen,
     isCancelDialogOpen,
@@ -89,6 +81,7 @@ export default function Bookings() {
     setCustomerSuggestions,
     availableSlots,
     setAvailableSlots,
+    slotsError,
     groupedServices,
     handleTransferToPOS,
     handleOpenCustomerProfile,
@@ -109,30 +102,25 @@ export default function Bookings() {
     onPhoneChange,
     selectSuggestedCustomer,
     handleSaveBooking,
-    handleWalkInPhoneSearch,
-    selectWalkInCustomer,
-    handleWalkInSubmit,
     openCreate,
     openEdit,
   } = useBookingsData();
+  const { t } = useTranslation("bookings");
 
   return (
-    <div
-      className="erp-page space-y-6 sm:space-y-8 pb-12 overflow-x-hidden"
-    >
+    <PageShell className="overflow-x-hidden">
       {/* ── HEADER WITH ALL ACTION TEXTS ALWAYS VISIBLE ── */}
       <PageHeader
         className={undefined}
-        title="إدارة الحجوزات"
-        subtitle="منظومة الحجوزات الشاملة المربوطة بنقطة البيع، لوحة الاستقبال، وسجل العملاء."
-        badge={connected ? "متصل مباشر" : "غير متصل"}
+        title={t("page.title")}
+        subtitle={t("page.subtitle")}
+        badge={connected ? t("page.badgeOn") : t("page.badgeOff")}
         icon={Calendar}
         actions={
           <BookingsHeaderActions
             viewMode={viewMode}
             setViewMode={setViewMode}
             onNavigate={navigate}
-            onWalkIn={() => setIsWalkInOpen(true)}
             onCreate={openCreate}
           />
         }
@@ -208,6 +196,7 @@ export default function Bookings() {
         duplicateBooking={duplicateBooking}
         conflictMsg={conflictMsg}
         availableSlots={availableSlots}
+        slotsError={slotsError}
         employees={employees}
         services={services}
         categories={categories}
@@ -225,23 +214,6 @@ export default function Bookings() {
         phoneInputRef={phoneInputRef}
       />
 
-      {/* ── WALK-IN CUSTOMER MODAL ── */}
-      <WalkInDialog
-        open={isWalkInOpen}
-        onOpenChange={setIsWalkInOpen}
-        walkInData={walkInData}
-        setWalkInData={setWalkInData}
-        walkInCustomer={walkInCustomer}
-        setWalkInCustomer={setWalkInCustomer}
-        walkInSuggestions={walkInSuggestions}
-        setWalkInSuggestions={setWalkInSuggestions}
-        employees={employees}
-        services={services}
-        onPhoneSearch={handleWalkInPhoneSearch}
-        onSelectCustomer={selectWalkInCustomer}
-        onSubmit={handleWalkInSubmit}
-        saving={walkInSaving}
-      />
       <CancelBookingDialog
         open={isCancelDialogOpen}
         onOpenChange={setIsCancelDialogOpen}
@@ -251,6 +223,6 @@ export default function Bookings() {
         onConfirm={confirmCancellation}
         saving={saving}
       />
-    </div>
+    </PageShell>
   );
 }

@@ -1,5 +1,5 @@
-import React from "react";
 import { ShieldAlert } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { usePOS } from "@/pages/cashier/POS/POSContext";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dialog";
 
 const ManagerApprovalModal = () => {
-  const { showApprovalModal, setShowApprovalModal } = usePOS();
+  const { t } = useTranslation("pos");
+  const { showApprovalModal, setShowApprovalModal, discountAllowance } = usePOS();
 
   return (
     <Dialog open={showApprovalModal} onOpenChange={setShowApprovalModal}>
@@ -22,19 +23,21 @@ const ManagerApprovalModal = () => {
             <ShieldAlert size={24} />
           </div>
           <DialogTitle className="text-center text-xl font-black">
-            تعديل الفاتورة غير متاح
+            {t("approval.title")}
           </DialogTitle>
-          <DialogDescription className="text-center text-xs font-bold text-muted">
-            يتم التعامل مع التعديلات المالية عبر طلبات مراجعة موثقة بدل تجاوز
-            الحماية من شاشة الدفع.
+          <DialogDescription className="text-center text-xs font-bold text-muted leading-relaxed">
+            {t("approval.description", {
+              label: discountAllowance?.label ?? t("approval.limit_fallback"),
+            })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button
+            autoFocus
             onClick={() => setShowApprovalModal(false)}
             className="h-11 w-full rounded-xl font-black"
           >
-            إغلاق
+            {t("approval.retry_button")}
           </Button>
         </DialogFooter>
       </DialogContent>

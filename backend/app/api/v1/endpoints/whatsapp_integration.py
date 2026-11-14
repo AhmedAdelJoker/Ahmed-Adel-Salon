@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import json
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -111,7 +114,15 @@ def verify_meta_whatsapp_webhook(
     if not settings.META_WA_VERIFY_TOKEN:
         raise HTTPException(status_code=503, detail="Verify token is not configured")
 
-    if hub_mode == "subscribe" and hub_verify_token == settings.META_WA_VERIFY_TOKEN:
+    # `compare_digest`, not `==`. The POST half of this webhook already does this
+    # for the app secret, and the asymmetry was the tell: the verify token is a
+    # shared secret on an unauthenticated endpoint, so a byte-by-byte comparison
+    # leaks how much of it a guess got right. Exploiting it over a network is
+    # slow, but the fix costs nothing and the reasoning is the same as everywhere
+    # else a secret is compared.
+    if hub_mode == "subscribe" and hmac.compare_digest(
+        hub_verify_token, settings.META_WA_VERIFY_TOKEN
+    ):
         return hub_challenge
 
     raise HTTPException(status_code=403, detail="Webhook verification failed")
@@ -122,7 +133,24 @@ async def receive_meta_whatsapp_webhook(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    payload = await request.json()
+    if not settings.META_WA_APP_SECRET:
+        raise HTTPException(status_code=503, detail="META_WA_APP_SECRET is not configured")
+    signature = request.headers.get("X-Hub-Signature-256", "")
+    body = await request.body()
+    expected = (
+        "sha256="
+        + hmac.new(
+            settings.META_WA_APP_SECRET.encode("utf-8"),
+            body,
+            hashlib.sha256,
+        ).hexdigest()
+    )
+    if not signature or not hmac.compare_digest(signature, expected):
+        raise HTTPException(status_code=403, detail="Invalid webhook signature")
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload") from exc
     updated_logs_count = update_logs_from_webhook_payload(db, payload)
     return WhatsAppWebhookReceiveRead(received=True, updated_logs_count=updated_logs_count)
 

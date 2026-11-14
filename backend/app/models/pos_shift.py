@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, Text, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -6,6 +6,14 @@ from app.db.base_class import Base
 
 class PosShift(Base):
     __tablename__ = "pos_shifts"
+    __table_args__ = (
+        # "Is there an open shift for this user?" is the first query every
+        # POS request makes, and these are what answer it. They used to live
+        # only in the Phase-2 migrations, so a fresh `create_all` database
+        # had none of them.
+        Index("ix_pos_shifts_status", "status"),
+        Index("ix_pos_shifts_user_id_opened_at", "user_id", "opened_at"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)

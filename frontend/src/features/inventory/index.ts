@@ -3,6 +3,15 @@ export { useInventoryData } from "@/features/inventory/hooks/useInventoryData";
 export type { InventoryProduct, InventoryStats } from "@/features/inventory/hooks/useInventoryData";
 export { useInventoryForm } from "@/features/inventory/hooks/useInventoryForm";
 export type { ProductFormData, StockFormData } from "@/features/inventory/hooks/useInventoryForm";
+export { useInventoryInsights } from "@/features/inventory/hooks/useInventoryInsights";
+export * from "@/features/inventory/insights";
+export { StockBar } from "@/features/inventory/components/StockBar";
+export { InventoryHero } from "@/features/inventory/components/InventoryHero";
+export { InsightsPanel } from "@/features/inventory/components/InsightsPanel";
+export { CategoryChips } from "@/features/inventory/components/CategoryChips";
+export { InventoryCard } from "@/features/inventory/components/InventoryCard";
+export { InventoryTable } from "@/features/inventory/components/InventoryTable";
+export { BulkActionBar } from "@/features/inventory/components/BulkActionBar";
 export {
   ProductCard,
   SmartStatusBar,
@@ -38,6 +47,7 @@ export {
   getUnitMeta,
   getAvailablePacks,
   getEstimatedUnitCost,
+  getEstimatedUnitPrice,
   formatQuantity,
   UNIT_OPTIONS,
   normalizeUnit,

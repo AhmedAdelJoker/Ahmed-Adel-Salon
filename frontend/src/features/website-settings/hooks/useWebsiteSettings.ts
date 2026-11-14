@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import api from "@/services/api";
 import { adaptObject } from "@/services/apiAdapter";
 import type { BusinessSettings, SettingsState } from "@/types/website";
@@ -11,34 +12,26 @@ import {
   DEFAULT_LANDING_TESTIMONIALS,
   DEFAULT_TRUST_BADGES,
 } from "@/lib/site/content";
-import { validateImageSize } from "@/lib/media/upload";
+import { GALLERY_UPLOAD_MAX_SIZE, validateImageSize } from "@/lib/media/upload";
+/*
+  `heroVideo` sits beside this hook inside the feature, so the `@/lib` alias the
+  rule asks for does not exist. Importing it through the feature barrel instead
+  would be circular: the barrel re-exports this very hook.
+*/
+// eslint-disable-next-line no-restricted-imports
+import {
+  HERO_VIDEO_ACCEPT,
+  HERO_VIDEO_MAX_SIZE,
+  grabVideoPoster,
+} from "../lib/heroVideo";
 
 const SUB_TABS = [
-  {
-    id: "content",
-    label: "المحتوى",
-    description: "العنوان الرئيسي، وصف الصفحة، وقسم من نحن.",
-  },
-  {
-    id: "sections",
-    label: "الأقسام",
-    description: "عناوين الأقسام، بطاقات الإحصاءات، وشارات الثقة.",
-  },
-  {
-    id: "portfolio",
-    label: "المعرض",
-    description: "صورة الغلاف الرئيسية وصور المعرض التي تظهر للعملاء.",
-  },
-  {
-    id: "social",
-    label: "التواصل",
-    description: "روابط السوشيال التي تظهر في صفحة العميل.",
-  },
-  {
-    id: "extras",
-    label: "نصوص إضافية",
-    description: "النصوص الدقيقة للأقسام المتقدمة والختام.",
-  },
+  { id: "content", key: "website.tabContent", descKey: "website.tabContentDesc" },
+  { id: "sections", key: "website.tabSections", descKey: "website.tabSectionsDesc" },
+  { id: "portfolio", key: "website.tabPortfolio", descKey: "website.tabPortfolioDesc" },
+  { id: "social", key: "website.tabSocial", descKey: "website.tabSocialDesc" },
+  { id: "extras", key: "website.tabExtras", descKey: "website.tabExtrasDesc" },
+  { id: "design", key: "website.tabDesign", descKey: "website.tabDesignDesc" },
 ];
 
 interface UseWebsiteSettingsProps {
@@ -47,6 +40,7 @@ interface UseWebsiteSettingsProps {
 }
 
 export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSettingsProps) {
+  const { t } = useTranslation("owner");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState("content");
@@ -57,6 +51,15 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
     landingAboutTitle: "",
     landingAboutContent: "",
     landingHeroBadge: "",
+    // Motion defaults on: the public site treats an absent value as enabled
+    // (so existing salons are unaffected), and the panel should show the switch
+    // reflecting the state that will actually apply rather than an off-looking
+    // toggle that means "on".
+    landingHeroVideoUrl: "",
+    landingVideoPosterUrl: "",
+    landingVideoAutoplay: true,
+    landingVideoMuted: true,
+    landingMotionEnabled: true,
     landingServicesEyebrow: DEFAULT_LANDING_COPY.landingServicesEyebrow,
     landingServicesTitle: DEFAULT_LANDING_COPY.landingServicesTitle,
     landingServicesSubtitle: DEFAULT_LANDING_COPY.landingServicesSubtitle,
@@ -156,6 +159,18 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
           settingsData.landingCoverImageUrl ||
           settingsData.landing_cover_image_url ||
           "",
+        // Read through the same alias-or-camel fallback the older fields use.
+        // `false` is meaningful here and must survive: a `||` chain would turn
+        // an explicit "motion off" back into "on".
+        landingHeroVideoUrl:
+          settingsData.landingHeroVideoUrl || settingsData.landing_hero_video_url || "",
+        landingVideoPosterUrl:
+          settingsData.landingVideoPosterUrl || settingsData.landing_video_poster_url || "",
+        landingVideoAutoplay:
+          settingsData.landingVideoAutoplay ?? settingsData.landing_video_autoplay ?? true,
+        landingVideoMuted: settingsData.landingVideoMuted ?? settingsData.landing_video_muted ?? true,
+        landingMotionEnabled:
+          settingsData.landingMotionEnabled ?? settingsData.landing_motion_enabled ?? true,
         landingThemeId: settingsData.landingThemeId || "gold",
         landingShowStaff: settingsData.landingShowStaff === true || settingsData.landingShowStaff === "true",
         landingShowStaffBio: settingsData.landingShowStaffBio === true || settingsData.landingShowStaffBio === "true",
@@ -180,7 +195,7 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
       });
     } catch (_err) {
       console.error("Failed to fetch website settings:", _err);
-      toast.error("فشل تحميل إعدادات الموقع");
+      toast.error(t("website.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -194,11 +209,11 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
     setSaving(true);
     try {
       await api.put("/business-settings", settings);
-      toast.success("تم حفظ إعدادات الموقع بنجاح");
+      toast.success(t("website.saveSuccess"));
       onSaved?.();
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
-      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || "فشل الحفظ — تحقق من البيانات ثم أعد المحاولة";
+      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || t("website.saveFailed");
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -207,9 +222,9 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
 
   const handleAddPortfolioImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !validateImageSize(file)) return;
+    if (!file || !validateImageSize(file, GALLERY_UPLOAD_MAX_SIZE)) return;
     if ((settings.landingPortfolio?.length || 0) >= 20) {
-      toast.error("الحد الأقصى 20 صورة في المعرض");
+      toast.error(t("website.galleryMax"));
       e.target.value = "";
       return;
     }
@@ -218,7 +233,7 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
     formData.append("file", file);
 
     try {
-      toast.loading("جاري رفع الصورة...", { id: "upload" });
+      toast.loading(t("website.imageUploading"), { id: "upload" });
       const res = await api.post("/business-settings/media", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
@@ -229,10 +244,10 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
         ...prev,
         landingPortfolio: [...(prev.landingPortfolio || []), newUrl],
       }));
-      toast.success("تم إضافة الصورة للمعرض", { id: "upload" });
+      toast.success(t("website.imageAdded"), { id: "upload" });
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
-      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || "فشل رفع الصورة";
+      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || t("website.imageUploadFailed");
       toast.error(msg, { id: "upload" });
     } finally {
       e.target.value = "";
@@ -241,13 +256,13 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
 
   const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !validateImageSize(file)) return;
+    if (!file || !validateImageSize(file, GALLERY_UPLOAD_MAX_SIZE)) return;
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      toast.loading("جاري رفع صورة الغلاف...", { id: "cover-upload" });
+      toast.loading(t("website.coverUploading"), { id: "cover-upload" });
       const res = await api.post("/business-settings/media", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
@@ -257,10 +272,10 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
         ...prev,
         landingCoverImageUrl: data.url || "",
       }));
-      toast.success("تم تحديث صورة الغلاف", { id: "cover-upload" });
+      toast.success(t("website.coverUpdated"), { id: "cover-upload" });
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
-      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || "فشل رفع صورة الغلاف";
+      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || t("website.coverUploadFailed");
       toast.error(msg, { id: "cover-upload" });
     } finally {
       e.target.value = "";
@@ -271,6 +286,85 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
     setSettings((prev) => ({
       ...prev,
       landingCoverImageUrl: "",
+    }));
+  };
+
+  /**
+   * Hero video upload.
+   *
+   * Client-side validation is a courtesy, not the control: the server re-checks
+   * extension and size in `validate_video`. It is here to give the owner an
+   * instant answer on a large file instead of a 25 MB upload that fails at the
+   * end — and, importantly, to derive the poster client-side, because the
+   * backend stores the clip verbatim and therefore cannot hand one back.
+   *
+   * The poster is mandatory for the video to render at all (see
+   * `buildLandingSiteContent`): a clip with no poster would blank the hero on
+   * every browser that refuses to autoplay. If the frame grab fails, the
+   * existing poster is left untouched rather than cleared.
+   */
+  const handleHeroVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!HERO_VIDEO_ACCEPT.split(",").some((ext) => file.name.toLowerCase().endsWith(ext))) {
+      toast.error(t("website.videoFormat"), { id: "video-upload" });
+      e.target.value = "";
+      return;
+    }
+    if (file.size > HERO_VIDEO_MAX_SIZE) {
+      toast.error(
+        t("website.videoTooBig", { size: (file.size / 1024 / 1024).toFixed(1) }),
+        { id: "video-upload" },
+      );
+      e.target.value = "";
+      return;
+    }
+
+    // Grab a poster frame before uploading, so a failed upload never leaves the
+    // hero pointing at a poster for a video that does not exist.
+    let poster = "";
+    try {
+      poster = await grabVideoPoster(file);
+    } catch {
+      poster = "";
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      toast.loading(t("website.videoUploading"), { id: "video-upload" });
+      const res = await api.post("/business-settings/hero-video", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const data = adaptObject(res, {}) as { url?: string };
+      if (!data.url) throw new Error(t("website.videoNoUrl"));
+
+      setSettings((prev) => ({
+        ...prev,
+        landingHeroVideoUrl: data.url || "",
+        // Fall back to the cover image if the frame grab came back empty, so the
+        // video still has something to show before it loads.
+        landingVideoPosterUrl: poster || prev.landingCoverImageUrl || "",
+        landingVideoAutoplay: true,
+        landingVideoMuted: true,
+      }));
+      toast.success(t("website.videoUploaded"), { id: "video-upload" });
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
+      const msg = ax?.response?.data?.detail || ax?.response?.data?.message || ax?.message || t("website.videoUploadFailed");
+      toast.error(msg, { id: "video-upload" });
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const removeHeroVideo = () => {
+    setSettings((prev) => ({
+      ...prev,
+      landingHeroVideoUrl: "",
+      landingVideoPosterUrl: "",
     }));
   };
 
@@ -310,6 +404,8 @@ export function useWebsiteSettings({ onSaved, onChangeDraft }: UseWebsiteSetting
     handleAddPortfolioImage,
     handleCoverImageUpload,
     removeCoverImage,
+    handleHeroVideoUpload,
+    removeHeroVideo,
     removePortfolioImage,
     updateArrayItem,
     SUB_TABS,

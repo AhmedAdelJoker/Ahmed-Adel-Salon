@@ -2,8 +2,9 @@
 import { Badge } from "@/components/ui/badge";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/core/utils";
-import ReceptionEmptyState from "@/features/reception/components/ReceptionEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import AppointmentCard from "@/features/reception/components/AppointmentCard";
+import { useTranslation } from "react-i18next";
 
 export default function BoardColumn({
   col,
@@ -19,6 +20,7 @@ export default function BoardColumn({
   onReassign,
   onUpdateStatus,
 }: any) {
+  const { t } = useTranslation("reception");
   const isOver = dropCol === col.key;
 
   const handleDragOver = (e) => {
@@ -63,10 +65,10 @@ export default function BoardColumn({
           </div>
           <div className="min-w-0">
             <h3 className="text-xs sm:text-sm font-black text-main truncate">
-              {col.title}
+              {t(`columns.${col.key}.title`) ?? col.title}
             </h3>
             <p className="hidden sm:block text-[10px] font-bold text-muted truncate">
-              {col.desc}
+              {t(`columns.${col.key}.desc`) ?? col.desc}
             </p>
           </div>
         </div>
@@ -89,10 +91,10 @@ export default function BoardColumn({
             <CardSkeleton />
           </>
         ) : items.length === 0 ? (
-          <ReceptionEmptyState
+          <EmptyState variant="board"
             icon={col.icon}
-            title="القائمة فارغة"
-            desc="لا يوجد عملاء في هذه المرحلة حالياً."
+            title={t("board.empty_column")}
+            message={t("board.empty_column_desc")}
           />
         ) : (
           items.map((appt) => (

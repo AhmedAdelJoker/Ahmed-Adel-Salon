@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TableEmptyState } from "@/components/shared/TableEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { formatDate, getUserName, getRole, getId } from "@/features/security/utils";
 import { ROLE_LABELS } from "@/features/security/constants";
 
@@ -57,7 +57,7 @@ export default function UsersPanelTab({ users, searchTerm, setSearchTerm }: User
             value={searchTerm || ""}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="بحث عن مستخدم أو دور..."
-            className="h-11 pr-11 bg-soft border-border focus:bg-card"
+            className="h-11 pe-11 bg-soft border-border focus:bg-card"
           />
         </div>
       </div>
@@ -111,10 +111,10 @@ export default function UsersPanelTab({ users, searchTerm, setSearchTerm }: User
             {users.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4}>
-                  <TableEmptyState
+                  <EmptyState variant="table"
                     icon={Users}
                     title="لا توجد بيانات مستخدمين"
-                    description="تعذر تحميل المستخدمين أو لا توجد حسابات متاحة للعرض."
+                    message="تعذر تحميل المستخدمين أو لا توجد حسابات متاحة للعرض."
                   />
                 </TableCell>
               </TableRow>

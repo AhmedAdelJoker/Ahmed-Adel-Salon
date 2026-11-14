@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query, Depends
 from sqlalchemy import case, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_db, require_roles
 from app.models.employee import Employee
@@ -161,7 +161,14 @@ def employee_performance(
     date_filter = Invoice.created_at.between(start_dt, end_dt)
 
     # Get all relevant invoices with items
-    invoices_query = db.query(Invoice).filter(non_draft, date_filter)
+    #
+    # `selectinload(Invoice.items)` because the aggregation below walks
+    # `invoice.items` for every invoice in the window. Without it that is one
+    # lazy load per invoice — a report over a busy month is hundreds of extra
+    # round trips, and the date filter does nothing to reduce the count.
+    invoices_query = db.query(Invoice).options(selectinload(Invoice.items)).filter(
+        non_draft, date_filter
+    )
     invoices = invoices_query.all()
 
     # Get all active employees for lookup

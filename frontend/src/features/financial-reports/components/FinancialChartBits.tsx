@@ -1,4 +1,5 @@
 import { formatCurrency } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
 
 export interface TooltipEntry {
   name?: string;
@@ -16,8 +17,9 @@ export function FinanceTooltip({
   payload?: TooltipEntry[];
   label?: string;
 }) {
+  const { t } = useTranslation("owner");
   if (!active || !payload || payload.length === 0) return null;
-  const title = label || payload[0]?.name || payload[0]?.payload?.name || "تفاصيل";
+  const title = label || payload[0]?.name || payload[0]?.payload?.name || t("finFeat.tooltip.fallbackTitle");
   return (
     <div className="min-w-[180px] rounded-2xl border border-border bg-card/95 p-4 shadow-premium backdrop-blur-md">
       <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-muted">{title}</p>
@@ -27,7 +29,7 @@ export function FinanceTooltip({
             <div className="flex min-w-0 items-center gap-2">
               <div
                 className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: entry.color || entry.payload?.fill || "#6366F1" }}
+                style={{ backgroundColor: entry.color || entry.payload?.fill || "var(--chart-2)" }}
               />
               <span className="truncate text-xs font-bold text-muted">{entry.name}</span>
             </div>

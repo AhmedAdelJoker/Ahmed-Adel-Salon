@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.orm import Session, joinedload
 from app.utils.media import process_image_content, get_upload_path
 from app.core.upload_security import validate_image
+from app.core.clock import salon_now
 
 router = APIRouter(prefix="/offers", tags=["Offers"])
 
@@ -164,7 +165,7 @@ def list_active_offers(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_staff),
 ):
-    today = date.today()
+    today = salon_now().date()
     query = (
         db.query(Offer)
         .filter(Offer.is_active == True)
@@ -271,11 +272,24 @@ def update_offer(
     offer.discount_percentage = discount_percentage
     offer.start_date = payload.start_date
     offer.end_date = payload.end_date
-    offer.is_public = payload.is_public
-    offer.is_active = payload.is_active
-    
-    _sync_offer_services(db, offer, payload.service_ids)
-    _sync_offer_products(db, offer, payload.products)
+
+    # What was actually sent. `service_ids` and `products` default to `[]` and
+    # `_sync_offer_*` deletes before re-inserting, so an editor that manages
+    # only the services wiped the offer's products — and one that manages only
+    # the products wiped its services. The public offer form edits neither flag
+    # either, and their defaults are `True`, so an update put a disabled or
+    # unpublished offer back on the site. An absent key now means "leave it".
+    touched = payload.model_fields_set
+
+    if "is_public" in touched:
+        offer.is_public = payload.is_public
+    if "is_active" in touched:
+        offer.is_active = payload.is_active
+
+    if "service_ids" in touched:
+        _sync_offer_services(db, offer, payload.service_ids)
+    if "products" in touched:
+        _sync_offer_products(db, offer, payload.products)
 
     db.add(offer)
     db.commit()

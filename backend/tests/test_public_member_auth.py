@@ -1,8 +1,9 @@
-from datetime import date, time, timedelta
+from datetime import date, time, timedelta, datetime, timezone
 from decimal import Decimal
 
 from app.api.v1.endpoints import booking_public
 from app.models.appointment import Appointment
+from app.models.business_settings import BusinessSettings
 from app.models.customer import Customer
 from app.models.appointment_service import AppointmentService
 from app.models.employee import Employee
@@ -153,6 +154,15 @@ def test_public_booking_uses_authenticated_member_customer(client, db_session, m
     db_session.commit()
     db_session.refresh(employee)
     db_session.refresh(service)
+
+    # Public booking is gated behind site publication, so publish it first.
+    settings_row = db_session.query(BusinessSettings).first()
+    if settings_row is None:
+        settings_row = BusinessSettings()
+        db_session.add(settings_row)
+    settings_row.public_site_snapshot = {"published": True}
+    settings_row.public_site_published_at = datetime.now(timezone.utc)
+    db_session.commit()
 
     monkeypatch.setattr(
         booking_public.booking_scheduler,

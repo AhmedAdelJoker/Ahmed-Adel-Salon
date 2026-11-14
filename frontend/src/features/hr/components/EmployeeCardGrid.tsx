@@ -1,7 +1,8 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useUI } from "@/context/UIContext";
 import {
+  Archive,
   Calendar,
   CheckCircle2,
   Clock,
@@ -11,201 +12,435 @@ import {
   Pencil,
   Phone,
   Plus,
+  RotateCcw,
   TrendingUp,
   Users,
   Wallet,
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EmployeeAvatar } from "@/components/shared/EmployeeAvatar";
-import EmptyState from "@/components/shared/EmptyState";
+import { EmployeePhoto } from "@/components/shared/EmployeePhoto";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "@/lib/format/locale";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/core/utils";
-import { EMPLOYMENT_TYPES, JOB_TITLE_BLUEPRINTS } from "@/features/hr/utils/constants";
-import { isCustomJobTitleValue } from "@/features/hr/utils/helpers";
+import {
+  employmentTypeLabel,
+  formatEmployeeDate,
+  formatEmployeeMoney,
+  jobTitleLabel,
+  tenureLabel,
+} from "@/features/hr/utils/helpers";
 import type { EmployeeRecord } from "@/types/employee";
 
+/** Local calendar day, so tenure does not drift across a UTC boundary. */
+const todayDateOnly = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate(),
+  ).padStart(2, "0")}`;
+};
+
+function VisibilityFlag({
+  on,
+  label,
+  t,
+}: {
+  on: boolean;
+  label: string;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
+  return (
+    <span
+      title={t(on ? "hr.visibleIn" : "hr.hiddenFrom", { what: label })}
+      className={cn(
+        "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold",
+        on
+          ? "border-line bg-raised text-content-secondary"
+          : "border-line-subtle bg-sunken text-content-disabled line-through",
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "h-1.5 w-1.5 rounded-full",
+          on ? "bg-success" : "bg-content-disabled",
+        )}
+      />
+      {label}
+    </span>
+  );
+}
+
+/**
+ * The roster as compact cards.
+ *
+ * These were `2rem`-radius marketing cards with two large stat boxes and a
+ * full-width phone panel; twenty employees produced a page several screens
+ * long with no extra information. This version keeps the same facts in roughly
+ * half the height: identity and status first, money and reachability second,
+ * and the two actions an owner actually uses at the bottom.
+ */
 export default function EmployeeCardGrid({
   employees,
   onEdit,
   onDelete,
+  onArchive,
   onCreate,
+  hasActiveFilters = false,
+  onClearFilters,
 }: {
   employees: EmployeeRecord[];
   onEdit: (emp: any) => void;
   onDelete: (emp: any) => void;
+  onArchive: (emp: any) => void;
   onCreate: () => void;
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
 }) {
+  const { t, i18n } = useTranslation("owner");
+  const language = i18n.resolvedLanguage || i18n.language || "ar";
+  const locale = getIntlLocale(language);
   const navigate = useNavigate();
   const { openEmployeeQuickView } = useUI();
+  const reduceMotion = useReducedMotion();
+  const today = todayDateOnly();
+
+  const statusMeta = (status?: string) => {
+    if (status === "active") {
+      return {
+        label: t("hr.statusActive"),
+        chip: "border-success-line bg-success-bg text-success-content",
+        dot: "bg-success",
+        icon: CheckCircle2,
+      };
+    }
+    if (status === "suspended") {
+      return {
+        label: t("hr.statusSuspended"),
+        chip: "border-warning-line bg-warning-bg text-warning-content",
+        dot: "bg-warning",
+        icon: Clock,
+      };
+    }
+    return {
+      label: t("hr.statusArchived"),
+      chip: "border-line bg-sunken text-content-tertiary",
+      dot: "bg-content-tertiary",
+      icon: XCircle,
+    };
+  };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+      animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+      exit={reduceMotion ? undefined : { opacity: 0, y: -10 }}
+      className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3"
     >
       {employees.length === 0 ? (
         <div className="col-span-full">
           <EmptyState
+            variant="section"
             icon={Users}
-            title="لا يوجد كوادر مطابقة"
-            description="جرب تعديل كلمات البحث أو أضف موظفاً جديداً للمنظومة."
+            title={
+              hasActiveFilters ? t("hr.noResultsTitle") : t("hr.noTeamTitle")
+            }
+            message={
+              hasActiveFilters ? t("hr.noResultsHint") : t("hr.noTeamHint")
+            }
             action={
-              <Button onClick={onCreate} className="rounded-xl bg-accent text-white font-black">
-                <Plus size={16} className="ml-2"/> إضافة موظف جديد
-              </Button>
+              hasActiveFilters && onClearFilters ? (
+                <Button
+                  variant="outline"
+                  onClick={onClearFilters}
+                  className="rounded-lg font-semibold"
+                >
+                  {t("hr.clearFilters")}
+                </Button>
+              ) : (
+                <Button
+                  onClick={onCreate}
+                  className="rounded-lg bg-accent font-semibold text-content-on-accent"
+                >
+                  <Plus size={16} className="ms-1.5" /> {t("hr.addEmployee")}
+                </Button>
+              )
             }
           />
         </div>
-      ) : employees.map((emp) => {
-        const bp =
-          JOB_TITLE_BLUEPRINTS[emp.jobTitle ?? ""] ||
-          JOB_TITLE_BLUEPRINTS.other;
-        const statusActive = emp.status === "active";
-        return (
-          <motion.div
-            key={emp.id}
-            layout
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            whileHover={{ y: -4 }}
-            className="group relative flex flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-soft hover:shadow-premium transition-all duration-300"
-          >
-            {/* Top accent bar */}
-            <div className={cn("h-1.5 w-full", bp.accent)} />
-            {/* Hover glow */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-b from-accent/[0.04] via-transparent to-transparent pointer-events-none" />
-            <div className="relative flex flex-1 flex-col p-6 sm:p-7 gap-5">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-1 gap-4">
-                  <div className="relative shrink-0">
-                    <div className="rounded-2xl ring-2 ring-border/50 shadow-lg overflow-hidden bg-soft">
-                      <EmployeeAvatar
-                        imageUrl={emp.profileImageUrl || emp.profile_image_url}
-                        name={emp.fullName}
-                        size="xl"
-                        className=""
-                      />
-                    </div>
-                    <div className={cn("absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-[3px] border-card shadow-md flex items-center justify-center text-white", statusActive ? "bg-success" : "bg-danger")}>
-                      <div className={cn("h-2 w-2 rounded-full bg-white", statusActive ? "animate-pulse" : "")} />
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <h3 className="text-[15px] sm:text-[17px] font-black text-main leading-tight line-clamp-1">
-                      {emp.fullName}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest border",
-                          isCustomJobTitleValue(emp.jobTitle)
-                            ? "bg-accent/10 text-accent border-accent/20"
-                            : bp.badgeClass,
-                        )}
+      ) : (
+        employees.map((emp) => {
+          const status = statusMeta(emp.status);
+          const StatusIcon = status.icon;
+          const job = jobTitleLabel(emp.jobTitle, t);
+          const joined = formatEmployeeDate(emp.hireDate, locale);
+          const tenure = tenureLabel(emp.hireDate, today, t);
+          const employment = emp.employmentType
+            ? employmentTypeLabel(emp.employmentType, t)
+            : null;
+          const hasId = emp.id !== undefined && emp.id !== null;
+
+          return (
+            <article
+              key={emp.id}
+              className="group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-raised shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-premium"
+            >
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 h-24"
+                style={{
+                  background:
+                    "radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 68%)",
+                }}
+              />
+              <div className="relative p-4">
+                <div className="absolute start-3 top-3 z-10">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-semibold shadow-sm backdrop-blur-sm",
+                      status.chip,
+                    )}
+                  >
+                    <StatusIcon size={10} aria-hidden="true" />
+                    {status.label}
+                  </span>
+                </div>
+                <div className="absolute end-2 top-2 z-10">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full border border-line/60 bg-card/70 text-content-tertiary backdrop-blur-sm hover:bg-card hover:text-content"
+                        aria-label={t("hr.employeeActions", {
+                          name: emp.fullName,
+                        })}
                       >
-                        {isCustomJobTitleValue(emp.jobTitle) && emp.jobTitle ? emp.jobTitle : bp.title}
-                      </Badge>
-                      <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black border", statusActive ? "bg-success-soft text-success border-success/20" : "bg-danger-soft text-danger border-danger/20")}>
-                        {statusActive ? <CheckCircle2 size={10} /> : <XCircle size={10} />} {statusActive ? "نشط" : "معلّق"}
+                        <MoreVertical size={15} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-52 rounded-xl border-line bg-card p-1.5 shadow-premium"
+                    >
+                      <DropdownMenuItem
+                        onClick={() => onEdit(emp)}
+                        className="rounded-lg py-2.5 font-semibold"
+                      >
+                        <Pencil size={15} className="ms-2.5 text-accent" />
+                        {t("hr.editProfile")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          hasId &&
+                          navigate(`/owner/payroll?employeeId=${emp.id}`)
+                        }
+                        className="rounded-lg py-2.5 font-semibold"
+                      >
+                        <DollarSign
+                          size={15}
+                          className="ms-2.5 text-emerald-600"
+                        />
+                        {t("hr.payrollSheet")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          hasId &&
+                          navigate(`/attendance?employeeId=${emp.id}`)
+                        }
+                        className="rounded-lg py-2.5 font-semibold"
+                      >
+                        <Clock size={15} className="ms-2.5 text-sky-600" />
+                        {t("hr.attendanceRecord")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          hasId &&
+                          openEmployeeQuickView(emp.id as string | number)
+                        }
+                        className="rounded-lg py-2.5 font-semibold"
+                      >
+                        <Eye size={15} className="ms-2.5 text-indigo-600" />
+                        {t("hr.quickView")}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator className="my-1.5" />
+                      <DropdownMenuItem
+                        onClick={() => onDelete(emp)}
+                        className="rounded-lg py-2.5 font-semibold text-amber-600"
+                      >
+                        {emp.status === "active" ? (
+                          <>
+                            <Clock size={15} className="ms-2.5" />
+                            {t("hr.leaveConfirm")}
+                          </>
+                        ) : (
+                          <>
+                            <RotateCcw size={15} className="ms-2.5" />
+                            {t("hr.returnConfirm")}
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => onArchive(emp)}
+                        className="rounded-lg py-2.5 font-semibold text-rose-600"
+                      >
+                        <Archive size={15} className="ms-2.5" />
+                        {t("hr.archiveButton")}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                <div className="flex flex-col items-center pt-5 text-center">
+                  {/*
+                    The photo *is* the control that opens the file. It used to
+                    be a button around a button, which the browser rejects
+                    (`validateDOMNesting`) -- the click still worked, so the
+                    invalid markup showed up only as a console warning.
+                  */}
+                  <div
+                    className="rounded-full p-1 transition-transform duration-200 hover:scale-[1.02] focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-accent"
+                    style={{
+                      boxShadow:
+                        "0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent), 0 8px 20px -10px color-mix(in srgb, var(--accent) 30%, transparent)",
+                    }}
+                  >
+                    <EmployeePhoto
+                      imageUrl={emp.profileImageUrl || emp.profile_image_url}
+                      name={emp.fullName}
+                      role={job}
+                      size="lg"
+                      shape="circle"
+                      hintMissing
+                      expandable={false}
+                      onActivate={() =>
+                        hasId && openEmployeeQuickView(emp.id as string | number)
+                      }
+                      activateLabel={t("hr.openFile")}
+                    />
+                  </div>
+                  <h3 className="mt-3 max-w-full truncate px-2 text-sm font-bold leading-tight text-content">
+                    {emp.fullName}
+                  </h3>
+                  <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
+                    <span className="inline-flex items-center rounded-full border border-line bg-sunken/70 px-2 py-0.5 text-[10px] font-semibold text-content-secondary">
+                      {job}
+                    </span>
+                    {employment && (
+                      <span className="text-[10px] font-medium text-content-tertiary">
+                        {employment}
                       </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-line-subtle bg-sunken/50 px-2.5 py-2.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-content-tertiary">
+                      <Wallet size={11} className="text-success" aria-hidden="true" />
+                      {t("hr.salaryLabel")}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted">
-                      <span className="inline-flex items-center gap-1"><Calendar size={11} /> {emp.hireDate ? new Date(emp.hireDate).toLocaleDateString("ar-EG") : "—"}</span>
-                      {emp.employmentType && <span className="hidden sm:inline">• {EMPLOYMENT_TYPES.find(t=>t.value===emp.employmentType)?.label || emp.employmentType}</span>}
+                    <div className="mt-1 truncate font-mono text-xs font-semibold tabular-nums text-content">
+                      {formatEmployeeMoney(emp.baseSalary, locale, language)}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-line-subtle bg-sunken/50 px-2.5 py-2.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-content-tertiary">
+                      <TrendingUp
+                        size={11}
+                        className="text-warning"
+                        aria-hidden="true"
+                      />
+                      {t("hr.commissionLabel")}
+                    </div>
+                    <div className="mt-1 font-mono text-xs font-semibold tabular-nums text-content">
+                      {emp.commissionRate ?? 0}%
                     </div>
                   </div>
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl bg-soft text-muted hover:bg-card hover:text-accent border border-border/50 shrink-0">
-                      <MoreVertical size={16} />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 border-border shadow-premium bg-card">
-                    <DropdownMenuItem onClick={() => onEdit(emp)} className="rounded-xl font-bold py-3">
-                      <Pencil size={16} className="ml-3 text-accent" /> تعديل الملف
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate(`/owner/payroll?employeeId=${emp.id}`)} className="rounded-xl font-bold py-3">
-                      <DollarSign size={16} className="ml-3 text-emerald-600" /> كشف الراتب
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate(`/attendance?employeeId=${emp.id}`)} className="rounded-xl font-bold py-3">
-                      <Clock size={16} className="ml-3 text-sky-600" /> سجل الحضور
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openEmployeeQuickView(emp.id as string | number)} className="rounded-xl font-bold py-3">
-                      <Eye size={16} className="ml-3 text-indigo-600" /> عرض سريع
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="my-2" />
-                    <DropdownMenuItem onClick={() => onDelete(emp)} className="rounded-xl font-bold py-3 text-rose-600">
-                      <XCircle size={16} className="ml-3" /> {emp.status === "active" ? "تعطيل الملف" : "تفعيل الملف"}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
 
-              {/* Decorative separator */}
-              <div className="h-px bg-gradient-to-r from-border via-border/50 to-transparent" />
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 gap-3">
-                  <div className="group/stat rounded-2xl bg-soft border border-border/60 p-3 sm:p-4 hover:border-primary/20 hover:bg-card transition-colors">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <div className="h-7 w-7 rounded-lg bg-success-soft text-success flex items-center justify-center"><Wallet size={14} /></div>
-                      <span className="text-[9px] font-black text-muted uppercase tracking-widest">الراتب الأساسي</span>
-                    </div>
-                    <div className="text-[15px] font-black text-main">
-                      {Number(emp.baseSalary).toLocaleString("ar-EG")} <span className="text-[10px] font-bold text-muted">ج.م</span>
-                    </div>
-                  </div>
-                  <div className="group/stat rounded-2xl bg-soft border border-border/60 p-3 sm:p-4 hover:border-primary/20 hover:bg-card transition-colors">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <div className="h-7 w-7 rounded-lg bg-warning-soft text-warning flex items-center justify-center"><TrendingUp size={14} /></div>
-                      <span className="text-[9px] font-black text-muted uppercase tracking-widest">العمولة</span>
-                    </div>
-                  <div className="text-[15px] font-black text-main">
-                    {emp.commissionRate} <span className="text-[10px] font-bold text-muted">%</span>
-                  </div>
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+                  <VisibilityFlag
+                    on={emp.showInPos !== false}
+                    label={t("hr.rolePos")}
+                    t={t}
+                  />
+                  <VisibilityFlag
+                    on={emp.showInBooking !== false}
+                    label={t("hr.roleBooking")}
+                    t={t}
+                  />
+                  <VisibilityFlag
+                    on={Boolean(emp.hasLoginAccount)}
+                    label={t("hr.roleLogin")}
+                    t={t}
+                  />
                 </div>
-              </div>
 
-              {/* Contact & Actions */}
-              <div className="mt-auto space-y-3">
-                <div className="flex items-center gap-3 rounded-2xl bg-accent/[0.06] border border-accent/10 p-3">
-                  <div className="h-9 w-9 rounded-xl bg-accent text-white flex items-center justify-center shadow-sm shrink-0">
-                    <Phone size={15} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[10px] font-black text-muted uppercase tracking-widest">الجوال الأساسي</div>
-                    <div className="text-[13px] font-black text-main truncate" dir="ltr">{emp.phonePrimary}</div>
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={() => onEdit(emp)} className="h-9 w-9 rounded-xl bg-card border border-border text-muted hover:text-accent hover:border-accent/20 shrink-0">
-                    <Pencil size={14} />
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] font-medium text-content-tertiary">
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar size={11} aria-hidden="true" />
+                    {joined
+                      ? t("hr.joinedOn", { date: joined })
+                      : t("hr.notSpecified")}
+                  </span>
+                  {tenure && (
+                    <span className="inline-flex items-center gap-1">
+                      <Clock size={11} aria-hidden="true" />
+                      {tenure}
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 border-t border-line-subtle pt-3">
+                  {emp.phonePrimary ? (
+                    <a
+                      href={`tel:${emp.phonePrimary}`}
+                      dir="ltr"
+                      className="inline-flex min-w-0 flex-1 items-center gap-1.5 rounded-xl border border-line bg-sunken/40 px-2.5 py-2 font-mono text-[11px] font-medium tabular-nums text-content-secondary transition-colors hover:border-accent/30 hover:text-content"
+                    >
+                      <Phone size={12} className="shrink-0" aria-hidden="true" />
+                      {emp.phonePrimary}
+                    </a>
+                  ) : (
+                    <span className="flex-1 text-[11px] text-content-tertiary">
+                      —
+                    </span>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      hasId && openEmployeeQuickView(emp.id as string | number)
+                    }
+                    disabled={!hasId}
+                    className="h-9 rounded-xl border-line px-2.5 text-[11px] font-semibold"
+                  >
+                    <Eye size={13} className="ms-1" aria-hidden="true" />
+                    {t("hr.openFile")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => onEdit(emp)}
+                    className="h-9 rounded-xl bg-accent px-2.5 text-[11px] font-semibold text-content-on-accent shadow-sm"
+                  >
+                    <Pencil size={13} className="ms-1" aria-hidden="true" />
+                    {t("hr.edit")}
                   </Button>
                 </div>
-                <div className="flex gap-2">
-                  <Button onClick={() => openEmployeeQuickView(emp.id as string | number)} className="flex-1 h-10 rounded-xl bg-soft hover:bg-accent hover:text-white text-main font-black text-[11px] border border-border transition-all">
-                    <Eye size={14} className="ml-2" /> معاينة
-                  </Button>
-                  <Button onClick={() => onEdit(emp)} className="flex-1 h-10 rounded-xl bg-accent text-white font-black text-[11px] shadow-lg shadow-accent/20 hover:bg-accent/90">
-                    <Pencil size={14} className="ml-2" /> تعديل
-                  </Button>
-                </div>
               </div>
-            </div>
-          </motion.div>
-        );
-      })}
+            </article>
+          );
+        })
+      )}
     </motion.div>
   );
 }

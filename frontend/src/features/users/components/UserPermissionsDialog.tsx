@@ -54,7 +54,7 @@ export function UserPermissionsDialog({
         <DialogContent
           className="max-w-[950px] p-0 overflow-hidden border-none bg-card shadow-premium rounded-[3rem]"
         >
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-10 py-10 bg-[#020617] text-white relative overflow-hidden">
+          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 px-10 py-10 bg-neutral-900 text-white overflow-hidden dark:bg-black/40">
             <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/10 rounded-full blur-[100px] -mr-[200px] -mt-[200px] pointer-events-none" />
             <div className="relative z-10 flex items-center gap-6">
               <div className="h-16 w-16 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 flex items-center justify-center text-primary shadow-2xl">
@@ -153,7 +153,7 @@ export function UserPermissionsDialog({
                                   </span>
                                 </div>
                               </div>
-                              <div className="pl-2">
+                              <div className="ps-2">
                                 {state === true ? (
                                   <div className="h-7 w-7 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 animate-in zoom-in-50 duration-500">
                                     <Check size={14} strokeWidth={4} />
@@ -197,7 +197,7 @@ export function UserPermissionsDialog({
             <Button
               onClick={onSubmit}
               disabled={isActionLoading}
-              className="rounded-xl h-12 px-12 bg-[#020617] text-white hover:scale-[1.02] font-black shadow-2xl transition-all flex items-center gap-3"
+              className="rounded-xl h-12 px-12 bg-neutral-900 text-white hover:scale-[1.02] font-black shadow-2xl transition-all flex items-center gap-3 dark:bg-black/40"
             >
               {isActionLoading ? (
                 <RefreshCw className="animate-spin" size={18} />

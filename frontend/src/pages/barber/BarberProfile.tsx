@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { PageShell } from "@/components/shared/PageShell";
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,11 +7,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, Bell, Shield, Palette, ArrowLeft } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
+import { staticURL } from "@/services/api";
+import { validateImageSize } from "@/lib/media/upload";
 import { adaptObject } from "@/services/apiAdapter";
-import { ProfileTab } from "@/features/barber-profile/components/ProfileTab";
-import { NotificationsTab } from "@/features/barber-profile/components/NotificationsTab";
-import { SecurityTab } from "@/features/barber-profile/components/SecurityTab";
-import { AppearanceTab } from "@/features/barber-profile/components/AppearanceTab";
+import { ProfileTab } from "@/features/barber-profile";
+import { NotificationsTab } from "@/features/barber-profile";
+import { SecurityTab } from "@/features/barber-profile";
+import { AppearanceTab } from "@/features/barber-profile";
 import type {
   BarberProfileForm,
   NotificationsState,
@@ -24,6 +27,7 @@ const BarberProfile = () => {
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarLoading, setAvatarLoading] = useState(false);
 
   const [profile, setProfile] = useState<BarberProfileForm>({
     full_name: (user?.full_name as string) || "",
@@ -128,17 +132,57 @@ const BarberProfile = () => {
     }
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /**
+   * Upload the barber's own photo.
+   *
+   * This was `FileReader.readAsDataURL` and nothing else: the preview was
+   * shown, the save sent no image field, and the data URL was thrown away — so
+   * picking a photo appeared to work and changed nothing. It now posts the file
+   * and stores the path the server gives back.
+   */
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev: ProgressEvent<FileReader>) => setAvatarPreview(ev.target?.result as string | null);
-    reader.readAsDataURL(file);
+    if (!validateImageSize(file)) {
+      e.target.value = "";
+      return;
+    }
+
+    // Instant local preview so the barber sees their pick immediately.
+    const localPreview = URL.createObjectURL(file);
+    setAvatarPreview(localPreview);
+    setAvatarLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await api.post("/barbers/upload-image", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const url = res.data?.url;
+      if (!url) throw new Error("لم يتم إرجاع رابط الصورة من الخادم");
+
+      setProfile((prev) => ({ ...prev, avatar_url: url }));
+      // Swap the blob preview for the stored path, cache-busted so a re-upload
+      // of the same bytes is not served from cache.
+      const resolved = url.startsWith("http") ? url : `${staticURL}${url}`;
+      setAvatarPreview(`${resolved}${resolved.includes("?") ? "&" : "?"}t=${Date.now()}`);
+      await refreshUser();
+      toast.success("تم رفع الصورة بنجاح");
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { detail?: unknown } }; message?: string };
+      const msg = apiErr?.response?.data?.detail || apiErr?.message || "فشل رفع الصورة";
+      toast.error(String(msg));
+      setAvatarPreview(null);
+    } finally {
+      setAvatarLoading(false);
+      URL.revokeObjectURL(localPreview);
+      e.target.value = "";
+    }
   };
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
@@ -163,25 +207,25 @@ const BarberProfile = () => {
               value="profile"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <User size={14} className="ml-1.5" /> الملف الشخصي
+              <User size={14} className="ms-1.5" /> الملف الشخصي
             </TabsTrigger>
             <TabsTrigger
               value="notifications"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Bell size={14} className="ml-1.5" /> الإشعارات
+              <Bell size={14} className="ms-1.5" /> الإشعارات
             </TabsTrigger>
             <TabsTrigger
               value="security"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Shield size={14} className="ml-1.5" /> الأمان
+              <Shield size={14} className="ms-1.5" /> الأمان
             </TabsTrigger>
             <TabsTrigger
               value="appearance"
               className="rounded-xl font-black text-xs data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <Palette size={14} className="ml-1.5" /> المظهر
+              <Palette size={14} className="ms-1.5" /> المظهر
             </TabsTrigger>
           </TabsList>
 
@@ -189,6 +233,7 @@ const BarberProfile = () => {
             profile={profile}
             setProfile={setProfile}
             avatarPreview={avatarPreview}
+            avatarLoading={avatarLoading}
             onAvatarChange={handleAvatarChange}
             loading={loading}
             onSaveProfile={handleSaveProfile}
@@ -205,11 +250,10 @@ const BarberProfile = () => {
             setSecurity={setSecurity}
             onSaveSecurity={handleSaveSecurity}
           />
-          <AppearanceTab appearance={appearance} setAppearance={setAppearance} />
-        </Tabs>
-      </div>
+            <AppearanceTab appearance={appearance} setAppearance={setAppearance} />
+          </Tabs>
+      </PageShell>
     </div>
   );
 };
-
 export default BarberProfile;

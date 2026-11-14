@@ -345,7 +345,12 @@ export function useEmployees() {
   return useQuery({
     queryKey: QUERY_KEYS.employees,
     queryFn: async () => {
-      const res = await api.get("/employees", { params: { limit: 1000 } });
+      // /employees/active (not /employees): the payroll-bearing roster is
+      // manage-employees-only, so cashiers got 403 here. The board needs
+      // every assignable staff member, without POS-visibility filtering.
+      const res = await api.get("/employees/active", {
+        params: { limit: 1000 },
+      });
       return adaptList(res);
     },
     staleTime: 5 * 60_000,

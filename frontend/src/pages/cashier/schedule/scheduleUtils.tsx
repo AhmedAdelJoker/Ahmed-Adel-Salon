@@ -1,7 +1,9 @@
+import i18n from "@/i18n";
+
 export const statusMap = {
   WAITING: {
     key: "WAITING",
-    label: "قادم",
+    label: "status.WAITING",
     variant: "info",
     color: "text-blue-500",
     bg: "bg-blue-500/10",
@@ -10,7 +12,7 @@ export const statusMap = {
   },
   CONFIRMED: {
     key: "CONFIRMED",
-    label: "مؤكد",
+    label: "status.CONFIRMED",
     variant: "warning",
     color: "text-amber-500",
     bg: "bg-amber-500/10",
@@ -19,7 +21,7 @@ export const statusMap = {
   },
   IN_PROGRESS: {
     key: "IN_PROGRESS",
-    label: "قيد التنفيذ",
+    label: "status.IN_PROGRESS",
     variant: ("accent" as any),
     color: "text-indigo-500",
     bg: "bg-indigo-500/10",
@@ -28,7 +30,7 @@ export const statusMap = {
   },
   AT_RECEPTION: {
     key: "AT_RECEPTION",
-    label: "عند الاستقبال",
+    label: "status.AT_RECEPTION",
     variant: ("successSoft" as any),
     color: "text-emerald-500",
     bg: "bg-emerald-500/10",
@@ -37,7 +39,7 @@ export const statusMap = {
   },
   AT_CASHIER: {
     key: "AT_CASHIER",
-    label: "عند الكاشير",
+    label: "status.AT_CASHIER",
     variant: "success",
     color: "text-emerald-600",
     bg: "bg-emerald-600/10",
@@ -46,7 +48,7 @@ export const statusMap = {
   },
   DONE: {
     key: "DONE",
-    label: "مكتمل",
+    label: "status.DONE",
     variant: "secondary",
     color: "text-slate-400",
     bg: "bg-slate-400/10",
@@ -55,7 +57,7 @@ export const statusMap = {
   },
   CANCELLED: {
     key: "CANCELLED",
-    label: "ملغي",
+    label: "status.CANCELLED",
     variant: "danger",
     color: "text-rose-500",
     bg: "bg-rose-500/10",
@@ -64,7 +66,7 @@ export const statusMap = {
   },
   NO_SHOW: {
     key: "NO_SHOW",
-    label: "لم يحضر",
+    label: "status.NO_SHOW",
     variant: "danger",
     color: "text-rose-700",
     bg: "bg-rose-700/10",
@@ -73,7 +75,7 @@ export const statusMap = {
   },
   LATE: {
     key: "LATE",
-    label: "متأخر",
+    label: "status.LATE",
     variant: "warning",
     color: "text-orange-500",
     bg: "bg-orange-500/10",
@@ -144,7 +146,7 @@ export function slotLabelToTime24(slotLabel) {
 export function formatTimeLabel24(date) {
   const h = date.getHours();
   const m = String(date.getMinutes()).padStart(2, "0");
-  const ampm = h >= 12 ? "م" : "ص";
+  const ampm = h >= 12 ? i18n.t("schedule:time.pm") : i18n.t("schedule:time.am");
   const h12 = h % 12 || 12;
   return `${h12}:${m} ${ampm}`;
 }

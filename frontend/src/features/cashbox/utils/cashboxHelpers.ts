@@ -12,16 +12,24 @@ export const TYPE_LABELS: Record<string, string> = {
   salary_advance: "سلفة",
 };
 
+/**
+ * Accent colour per cashbox transaction type.
+ *
+ * Money-in is green, money-out is red, and the opening/closing balances fall
+ * back to the brand and muted text. These were raw Tailwind hex, so the red for
+ * withdrawals was not the theme's danger red and the pairs did not match the
+ * charts on the same page.
+ */
 export const TYPE_COLORS: Record<string, string> = {
-  manual_deposit: "#10b981",
-  invoice_payment: "#6366f1",
-  manual_withdraw: "#ef4444",
-  expense_payment: "#f59e0b",
-  refund: "#06b6d4",
-  payroll_payment: "#8b5cf6",
-  salary_advance: "#f97316",
-  opening_balance: "#0ea5e9",
-  closing_balance: "#475569",
+  manual_deposit: "var(--chart-3)",
+  invoice_payment: "var(--chart-2)",
+  manual_withdraw: "var(--chart-7)",
+  expense_payment: "var(--chart-4)",
+  refund: "var(--chart-6)",
+  payroll_payment: "var(--chart-5)",
+  salary_advance: "var(--warning)",
+  opening_balance: "var(--primary)",
+  closing_balance: "var(--text-muted)",
 };
 
 export const PAYMENT_LABELS: Record<string, string> = {

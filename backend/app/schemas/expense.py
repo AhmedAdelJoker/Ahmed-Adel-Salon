@@ -23,7 +23,11 @@ class ExpenseBase(BaseModel):
     reference_type: Optional[str] = Field(None, max_length=50)
     reference_id: Optional[int] = None
     internal_notes: Optional[str] = Field(None, max_length=500)
-    status: Optional[str] = Field(None, max_length=30)
+    # NOTE: no `status` here on purpose. The lifecycle (pending_audit →
+    # approved / rejected) moves only through the /approve and /reject
+    # endpoints so an approved expense can never skip the cash-box write or
+    # the audit trail. Clients may still *send* a `status` key — Pydantic
+    # ignores unknown fields, which keeps older frontends safe.
 
 
 class ExpenseCreate(ExpenseBase):

@@ -8,12 +8,14 @@ import api from "@/services/api";
 import { normalizeItemResponse } from "@/services/apiAdapter";
 import { EMPTY_CUSTOMER_FORM } from "@/features/customers/constants";
 import { customerId, customerName, secondPhone } from "@/features/customers/utils/customer";
+import { useTranslation } from "react-i18next";
 
 export function useCustomerDialogs(
   fetchCustomers: () => Promise<void>,
   removeCustomer: (id: number | string) => void,
 ) {
   const navigate = useNavigate();
+  const { t } = useTranslation("customers");
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
    
@@ -33,13 +35,7 @@ export function useCustomerDialogs(
         t.isContentEditable
       )
         return;
-      if (e.key === "/") {
-        e.preventDefault();
-        (document.querySelector('input[placeholder*="البحث"]') as HTMLElement)?.focus();
-      } else if (e.key === "n") {
-        e.preventDefault();
-        openCreateCustomer();
-      } else if (e.key === "Escape" && isDetailsOpen) setIsDetailsOpen(false);
+      if (e.key === "Escape" && isDetailsOpen) setIsDetailsOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -75,54 +71,30 @@ export function useCustomerDialogs(
     const name = customerForm.name.trim();
     const phone = customerForm.phone.trim();
     if (!name || !phone) {
-      toast.error("الاسم ورقم الجوال مطلوبان");
+      toast.error(t("toasts.namePhoneRequired"));
       return;
     }
 
     const [firstName, ...lastNameParts] = name.split(" ");
     const lastName = lastNameParts.join(" ");
 
+    // Preserve the fields the quick form doesn't show so PUT doesn't wipe them.
     const payload = {
       first_name: firstName,
-      firstName,
       last_name: lastName,
-      lastName,
       phone,
-      phone_normalized: phone.replace(/\s+/g, ""),
-      phone2: customerForm.phone2?.trim() || null,
-      alternate_phone: customerForm.phone2?.trim() || null,
-      secondary_phone: customerForm.phone2?.trim() || null,
+      second_phone: customerForm.phone2?.trim() || null,
+      email: editingCustomer?.email || null,
+      notes: editingCustomer?.notes || null,
     };
 
     try {
       setIsSavingCustomer(true);
       const id = customerId(editingCustomer);
-      let response;
-      try {
-        response = id
-          ? await api.put(`/customers/${id}`, payload)
-          : await api.post("/customers", payload);
-      } catch (error) {
-         
-        const apiErr = error as { response?: { status?: number; data?: { detail?: unknown } } };
-        if (apiErr?.response?.status !== 422 || !customerForm.phone2.trim())
-          throw error;
-         
-        const fallbackPayload = { ...payload } as Record<string, any>;
-        delete fallbackPayload.phone2;
-        delete fallbackPayload.alternate_phone;
-        delete fallbackPayload.secondary_phone;
-        fallbackPayload.notes = [
-          fallbackPayload.notes,
-          `رقم إضافي: ${customerForm.phone2.trim()}`,
-        ]
-          .filter(Boolean)
-          .join("\n");
-        response = id
-          ? await api.put(`/customers/${id}`, fallbackPayload)
-          : await api.post("/customers", fallbackPayload);
-      }
-      toast.success(id ? "تم تحديث بيانات العميل" : "تمت إضافة العميل بنجاح");
+      const response = id
+        ? await api.put(`/customers/${id}`, payload)
+        : await api.post("/customers", payload);
+      toast.success(id ? t("toasts.updateSuccess") : t("toasts.saveSuccess"));
       await fetchCustomers();
       closeCustomerForm();
       const saved = normalizeItemResponse(response, null);
@@ -131,7 +103,7 @@ export function useCustomerDialogs(
       console.error("Customer save error:", error);
        
       const apiErr2 = error as { response?: { data?: { detail?: unknown } } };
-      toast.error((apiErr2?.response?.data?.detail as string) || "فشل حفظ بيانات العميل");
+      toast.error((apiErr2?.response?.data?.detail as string) || t("toasts.saveFailed"));
     } finally {
       setIsSavingCustomer(false);
     }
@@ -139,23 +111,26 @@ export function useCustomerDialogs(
   async function handleDelete() {
     if (!deleteTarget) return;
     const deletedId = customerId(deleteTarget);
+    const archiveReason = `${customerName(deleteTarget)} — ${t("toasts.deleteSuccess")}`;
     setDeleteTarget(null);
     removeCustomer(deletedId);
     try {
-      await api.delete(`/customers/${deletedId}`);
+      await api.delete(`/customers/${deletedId}`, {
+        data: { archive_reason: archiveReason },
+      });
       toast.success(
-        (t) => (
+        (toastObj) => (
           <span className="flex items-center gap-3">
-            <span>تم نقل العميل إلى الأرشيف</span>
+            <span>{t("toasts.deleteSuccess")}</span>
             <button
               type="button"
               onClick={() => {
-                toast.dismiss(t.id);
+                toast.dismiss(toastObj.id);
                 navigate("/owner/customers/archive");
               }}
               className="shrink-0 font-black underline underline-offset-2"
             >
-              عرض الأرشيف
+              {t("toasts.viewArchive")}
             </button>
           </span>
         ),
@@ -163,7 +138,7 @@ export function useCustomerDialogs(
       );
     } catch (error) {
       console.error("Customer delete error:", error);
-      toast.error("فشل في حذف العميل");
+      toast.error(t("toasts.deleteFailed"));
       fetchCustomers();
     }
   }

@@ -55,6 +55,8 @@ export interface AttendanceSettingsForm {
   open_time: string;
   close_time: string;
   late_threshold: number;
+  late_penalty_per_minute: number;
+  auto_penalty_enabled: boolean;
 }
 
 /**

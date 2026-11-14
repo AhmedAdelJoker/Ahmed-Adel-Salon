@@ -53,7 +53,7 @@ export function EmployeeCardHeader({
               aiInfo.color,
             )}
           >
-            {aiInfo.icon && <aiInfo.icon size={9} className="ml-0.5" />}
+            {aiInfo.icon && <aiInfo.icon size={9} className="ms-0.5" />}
             {aiLabel}
           </Badge>
         </div>

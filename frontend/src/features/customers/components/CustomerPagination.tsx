@@ -7,6 +7,7 @@
 import { useMemo } from "react";
 import { Pagination, createPaginationState } from "@/components/shared/Pagination";
 import { CUSTOMERS_PAGE_SIZE } from "@/features/customers/constants";
+import { useTranslation } from "react-i18next";
 
 export default function CustomerPagination({
   currentPage,
@@ -21,6 +22,7 @@ export default function CustomerPagination({
   filteredCount: number;
   onPage: (page: number) => void;
 }) {
+  const { t, i18n } = useTranslation("customers");
   // Stable paginator instance — we only need .total for display
   // (page navigation is handled by parent via onPage).
   const paginator = useMemo(
@@ -39,10 +41,10 @@ export default function CustomerPagination({
         onPageChange={onPage}
         showSizeChanger={false}
         sizePosition="right"
-        locale="ar"
+        locale={i18n.language.startsWith("ar") ? "ar" : "en"}
       />
-      <div className="px-3 pb-2 text-center text-[10px] text-muted sm:text-right">
-        عرض {filteredCount} من {totalCount} — صفحة {currentPage} / {totalPages}
+      <div className="px-3 pb-2 text-center text-[10px] text-muted sm:text-end">
+        {t("pagination.showing", { count: filteredCount, total: totalCount })} — {t("pagination.pageOf", { page: currentPage, total: totalPages })}
       </div>
     </div>
   );

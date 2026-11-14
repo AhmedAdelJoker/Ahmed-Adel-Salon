@@ -24,6 +24,9 @@ export interface TodayInvoice {
   invoice_no?: string;
   customer_name?: string;
   total_amount?: number;
+  /** VAT snapshot (0 when the shop has no tax configured). */
+  tax_rate?: number;
+  tax_amount?: number;
   payment_method?: string;
   barber_name?: string;
   items?: TodayInvoiceItem[];

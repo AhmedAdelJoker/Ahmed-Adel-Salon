@@ -1,14 +1,15 @@
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, and_, or_
 from typing import Dict, Any
 
 from app.models.employee import Employee
-from app.models.employee_presence_log import EmployeePresenceLog
+from app.models.employee_presence_log import EmployeePresenceLog, AttendancePenalty
 from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
 from app.models.salary_advance import SalaryAdvance
+from app.core.employee_rules import SERVICE_PROVIDER_JOB_TITLES
 
 def calculate_attendance_metrics(
     db: Session, 
@@ -24,11 +25,20 @@ def calculate_attendance_metrics(
     # Python datetime: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
     # Most salons in MENA work all days except maybe one day.
     # If not specified, assume 6 days a week (excluding Friday=4)
-    work_days = employee.work_days_json or [0, 1, 2, 3, 5, 6] 
-    
+    work_days = employee.work_days_json or [0, 1, 2, 3, 5, 6]
+
+    # New hires can't be absent before they had a chance to work — the loop
+    # starts on the hire date, otherwise their expected days fills up with
+    # pre-hire days that would double-count against the absence generator
+    # (which already skips pre-hire days).
+    if isinstance(employee.hire_date, datetime):
+        start_date = max(start_date, datetime.combine(employee.hire_date.date(), datetime.min.time()))
+    elif isinstance(employee.hire_date, date):
+        start_date = max(start_date, datetime.combine(employee.hire_date, datetime.min.time()))
+
     expected_days = 0
     actual_days = 0
-    
+
     current_date = start_date.date()
     target_end_date = end_date.date()
     
@@ -47,11 +57,11 @@ def calculate_attendance_metrics(
         EmployeePresenceLog.created_at >= start_date,
         EmployeePresenceLog.created_at < end_date
     ).all()
-    
+
     log_dates = {log.created_at.date() for log in logs if log.status == "in"}
-    
+
     temp_date = current_date
-    while temp_date < target_end_date:
+    while temp_date < loop_end_date:
         if temp_date.weekday() in work_days:
             expected_days += 1
             if temp_date in log_dates:
@@ -85,12 +95,28 @@ def calculate_expected_net_salary(
         
     # 1. Commission (All types can earn commission usually)
     commission_amount = Decimal("0.00")
-    if emp.job_title == "barber":
-        comm_sum = db.query(func.sum(InvoiceItem.commission_amount)).join(Invoice).filter(
-            Invoice.barber_id == emp.id,
-            Invoice.created_at >= start_date,
-            Invoice.created_at < end_date
-        ).scalar()
+    if emp.job_title in SERVICE_PROVIDER_JOB_TITLES:
+        # Every service-providing title earns commission on the invoices
+        # attributed to them. Previously only exactly "barber" did, so a
+        # colourist or esthetician with a commission rate was silently paid
+        # none of it. Attribution is now per line (InvoiceItem.employee_id);
+        # lines written before the link keep falling back to Invoice.barber_id.
+        comm_sum = (
+            db.query(func.sum(InvoiceItem.commission_amount))
+            .join(Invoice)
+            .filter(
+                Invoice.created_at >= start_date,
+                Invoice.created_at < end_date,
+                or_(
+                    InvoiceItem.employee_id == emp.id,
+                    and_(
+                        InvoiceItem.employee_id.is_(None),
+                        Invoice.barber_id == emp.id,
+                    ),
+                ),
+            )
+            .scalar()
+        )
         commission_amount = Decimal(str(comm_sum or 0))
     elif emp.job_title == "barber_assistant" and emp.receives_commission:
         if emp.assistant_of_barber_id:
@@ -112,6 +138,8 @@ def calculate_expected_net_salary(
     bonus = Decimal("0.00")
     discipline_bonus = Decimal("0.00")
     auto_deduction = Decimal("0.00")
+    late_penalties = Decimal("0.00")
+    absence_count = 0
     
     if emp.employment_type == "temporary":
         # System "اليومية": Salary is daily rate * actual days
@@ -131,10 +159,51 @@ def calculate_expected_net_salary(
             
         # Auto Deduction
         if emp.enable_attendance_auto_deduction:
-            # (base_salary / 30) * missed_days
+            # Full-day absences now live in `attendance_penalties`
+            # (source="absence"), written by `ensure_absence_penalties` at payroll
+            # calculation time or via the manual backfill button. Previously both
+            # were computed independently and the monitor showed double the
+            # deduction as soon as absence penalties existed — both paths now
+            # agree: the day-value term is reduced by the absence records that
+            # already cover those days.
+            absence_count = (
+                db.query(func.count(AttendancePenalty.id))
+                .filter(
+                    AttendancePenalty.employee_id == emp.id,
+                    AttendancePenalty.source == "absence",
+                    AttendancePenalty.is_excused.is_(False),
+                    AttendancePenalty.date >= start_date.date(),
+                    AttendancePenalty.date < end_date.date(),
+                )
+                .scalar()
+                or 0
+            )
+            effective_missed = max(0, int(metrics["missed_days"]) - int(absence_count))
+
+            # (base_salary / 30) * missed_days not yet covered by absence penalties
             day_value = base_salary / Decimal("30")
-            auto_deduction = (day_value * metrics["missed_days"]).quantize(Decimal("0.01"))
-        
+            auto_deduction = (day_value * effective_missed).quantize(Decimal("0.01"))
+
+            # Late-arrival and FULL-DAY absences raised in the period.
+            # Excused penalties are waived and never touch the salary. This is
+            # the deduction side of the attendance register: a penalty recorded
+            # in /penalties must actually leave the net pay, or the penalties
+            # tab is bookkeeping with no consequence.
+            penalty_total = (
+                db.query(func.sum(AttendancePenalty.penalty_amount))
+                .filter(
+                    AttendancePenalty.employee_id == emp.id,
+                    AttendancePenalty.is_excused.is_(False),
+                    AttendancePenalty.date >= start_date.date(),
+                    AttendancePenalty.date < end_date.date(),
+                )
+                .scalar()
+            )
+            late_penalties = Decimal(str(penalty_total or 0)).quantize(Decimal("0.01"))
+            auto_deduction += late_penalties
+        else:
+            late_penalties = Decimal("0.00")
+
     # 4. Advances & Fixed Deductions
     pending_advances_sum = db.query(func.sum(SalaryAdvance.amount)).filter(
         SalaryAdvance.employee_id == emp.id,
@@ -158,6 +227,8 @@ def calculate_expected_net_salary(
         "discipline_bonus": discipline_bonus,
         "fixed_deductions": fixed_deductions,
         "auto_deduction": auto_deduction,
+        "late_penalties": late_penalties,
+        "absence_penalties": absence_count,
         "advance_amount": advance_amount,
         "net_salary": max(Decimal("0.00"), net_salary),
         "metrics": metrics

@@ -144,7 +144,7 @@ export default function AccountantDashboard() {
             </Button>
             <Button onClick={loadData} variant="outline" className="h-11">
               <Activity
-                className={cn("ml-2 h-4 w-4", loading ? "animate-spin" : "")}
+                className={cn("ms-2 h-4 w-4", loading ? "animate-spin" : "")}
               />
               تحديث الأرقام
             </Button>
@@ -182,7 +182,7 @@ export default function AccountantDashboard() {
               مقارنة الإيرادات اليومية والاتجاه العام للسيولة.
             </p>
           </div>
-          <div className="h-[320px] pb-8 pr-4 sm:h-[380px]" dir="ltr">
+          <div className="h-[320px] pb-8 pe-4 sm:h-[380px]" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartRows}>
                 <defs>
@@ -302,7 +302,7 @@ export default function AccountantDashboard() {
               onClick={() => navigate("/expenses")}
               className="mt-8 w-full text-[10px] font-black uppercase tracking-widest h-12 rounded-xl"
             >
-              مراجعة المصروفات <TrendingDown size={16} className="mr-2" />
+              مراجعة المصروفات <TrendingDown size={16} className="me-2" />
             </Button>
           </PremiumCard>
         </div>

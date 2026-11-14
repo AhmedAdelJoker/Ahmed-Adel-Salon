@@ -1,25 +1,19 @@
 import React from "react";
-import { Grid, Clock, Zap } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { CalendarClock, Package, ShoppingCart } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/core/utils";
 import { Badge } from "@/components/ui/badge";
 
 const TABS = [
-  { id: "ops", icon: Clock, label: "الجلسات", badge: "sessions" },
-  {
-    id: "items",
-    icon: Grid,
-    label: "إضافة",
-    badge: "items",
-    disabledCheck: "noAppointment",
-  },
-  { id: "cart", icon: Zap, label: "السلة", badge: "cart" },
+  { id: "ops", icon: CalendarClock, labelKey: "sessions", badge: "sessions" },
+  { id: "items", icon: Package, labelKey: "add", badge: "items" },
+  { id: "cart", icon: ShoppingCart, labelKey: "cart", badge: "cart" },
 ];
 
 interface POSBottomNavProps {
   activeView: string;
   setActiveView: (view: string) => void;
-  activeAppointmentId?: string | number | null;
   cartLength: number;
   readyAppointmentsLength: number;
 }
@@ -27,19 +21,13 @@ interface POSBottomNavProps {
 const POSBottomNav = ({
   activeView,
   setActiveView,
-  activeAppointmentId,
   cartLength,
   readyAppointmentsLength,
 }: POSBottomNavProps) => {
-  const handleTabClick = (tabId) => {
-    if (tabId === "items" && !activeAppointmentId) {
-      return; // Disabled - handled by visual state
-    }
-    setActiveView(tabId);
-  };
+  const { t } = useTranslation("pos");
 
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence>
       <motion.nav
         initial={{ y: "100%", opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -47,14 +35,18 @@ const POSBottomNav = ({
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
         className="fixed inset-x-0 bottom-0 z-50 lg:hidden mobile-bottom-safe"
         role="tablist"
-        aria-label="تنقل نقطة البيع"
+        aria-label={t("nav.label")}
       >
         <div className="mx-auto max-w-xl">
-          <div className="rounded-t-[2rem] bg-card/95 backdrop-blur-xl border border-border shadow-premium overflow-hidden">
+          {/* bg-card (no backdrop-blur): the bottom bar is a persistent
+              surface on the mobile till; at 95% opacity the blur was visually
+              a no-op while costing compositor time every frame. */}
+          <div className="overflow-hidden rounded-t-[1.75rem] border border-border bg-card shadow-premium">
             <div className="grid grid-cols-3 gap-1 p-1.5">
               {TABS.map((tab) => {
                 const isActive = activeView === tab.id;
                 const Icon = tab.icon;
+                const label = t(`nav.${tab.labelKey}`);
                 const showBadge =
                   tab.badge === "sessions"
                     ? readyAppointmentsLength > 0
@@ -67,25 +59,19 @@ const POSBottomNav = ({
                     : tab.badge === "cart"
                       ? cartLength
                       : 0;
-                const isDisabled =
-                  tab.disabledCheck === "noAppointment" && !activeAppointmentId;
-
                 return (
                   <button
                     key={tab.id}
+                    type="button"
                     role="tab"
                     aria-selected={isActive}
-                    aria-disabled={isDisabled}
-                    aria-label={tab.label}
-                    onClick={() => handleTabClick(tab.id)}
-                    disabled={isDisabled}
+                    aria-label={label}
+                    onClick={() => setActiveView(tab.id)}
                     className={cn(
-                      "relative flex flex-col items-center justify-center gap-1 rounded-xl py-2.5 px-2 transition-all duration-300 touch-target",
+                      "relative flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2.5 transition-colors touch-target",
                       isActive
-                        ? "bg-primary-soft text-primary"
-                        : isDisabled
-                          ? "text-muted/40 opacity-60"
-                          : "text-muted hover:bg-soft hover:text-main",
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted hover:bg-soft hover:text-main",
                     )}
                     style={{ minHeight: "56px" }}
                   >
@@ -95,12 +81,12 @@ const POSBottomNav = ({
                       aria-hidden="true"
                     />
                     <span className="text-[10px] font-black leading-none">
-                      {tab.label}
+                      {label}
                     </span>
                     {showBadge && (
                       <Badge
                         variant={isActive ? "primary" : "outline"}
-                        className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full px-1.5 text-[9px] font-black"
+                        className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full px-1.5 text-[10px] font-black"
                       >
                         {badgeCount > 9 ? "9+" : badgeCount}
                       </Badge>
@@ -108,7 +94,7 @@ const POSBottomNav = ({
                     {isActive && (
                       <motion.div
                         layout
-                        className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-8 bg-primary rounded-full"
+                        className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-primary"
                         initial={{ scaleX: 0 }}
                         animate={{ scaleX: 1 }}
                         transition={{

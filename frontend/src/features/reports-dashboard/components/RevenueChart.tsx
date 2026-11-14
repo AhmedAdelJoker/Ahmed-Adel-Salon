@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslation } from "react-i18next";
 import {
   Select,
   SelectTrigger,
@@ -31,6 +32,9 @@ export interface RevenueChartProps {
 }
 
 export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, onPeriodChange }: RevenueChartProps) {
+  const { t } = useTranslation("owner");
+  const revenueLabel = t("revenueChart.revenue");
+  const appointmentsLabel = t("revenueChart.appointments");
   return (
     <ContentPanel className="xl:col-span-2" title={undefined} subtitle={undefined} actions={undefined}>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -40,25 +44,30 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
           </div>
           <div className="min-w-0">
             <h3 className="text-xl font-black tracking-tight text-main truncate">
-              تحليل تدفق الإيرادات
+              {t("revenueChart.title")}
             </h3>
             <p className="text-xs font-bold text-muted truncate">
-              مقارنة الإيرادات التشغيلية للفترة المختارة.
+              {t("revenueChart.subtitle")}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={chartType} onValueChange={onChartTypeChange}>
             <SelectTrigger className="h-9 rounded-xl text-sm">
-              <SelectValue placeholder="نوع الرسم" />
+              <SelectValue placeholder={t("revenueChart.chartTypePlaceholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="area">مناطقي</SelectItem>
-              <SelectItem value="bar">أعمدة</SelectItem>
+              <SelectItem value="area">{t("revenueChart.area")}</SelectItem>
+              <SelectItem value="bar">{t("revenueChart.bar")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
+      {chartRows.length === 0 ? (
+        <div className="flex h-[360px] sm:h-[420px] min-h-[320px] items-center justify-center rounded-xl border border-dashed border-border text-[11px] font-bold text-muted">
+          {t("revenueChart.noData")}
+        </div>
+      ) : (
       <div className="h-[360px] sm:h-[420px] min-h-[320px]" dir="ltr">
         <ResponsiveContainer width="100%" height="100%">
           {chartType === "area" ? (
@@ -78,7 +87,7 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
                 dataKey="name"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: "var(--text)", fontSize: 12, fontWeight: 700 }}
+                tick={{ fill: "var(--text-muted)", fontSize: 12, fontWeight: 700 }}
                 dy={10}
               />
               <YAxis
@@ -98,18 +107,17 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
                 }}
                 formatter={(value, name) => [
                   name === "revenue" ? formatCurrency(value) : value,
-                  name === "revenue" ? "الإيرادات" : "المواعيد",
+                  name === "revenue" ? revenueLabel : appointmentsLabel,
                 ]}
                 labelFormatter={(label) => label}
               />
               <Legend
                 wrapperStyle={{ paddingTop: 20 }}
-                formatter={(name) => name === "revenue" ? "الإيرادات" : "المواعيد"}
               />
               <Area
                 type="monotone"
                 dataKey="revenue"
-                name="الإيرادات"
+                name={revenueLabel}
                 stroke="var(--primary)"
                 strokeWidth={3}
                 fillOpacity={1}
@@ -121,7 +129,7 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
                 <Area
                   type="monotone"
                   dataKey="appointments"
-                  name="المواعيد"
+                  name={appointmentsLabel}
                   stroke="var(--info)"
                   strokeWidth={2.5}
                   strokeDasharray="6 4"
@@ -146,7 +154,7 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
                 type="category"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: "var(--text)", fontSize: 12, fontWeight: 700 }}
+                tick={{ fill: "var(--text-muted)", fontSize: 12, fontWeight: 700 }}
                 width={90}
                 orientation="left"
                 padding={{ top: 10, bottom: 10 }}
@@ -160,14 +168,15 @@ export function RevenueChart({ chartRows, chartType, onChartTypeChange, period, 
                 }}
               />
               <Legend wrapperStyle={{ paddingTop: 20 }} />
-              <Bar dataKey="revenue" name="الإيرادات" fill="var(--primary)" radius={[0, 8, 8, 0]} maxBarSize={40} />
+              <Bar dataKey="revenue" name={revenueLabel} fill="var(--primary)" radius={[0, 8, 8, 0]} maxBarSize={40} />
               {chartRows.some((r) => r.appointments) && (
-                <Bar dataKey="appointments" name="المواعيد" fill="var(--info)" radius={[0, 8, 8, 0]} maxBarSize={40} />
+                <Bar dataKey="appointments" name={appointmentsLabel} fill="var(--info)" radius={[0, 8, 8, 0]} maxBarSize={40} />
               )}
             </BarChart>
           )}
         </ResponsiveContainer>
       </div>
+      )}
     </ContentPanel>
   );
 }

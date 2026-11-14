@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import * as React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "../../lib/utils";
@@ -17,7 +16,7 @@ const TooltipContent = React.forwardRef<
         ref={ref}
         sideOffset={sideOffset}
         className={cn(
-          "z-[9999] overflow-hidden rounded-xl border border-black/10 bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-gray-900 shadow-xl data-[state=delayed-open]:animate-scale-in dark:border-white/10 dark:bg-[#171717] dark:text-gray-100",
+          "z-[9999] overflow-hidden rounded-[length:var(--r-sm)] border border-line bg-panel px-3 py-1.5 text-[length:var(--step--1)] font-medium text-ink shadow-lg data-[state=delayed-open]:animate-scale-in",
           className,
         )}
         {...props}

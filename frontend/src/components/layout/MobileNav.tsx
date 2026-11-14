@@ -1,109 +1,64 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, ShoppingBag, Briefcase, Wallet, Users as UsersIcon } from "lucide-react";
+import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/core/utils";
-import { Calendar, Users, Zap } from "lucide-react";
-
-const HOME_BY_ROLE: Record<string, string> = {
-  OWNER: "/owner",
-  ADMIN: "/owner",
-  MANAGER: "/manager",
-  CASHIER: "/cashier",
-  ACCOUNTANT: "/accountant",
-  BARBER: "/barber",
-};
+import { getHomePath, hasRoleAccess } from "@/lib/access/roles";
+import { getMobileNavItems, routeKey } from "@/app/route-registry";
 
 export function getMobileHomePath(role: unknown): string {
-  return HOME_BY_ROLE[String(role ?? "").toUpperCase()] ?? "/cashier";
+  return getHomePath(role);
 }
-
-const MOBILE_LINKS = [
-  {
-    icon: Home,
-    label: "الرئيسية",
-    to: "__HOME__",
-    roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN", "ACCOUNTANT"],
-  },
-  {
-    icon: Zap,
-    label: "الكاشير",
-    to: "/pos",
-    roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN"],
-  },
-  {
-    icon: Calendar,
-    label: "الحجوزات",
-    to: "/bookings",
-    roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN", "BARBER"],
-  },
-  {
-    icon: Briefcase,
-    label: "محطتي",
-    to: "/barber/workstation",
-    roles: ["BARBER"],
-  },
-  {
-    icon: Wallet,
-    label: "أرباحي",
-    to: "/barber/earnings",
-    roles: ["BARBER"],
-  },
-  {
-    icon: UsersIcon,
-    label: "عملائي",
-    to: "/barber/clients",
-    roles: ["BARBER"],
-  },
-  {
-    icon: Users,
-    label: "العملاء",
-    to: "/customers",
-    roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN"],
-  },
-  {
-    icon: ShoppingBag,
-    label: "المخزن",
-    to: "/inventory",
-    roles: ["CASHIER", "MANAGER", "OWNER", "ADMIN"],
-  },
-];
 
 export default function MobileNav() {
   const { user } = useAuth();
   const location = useLocation();
-  const role = String(user?.role ?? "").toUpperCase();
-  const homePath = getMobileHomePath(role);
+  const { t } = useTranslation("routes");
 
-  const resolvedLinks = MOBILE_LINKS.map((link) =>
-    link.to === "__HOME__" ? { ...link, to: homePath } : link,
-  ).filter(
-    (link) => !link.roles || link.roles.includes(role),
+  const links = useMemo(
+    () =>
+      getMobileNavItems()
+        .filter((item) => hasRoleAccess(user, item.roles as string[], item.to))
+        // The registry marks each role's dashboard with mobileOrder 1 and
+        // single-role navs, so every role keeps a home entry. Previously BARBER
+        // got no home button at all because its entries were all sub-pages.
+        .sort((a, b) => a.order - b.order),
+    [user],
   );
+
   const gridCols =
-    resolvedLinks.length <= 1
+    links.length <= 1
       ? "grid-cols-1"
-      : resolvedLinks.length === 2
+      : links.length === 2
         ? "grid-cols-2"
-        : resolvedLinks.length === 3
+        : links.length === 3
           ? "grid-cols-3"
-          : resolvedLinks.length === 4
+          : links.length === 4
             ? "grid-cols-4"
             : "grid-cols-5";
 
+  if (links.length === 0) return null;
+
   return (
-    <nav aria-label="التنقل السريع" className="fixed inset-x-4 bottom-4 z-50 lg:hidden">
+    <nav
+      aria-label={t("ui.quickNav")}
+      className="fixed inset-x-4 bottom-4 z-50 lg:hidden"
+    >
       <div className="mx-auto max-w-lg rounded-2xl border border-border bg-card/90 px-2 py-2 shadow-premium backdrop-blur-xl">
         <div className={`grid gap-1 ${gridCols}`}>
-          {resolvedLinks.map((link) => {
+          {links.map((link) => {
             const Icon = link.icon;
+            const label = t(`nav.${routeKey(link.to)}`, {
+              defaultValue: link.label,
+            });
             const isActive =
               location.pathname === link.to ||
               location.pathname.startsWith(`${link.to}/`);
             return (
               <NavLink
-                key={link.label + link.to}
+                key={link.to}
                 to={link.to}
-                aria-label={link.label}
+                aria-label={label}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 rounded-xl py-2 transition-all",
@@ -112,8 +67,12 @@ export default function MobileNav() {
                     : "text-muted hover:bg-soft",
                 )}
               >
-                <Icon size={18} strokeWidth={isActive ? 2.5 : 2} aria-hidden="true" />
-                <span className="text-[10px] font-bold">{link.label}</span>
+                <Icon
+                  size={18}
+                  strokeWidth={isActive ? 2.5 : 2}
+                  aria-hidden="true"
+                />
+                <span className="text-[10px] font-bold">{label}</span>
               </NavLink>
             );
           })}

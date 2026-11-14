@@ -4,6 +4,10 @@
  * Falls back to browser print if no native bridge available
  */
 
+import i18n from "@/i18n";
+import { getIntlLocale } from "@/lib/format/locale";
+import { getCurrency } from "@/lib/core/currency";
+
 // ============================================================
 // Types
 // ============================================================
@@ -38,6 +42,9 @@ interface ReceiptData {
   items: ReceiptItem[];
   subtotal: number;
   discount: number;
+  /** VAT snapshot from the invoice (0 = no tax line printed). */
+  taxRate?: number;
+  taxAmount?: number;
   total: number;
   shopName: string;
   shopPhone: string;
@@ -193,7 +200,7 @@ function buildReceiptESCPOS(data: ReceiptData, options: ReceiptBuildOptions = {}
 
   // Shop info
   if (data.shopPhone)
-    commands.push(encodeText(`ت: ${data.shopPhone}\n`, codepage));
+    commands.push(encodeText(`${i18n.t("pos:receipt.phone_prefix")} ${data.shopPhone}\n`, codepage));
   if (data.shopAddress)
     commands.push(encodeText(`${data.shopAddress}\n`, codepage));
   commands.push(ESC_POS.LF);
@@ -203,27 +210,32 @@ function buildReceiptESCPOS(data: ReceiptData, options: ReceiptBuildOptions = {}
 
   // Receipt title
   commands.push(ESC_POS.BOLD_ON);
-  commands.push(encodeText("إيصال مبيعات\n", codepage));
+  commands.push(encodeText(`${i18n.t("pos:receipt.title_thermal")}\n`, codepage));
   commands.push(ESC_POS.BOLD_OFF);
   commands.push(ESC_POS.LF);
 
   // Meta section
   commands.push(ESC_POS.ALIGN_RIGHT);
-  commands.push(encodeText(`رقم الفاتورة: #${data.invoiceNo}\n`, codepage));
-  commands.push(encodeText(`التاريخ: ${data.createdAt}\n`, codepage));
-  commands.push(encodeText(`العميل: ${data.customerName}\n`, codepage));
+  commands.push(encodeText(`${i18n.t("pos:receipt.invoice_no")}: #${data.invoiceNo}\n`, codepage));
+  commands.push(encodeText(`${i18n.t("pos:receipt.date")}: ${data.createdAt}\n`, codepage));
+  commands.push(encodeText(`${i18n.t("pos:receipt.customer")}: ${data.customerName}\n`, codepage));
 
-  const paymentLabels: Record<string, string> = {
-    cash: "نقدي",
-    card: "شبكة",
-    visa: "فيزا",
-    mada: "مدى",
-    wallet: "محفظة",
-    instapay: "انستا باي",
+  const methodLabel = (method: string): string => {
+    const known = [
+      "cash",
+      "card",
+      "visa",
+      "mada",
+      "wallet",
+      "instapay",
+      "bank_transfer",
+      "split",
+    ];
+    return known.includes(method) ? i18n.t(`pos:payments.${method}`) : method;
   };
   commands.push(
     encodeText(
-      `الدفع: ${paymentLabels[data.paymentMethod] || data.paymentMethod}\n`,
+      `${i18n.t("pos:receipt.pay")}: ${methodLabel(data.paymentMethod)}\n`,
       codepage,
     ),
   );
@@ -232,7 +244,10 @@ function buildReceiptESCPOS(data: ReceiptData, options: ReceiptBuildOptions = {}
   // Items table header
   commands.push(
     encodeText(
-      "الصنف".padEnd(22) + "ك".padStart(3) + "الإجمالي".padStart(12) + "\n",
+      i18n.t("pos:receipt.item").padEnd(22) +
+        i18n.t("pos:receipt.qty").padStart(3) +
+        i18n.t("pos:receipt.line_total").padStart(12) +
+        "\n",
       codepage,
     ),
   );
@@ -255,19 +270,28 @@ function buildReceiptESCPOS(data: ReceiptData, options: ReceiptBuildOptions = {}
   commands.push(ESC_POS.ALIGN_RIGHT);
   commands.push(
     encodeText(
-      `المجموع الفرعي: ${formatCurrencyESC(data.subtotal)}\n`,
+      `${i18n.t("pos:receipt.subtotal")}: ${formatCurrencyESC(data.subtotal)}\n`,
       codepage,
     ),
   );
   if (data.discount > 0) {
     commands.push(
-      encodeText(`الخصم: -${formatCurrencyESC(data.discount)}\n`, codepage),
+      encodeText(`${i18n.t("pos:receipt.discount")}: -${formatCurrencyESC(data.discount)}\n`, codepage),
+    );
+  }
+  if (Number(data.taxAmount || 0) > 0) {
+    const rateSuffix = Number(data.taxRate || 0) > 0 ? ` (${Number(data.taxRate)}%)` : "";
+    commands.push(
+      encodeText(
+        `${i18n.t("pos:receipt.tax")}${rateSuffix}: +${formatCurrencyESC(Number(data.taxAmount))}\n`,
+        codepage,
+      ),
     );
   }
   commands.push(ESC_POS.BOLD_ON);
   commands.push(ESC_POS.FONT_SIZE_LARGE);
   commands.push(
-    encodeText(`الإجمالي: ${formatCurrencyESC(data.total)}\n`, codepage),
+    encodeText(`${i18n.t("pos:receipt.total")}: ${formatCurrencyESC(data.total)}\n`, codepage),
   );
   commands.push(ESC_POS.FONT_SIZE_NORMAL);
   commands.push(ESC_POS.BOLD_OFF);
@@ -278,13 +302,13 @@ function buildReceiptESCPOS(data: ReceiptData, options: ReceiptBuildOptions = {}
     // Note: QR from dataURL needs to be converted to raw bytes for ESC/POS
     // This is a simplified version - real implementation would decode the dataURL
     commands.push(ESC_POS.ALIGN_CENTER);
-    commands.push(encodeText("[QR Code - امسح للتقييم]\n", codepage));
+    commands.push(encodeText(`${i18n.t("pos:receipt.qr_hint")}\n`, codepage));
     commands.push(ESC_POS.LF);
   }
 
   // Footer
   commands.push(encodeText(data.footer + "\n", codepage));
-  commands.push(encodeText("شكراً لزيارتكم\n", codepage));
+  commands.push(encodeText(`${i18n.t("pos:receipt.thank_you_default")}\n`, codepage));
   commands.push(ESC_POS.LF);
   commands.push(ESC_POS.LF);
 
@@ -302,11 +326,14 @@ function buildReceiptESCPOS(data: ReceiptData, options: ReceiptBuildOptions = {}
 }
 
 function formatCurrencyESC(value: number | string | null | undefined): string {
-  return new Intl.NumberFormat("ar-EG", {
-    style: "currency",
-    currency: "EGP",
-    maximumFractionDigits: 2,
-  }).format(typeof value === "number" ? value : (value ? parseFloat(String(value)) : 0));
+  return new Intl.NumberFormat(
+    getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar"),
+    {
+      style: "currency",
+      currency: getCurrency(),
+      maximumFractionDigits: 2,
+    },
+  ).format(typeof value === "number" ? value : (value ? parseFloat(String(value)) : 0));
 }
 
 // ============================================================
@@ -323,7 +350,7 @@ class WebUSBPrinter {
 
   async requestDevice(filters: any[] = []): Promise<any> {
     if (!(navigator as any).usb) {
-      throw new Error("WebUSB غير مدعوم في هذا المتصفح. استخدم Chrome/Edge.");
+      throw new Error(i18n.t("pos:print_errors.webusb_unsupported"));
     }
 
     const defaultFilters = [
@@ -354,7 +381,7 @@ class WebUSBPrinter {
     );
 
     if (!this.endpointOut) {
-      throw new Error("لم يتم العثور على نقطة إخراج USB للطباعة");
+      throw new Error(i18n.t("pos:print_errors.usb_endpoint"));
     }
 
     return this.device;
@@ -362,7 +389,7 @@ class WebUSBPrinter {
 
   async print(data: Uint8Array): Promise<void> {
     if (!this.device || !this.endpointOut) {
-      throw new Error("الطابعة غير متصلة. استخدم requestDevice() أولاً.");
+      throw new Error(i18n.t("pos:print_errors.printer_not_connected"));
     }
 
     await this.device.transferOut(this.endpointOut.endpointNumber, data);
@@ -394,7 +421,7 @@ class ElectronPrinter {
 
   async print(data: unknown): Promise<unknown> {
     if (!this.isElectron) {
-      throw new Error("ليس في بيئة Electron");
+      throw new Error(i18n.t("pos:print_errors.not_electron"));
     }
 
     return await (window as any).electronAPI.printReceipt(data);
@@ -418,7 +445,7 @@ class TauriPrinter {
 
   async print(data: unknown): Promise<unknown> {
     if (!this.isTauri) {
-      throw new Error("ليس في بيئة TAURI");
+      throw new Error(i18n.t("pos:print_errors.not_tauri"));
     }
 
     const { invoke } = (window as any).__TAURI__.core;
@@ -455,6 +482,8 @@ async function printViaBrowser(receiptData: ReceiptData): Promise<void> {
     })),
     subtotal_amount: receiptData.subtotal,
     discount_amount: receiptData.discount,
+    tax_rate: receiptData.taxRate ?? 0,
+    tax_amount: receiptData.taxAmount ?? 0,
     total_amount: receiptData.total,
   };
 
@@ -518,7 +547,9 @@ class ThermalPrinterManager {
         this.currentBridge = null; // Uses fallback
         break;
       default:
-        throw new Error(`نوع طابعة غير مدعوم: ${config.type}`);
+        throw new Error(
+          i18n.t("pos:print_errors.unsupported_type", { type: config.type }),
+        );
     }
 
     return true;

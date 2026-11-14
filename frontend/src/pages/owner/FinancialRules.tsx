@@ -47,21 +47,25 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/core/utils";
-import { TableEmptyState } from "@/components/shared/TableEmptyState";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 
 import { useFinancialRules, paymentLabels, formatCurrency, formatDate } from "@/features/financial-rules";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "@/lib/format/locale";
 
 const TABS = [
-  { id: "overview", label: "نظرة عامة والملخص", icon: TrendingUp },
-  { id: "rules", label: "قواعد الفواتير والضرائب", icon: Receipt },
-  { id: "payments", label: "المدفوعات والورديات", icon: Wallet },
-  { id: "audit", label: "سجل الرقابة المالية", icon: FileLock2 },
+  { id: "overview", label: "finRules.tabs.overview", icon: TrendingUp },
+  { id: "rules", label: "finRules.tabs.rules", icon: Receipt },
+  { id: "payments", label: "finRules.tabs.payments", icon: Wallet },
+  { id: "audit", label: "finRules.tabs.audit", icon: FileLock2 },
 ];
 
 export default function FinancialRules({ hideChrome = false }: { hideChrome?: boolean }) {
+  const { t, i18n } = useTranslation("owner");
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
   const {
     loading,
     saving,
@@ -102,7 +106,7 @@ export default function FinancialRules({ hideChrome = false }: { hideChrome?: bo
     <>
       {isDirty && (
         <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-[10px] font-black text-amber-700">
-          تعديلات غير محفوظة
+          {t("finRules.unsaved")}
         </Badge>
       )}
       <Button
@@ -112,14 +116,14 @@ export default function FinancialRules({ hideChrome = false }: { hideChrome?: bo
         variant="outline"
         className="h-11 gap-2 text-xs font-black"
       >
-        <RefreshCw size={15} className={cn(refreshing && "animate-spin")} /> مزامنة
+        <RefreshCw size={15} className={cn(refreshing && "animate-spin")} /> {t("finRules.sync")}
       </Button>
       <Button
         onClick={exportRules}
         variant="outline"
         className="h-11 gap-2 text-xs font-black"
       >
-        <Download size={15} /> تصدير السجل
+        <Download size={15} /> {t("finRules.exportLog")}
       </Button>
       {isDirty && (
         <Button
@@ -128,17 +132,17 @@ export default function FinancialRules({ hideChrome = false }: { hideChrome?: bo
           variant="ghost"
           className="h-11 gap-2 text-xs font-black text-muted"
         >
-          <Undo2 size={15} /> تراجع
+          <Undo2 size={15} /> {t("finRules.undo")}
         </Button>
       )}
       <Button
         onClick={saveRules}
         loading={saving}
         disabled={saving || !isDirty}
-        title={isDirty ? "حفظ القواعد المالية" : "لا توجد تعديلات للحفظ"}
+        title={isDirty ? t("finRules.saveTitleOn") : t("finRules.saveTitleOff")}
         className="h-11 gap-2 px-6 text-xs font-black"
       >
-        <Save size={15} /> توثيق القواعد
+        <Save size={15} /> {t("finRules.save")}
       </Button>
     </>
   );
@@ -148,18 +152,18 @@ export default function FinancialRules({ hideChrome = false }: { hideChrome?: bo
       {hideChrome ? (
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card p-3 shadow-sm print:hidden">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-black text-main">القواعد المالية</p>
+            <p className="truncate text-sm font-black text-main">{t("finRules.title")}</p>
             <p className="truncate text-[11px] font-bold text-muted">
-              الضرائب، سياسات الخصم، طرق الدفع، ومعايير الورديات
+              {t("finRules.compactSubtitle")}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">{headerActions}</div>
         </div>
       ) : (
         <PageHeader
-          title="القواعد المالية"
-          subtitle="التحكم في الضرائب، سياسات الخصم، طرق الدفع، ومعايير فتح وإغلاق الورديات."
-          badge="محرك الرقابة"
+          title={t("finRules.title")}
+          subtitle={t("finRules.subtitle")}
+          badge={t("finRules.badge")}
           icon={ShieldCheck}
           actions={<div className="flex flex-wrap items-center gap-2 print:hidden">{headerActions}</div>}
         />
@@ -178,22 +182,23 @@ export default function FinancialRules({ hideChrome = false }: { hideChrome?: bo
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 overflow-x-auto p-1.5 print:hidden">
           {TABS.map((tab) => (
             <TabsTrigger key={tab.id} value={tab.id} className="gap-1.5 text-xs font-black">
-              <tab.icon size={14} /> {tab.label}
+              <tab.icon size={14} /> {t("finRules.tabs." + tab.id)}
             </TabsTrigger>
           ))}
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
-          <OverviewPanel rules={rules} metrics={metrics} isDirty={isDirty} />
+          <OverviewPanel rules={rules} metrics={metrics} isDirty={isDirty} t={t} />
         </TabsContent>
         <TabsContent value="rules" className="mt-4">
-          <RulesPanel rules={rules} updateRule={updateRule} />
+          <RulesPanel rules={rules} updateRule={updateRule} t={t} />
         </TabsContent>
         <TabsContent value="payments" className="mt-4">
           <PaymentsPanel
             rules={rules}
             updateRule={updateRule}
             updatePaymentMethod={updatePaymentMethod}
+            t={t}
           />
         </TabsContent>
         <TabsContent value="audit" className="mt-4">
@@ -201,6 +206,8 @@ export default function FinancialRules({ hideChrome = false }: { hideChrome?: bo
             rows={filteredAuditRows}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
+            t={t}
+            locale={locale}
           />
         </TabsContent>
       </Tabs>
@@ -208,41 +215,41 @@ export default function FinancialRules({ hideChrome = false }: { hideChrome?: bo
   );
 }
 
-function OverviewPanel({ rules, metrics, isDirty }: { rules: Record<string, any>; metrics: { revenue: number; expenseTotal: number; net: number; discounts: number; openShifts: number }; isDirty: boolean }) {
+function OverviewPanel({ rules, metrics, isDirty, t }: { rules: Record<string, any>; metrics: { revenue: number; expenseTotal: number; net: number; discounts: number; openShifts: number }; isDirty: boolean; t: any }) {
   const checks = [
-    { title: "الضرائب مفعّلة (VAT)", value: rules.taxRate > 0, icon: Percent },
+    { title: t("finRules.check.vat"), value: rules.taxRate > 0, icon: Percent },
     {
-      title: "تنبيهات الخصم المشبوه",
+      title: t("finRules.check.suspicious"),
       value: rules.enableSuspiciousDiscountAlerts,
       icon: BellRing,
     },
     {
-      title: "سبب الخصم إلزامي",
+      title: t("finRules.check.reason"),
       value: rules.requireDiscountReason,
       icon: BadgePercent,
     },
     {
-      title: "موافقة المدير للخصومات",
+      title: t("finRules.check.managerApproval"),
       value: rules.requireManagerApprovalAboveLimit,
       icon: ShieldAlert,
     },
     {
-      title: "البيع مرتبط بالوردية",
+      title: t("finRules.check.shiftBinding"),
       value: rules.requireOpenShiftForInvoices,
       icon: Lock,
     },
     {
-      title: "قفل فواتير الوردية المغلقة",
+      title: t("finRules.check.lockClosed"),
       value: rules.lockInvoicesAfterShiftClose,
       icon: FileLock2,
     },
     {
-      title: "اعتماد المصروفات",
+      title: t("finRules.check.expenseApproval"),
       value: rules.enableExpenseApproval,
       icon: FileCheck2,
     },
     {
-      title: "منع المخزون السالب",
+      title: t("finRules.check.noNegative"),
       value: !rules.allowNegativeInventory,
       icon: AlertTriangle,
     },
@@ -252,32 +259,32 @@ function OverviewPanel({ rules, metrics, isDirty }: { rules: Record<string, any>
     <div className="space-y-6">
       <div data-stats-grid="true">
         <CurrencyStatCard
-          label="إيرادات اليوم"
+          label={t("finRules.stats.revenueToday")}
           value={metrics.revenue}
           icon={Banknote}
           variant="success"
-          hint="فواتير اليوم"
+          hint={t("finRules.stats.revenueHint")}
         />
         <CurrencyStatCard
-          label="مصروفات اليوم"
+          label={t("finRules.stats.expenseToday")}
           value={metrics.expenseTotal}
           icon={CreditCard}
           variant="danger"
-          hint="مصروفات اليوم"
+          hint={t("finRules.stats.expenseHint")}
         />
         <CurrencyStatCard
-          label="صافي اليوم"
+          label={t("finRules.stats.netToday")}
           value={metrics.net}
           icon={TrendingUp}
           variant={metrics.net >= 0 ? "primary" : "danger"}
-          hint="الإيراد − المنصرف"
+          hint={t("finRules.stats.netHint")}
         />
         <CurrencyStatCard
-          label="إجمالي الخصومات"
+          label={t("finRules.stats.discounts")}
           value={metrics.discounts}
           icon={BadgePercent}
           variant="secondary"
-          hint="من فواتير اليوم"
+          hint={t("finRules.stats.discountsHint")}
         />
       </div>
 
@@ -285,19 +292,19 @@ function OverviewPanel({ rules, metrics, isDirty }: { rules: Record<string, any>
         <ContentPanel
           title={
             <span className="flex items-center gap-2">
-              <ShieldCheck size={16} className="text-primary" /> حالة الحماية الرقابية
+              <ShieldCheck size={16} className="text-primary" /> {t("finRules.protection.title")}
             </span>
           }
-          subtitle="مدى صرامة القواعد المطبقة بالنظام"
+          subtitle={t("finRules.protection.subtitle")}
           className="lg:col-span-2"
           actions={
             isDirty ? (
               <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-[10px] font-black text-amber-700">
-                مسودة غير محفوظة
+                {t("finRules.protection.draftBadge")}
               </Badge>
             ) : (
               <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-[10px] font-black text-emerald-700">
-                موثق ومفعل
+                {t("finRules.protection.savedBadge")}
               </Badge>
             )
           }
@@ -336,29 +343,29 @@ function OverviewPanel({ rules, metrics, isDirty }: { rules: Record<string, any>
         <ContentPanel
           title={
             <span className="flex items-center gap-2">
-              <Zap size={16} className="text-primary" /> ملخص الحركة المباشرة
+              <Zap size={16} className="text-primary" /> {t("finRules.live.title")}
             </span>
           }
         >
           <div className="space-y-4">
             <SummaryLine
-              label="الإيراد المسجل"
+              label={t("finRules.live.revenue")}
               value={formatCurrency(metrics.revenue)}
             />
             <SummaryLine
-              label="المنصرف"
+              label={t("finRules.live.spent")}
               value={formatCurrency(metrics.expenseTotal)}
             />
             <div className="my-4 border-t border-dashed border-border/60" />
             <SummaryLine
-              label="الصافي الحالي"
+              label={t("finRules.live.net")}
               value={formatCurrency(metrics.net)}
               highlight={metrics.net >= 0 ? "success" : "danger"}
               large
             />
             <div className="mt-6 flex items-center justify-between rounded-2xl border border-primary/20 bg-primary/5 p-4">
               <span className="text-xs font-bold text-muted">
-                الورديات المفتوحة (درج النقود)
+                {t("finRules.live.openShifts")}
               </span>
               <span className="text-lg font-black tabular-nums text-primary">
                 {metrics.openShifts}
@@ -371,46 +378,42 @@ function OverviewPanel({ rules, metrics, isDirty }: { rules: Record<string, any>
   );
 }
 
-function RulesPanel({ rules, updateRule }: { rules: Record<string, any>; updateRule: (key: string, value: any) => void }) {
+function RulesPanel({ rules, updateRule, t }: { rules: Record<string, any>; updateRule: (key: string, value: any) => void; t: any }) {
   const booleanRules = [
     {
       key: "enableSuspiciousDiscountAlerts",
-      title: "تنبيهات الخصم المشبوه",
-      description: "إصدار تنبيه للمالك عند تجاوز الخصومات لمعدلات غير طبيعية.",
+      title: t("finRules.check.suspicious"),
+      description: t("finRules.rulesPanel.suspiciousDesc"),
       icon: BellRing,
     },
     {
       key: "requireDiscountReason",
-      title: "إلزام سبب الخصم",
-      description:
-        "لا يسمح بإضافة أي خصم على الفاتورة بدون كتابة ملاحظة توضيحية.",
+      title: t("finRules.check.reason"),
+      description: t("finRules.rulesPanel.reasonDesc"),
       icon: BadgePercent,
     },
     {
       key: "requireManagerApprovalAboveLimit",
-      title: "اعتماد الخصومات العالية",
-      description:
-        "المطالبة بموافقة مدير/مالك عند تجاوز نسبة الخصم حد الكاشير المسموح.",
+      title: t("finRules.check.managerApproval"),
+      description: t("finRules.rulesPanel.approvalDesc"),
       icon: ShieldAlert,
     },
     {
       key: "enableExpenseApproval",
-      title: "اعتماد المصروفات",
-      description:
-        "لا يتم إدراج المصروفات الكبيرة بالتقارير إلا بعد مراجعتها واعتمادها.",
+      title: t("finRules.check.expenseApproval"),
+      description: t("finRules.rulesPanel.expenseDesc"),
       icon: FileCheck2,
     },
     {
       key: "enableProductCostTracking",
-      title: "تتبع تكلفة المخزون",
-      description:
-        "احتساب الربحية تلقائياً بناءً على متوسط تكلفة الشراء للمنتج.",
+      title: t("finRules.rulesPanel.costTitle"),
+      description: t("finRules.rulesPanel.costDesc"),
       icon: Calculator,
     },
     {
       key: "allowNegativeInventory",
-      title: "السماح بالمخزون السالب",
-      description: "تمكين بيع منتجات رصيدها صفر. (لا يُنصح به لأسباب رقابية).",
+      title: t("finRules.rulesPanel.negativeTitle"),
+      description: t("finRules.rulesPanel.negativeDesc"),
       icon: AlertTriangle,
     },
   ];
@@ -420,7 +423,7 @@ function RulesPanel({ rules, updateRule }: { rules: Record<string, any>; updateR
       <ContentPanel
         title={
           <span className="flex items-center gap-2">
-            <Receipt size={16} className="text-primary" /> سياسات الفواتير والخصم
+            <Receipt size={16} className="text-primary" /> {t("finRules.rulesPanel.title")}
           </span>
         }
         className="lg:col-span-2"
@@ -440,33 +443,33 @@ function RulesPanel({ rules, updateRule }: { rules: Record<string, any>; updateR
       <ContentPanel
         title={
           <span className="flex items-center gap-2">
-            <Calculator size={16} className="text-primary" /> القيم والحدود المالية
+            <Calculator size={16} className="text-primary" /> {t("finRules.rulesPanel.limitsTitle")}
           </span>
         }
       >
         <div className="space-y-5">
           <NumberField
-            label="نسبة الضريبة (VAT) %"
+            label={t("finRules.field.taxRate")}
             value={rules.taxRate}
             onChange={(value) => updateRule("taxRate", value)}
             icon={Percent}
             max={100}
-            hint="النسبة المطبقة على الفواتير (0 – 100)"
+            hint={t("finRules.field.taxRateHint")}
           />
           <NumberField
-            label="حد خصم الكاشير (%)"
+            label={t("finRules.field.cashierLimit")}
             value={rules.cashierDiscountLimit}
             onChange={(value) => updateRule("cashierDiscountLimit", value)}
             icon={BadgePercent}
             max={100}
-            hint="الأعلى من ذلك يتطلب اعتماد مدير (0 – 100)"
+            hint={t("finRules.field.cashierLimitHint")}
           />
           <NumberField
-            label="أقصى قيمة للفاتورة بدون اعتماد (ج.م)"
+            label={t("finRules.field.maxInvoice")}
             value={rules.maxInvoiceWithoutApproval}
             onChange={(value) => updateRule("maxInvoiceWithoutApproval", value)}
             icon={Banknote}
-            hint="الفواتير الأعلى من هذا المبلغ تتطلب اعتماداً"
+            hint={t("finRules.field.maxInvoiceHint")}
           />
         </div>
       </ContentPanel>
@@ -474,7 +477,7 @@ function RulesPanel({ rules, updateRule }: { rules: Record<string, any>; updateR
   );
 }
 
-function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Record<string, any>; updateRule: (key: string, value: any) => void; updatePaymentMethod: (key: string, value: boolean) => void }) {
+function PaymentsPanel({ rules, updateRule, updatePaymentMethod, t }: { rules: Record<string, any>; updateRule: (key: string, value: any) => void; updatePaymentMethod: (key: string, value: boolean) => void; t: any }) {
   const methods = ["cash", "card", "wallet", "instapay"];
 
   return (
@@ -482,7 +485,7 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
       <ContentPanel
         title={
           <span className="flex items-center gap-2">
-            <Lock size={16} className="text-primary" /> ضوابط درج النقود والورديات
+            <Lock size={16} className="text-primary" /> {t("finRules.cash.title")}
           </span>
         }
         className="lg:col-span-2"
@@ -491,9 +494,9 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
           <ToggleRule
             rule={{
               key: "requireOpenShiftForInvoices",
-              title: "الربط بنقاط البيع المفتوحة",
+              title: t("finRules.cash.openShiftTitle"),
               description:
-                "يُمنع أي مستخدم من إصدار فواتير دون فتح وردية/درج نقود خاص به.",
+                t("finRules.cash.openShiftDesc"),
               icon: Lock,
             }}
             rules={rules}
@@ -503,9 +506,9 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
           <ToggleRule
             rule={{
               key: "lockInvoicesAfterShiftClose",
-              title: "تجميد الفواتير للورديات المغلقة",
+              title: t("finRules.cash.lockTitle"),
               description:
-                "تحويل فواتير الوردية المغلقة لوضع القراءة فقط (تتطلب مدير للتعديل).",
+                t("finRules.cash.lockDesc"),
               icon: FileLock2,
             }}
             rules={rules}
@@ -515,7 +518,7 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
         </div>
 
         <h3 className="mb-3 text-[11px] font-black uppercase tracking-widest text-muted">
-          قنوات الدفع المسموحة للعملاء
+          {t("finRules.cash.channelsTitle")}
         </h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {methods.map((method) => (
@@ -534,7 +537,7 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
                   )}
                 </div>
                 <span className="truncate text-sm font-bold text-main">
-                  {paymentLabels[method]}
+                  {t(paymentLabels[method])}
                 </span>
               </div>
               <Switch
@@ -542,7 +545,7 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
                 onCheckedChange={(checked) =>
                   updatePaymentMethod(method, checked)
                 }
-                aria-label={`تفعيل الدفع عبر ${paymentLabels[method]}`}
+                aria-label={t("finRules.cash.enableVia", { label: t(paymentLabels[method]) })}
               />
             </div>
           ))}
@@ -553,7 +556,7 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
         <ContentPanel
           title={
             <span className="flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-primary" /> التفضيل الافتراضي للدفع
+              <CheckCircle2 size={16} className="text-primary" /> {t("finRules.pref.title")}
             </span>
           }
         >
@@ -573,7 +576,7 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
                       : "border-border/50 bg-soft/30 text-muted hover:bg-soft hover:text-main",
                   )}
                 >
-                  <span>{paymentLabels[method]}</span>
+                  <span>{t(paymentLabels[method])}</span>
                   {selected && <CheckCircle2 size={18} />}
                 </button>
               );
@@ -584,7 +587,7 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
         <ContentPanel
           title={
             <span className="flex items-center gap-2">
-              <Settings2 size={16} className="text-primary" /> الإغلاق التلقائي للورديات
+              <Settings2 size={16} className="text-primary" /> {t("finRules.autoClose.title")}
             </span>
           }
         >
@@ -592,9 +595,9 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
             <ToggleRule
               rule={{
                 key: "enableAutoShiftClose",
-                title: "الإغلاق التلقائي للورديات",
+                title: t("finRules.autoClose.title"),
                 description:
-                  "يقوم النظام تلقائياً بإغلاق الورديات المفتوحة بعد نهاية ساعات العمل الرسمية وفترة السماح.",
+                  t("finRules.autoClose.ruleDesc"),
                 icon: Zap,
               }}
               rules={rules}
@@ -603,7 +606,7 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
             />
 
             <NumberField
-              label="فترة السماح بعد نهاية الدوام (دقيقة)"
+              label={t("finRules.field.grace")}
               value={rules.shiftAutoCloseGracePeriod}
               onChange={(value) =>
                 updateRule("shiftAutoCloseGracePeriod", value)
@@ -611,19 +614,21 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
               icon={Clock}
               min={0}
               max={120}
-              hint="المدة بعد وقت الإغلاق الرسمي قبل الإغلاق التلقائي (0 – 120)"
+              hint={t("finRules.field.graceHint")}
             />
 
             <NumberField
-              label="ساعات القفل التلقائي للوردية (إذا نُسيت)"
+              label={t("finRules.field.autoLock")}
               value={rules.autoLockShiftHours}
               onChange={(value) => updateRule("autoLockShiftHours", value)}
               icon={Clock}
-              hint="إغلاق احترازي إذا تُركت الوردية مفتوحة"
+              min={0}
+              max={168}
+              hint={t("finRules.field.autoLockHint")}
             />
 
             <NumberField
-              label="تنبيه الكاشير قبل الإغلاق التلقائي (دقيقة)"
+              label={t("finRules.field.closeWarning")}
               value={rules.shiftCloseWarningMinutes}
               onChange={(value) =>
                 updateRule("shiftCloseWarningMinutes", value)
@@ -631,18 +636,18 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
               icon={BellRing}
               min={0}
               max={60}
-              hint="تنبيه الكاشير بقرب الإغلاق التلقائي (0 – 60)"
+              hint={t("finRules.field.closeWarningHint")}
             />
 
             <div className="border-t border-border/50 pt-5">
               <NumberField
-                label="العجز النقدي المسموح دون مساءلة (ج.م)"
+                label={t("finRules.field.discrepancy")}
                 value={rules.maxCashDiscrepancyWithoutNote}
                 onChange={(value) =>
                   updateRule("maxCashDiscrepancyWithoutNote", value)
                 }
                 icon={AlertTriangle}
-                hint="عجز أكبر من هذا المبلغ يتطلب ملاحظة توضيحية"
+                hint={t("finRules.field.discrepancyHint")}
               />
             </div>
           </div>
@@ -652,19 +657,19 @@ function PaymentsPanel({ rules, updateRule, updatePaymentMethod }: { rules: Reco
   );
 }
 
-function AuditPanel({ rows, searchTerm, setSearchTerm }: { rows: Record<string, any>[]; searchTerm: string; setSearchTerm: (v: string) => void }) {
+function AuditPanel({ rows, searchTerm, setSearchTerm, t, locale }: { rows: Record<string, any>[]; searchTerm: string; setSearchTerm: (v: string) => void; t: any; locale: string }) {
   return (
     <ContentPanel
       title={
         <span className="flex items-center gap-2">
-          <Search size={16} className="text-primary" /> أرشيف الرقابة المتقدم
+          <Search size={16} className="text-primary" /> {t("finRules.audit.title")}
         </span>
       }
-      subtitle="تتبع العمليات الحساسة كالخصومات، التعديلات، وإلغاء الفواتير."
+      subtitle={t("finRules.audit.subtitle")}
       actions={
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="shrink-0 tabular-nums">
-            {rows.length} عملية
+            {t("finRules.audit.count", { n: rows.length })}
           </Badge>
           <div className="relative w-full sm:w-72">
             <Search
@@ -674,9 +679,9 @@ function AuditPanel({ rows, searchTerm, setSearchTerm }: { rows: Record<string, 
             <Input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="بحث بالنوع أو الوصف أو القسم..."
-              aria-label="بحث في سجل الرقابة"
-              className="h-11 rounded-xl border-border/60 bg-card pr-11 text-xs font-bold shadow-sm focus-visible:ring-primary/30"
+              placeholder={t("finRules.audit.searchPlaceholder")}
+              aria-label={t("finRules.audit.searchAria")}
+              className="h-11 rounded-xl border-border/60 bg-card pe-11 text-xs font-bold shadow-sm focus-visible:ring-primary/30"
             />
           </div>
         </div>
@@ -688,16 +693,16 @@ function AuditPanel({ rows, searchTerm, setSearchTerm }: { rows: Record<string, 
           <TableHeader>
             <TableRow className="border-border/50 bg-soft/30 hover:bg-soft/30">
               <TableHead className="rounded-tr-2xl py-4 text-right text-xs font-black uppercase tracking-widest text-muted">
-                نوع الإجراء
+                {t("finRules.audit.thAction")}
               </TableHead>
               <TableHead className="py-4 text-right text-xs font-black uppercase tracking-widest text-muted">
-                تفاصيل العملية
+                {t("finRules.audit.thDetails")}
               </TableHead>
               <TableHead className="py-4 text-right text-xs font-black uppercase tracking-widest text-muted">
-                القسم/الكيان
+                {t("finRules.audit.thEntity")}
               </TableHead>
               <TableHead className="rounded-tl-2xl py-4 text-right text-xs font-black uppercase tracking-widest text-muted">
-                طابع زمني
+                {t("finRules.audit.thTime")}
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -712,30 +717,30 @@ function AuditPanel({ rows, searchTerm, setSearchTerm }: { rows: Record<string, 
                     variant="outline"
                     className="rounded-lg bg-card px-3 py-1 text-[10px] font-bold uppercase tracking-widest"
                   >
-                    {row.action || "عملية"}
+                    {row.action || t("finRules.audit.fallbackAction")}
                   </Badge>
                 </TableCell>
                 <TableCell className="max-w-sm truncate py-4 text-sm font-semibold text-main">
-                  {row.description || "لا يوجد وصف"}
+                  {row.description || t("finRules.audit.noDesc")}
                 </TableCell>
                 <TableCell className="py-4 text-xs font-bold text-muted">
-                  {row.entity_type || "عام"}
+                  {row.entity_type || t("finRules.audit.genericEntity")}
                 </TableCell>
                 <TableCell
                   className="py-4 text-xs font-bold tabular-nums text-muted"
                   dir="ltr"
                 >
-                  {formatDate(row.created_at || row.createdAt)}
+                  {formatDate(row.created_at || row.createdAt, locale)}
                 </TableCell>
               </TableRow>
             ))}
             {rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="h-64">
-                  <TableEmptyState
+                  <EmptyState variant="table"
                     icon={FileLock2}
-                    title="لا توجد عمليات رقابية مسجلة"
-                    description="جرّب كلمة بحث مختلفة أو تأكد من اتصال النظام بالخادم."
+                    title={t("finRules.audit.emptyTitle")}
+                    message={t("finRules.audit.emptyMessage")}
                   />
                 </TableCell>
               </TableRow>

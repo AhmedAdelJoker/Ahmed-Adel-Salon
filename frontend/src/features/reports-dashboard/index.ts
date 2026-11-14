@@ -2,9 +2,6 @@ export { useReportsDashboard } from "@/features/reports-dashboard/hooks/useRepor
 export type { UseReportsDashboardReturn } from "@/features/reports-dashboard/hooks/useReportsDashboard";
 export {
   DEFAULT_STATS,
-  DEMO_STATS,
-  FALLBACK_SERVICES,
-  FALLBACK_WEEKLY,
   KPI_CONFIG,
   PERIODS,
 } from "@/features/reports-dashboard/constants";
@@ -29,3 +26,15 @@ export { ServiceDistribution } from "@/features/reports-dashboard/components/Ser
 export type { ServiceDistributionProps } from "@/features/reports-dashboard/components/ServiceDistribution";
 export { SmartInsights } from "@/features/reports-dashboard/components/SmartInsights";
 export type { SmartInsightsProps } from "@/features/reports-dashboard/components/SmartInsights";
+
+export { NeedsAttention } from "@/features/reports-dashboard/components/NeedsAttention";
+export type { NeedsAttentionProps } from "@/features/reports-dashboard/components/NeedsAttention";
+export { useNeedsAttention } from "@/features/reports-dashboard/hooks/useNeedsAttention";
+export type { UseNeedsAttentionReturn } from "@/features/reports-dashboard/hooks/useNeedsAttention";export { RevenueSparkline } from "@/features/reports-dashboard/components/RevenueSparkline";
+export type { RevenueSparklineProps } from "@/features/reports-dashboard/components/RevenueSparkline";
+export { RankingTable, Delta } from "@/features/reports-dashboard/components/RankingTable";
+export type { RankingTableProps, RankRow } from "@/features/reports-dashboard/components/RankingTable";
+export { DayStatusBar } from "@/features/reports-dashboard/components/DayStatusBar";
+export type { DayStatusBarProps } from "@/features/reports-dashboard/components/DayStatusBar";
+export { useOperatingSummary } from "@/features/reports-dashboard/hooks/useOperatingSummary";
+export type { UseOperatingSummaryReturn, OperatingSummary, DailyPoint, DayStatus, RankedBarber, RankedService, CancellationStats } from "@/features/reports-dashboard/hooks/useOperatingSummary";

@@ -12,6 +12,15 @@ export const posShiftService = {
     return normalizeItemResponse(response, null);
   },
 
+  // Live money-grade aggregates for the open shift (GET /pos-shifts/current/stats).
+  // Returns the flat stats object (total_sales, invoice_count, expected_closing_cash, ...)
+  // or null when no shift is open. Mirrors close_shift arithmetic:
+  // expected_closing_cash = opening + cash sales - cash expenses.
+  currentStats: async () => {
+    const response = await api.get("/pos-shifts/current/stats");
+    return response.data?.stats ?? null;
+  },
+
   open: async (payload: Record<string, unknown> = {}) => {
     const response = await api.post("/pos-shifts/open", {
       opening_cash: Number(payload.opening_cash ?? payload.openingCash ?? 0),
@@ -43,9 +52,20 @@ export const posShiftService = {
       countedCash: closingValue,
       closing_note: closingNote,
       closingNote,
+      // Manager co-signature fields for the high-variance close policy — the
+      // backend only requires them for non-supervisory closers over the limit.
+      approver_username: payload.approver_username ?? payload.approverUsername ?? "",
+      approver_password: payload.approver_password ?? payload.approverPassword ?? "",
     });
 
     return normalizeItemResponse(response, null);
+  },
+
+  // Money-grade figures for any (usually closed) shift — powers the reprint
+  // of an archived shift report.
+  shiftStats: async (shiftId: string | number) => {
+    const response = await api.get(`/pos-shifts/${shiftId}/stats`);
+    return response.data?.stats ?? null;
   },
 
   getBalance: async () => {

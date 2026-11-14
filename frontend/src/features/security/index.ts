@@ -6,3 +6,7 @@ export { default as StatusRow } from "@/features/security/components/StatusRow";
 export { default as UsersPanelTab } from "@/features/security/components/UsersPanelTab";
 export { default as PoliciesPanel } from "@/features/security/components/PoliciesPanel";
 export { default as ActivityPanel } from "@/features/security/components/ActivityPanel";
+
+// Re-exported so consumers use the feature's public API instead of
+// reaching into its internals. See eslint.config.js -> featureBoundary.
+export { default as TwoFactorPanel } from "@/features/security/components/TwoFactorPanel";

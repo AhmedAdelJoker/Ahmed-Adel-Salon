@@ -1,0 +1,352 @@
+{
+  "customer": {
+    "unknown": "عميل"
+  },
+  "page": {
+    "title": "سجل العملاء",
+    "subtitle": "إدارة قاعدة البيانات وبناء علاقات ولاء مستدامة",
+    "loading": "جاري تحميل العملاء..."
+  },
+  "header": {
+    "import": "استيراد",
+    "export": "تصدير",
+    "archive": "الأرشيف",
+    "create": "إضافة عميل",
+    "importError": "فشل استيراد العملاء"
+  },
+  "import": {
+    "loading": "جاري استيراد العملاء...",
+    "loadingProducts": "جاري استيراد المنتجات...",
+    "success": "تم الاستيراد بنجاح",
+    "errorsWarn": "تم الاستيراد مع وجود بعض الأخطاء، راجع الكونسول.",
+    "failed": "فشل استيراد الملف"
+  },
+  "stats": {
+    "total": "إجمالي العملاء",
+    "vip": "نخبة VIP",
+    "regular": "عملاء منتظمون",
+    "new": "عملاء جدد",
+    "avgSpend": "متوسط الإنفاق",
+    "totalSpend": "إجمالي الإنفاق",
+    "visits": "الزيارات",
+    "loyaltyPoints": "نقاط الولاء",
+    "totalPaid": "المدفوع"
+  },
+  "filterTabs": {
+    "all": "الكل",
+    "vip": "VIP",
+    "regular": "منتظم",
+    "new": "جديد"
+  },
+  "toolbar": {
+    "search": "البحث بالاسم أو رقم الجوال...",
+    "cardsView": "عرض بطاقات",
+    "tableView": "عرض جدول",
+    "clearFilters": "مسح البحث والفلتر"
+  },
+  "table": {
+    "customerProfile": "ملف العميل",
+    "contact": "رقم التواصل",
+    "visits": "الزيارات",
+    "spend": "الإنفاق",
+    "actions": "الإجراءات",
+    "viewProfile": "عرض الملف",
+    "quickOpen": "فتح سريع",
+    "archive": "أرشفة",
+    "visitBadge": "{{count}} زيارة",
+    "emptyTitle": "لا يوجد عملاء مطابقين",
+    "emptyHint": "جرّب كلمة بحث مختلفة أو غيّر الفلتر",
+    "emptyNoCustomers": "لا يوجد عملاء",
+    "emptyNoCustomersHint": "أضف أول عميل من زر إضافة عميل",
+    "idFallback": "---"
+  },
+  "cards": {
+    "phoneLabel": "الهاتف",
+    "spendLabel": "الإنفاق",
+    "record": "السجل",
+    "archive": "أرشفة",
+    "emptyTitle": "لا يوجد عملاء مطابقين",
+    "emptyHint": "جرّب كلمة بحث مختلفة أو غيّر الفلتر"
+  },
+  "empty": {
+    "noCustomers": "لا يوجد عملاء",
+    "noCustomersHint": "أضف أول عميل من زر إضافة عميل",
+    "noResults": "لا توجد نتائج مطابقة",
+    "noResultsHint": "جرّب كلمة بحث مختلفة أو غيّر الفلتر"
+  },
+  "pagination": {
+    "pageOf": "صفحة {{page}} من {{total}}",
+    "showing": "عرض {{count}} من {{total}}"
+  },
+  "form": {
+    "editTitle": "تعديل بيانات العميل",
+    "createTitle": "إضافة عميل جديد",
+    "description": "أدخل اسم العميل ورقم الجوال. رقم إضافي اختياري.",
+    "nameLabel": "الاسم الكامل",
+    "nameRequired": "*",
+    "namePlaceholder": "مثال: أحمد محمد",
+    "phoneLabel": "رقم الجوال",
+    "phonePlaceholder": "010...",
+    "secondPhoneLabel": "رقم إضافي (اختياري)",
+    "secondPhonePlaceholder": "010...",
+    "cancel": "إلغاء",
+    "saveEdit": "حفظ التغييرات",
+    "create": "إضافة عميل",
+    "firstNameLabel": "الاسم الأول",
+    "lastNameLabel": "اسم العائلة",
+    "emailLabel": "البريد الإلكتروني",
+    "notesLabel": "ملاحظات"
+  },
+  "details": {
+    "title": "تفاصيل العميل",
+    "phone": "الهاتف",
+    "secondPhone": "رقم إضافي",
+    "email": "البريد الإلكتروني",
+    "createdSince": "منذ",
+    "totalSpend": "إجمالي الإنفاق",
+    "visits": "الزيارات",
+    "loyaltyPoints": "نقاط الولاء",
+    "totalPaid": "المدفوع",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "newBooking": "حجز جديد",
+    "back": "العودة",
+    "ok": "موافق",
+    "notFound": "العميل غير موجود",
+    "backToCustomers": "العودة للعملاء",
+    "profileSubtitle": "ملف العميل الكامل • رقم #{{id}}",
+    "since": "منذ",
+    "description": "مراجعة بيانات العميل وسجل التعاملات.",
+    "archivedDescription": "مراجعة بيانات العميل وسجل ولائه قبل الاستعادة أو الحذف النهائي.",
+    "balance": "الرصيد",
+    "lastVisit": "آخر زيارة",
+    "archivedAt": "تاريخ الأرشفة",
+    "tier": "فئة الولاء",
+    "restore": "استعادة العميل"
+  },
+  "tabs": {
+    "overview": "نظرة عامة",
+    "appointments": "المواعيد",
+    "invoices": "الفواتير"
+  },
+  "delete": {
+    "title": "أرشفة العميل",
+    "description": "هل أنت متأكد من أرشفة {{name}}؟ سيتم نقله إلى الأرشيف ويمكن للمالك استرجاعه لاحقاً من صفحة الأرشيف.",
+    "confirm": "نعم، أرشِف",
+    "cancel": "إلغاء"
+  },
+  "toasts": {
+    "loadFailed": "فشل في تحميل بيانات العملاء",
+    "statsFailed": "إحصائيات العملاء",
+    "saveSuccess": "تمت إضافة العميل بنجاح",
+    "updateSuccess": "تم تحديث بيانات العميل",
+    "saveFailed": "فشل حفظ بيانات العميل",
+    "deleteSuccess": "تم نقل العميل إلى الأرشيف",
+    "deleteFailed": "فشل في حذف العميل",
+    "importSuccess": "تم استيراد العملاء بنجاح",
+    "importFailed": "فشل استيراد العملاء",
+    "viewArchive": "عرض الأرشيف",
+    "namePhoneRequired": "الاسم ورقم الجوال مطلوبان"
+  },
+  "search": {
+    "shortcut": "البحث",
+    "createShortcut": "n"
+  },
+  "shortcuts": {
+    "search": "البحث (/)",
+    "create": "عميل جديد (n)",
+    "close": "إغلاق"
+  },
+  "tier": {
+    "gold": "ذهبي",
+    "silver": "فضي",
+    "bronze": "برونزي"
+  },
+  "tierHistory": {
+    "title": "تاريخ تغييرات الولاء",
+    "noHistory": "لا توجد تغييرات في فئة الولاء",
+    "changedTo": "تم تغيير الفئة إلى",
+    "changedBy": "تم بواسطة",
+    "date": "التاريخ"
+  },
+  "status": {
+    "PENDING": "قيد الانتظار",
+    "CONFIRMED": "مؤكد",
+    "WAITING": "في الانتظار",
+    "IN_PROGRESS": "قيد التنفيذ",
+    "READY_FOR_PAYMENT": "جاهز للدفع",
+    "COMPLETED": "مكتمل",
+    "CANCELLED": "ملغي",
+    "AUTO_CANCELLED": "أُلغي تلقائياً",
+    "NO_SHOW": "لم يحضر"
+  },
+  "overview": {
+    "totalSpend": "إجمالي الإنفاق",
+    "visits": "الزيارات",
+    "points": "نقاط الولاء",
+    "paid": "المدفوع",
+    "avgSpend": "متوسط الإنفاق لكل زيارة",
+    "noShowRate": "معدل عدم الحضور",
+    "upcomingAppointments": "مواعيد قادمة",
+    "recentAppointments": "آخر المواعيد",
+    "recentInvoices": "آخر الفواتير",
+    "activityLog": "سجل النشاط",
+    "activityFilters": {
+      "all": "الكل",
+      "appointment": "مواعيد",
+      "invoice": "فواتير",
+      "edit": "تعديلات",
+      "payment": "مدفوعات"
+    },
+    "noAppointments": "لا توجد مواعيد",
+    "noInvoices": "لا توجد فواتير",
+    "noActivity": "لا توجد أنشطة مسجلة"
+  },
+  "invoices": {
+    "viewInvoice": "عرض الفاتورة",
+    "noInvoices": "لا توجد فواتير",
+    "emptyMessage": "لم يتم إصدار أي فواتير لهذا العميل",
+    "details": "تفاصيل الفاتورة",
+    "tableInvoice": "الفاتورة",
+    "tableDate": "التاريخ",
+    "tableAmount": "المبلغ",
+    "tableStatus": "الحالة",
+    "actions": "إجراءات",
+    "statusClosed": "ملغاة",
+    "statusOpen": "صادرة",
+    "statusDraft": "مسودة"
+  },
+  "appointments": {
+    "noAppointments": "لا توجد مواعيد",
+    "emptyMessage": "لم يتم تسجيل أي مواعيد لهذا العميل",
+    "viewAll": "عرض جميع المواعيد",
+    "showLess": "عرض أقل",
+    "showRemaining": "عرض الباقي ({{count}})",
+    "viewDetails": "عرض التفاصيل",
+    "allAppointmentsTitle": "سجل مواعيد {{name}}",
+    "payNow": "الدفع الآن",
+    "cancelAll": "إلغاء جميع المواعيد القادمة",
+    "cancelAllConfirm": "هل أنت متأكد من إلغاء جميع المواعيد القادمة؟ لا يمكن التراجع عن هذا الإجراء.",
+    "cancelAllSuccess": "تم إلغاء جميع المواعيد القادمة بنجاح",
+    "cancelAllFailed": "فشل إلغاء المواعيد القادمة"
+  },
+  "activity": {
+    "noActivity": "لا توجد سجلات",
+    "noActivityRecords": "لا توجد أنشطة مسجلة"
+  },
+  "merge": {
+    "title": "دمج العملاء",
+    "description": "دمج العملاء المكررين"
+  },
+  "duplicates": {
+    "alert": "تم العثور على عملاء مكررين",
+    "mergeButton": "دمج"
+  },
+  "filter": {
+    "all": "الكل",
+    "vip": "VIP",
+    "regular": "منتظم",
+    "new": "جديد"
+  },
+  "bulk": {
+    "selected": "تم تحديد {{count}} عميل",
+    "selectAll": "تحديد الكل",
+    "selectNone": "إلغاء التحديد",
+    "delete": "حذف المحدد",
+    "deleteSelected": "حذف العملاء المحددين",
+    "deleteConfirm": "هل أنت متأكد من حذف {{count}} عميل؟ لا يمكن التراجع عن هذا الإجراء."
+  },
+  "heatmap": {
+    "title": "خريطة أوقات الذروة",
+    "noData": "لا توجد بيانات كافية لعرض الخريطة الحرارية",
+    "visits": "زيارات",
+    "hour": "الساعة"
+  },
+  "coupons": {
+    "title": "الخصومات المطبقة",
+    "noCoupons": "لم تُطبّق أي خصومات على فواتير هذا العميل",
+    "invoice": "رقم الفاتورة",
+    "date": "التاريخ",
+    "type": "النوع",
+    "amount": "المبلغ",
+    "discountType": {
+      "percentage": "نسبة مئوية",
+      "fixed": "مبلغ ثابت",
+      "amount": "مبلغ ثابت",
+      "coupon": "كوبون",
+      "manual": "يدوي",
+      "loyalty": "نقاط الولاء",
+      "promo": "عرض ترويجي"
+    }
+  },
+  "duplicatesAlert": {
+    "title": "تم اكتشاف {{groupCount}} مجموعة من العملاء المكررين",
+    "hint": "عملاء يتشاركون نفس رقم الهاتف — دمجهم يحفظ السجلات في مكان واحد",
+    "count": "{{customerCount}} عميل",
+    "merge": "بدء الدمج"
+  },
+  "mergeDialog": {
+    "title": "دمج العملاء المكررين",
+    "subtitle": "مجموعات العملاء الذين يتشاركون نفس رقم الهاتف — اختر من كل مجموعة الصف الذي يبقى",
+    "mergeWith": "دمج الباقي مع المحدد",
+    "refresh": "تحديث",
+    "close": "إغلاق",
+    "noDuplicates": "لا توجد مجموعات مكررة حالياً",
+    "loading": "جاري التحميل…",
+    "confirm": "سيتم دمج {{count}} عميل داخل «{{name}}».\nستُنقل كل المواعيد والفواتير والجلسات للعميل المُحتفظ به، وسيُؤرشف الباقون مع تسجيل سبب الدمج.\nهل تريد المتابعة؟",
+    "success": "تم دمج المجموعة بنجاح",
+    "failed": "فشل دمج المجموعة",
+    "keep": "يبقى"
+  },
+  "bookingModal": {
+    "title": "حجز جديد للعميل",
+    "customer": "{{firstName}} {{lastName}}",
+    "selectServices": "اختر الخدمات *",
+    "date": "التاريخ *",
+    "time": "الوقت *",
+    "barber": "الخبير",
+    "autoAssign": "توزيع تلقائي",
+    "notes": "ملاحظات",
+    "notesPlaceholder": "أي ملاحظات...",
+    "summary": "الإجمالي ({{count}} خدمات • {{duration}} دقيقة)",
+    "confirm": "تأكيد الحجز",
+    "cancel": "إلغاء",
+    "errorSelectService": "اختر خدمة واحدة على الأقل",
+    "errorSelectTime": "يرجى اختيار الوقت",
+    "errorPastTime": "لا يمكن الحجز في وقت مضى",
+    "errorConflict": "يوجد تعارض في الموعد",
+    "errorSameDay": "هذا العميل لديه حجز بالفعل في هذا اليوم. يرجى اختيار يوم آخر.",
+    "success": "تم حجز الموعد بنجاح",
+    "failed": "فشل الحجز",
+    "conflict": "يوجد تعارض في الموعد",
+    "sameDay": "هذا العميل لديه حجز في هذا اليوم بالفعل",
+    "minutesAbbr": "د"
+  },
+  "customerDetail": {
+    "notFound": "العميل غير موجود",
+    "backToCustomers": "العودة للعملاء",
+    "back": "العودة",
+    "newBooking": "حجز جديد",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "archive": "أرشفة العميل",
+    "archiveConfirm": "هل أنت متأكد من أرشفة {{name}}؟ سيتم نقله إلى الأرشيف ويمكن للمالك استرجاعه لاحقاً من صفحة الأرشيف.",
+    "archiveConfirmText": "نعم، أرشِف",
+    "archiveCancel": "إلغاء"
+  },
+  "quickActions": {
+    "whatsapp": "إرسال رسالة واتساب",
+    "reminder": "إرسال تذكير بالموعد",
+    "printCard": "طباعة بطاقة العميل",
+    "transferPOS": "تحويل إلى نقطة البيع",
+    "bookAppointment": "حجز موعد جديد",
+    "createCustomer": "إنشاء عميل جديد"
+  },
+  "export": {
+    "title": "تصدير بيانات العميل",
+    "button": "تصدير PDF",
+    "success": "تم تصدير بيانات العميل بنجاح",
+    "failed": "فشل تصدير بيانات العميل",
+    "filename": "بيانات_العميل_{{name}}_{{date}}"
+  }
+}

@@ -10,6 +10,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    text,
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -22,6 +23,30 @@ class Appointment(Base):
     __table_args__ = (
         Index("ix_appointments_barber_date", "barber_id", "appointment_date"),
         Index("ix_appointments_barber_date_status", "barber_id", "appointment_date", "status"),
+        # A barber cannot be in two chairs at once, and until now the only thing
+        # standing between two simultaneous `POST /public/booking` calls and a
+        # double booking was a Python query that read the busy list, decided the
+        # slot was free, and then inserted. Both requests read, both decided
+        # "free", both inserted.
+        #
+        # Partial, over exactly the statuses `holds_barber_time()` counts as
+        # busy, so a cancelled booking does not keep occupying the index it
+        # freed — and so the constraint and the availability query can never
+        # disagree about which rows they cover.
+        #
+        # This catches the same-start-time collision on both engines. It cannot
+        # express "these two intervals overlap", which needs an exclusion
+        # constraint with a gist index; the overlap case stays with the
+        # scheduler plus the row lock taken before it.
+        Index(
+            "uq_appointments_barber_slot",
+            "barber_id",
+            "appointment_date",
+            "appointment_time",
+            unique=True,
+            sqlite_where=text("status NOT IN ('cancelled', 'auto_cancelled', 'no_show')"),
+            postgresql_where=text("status NOT IN ('cancelled', 'auto_cancelled', 'no_show')"),
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -35,6 +60,15 @@ class Appointment(Base):
     status = Column(String(30), nullable=False, default="pending", index=True)
     notes = Column(Text, nullable=True)
     cancellation_reason = Column(Text, nullable=True)
+
+    # When the barber actually began the service.
+    #
+    # The workstation's service timer is reconstructed from this, so without it
+    # a page refresh mid-cut reset the timer to zero and the barber lost track
+    # of how long they had been working. It is set on the transition into
+    # `in-service` and never cleared, so it stays truthful as a record of when
+    # work started even if the appointment later moves on.
+    started_at = Column(DateTime(timezone=True), nullable=True)
 
     total_estimated_price = Column(Numeric(10, 2), nullable=False, default=0)
     total_estimated_duration_minutes = Column(Integer, nullable=False, default=0)

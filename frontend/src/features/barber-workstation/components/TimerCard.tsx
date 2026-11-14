@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { User, CheckCircle, Pause, Play, MessageSquare, DollarSign } from "lucide-react";
 import { motion } from "framer-motion";
+import { allowedTransitions } from "@/lib/barberStatus";
 
 interface TimerCardAppointment {
   customer_name: string;
@@ -8,6 +9,8 @@ interface TimerCardAppointment {
   customer_phone?: string | null;
   total_amount?: number | null;
   notes?: string | null;
+  /** Needed to know which actions the API will still accept. */
+  status?: string | null;
 }
 
 interface TimerCardProps {
@@ -31,6 +34,21 @@ export const TimerCard = ({
   onComplete,
   appointment,
 }: TimerCardProps) => {
+  /**
+   * The three buttons here were driven entirely by `timerRunning` and
+   * `elapsedTime`, both of which are *derived* -- a timer can be running on a
+   * job the backend has already closed. `onComplete` commits
+   * `ready_for_payment`, a terminal status, so once the cashier had taken
+   * payment this button still rendered, still opened the tip dialog, and still
+   * ended in a 409.
+   *
+   * `appointment.status` is the source of truth; the timer is only a view of it.
+   */
+  const canStart = allowedTransitions(appointment.status).includes("in-service");
+  const canComplete = allowedTransitions(appointment.status).includes(
+    "ready_for_payment",
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -49,13 +67,16 @@ export const TimerCard = ({
           </div>
           <div className="flex items-center justify-center md:justify-start gap-4 mt-4">
             {!timerRunning && elapsedTime === 0 ? (
-              <Button
-                size="lg"
-                className="h-14 w-14 rounded-full bg-success text-white shadow-lg"
-                onClick={onStartTimer}
-              >
-                <Play size={24} />
-              </Button>
+              canStart ? (
+                <Button
+                  size="lg"
+                  className="h-14 w-14 rounded-full bg-success text-white shadow-lg"
+                  onClick={onStartTimer}
+                  aria-label="بدء الخدمة"
+                >
+                  <Play size={24} />
+                </Button>
+              ) : null
             ) : timerRunning ? (
               <>
                 <Button
@@ -63,33 +84,50 @@ export const TimerCard = ({
                   size="lg"
                   className="h-14 w-14 rounded-full border-warning text-warning"
                   onClick={onPauseTimer}
+                  aria-label="إيقاف مؤقت"
                 >
                   <Pause size={24} />
                 </Button>
-                <Button
-                  size="lg"
-                  className="h-14 w-14 rounded-full bg-success text-white shadow-lg"
-                  onClick={onComplete}
-                >
-                  <CheckCircle size={24} />
-                </Button>
+                {canComplete && (
+                  <Button
+                    size="lg"
+                    className="h-14 w-14 rounded-full bg-success text-white shadow-lg"
+                    onClick={onComplete}
+                    aria-label="إنهاء الخدمة"
+                  >
+                    <CheckCircle size={24} />
+                  </Button>
+                )}
               </>
             ) : (
               <>
-                <Button
-                  size="lg"
-                  className="h-14 w-14 rounded-full bg-primary text-white shadow-lg"
-                  onClick={onStartTimer}
-                >
-                  <Play size={24} />
-                </Button>
-                <Button
-                  size="lg"
-                  className="h-14 w-14 rounded-full bg-success text-white shadow-lg"
-                  onClick={onComplete}
-                >
-                  <CheckCircle size={24} />
-                </Button>
+                {canStart && (
+                  <Button
+                    size="lg"
+                    className="h-14 w-14 rounded-full bg-primary text-white shadow-lg"
+                    onClick={onStartTimer}
+                    aria-label="استئناف الخدمة"
+                  >
+                    <Play size={24} />
+                  </Button>
+                )}
+                {canComplete && (
+                  <Button
+                    size="lg"
+                    className="h-14 w-14 rounded-full bg-success text-white shadow-lg"
+                    onClick={onComplete}
+                    aria-label="إنهاء الخدمة"
+                  >
+                    <CheckCircle size={24} />
+                  </Button>
+                )}
+                {!canStart && !canComplete && (
+                  <p className="text-xs font-bold text-slate-300 text-center">
+                    {appointment.status === "ready_for_payment"
+                      ? "تم إنهاء الخدمة — بانتظار الدفع"
+                      : "لا توجد إجراءات متاحة"}
+                  </p>
+                )}
               </>
             )}
           </div>

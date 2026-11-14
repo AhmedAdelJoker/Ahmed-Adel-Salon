@@ -2,7 +2,8 @@ import { FileDown, FileText, MousePointer2, Printer, Receipt, X } from "lucide-r
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn, formatCurrency } from "@/lib/core/utils";
-import { expenseCategoryLabel } from "@/lib/money/expenseCategories";
+import { expenseCatLabelFor } from "@/features/financial-reports/utils";
+import { useTranslation } from "react-i18next";
 import { dayKeyOf, paymentLabel, shortLabel } from "@/features/financial-reports/utils";
 import type { ExpenseSlice, FinancialsState, RawRow, TrendPoint } from "@/types/reports";
 
@@ -42,6 +43,7 @@ export function DrilldownPanel({
   onExportPayment,
   onPrint,
 }: DrilldownPanelProps) {
+  const { t } = useTranslation("owner");
   if (!selectedDay && !selectedExpenseCategory && !selectedPayment) return null;
   return (
     <Card className="overflow-hidden border-primary/30 bg-primary/5 animate-in slide-in-from-bottom-4">
@@ -54,18 +56,18 @@ export function DrilldownPanel({
             <CardTitle className="text-lg">
               {selectedDay
                 ? selectedDay.isBucket && selectedDay.rangeEnd
-                  ? `تفاصيل الفترة ${selectedDay.date} إلى ${selectedDay.rangeEnd} (تجميع أسبوعي)`
-                  : `تفاصيل ${selectedDay.date} — ${shortLabel(selectedDay.date)}`
+                  ? t("finFeat.drill.titlePeriod", { from: selectedDay.date, to: selectedDay.rangeEnd })
+                  : t("finFeat.drill.titleDay", { date: selectedDay.date, label: shortLabel(selectedDay.date) })
                 : selectedExpenseCategory
-                  ? `تفاصيل البند: ${selectedExpenseCategory.name}`
-                  : `تحصيلات: ${selectedPayment ? paymentLabel(selectedPayment.name) : ""}`}
+                  ? t("finFeat.drill.titleCategory", { name: selectedExpenseCategory.name })
+                  : t("finFeat.drill.titlePayments", { name: selectedPayment ? paymentLabel(selectedPayment.name, t) : "" })}
             </CardTitle>
             <CardDescription className="text-[10px]">
               {selectedDay
-                ? "تفاصيل الإيرادات والمصروفات والفواتير لهذا اليوم"
+                ? t("finFeat.drill.subtitleDay")
                 : selectedExpenseCategory
-                  ? "تحليل مفصل لهذا البند من المصروفات"
-                  : "الفواتير المحصلة بهذه الوسيلة خلال الفترة"}
+                  ? t("finFeat.drill.subtitleCategory")
+                  : t("finFeat.drill.subtitlePayments")}
             </CardDescription>
           </div>
         </div>
@@ -74,7 +76,7 @@ export function DrilldownPanel({
           size="icon"
           className="h-8 w-8"
           onClick={onClose}
-          aria-label="إغلاق التفاصيل"
+          aria-label={t("finFeat.drill.close")}
         >
           <X size={18} />
         </Button>
@@ -86,21 +88,21 @@ export function DrilldownPanel({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
                 <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">
-                  إيرادات اليوم
+                  {t("finFeat.drill.dayRevenue")}
                 </p>
                 <p className="text-2xl font-black text-emerald-600 tabular-nums">
                   {formatCurrency(selectedDay.rev)}
                 </p>
-                <p className="mt-1 text-[11px] font-bold text-muted">{dayInvoices.length} فاتورة</p>
+                <p className="mt-1 text-[11px] font-bold text-muted">{t("finFeat.drill.invoicesCount", { count: dayInvoices.length })}</p>
               </div>
               <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-center">
                 <p className="text-[10px] font-black uppercase tracking-widest text-rose-600 mb-1">
-                  مصروفات اليوم
+                  {t("finFeat.drill.dayExpenses")}
                 </p>
                 <p className="text-2xl font-black text-rose-600 tabular-nums">
                   {formatCurrency(selectedDay.exp)}
                 </p>
-                <p className="mt-1 text-[11px] font-bold text-muted">{dayExpenses.length} مصروف</p>
+                <p className="mt-1 text-[11px] font-bold text-muted">{t("finFeat.drill.expensesCount", { count: dayExpenses.length })}</p>
               </div>
               <div
                 className={cn(
@@ -111,7 +113,7 @@ export function DrilldownPanel({
                 )}
               >
                 <p className="text-[10px] font-black uppercase tracking-widest mb-1">
-                  {selectedDay.net >= 0 ? "صافي ربح" : "صافي خسارة"}
+                  {selectedDay.net >= 0 ? t("finFeat.drill.netProfit") : t("finFeat.drill.netLoss")}
                 </p>
                 <p
                   className={cn(
@@ -133,7 +135,7 @@ export function DrilldownPanel({
                 className="gap-2 text-[11px] font-black"
                 disabled={dayInvoices.length === 0 && dayExpenses.length === 0}
               >
-                <FileDown size={14} /> تصدير اليوم Excel
+                <FileDown size={14} /> {t("finFeat.drill.exportDay")}
               </Button>
               <Button
                 onClick={onPrint}
@@ -141,14 +143,14 @@ export function DrilldownPanel({
                 size="sm"
                 className="gap-2 text-[11px] font-black"
               >
-                <Printer size={14} /> طباعة التفاصيل
+                <Printer size={14} /> {t("finFeat.drill.print")}
               </Button>
             </div>
             {dayInvoices.length > 0 && (
               <div>
                 <h4 className="mb-2 text-sm font-black text-main flex items-center gap-2">
                   <FileText size={14} className="text-emerald-600" />
-                  فواتير اليوم ({dayInvoices.length})
+                  {t("finFeat.drill.dayInvoicesSection", { count: dayInvoices.length })}
                 </h4>
                 <div className="max-h-[220px] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-card p-2">
                   {dayInvoices.map((inv, idx) => (
@@ -161,12 +163,12 @@ export function DrilldownPanel({
                           #{inv.id ?? idx + 1}
                         </span>
                         <span className="font-bold text-main">
-                          {inv.client_name || inv.client_name_ar || "عميل"}
+                          {inv.client_name || inv.client_name_ar || t("finFeat.row.customerFallback")}
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-[10px] text-muted">
-                          {paymentLabel(inv.payment_method)}
+                          {paymentLabel(inv.payment_method, t)}
                         </span>
                         <span className="font-black text-emerald-600 tabular-nums">
                           {formatCurrency(inv.total_amount)}
@@ -183,7 +185,7 @@ export function DrilldownPanel({
               <div>
                 <h4 className="mb-2 text-sm font-black text-main flex items-center gap-2">
                   <Receipt size={14} className="text-rose-600" />
-                  مصروفات اليوم ({dayExpenses.length})
+                  {t("finFeat.drill.dayExpensesSection", { count: dayExpenses.length })}
                 </h4>
                 <div className="max-h-[220px] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-card p-2">
                   {dayExpenses.map((exp, idx) => (
@@ -193,10 +195,10 @@ export function DrilldownPanel({
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted">
-                          {expenseCategoryLabel(exp.category ?? "عام")}
+                          {expenseCatLabelFor(exp.category ?? "عام", t)}
                         </span>
                         <span className="font-bold text-main truncate max-w-[160px]">
-                          {exp.title || exp.description || "مصروف"}
+                          {exp.title || exp.description || t("finFeat.row.expenseFallback")}
                         </span>
                       </div>
                       <span className="font-black text-rose-600 tabular-nums">
@@ -211,7 +213,7 @@ export function DrilldownPanel({
             {/* Empty state */}
             {dayInvoices.length === 0 && dayExpenses.length === 0 && (
               <p className="text-center text-xs font-bold text-muted py-4">
-                لا توجد فواتير أو مصروفات مسجلة لهذا اليوم
+                {t("finFeat.drill.emptyDay")}
               </p>
             )}
           </div>
@@ -225,7 +227,7 @@ export function DrilldownPanel({
                   </span>
                 </div>
                 <div className="mt-2 flex items-center justify-between text-xs font-bold text-muted">
-                  <span>نسبة من إجمالي المصروفات</span>
+                  <span>{t("finFeat.drill.shareOfExpenses")}</span>
                   <span>
                     {financials.expenses > 0
                       ? ((selectedExpenseCategory.value / financials.expenses) * 100).toFixed(1) + "%"
@@ -242,14 +244,14 @@ export function DrilldownPanel({
                 </div>
               </div>
               <p className="text-[11px] font-bold text-muted">
-                عدد الحركات: {selectedExpenseCategory.count ?? categoryMovements.length}
+                {t("finFeat.drill.movementsOfCategory", { count: selectedExpenseCategory.count ?? categoryMovements.length })}
               </p>
               {categoryMovements.length > 0 && (
                 <div>
                   <div className="mb-2 flex items-center justify-between">
                     <h4 className="text-sm font-black text-main flex items-center gap-2">
                       <Receipt size={14} className="text-rose-600" />
-                      الحركات المكونة للبند ({categoryMovements.length})
+                      {t("finFeat.drill.categoryMovementsSection", { count: categoryMovements.length })}
                     </h4>
                     <Button
                       onClick={onExportCategory}
@@ -257,7 +259,7 @@ export function DrilldownPanel({
                       size="sm"
                       className="gap-2 text-[11px] font-black print:hidden"
                     >
-                      <FileDown size={14} /> تصدير Excel
+                      <FileDown size={14} /> {t("finFeat.drill.exportExcel")}
                     </Button>
                   </div>
                   <div className="max-h-[240px] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-card p-2">
@@ -271,7 +273,7 @@ export function DrilldownPanel({
                             {dayKeyOf(e.expense_date ?? e.created_at)}
                           </span>
                           <span className="font-bold text-main truncate max-w-[200px]">
-                            {e.title || e.description || "مصروف"}
+                            {e.title || e.description || t("finFeat.row.expenseFallback")}
                           </span>
                         </div>
                         <span className="font-black text-rose-600 tabular-nums">
@@ -288,14 +290,14 @@ export function DrilldownPanel({
               <div className="rounded-2xl border border-border/60 bg-card p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-black text-main">
-                    {paymentLabel(selectedPayment.name)}
+                    {paymentLabel(selectedPayment.name, t)}
                   </span>
                   <span className="text-lg font-black tabular-nums text-main">
                     {formatCurrency(selectedPayment.value)}
                   </span>
                 </div>
                 <div className="mt-2 flex items-center justify-between text-xs font-bold text-muted">
-                  <span>نسبة من إجمالي الإيرادات</span>
+                  <span>{t("finFeat.drill.shareOfRevenue")}</span>
                   <span>
                     {financials.revenue > 0
                       ? ((selectedPayment.value / financials.revenue) * 100).toFixed(1) + "%"
@@ -314,7 +316,7 @@ export function DrilldownPanel({
               <div className="mb-2 flex items-center justify-between">
                 <h4 className="text-sm font-black text-main flex items-center gap-2">
                   <FileText size={14} className="text-emerald-600" />
-                  فواتير {paymentLabel(selectedPayment.name)} ({paymentInvoices.length})
+                  {t("finFeat.drill.paymentInvoicesSection", { name: paymentLabel(selectedPayment.name, t), count: paymentInvoices.length })}
                 </h4>
                 <Button
                   onClick={onExportPayment}
@@ -323,7 +325,7 @@ export function DrilldownPanel({
                   className="gap-2 text-[11px] font-black print:hidden"
                   disabled={paymentInvoices.length === 0}
                 >
-                  <FileDown size={14} /> تصدير Excel
+                  <FileDown size={14} /> {t("finFeat.drill.exportExcel")}
                 </Button>
               </div>
               {paymentInvoices.length > 0 ? (
@@ -338,7 +340,7 @@ export function DrilldownPanel({
                           {dayKeyOf(inv.created_at)}
                         </span>
                         <span className="font-bold text-main truncate max-w-[200px]">
-                          {inv.client_name || inv.client_name_ar || "عميل"}
+                          {inv.client_name || inv.client_name_ar || t("finFeat.row.customerFallback")}
                         </span>
                       </div>
                       <span className="font-black text-emerald-600 tabular-nums">
@@ -349,7 +351,7 @@ export function DrilldownPanel({
                 </div>
               ) : (
                 <p className="text-center text-xs font-bold text-muted py-4">
-                  لا توجد فواتير مسجلة بهذه الوسيلة
+                  {t("finFeat.drill.emptyPayment")}
                 </p>
               )}
             </div>

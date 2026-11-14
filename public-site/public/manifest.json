@@ -1,17 +1,38 @@
 {
-  "name": "Salon Pro — Royal Grooming",
+  "id": "/",
+  "name": "Salon Pro — نظام إدارة الصالونات",
   "short_name": "Salon Pro",
-  "description": "Book your royal grooming experience at premium barbershops.",
+  "description": "منصة متكاملة لإدارة محلات الحلاقة: حجوزات، خدمات، عملاء، فريق، ومخزون — في مكان واحد.",
+  "lang": "ar",
+  "dir": "rtl",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
   "background_color": "#09090B",
   "theme_color": "#09090B",
-  "lang": "ar",
-  "dir": "rtl",
-  "categories": ["lifestyle", "business", "booking"],
+  "categories": ["business", "productivity", "lifestyle"],
+  "prefer_related_applications": false,
   "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "/favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
@@ -21,14 +42,11 @@
   ],
   "shortcuts": [
     {
-      "name": "Book Appointment",
-      "short_name": "Book",
-      "url": "/book"
-    },
-    {
-      "name": "Home",
-      "short_name": "Home",
-      "url": "/"
+      "name": "احجز موعدك الآن",
+      "short_name": "الحجز",
+      "description": "افتح صفحة الحجز مباشرة",
+      "url": "/book",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

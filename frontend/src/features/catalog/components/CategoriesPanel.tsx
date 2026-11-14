@@ -139,7 +139,7 @@ export default function CategoriesPanel({
                           <Badge variant="secondary" className="text-[10px]">معطل</Badge>
                         )}
                         <Button variant="outline" size="sm" onClick={() => onEdit(cat)} className="h-9 rounded-xl px-3 text-xs font-black">
-                          <Pencil size={14} className="ml-1" /> تعديل
+                          <Pencil size={14} className="ms-1" /> تعديل
                         </Button>
                       </div>
                     </div>

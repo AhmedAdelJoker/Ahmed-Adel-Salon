@@ -1,0 +1,1848 @@
+/**
+ * mockup.css — the layout layer for the redesigned public page.
+ *
+ * ## Why these classes and not Tailwind utilities in the JSX
+ *
+ * The design is a single composition: a hero that is two columns where one is
+ * a fixed-width booking card, a masonry gallery whose first tile spans two rows,
+ * a filter row that sits on the section's baseline. Writing that as utilities
+ * spread across eight components produces eight different vertical rhythms and
+ * no way to see the composition as a whole.
+ *
+ * So the *layout* lives here and the *palette* stays in `theme.ts`. Nothing in
+ * this file contains a colour: every paint resolves to a `--c-*` custom
+ * property, which is what keeps all six palettes working without a second pass.
+ * If a hex ever appears here it is a bug, and `public-site/scripts/brace-check`
+ * exists to fail loudly rather than let one drift in.
+ *
+ * ## Conventions carried over from the mockup
+ *
+ * - Logical properties throughout (`inset-inline-start`, `padding-inline-end`),
+ *   so RTL and LTR are one codebase. The mockup used these too.
+ * - `clamp()` for anything typographic, so there is no breakpoint at which the
+ *   headline jumps rather than scales.
+ * - `prefers-reduced-motion` gates every transition declared here.
+ */
+
+@layer base {
+  /*
+   * `mk-skin` is the opt-in class on `<body>` (see `index.html`).
+   *
+   * Scoped rather than global on purpose: the ATELIER 26 stylesheet also ships
+   * in this bundle and owns `::selection` for the dashboard. Two declarations
+   * of the same pseudo-element in one sheet means import order decides which
+   * wins for both, so the landing skin asks for its own by class instead.
+   */
+  html.mk-skin ::selection {
+    background-color: var(--c-accent-wash);
+    color: var(--c-text);
+  }
+
+  /*
+   * Chrome's default selection is a bright system blue, which on a coral page
+   * reads as a foreign element; an unthemed scrollbar is a grey bar against
+   * every palette.
+   */
+  html.mk-skin {
+    scrollbar-color: var(--c-border-strong) transparent;
+  }
+
+  html.mk-skin ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  html.mk-skin ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  html.mk-skin ::-webkit-scrollbar-thumb {
+    background-color: var(--c-border-strong);
+    border-radius: 999px;
+    /* Transparent border plus `content-box` keeps the track visible around a
+       rounded thumb; without it the thumb fills the full track width. */
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  html.mk-skin ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--c-accent);
+  }
+
+  /*
+    The canvas wash.
+
+    A page that is one flat colour reads as a printing error. A very faint
+    accent-tinted radial gives the background depth without being visible as a
+    gradient, and composing it from `accentWash` rather than a hex means it
+    re-tints with whichever of the six palettes the salon chose: a hardcoded
+    coral glow here would still be glowing on a cobalt site.
+
+    `fixed` so it does not scroll with a long page and expose an edge where it
+    stops.
+  */
+  html.mk-skin body {
+    background-image: radial-gradient(
+      ellipse 120% 80% at 50% -10%,
+      var(--c-accent-wash) 0%,
+      transparent 60%
+    );
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  /*
+    The scale.
+
+    `clamp()` rather than breakpoints: there is no width at which the headline
+    jumps instead of scaling, which is the difference between a page that feels
+    sized and one that feels assembled from four fixed layouts. The lower bound is
+    the smallest the type has to stay legible at, the upper bound the largest it
+    should grow before the measure gets uncomfortable.
+
+    Radii stay small by the current standard (8–28px). The oversized-radius look
+    is what makes a page read as a template, and it does not survive contact with
+    a long price list.
+  */
+  :root {
+    --step--2: clamp(0.69rem, 0.68rem + 0.06vw, 0.75rem);
+    --step--1: clamp(0.83rem, 0.81rem + 0.11vw, 0.9rem);
+    --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.13rem);
+    --step-1: clamp(1.2rem, 1.11rem + 0.45vw, 1.5rem);
+    --step-2: clamp(1.44rem, 1.29rem + 0.73vw, 2rem);
+    --step-3: clamp(1.73rem, 1.45rem + 1.4vw, 2.66rem);
+    --step-4: clamp(2.07rem, 1.6rem + 2.35vw, 3.55rem);
+    --step-5: clamp(2.49rem, 1.73rem + 3.8vw, 4.74rem);
+
+    --gutter: clamp(1.25rem, 4vw, 2.5rem);
+    --section-y: clamp(4.5rem, 9vw, 8rem);
+
+    --r-sm: 0.25rem;
+    --r-md: 0.375rem;
+    --r-lg: 0.5rem;
+    --r-xl: 0.75rem;
+
+    /*
+      The editorial display face. Arabic is a Naskh serif (Amiri); Latin is
+      Cormorant Garamond. The switch lives on the document's lang attribute,
+      which `I18nContext` already keeps in sync, so one class name covers both
+      scripts.
+    */
+    --font-editorial: "Cormorant Garamond", "Amiri", "Times New Roman", serif;
+  }
+
+  html[lang="ar"] {
+    --font-editorial: "Amiri", "Cormorant Garamond", "Times New Roman", serif;
+  }
+
+  /* ── Shell ────────────────────────────────────────────────────────────── */
+  .mk-shell {
+    width: 100%;
+    max-width: 1240px;
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
+  /* ── Announcement bar ────────────────────────────────────────────────── */
+  /*
+    The strip is ink, not accent. A full-width saturated bar is the loudest
+    thing on the page and it sits above the brand mark; copper belongs on the
+    one action per screen, not on a status line.
+  */
+  .mk-topbar {
+    background-color: var(--c-text);
+    color: var(--c-bg);
+    font-size: var(--step--2);
+    font-weight: 700;
+    padding-block: 0.6rem;
+    text-align: center;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Site header ─────────────────────────────────────────────────────── */
+  /*
+    The header is sticky, so it must paint its own ground. It was left
+    transparent: at rest that looked fine because the page starts beneath it,
+    but once the visitor scrolled, the hero and the service list ran visibly
+    through the wordmark.
+  */
+  .mk-site-header {
+    background-color: var(--c-bg);
+    transition:
+      background-color 0.25s ease,
+      border-color 0.25s ease,
+      box-shadow 0.25s ease;
+    border-bottom: 1px solid transparent;
+  }
+
+  .mk-site-header[data-scrolled="true"] {
+    background-color: var(--c-glass-strong);
+    backdrop-filter: blur(12px);
+    border-bottom-color: var(--c-border);
+  }
+
+  /*
+    `.shell` is used by the booking, entity and skeleton pages but was never
+    defined, so those pages had no horizontal container. Alias it to the one
+    shell the landing page uses.
+  */
+  .shell {
+    width: 100%;
+    max-width: 1240px;
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────────── */
+  .mk-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 0;
+    cursor: pointer;
+    border-radius: var(--r-sm);
+    font-weight: 700;
+    text-decoration: none;
+    transition:
+      transform 0.2s ease,
+      filter 0.2s ease,
+      background-color 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .mk-btn:focus-visible {
+    outline: 3px solid var(--c-accent-2);
+    outline-offset: 3px;
+  }
+
+  .mk-btn-lg {
+    padding: 0.95rem 1.9rem;
+    font-size: var(--step-0);
+  }
+
+  .mk-btn-sm {
+    padding: 0.6rem 1.25rem;
+    font-size: var(--step--1);
+  }
+
+  .mk-btn-primary {
+    background-color: var(--c-accent);
+    color: var(--c-on-accent);
+  }
+
+  .mk-btn-ghost {
+    background-color: transparent;
+    color: var(--c-text);
+    border: 1px solid var(--c-border-strong);
+  }
+
+  @media (hover: hover) {
+    .mk-btn:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.08);
+    }
+  }
+
+  /* ── Hero ────────────────────────────────────────────────────────────── */
+  /*
+    An editorial split, not a photograph with type on top.
+
+    The photograph is a framed portrait on one side; the type sits on the paper
+    ground with real contrast, so the headline never depends on what happens to
+    be behind it. The booking controls move into a thin reservation bar beneath
+    the fold, which is what stops the hero from being a form with a headline
+    attached.
+  */
+  .mk-hero {
+    position: relative;
+    overflow: hidden;
+    padding-block: clamp(2.5rem, 5vw, 4.5rem) 0;
+  }
+
+  .mk-hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+    gap: clamp(2rem, 5vw, 5.5rem);
+    align-items: end;
+  }
+
+  .mk-hero-copy {
+    padding-block-end: clamp(1.5rem, 3vw, 2.75rem);
+  }
+
+  .mk-hero-title {
+    font-family: var(--font-editorial);
+    font-weight: 700;
+    font-size: clamp(2.7rem, 1.6rem + 4.4vw, 5.2rem);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    color: var(--c-text);
+    text-wrap: balance;
+  }
+
+  html[lang="ar"] .mk-hero-title {
+    line-height: 1.22;
+    letter-spacing: 0;
+  }
+
+  .mk-hero-sub {
+    margin-top: 1.35rem;
+    max-width: 46ch;
+    font-size: var(--step-1);
+    line-height: 1.85;
+    color: var(--c-muted);
+  }
+
+  .mk-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 2.25rem;
+  }
+
+  .mk-hero-media {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    border-radius: var(--r-lg);
+    background-color: var(--c-inset);
+  }
+
+  .mk-hero-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  /*
+    A salon that has not uploaded a cover gets a composed plate: the monogram
+    in the display face over a hairline rule. It is a finished composition
+    rather than a grey rectangle that reads as a failed download.
+  */
+  .mk-hero-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    height: 100%;
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent 0 55px,
+      var(--c-border) 55px 56px
+    );
+  }
+
+  .mk-hero-placeholder span {
+    font-family: var(--font-editorial);
+    font-size: clamp(7rem, 16vw, 12rem);
+    line-height: 0.9;
+    color: var(--c-accent);
+  }
+
+  .mk-hero-placeholder i {
+    width: 3rem;
+    height: 1px;
+    background-color: var(--c-accent);
+  }
+
+  /*
+    A hairline frame offset from the photograph's corner. It is the one
+    decorative element in the hero, and it is drawn in the accent at low alpha
+    rather than a shadow so it works on both the ivory and the espresso ground.
+  */
+  .mk-hero-frame {
+    position: absolute;
+    inset-block-start: 1rem;
+    inset-inline-start: -1rem;
+    inset-block-end: -1rem;
+    inset-inline-end: 1rem;
+    border: 1px solid var(--c-accent-line);
+    border-radius: var(--r-lg);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .mk-hero-media .mk-hero-status {
+    position: absolute;
+    inset-block-end: 1rem;
+    inset-inline-end: 1rem;
+    inset-inline-start: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.8rem 1rem;
+    border-radius: var(--r-md);
+    background-color: var(--c-glass-strong);
+    backdrop-filter: blur(10px);
+    font-size: var(--step--1);
+    font-weight: 700;
+    color: var(--c-text);
+  }
+
+  /* ── Reservation bar ─────────────────────────────────────────────────── */
+  .mk-reserve {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr 1fr auto;
+    align-items: stretch;
+    margin-top: clamp(2.25rem, 4vw, 3.5rem);
+    border: 1px solid var(--c-border-strong);
+    border-radius: var(--r-md);
+    background-color: var(--c-card);
+    overflow: hidden;
+  }
+
+  .mk-reserve-field {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+    padding: 0.9rem 1.15rem;
+    border-inline-end: 1px solid var(--c-border);
+  }
+
+  .mk-reserve-field label {
+    font-size: var(--step--2);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--c-faint);
+  }
+
+  .mk-reserve-field select {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    background-color: transparent;
+    color: var(--c-text);
+    font: inherit;
+    font-weight: 700;
+    font-size: var(--step-0);
+    cursor: pointer;
+  }
+
+  .mk-reserve-field select:focus-visible {
+    outline: 2px solid var(--c-accent-2);
+    outline-offset: 2px;
+  }
+
+  .mk-reserve-cta {
+    display: flex;
+    align-items: stretch;
+    padding: 0.5rem;
+  }
+
+  .mk-reserve-cta .mk-btn {
+    height: 100%;
+    padding-inline: 1.6rem;
+  }
+
+  /* ── Open/closed pill ────────────────────────────────────────────────── */
+  .mk-openbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    background-color: var(--c-ok-wash);
+    border: 1px solid var(--c-ok-line);
+    font-size: var(--step--1);
+    font-weight: 700;
+    color: var(--c-ok);
+  }
+
+  .mk-openbar[data-open="false"] {
+    background-color: var(--c-stop-wash);
+    border-color: var(--c-stop-line);
+    color: var(--c-stop);
+  }
+
+  .mk-openbar__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: currentColor;
+    flex: 0 0 auto;
+  }
+
+  /* The dot breathes while the salon is open and stays still when it is not —
+     a closed salon that keeps pulsing reads as available. */
+  @media (prefers-reduced-motion: no-preference) {
+    .mk-openbar[data-open="true"] .mk-openbar__dot {
+      animation: openbar-pulse 2.4s ease-in-out infinite;
+    }
+  }
+
+  @keyframes openbar-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 var(--c-ok-line);
+    }
+    50% {
+      opacity: 0.75;
+      box-shadow: 0 0 0 6px transparent;
+    }
+  }
+
+  /* ── Booking card ────────────────────────────────────────────────────── */
+  /*
+    A solid card, not a translucent panel. `rgba(…, 0.55)` over a photograph
+    makes the labels dependent on whatever is behind them, and the summary row
+    is the one place a visitor has to read numbers carefully before committing.
+  */
+  .mk-bookcard {
+    background-color: var(--c-card);
+    border: 1px solid var(--c-border-strong);
+    border-radius: var(--r-xl);
+    padding: 1.75rem;
+    box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.9);
+  }
+
+  .mk-bookcard .mk-btn {
+    width: 100%;
+    margin-top: 1.25rem;
+  }
+
+  /* ── Trust row ───────────────────────────────────────────────────────── */
+  .mk-trust {
+    display: flex;
+    gap: clamp(1.5rem, 4vw, 3rem);
+    margin-top: clamp(2rem, 4vw, 3rem);
+    flex-wrap: wrap;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--c-border);
+  }
+
+  .mk-trust dd {
+    font-family: var(--font-editorial);
+    font-size: var(--step-3);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--c-text);
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+  }
+
+  .mk-trust dt {
+    margin-top: 0.55rem;
+    font-size: var(--step--2);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--c-faint);
+  }
+
+  /* ── About ───────────────────────────────────────────────────────────── */
+  .mk-about {
+    background-color: var(--c-surface);
+    border-block: 1px solid var(--c-border);
+  }
+
+  .mk-about-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+  }
+
+  /*
+    The badge hangs off the photograph's edge, so it cannot live inside it.
+
+    The photograph clips its own overflowing image (`overflow: hidden` is what
+    keeps the scaled parallax layer inside the rounded frame), and the badge —
+    offset to the inline-start edge — was being cut by that same clip. A
+    wrapper that does not clip holds the badge instead, and the frame below
+    still hides the image overflow.
+  */
+  .mk-about-media {
+    position: relative;
+  }
+
+  .mk-about-photo {
+    position: relative;
+    border-radius: var(--r-xl);
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+  }
+
+  .mk-about-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .mk-badge-float {
+    position: absolute;
+    inset-block-end: 1.5rem;
+    inset-inline-start: -1.25rem;
+    background-color: var(--c-card);
+    border: 1px solid var(--c-border-strong);
+    border-radius: var(--r-lg);
+    padding: 1rem 1.35rem;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.8);
+  }
+
+  .mk-badge-float strong {
+    font-size: var(--step-1);
+    font-weight: 900;
+    color: var(--c-accent-2);
+    line-height: 1;
+  }
+
+  .mk-badge-float span {
+    font-size: var(--step--2);
+    color: var(--c-muted);
+    font-weight: 600;
+  }
+
+  .mk-feat {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .mk-feat__icon {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    border-radius: var(--r-md);
+    background-color: var(--c-accent-wash);
+    color: var(--c-accent);
+    display: grid;
+    place-items: center;
+    font-size: 1.1rem;
+  }
+
+  /* ── Features ────────────────────────────────────────────────────────── */
+  /*
+    Numbered columns over a rule, not cards. Three claims do not need three
+    boxes; the rule is enough to structure them, and the numerals give the row
+    the same rhythm as the service menu.
+  */
+  .mk-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: clamp(1.5rem, 4vw, 3rem);
+    border-top: 1px solid var(--c-border-strong);
+  }
+
+  .mk-feature {
+    padding-top: 1.3rem;
+  }
+
+  .mk-feature__n {
+    font-family: var(--font-editorial);
+    font-size: var(--step--1);
+    color: var(--c-accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mk-feature h3 {
+    margin-top: 0.4rem;
+    font-family: var(--font-editorial);
+    font-size: var(--step-1);
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--c-text);
+  }
+
+  .mk-feature p {
+    margin-top: 0.5rem;
+    font-size: var(--step--1);
+    line-height: 1.85;
+    color: var(--c-muted);
+  }
+
+  /* ── Section headings ────────────────────────────────────────────────── */
+  .mk-svc-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 2rem;
+    flex-wrap: wrap;
+    margin-bottom: 3rem;
+  }
+
+  /*
+    Letter-spacing is a Latin display device, and it damages Arabic.
+
+    Arabic is a cursive script: the letters join along a baseline, and any
+    tracking — positive *or* negative — pulls the joins apart or overlaps
+    them. A name set with -0.02em tracking is measurably tighter than the
+    same name set without it, and a label set with 0.16em tracking reads as
+    loose, disconnected letters rather than a word.
+
+    The uppercase transform has the same problem in reverse: Arabic has no
+    upper case, so `text-transform: uppercase` does nothing there, while the
+    letter-spacing it is paired with still breaks the joins.
+
+    So the tracking is neutralised for the Arabic locale across every label,
+    and the transform is dropped with it. The rules stay in place for Latin,
+    where they are the point.
+  */
+  html[lang="ar"] .mk-eyebrow,
+  html[lang="ar"] .mk-trust dt,
+  html[lang="ar"] .mk-reserve-field label,
+  html[lang="ar"] .mk-member-role,
+  html[lang="ar"] .mk-c-fact h3,
+  html[lang="ar"] .mk-offer__old,
+  html[lang="ar"] .mk-h2,
+  html[lang="ar"] .mk-hero-title,
+  html[lang="ar"] .mk-member-name,
+  html[lang="ar"] .mk-menu-name,
+  html[lang="ar"] .mk-offers h2,
+  html[lang="ar"] .mk-offers h4,
+  html[lang="ar"] .mk-lead,
+  html[lang="ar"] .mk-faq__label {
+    letter-spacing: normal;
+  }
+
+  html[lang="ar"] .mk-eyebrow {
+    text-transform: none;
+  }
+
+  .mk-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    font-size: var(--step--2);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--c-accent);
+  }
+
+  .mk-eyebrow::before {
+    content: "";
+    width: 1.75rem;
+    height: 1px;
+    background-color: currentColor;
+    flex: 0 0 auto;
+  }
+
+  .mk-h2 {
+    font-family: var(--font-editorial);
+    font-size: var(--step-4);
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+    color: var(--c-text);
+    text-wrap: balance;
+  }
+
+  html[lang="ar"] .mk-h2 {
+    line-height: 1.3;
+    letter-spacing: 0;
+  }
+
+  .mk-h3 {
+    font-size: var(--step-2);
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--c-text);
+  }
+
+  .mk-lead {
+    font-size: var(--step-1);
+    color: var(--c-muted);
+    line-height: 1.85;
+    max-width: 62ch;
+  }
+
+  /* ── Filters ─────────────────────────────────────────────────────────── */
+  .mk-filters {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .mk-filters button {
+    background-color: transparent;
+    border: 1px solid var(--c-border-strong);
+    color: var(--c-muted);
+    padding: 0.5rem 1.15rem;
+    border-radius: 999px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: color 0.18s ease, border-color 0.18s ease;
+  }
+
+  .mk-filters button[aria-pressed="true"] {
+    background-color: var(--c-accent);
+    border-color: var(--c-accent);
+    color: var(--c-on-accent);
+  }
+
+  @media (hover: hover) {
+    .mk-filters button:hover:not([aria-pressed="true"]) {
+      color: var(--c-text);
+      border-color: var(--c-faint);
+    }
+  }
+
+  /*
+    ── Section rhythm ─────────────────────────────────────────────────
+
+    Every landing section carried `py-[length:var(--section-y)]`, and two
+    neighbours therefore put *both* of their paddings in the same gap — up to
+    256px of nothing between a gallery and a booking button. The band that read
+    as "editorial breathing room" was two half-bands stacked by accident.
+
+    Collapsing the start padding of a section that follows another section
+    gives the page one rhythm instead of two, and it is a rule rather than
+    eight different numbers to keep in sync.
+  */
+  .mk-section {
+    padding-block: var(--section-y);
+  }
+
+  .mk-section + .mk-section {
+    padding-block-start: calc(var(--section-y) / 2);
+  }
+
+  /* ── Service menu ────────────────────────────────────────────────────── */
+  /*
+    A printed menu, not a card grid.
+
+    Each service is a row: index, name, duration, price, action. The price is
+    on the same baseline as the name so the list can be scanned vertically,
+    which is how someone decides what to book. `featured` is a small copper
+    rule in the margin instead of a badge — a badge on every third row stops
+    meaning anything.
+  */
+  .mk-menu {
+    border-top: 1px solid var(--c-border-strong);
+    /*
+      A price list is read by scanning one column of numbers against one column
+      of names. At the shell's full width the name column absorbed the entire
+      difference and the two ends of a row stopped relating to each other — the
+      price looked like it belonged to the next row. A measure keeps the eye on
+      the line.
+    */
+    max-inline-size: 62rem;
+  }
+
+  .mk-menu-group + .mk-menu-group {
+    margin-top: clamp(1.25rem, 2.5vw, 2rem);
+  }
+
+  .mk-menu-group-title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.9rem;
+    padding-block: 1.1rem 0.4rem;
+    font-family: var(--font-editorial);
+    font-size: var(--step-1);
+    font-weight: 700;
+    color: var(--c-text);
+  }
+
+  .mk-menu-group-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background-color: var(--c-border);
+  }
+
+  /*
+    `.mk-menu`'s own border-top and the first group's rule were drawing a
+    hairline one line-length apart with nothing between them, which reads as a
+    stray line rather than a section divider.
+  */
+  .mk-menu > .mk-menu-group:first-child > .mk-menu-group-title::after {
+    display: none;
+  }
+
+  .mk-menu-row {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: clamp(0.75rem, 2vw, 1.5rem);
+    padding-block: 1.05rem;
+    border-bottom: 1px solid var(--c-border);
+    transition: background-color 0.2s ease;
+  }
+
+  /* The next group's title carries the rule, so the last row does not need one. */
+  .mk-menu-group:last-child .mk-menu-row:last-child {
+    border-bottom: 0;
+  }
+
+  @media (hover: hover) {
+    .mk-menu-row:hover {
+      background-color: var(--c-accent-wash);
+    }
+  }
+
+  .mk-menu-num {
+    font-family: var(--font-editorial);
+    font-size: var(--step--1);
+    color: var(--c-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mk-menu-row[data-featured="true"] .mk-menu-num {
+    color: var(--c-accent);
+    font-weight: 700;
+  }
+
+  .mk-menu-name {
+    min-width: 0;
+    font-size: var(--step-0);
+    font-weight: 700;
+    line-height: 1.5;
+    color: var(--c-text);
+  }
+
+  .mk-menu-name a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  @media (hover: hover) {
+    .mk-menu-name a:hover {
+      color: var(--c-accent);
+    }
+  }
+
+  .mk-menu-desc {
+    margin-top: 0.2rem;
+    max-width: 54ch;
+    font-size: var(--step--1);
+    line-height: 1.7;
+    color: var(--c-muted);
+  }
+
+  .mk-menu-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.35rem;
+    font-size: var(--step--2);
+    font-weight: 600;
+    color: var(--c-faint);
+  }
+
+  .mk-menu-price {
+    font-family: var(--font-editorial);
+    font-size: var(--step-1);
+    font-weight: 700;
+    color: var(--c-text);
+    white-space: nowrap;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+  }
+
+  .mk-menu-price small {
+    font-family: inherit;
+    font-size: 0.62em;
+    font-weight: 600;
+    color: var(--c-faint);
+  }
+
+  .mk-menu-book {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.9rem;
+    border: 1px solid var(--c-border-strong);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-text);
+    font-weight: 700;
+    font-size: var(--step--1);
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      border-color 0.2s ease,
+      background-color 0.2s ease,
+      color 0.2s ease;
+  }
+
+  @media (hover: hover) {
+    .mk-menu-book:hover {
+      border-color: var(--c-accent);
+      background-color: var(--c-accent);
+      color: var(--c-on-accent);
+    }
+  }
+
+  .mk-menu-book:focus-visible {
+    outline: 2px solid var(--c-accent-2);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 640px) {
+    .mk-menu-row {
+      grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+    }
+
+    .mk-menu-book {
+      grid-column: 2 / -1;
+      justify-self: start;
+      margin-top: 0.35rem;
+    }
+
+    .mk-menu-price {
+      justify-self: end;
+    }
+  }
+
+  .mk-empty {
+    border: 1px dashed var(--c-border-strong);
+    border-radius: var(--r-lg);
+    padding: 3.5rem 2rem;
+    text-align: center;
+    color: var(--c-muted);
+    font-weight: 600;
+  }
+
+  /* ── Offers band ─────────────────────────────────────────────────────── */
+  .mk-offers {
+    margin-top: 4.5rem;
+    padding: 2.75rem;
+    border-radius: var(--r-xl);
+    background: linear-gradient(120deg, var(--c-card), var(--c-accent-wash));
+    border: 1px solid var(--c-accent-line);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 2rem;
+    align-items: center;
+  }
+
+  .mk-offer {
+    padding-inline-start: 1.5rem;
+    border-inline-start: 2px solid var(--c-accent);
+  }
+
+  /* The owner-uploaded offer photo. Full-bleed across the card's top, offset
+     against the accent rule to the opposite edge so the two read as one frame:
+     the rule starts below the media instead of competing with it. */
+  .mk-offer:has(> .mk-offer__media) {
+    padding-inline-start: 0;
+    border-inline-start-width: 0;
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+
+  .mk-offer__media {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
+
+  .mk-offer__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s ease;
+  }
+
+  @media (hover: hover) {
+    .mk-offer:hover .mk-offer__media img {
+      transform: scale(1.06);
+    }
+  }
+
+  .mk-offer__media-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.35), transparent 45%);
+  }
+
+  .mk-offer__old {
+    font-size: var(--step--1);
+    color: var(--c-faint);
+    text-decoration: line-through;
+  }
+
+  .mk-offer__new {
+    font-size: var(--step-1);
+    font-weight: 900;
+    color: var(--c-ok);
+  }
+
+  /* Rendered standalone between page sections, so the band must not also
+     carry the mockup's 4.5rem top margin on top of the section padding. */
+  .mk-offers--section {
+    margin-top: 0;
+  }
+
+  .mk-offer__prices {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .mk-offer h4,
+  .mk-offer h2 {
+    min-width: 0;
+    font-size: var(--step-0);
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--c-text);
+  }
+
+  .mk-offer a,
+  .mk-offer h4 a,
+  .mk-offer h2 a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  @media (hover: hover) {
+    .mk-offer a:hover {
+      color: var(--c-accent-2);
+    }
+  }
+
+  .mk-offer__desc {
+    font-size: var(--step--1);
+    line-height: 1.8;
+    color: var(--c-muted);
+  }
+
+  /* ── Team ────────────────────────────────────────────────────────────── */
+  /*
+    Editorial portraits: no card frame, no border, no drop shadow. The photo
+    and the name are the unit; a card around each stylist turned a team into a
+    product grid.
+  */
+  /*
+    `auto-fill`, not `auto-fit`: with two stylists the card tracks would
+    otherwise stretch to half the page each, turning two portraits into two
+    billboards. The tracks stay card-sized and the row simply ends.
+  */
+  /*
+    Flex, not grid.
+
+    `repeat(auto-fill, minmax(230px, 1fr))` sized the *tracks*, so a two-person
+    team — which is what a small shop actually has — filled two of the four
+    tracks the row could fit and left the trailing half of the section empty.
+    Under `auto-fit` the same two cards stretched to ~570px each and the
+    portrait blew up with them.
+
+    A flex row with a hard cap on the card keeps every portrait at a size that
+    reads as a person, and lets the leftover measure sit where the design
+    already puts whitespace: after the last card, on the trailing edge.
+  */
+  .mk-team-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: clamp(1.25rem, 3vw, 2.5rem);
+  }
+
+  .mk-team-grid > li {
+    flex: 1 1 15rem;
+    min-width: 0;
+    max-inline-size: 21rem;
+  }
+
+  .mk-member {
+    background-color: transparent;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    transition: transform 0.3s ease;
+  }
+
+  @media (hover: hover) {
+    .mk-member:hover {
+      transform: translateY(-3px);
+    }
+  }
+
+  .mk-member > .parallax {
+    border-radius: var(--r-md);
+    /* A slight desaturation keeps a row of portraits coherent; the colour
+       returns on hover so the face still feels alive. */
+    filter: grayscale(35%) contrast(1.02);
+    transition: filter 0.5s ease;
+  }
+
+  @media (hover: hover) {
+    .mk-member:hover > .parallax {
+      filter: grayscale(0%) contrast(1);
+    }
+  }
+
+  .mk-member .mk-btn {
+    width: 100%;
+    margin-top: 0.9rem;
+  }
+
+  .mk-member-info {
+    padding: 1rem 0 0;
+    border-top: 1px solid var(--c-border);
+    margin-top: 1rem;
+  }
+
+  .mk-member-name {
+    font-family: var(--font-editorial);
+    font-size: var(--step-1);
+    font-weight: 700;
+    line-height: 1.35;
+    margin: 0;
+  }
+
+  .mk-member-role {
+    font-size: var(--step--2);
+    color: var(--c-accent);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .mk-member-bio {
+    font-size: var(--step--1);
+    line-height: 1.75;
+    color: var(--c-muted);
+    margin-top: 0.6rem;
+  }
+
+  .mk-availability {
+    color: var(--c-ok);
+    font-weight: 700;
+  }
+
+  .mk-stars {
+    color: #fbbf24;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    margin-top: 0.5rem;
+  }
+
+  /* ── Reviews ─────────────────────────────────────────────────────────── */
+  .mk-rev-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .mk-rev {
+    background-color: var(--c-card);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-lg);
+    padding: 1.6rem;
+  }
+
+  /*
+    The quote mark.
+
+    It was set as a letter-spaced, uppercase fragment of body text, so it
+    rendered as a stray speck in the corner of the card — a piece of a word
+    rather than a mark. It is now a full-size glyph in the accent colour,
+    and the verified-review date no longer borrows the same styling: a date
+    in 0.14em tracking reads as a typo.
+  */
+  .mk-rev__q {
+    font-family: var(--font-editorial);
+    font-size: 2.75rem;
+    line-height: 0.6;
+    color: var(--c-accent);
+    opacity: 0.55;
+  }
+
+  .mk-rev__date {
+    font-size: var(--step--2);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--c-faint);
+  }
+
+  .mk-rev blockquote {
+    font-size: var(--step--1);
+    line-height: 1.9;
+    color: var(--c-muted);
+  }
+
+  .mk-rev footer strong {
+    display: block;
+    font-size: var(--step--1);
+    font-weight: 700;
+    color: var(--c-text);
+  }
+
+  .mk-rev__role {
+    display: block;
+    font-size: var(--step--2);
+    font-weight: 700;
+    color: var(--c-accent-2);
+  }
+
+  .mk-rev footer {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1.35rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--c-border);
+  }
+
+  .mk-rev__av {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background-color: var(--c-accent-wash);
+    color: var(--c-accent);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: var(--step--1);
+    flex: 0 0 auto;
+  }
+
+  .mk-verified {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--c-ok);
+    font-size: 0.76rem;
+    font-weight: 700;
+    margin-top: 0.55rem;
+  }
+
+  /* ── Contact ─────────────────────────────────────────────────────────── */
+  .mk-contact {
+    background-color: var(--c-surface);
+    border-block: 1px solid var(--c-border);
+    padding-block: var(--section-y);
+  }
+
+  .mk-c-card {
+    background-color: var(--c-card);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-lg);
+    padding: 1.6rem;
+  }
+
+  /*
+    The closing facts: address and phone side by side over one rule. Sharing a
+    line rather than stacking inside a card keeps the band short, and a salon
+    with only one of the two does not leave a hole where the other would be.
+  */
+  .mk-c-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem clamp(2rem, 6vw, 5rem);
+    border-top: 1px solid var(--c-border-strong);
+    padding-top: 1.75rem;
+  }
+
+  .mk-c-fact {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+
+  .mk-c-fact > svg {
+    margin-top: 0.15rem;
+    flex: 0 0 auto;
+    color: var(--c-accent);
+  }
+
+  .mk-c-fact h3 {
+    font-size: var(--step--2);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--c-faint);
+  }
+
+  /* The fact's value. It is a `tel:` link on the public page, so the rule
+     covers both the link and the plain-text case. */
+  .mk-c-fact p,
+  .mk-c-fact a {
+    margin-top: 0.2rem;
+    font-size: var(--step-0);
+    font-weight: 700;
+    line-height: 1.6;
+    color: var(--c-text);
+    text-decoration: none;
+  }
+
+  .mk-c-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .mk-hours {
+    display: grid;
+    gap: 0.55rem;
+    margin-top: 1.25rem;
+  }
+
+  .mk-hours li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: var(--step--1);
+    padding-block: 0.5rem;
+    border-bottom: 1px dashed var(--c-border);
+  }
+
+  .mk-hours li:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .mk-hours li span:last-child {
+    color: var(--c-muted);
+  }
+
+  /* Today's row is circled the way a printed schedule circles its day. */
+  .mk-hours-today {
+    background: var(--c-accent-wash);
+    border-bottom: 0 !important;
+    border-radius: var(--r-md);
+    padding-inline: 0.65rem;
+  }
+
+  .mk-hours-today + li {
+    border-top: 0;
+  }
+
+  .mk-hours-today span:first-child {
+    color: var(--c-accent-2);
+    font-weight: 800;
+  }
+
+  .mk-hours-today-tag {
+    display: inline-block;
+    margin-inline-start: 0.5rem;
+    padding: 0.05rem 0.55rem;
+    border-radius: 999px;
+    background-color: var(--c-accent);
+    color: var(--c-bg);
+    font-size: var(--step--2);
+    font-weight: 800;
+    vertical-align: middle;
+  }
+
+  /* The live dot on the open/closed pill: "open" is a state, not a badge. */
+  .mk-pulse {
+    position: relative;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background-color: currentColor;
+    flex: none;
+  }
+
+  .mk-pulse::after {
+    content: "";
+    position: absolute;
+    inset: -0.18rem;
+    border-radius: inherit;
+    border: 1.5px solid currentColor;
+    opacity: 0.7;
+    animation: mk-pulse 1.8s ease-out infinite;
+  }
+
+  @keyframes mk-pulse {
+    0% {
+      transform: scale(0.55);
+      opacity: 0.85;
+    }
+    100% {
+      transform: scale(1.7);
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mk-pulse::after {
+      animation: none;
+    }
+  }
+
+  /* ── Closing band ────────────────────────────────────────────────────── */
+  /*
+    The last thing on the page. It was a centred card with a 3rem radius —
+    the old template's shape — and it is now a band of the same paper as
+    everything else: a rule, a serif title, the owner's sentence, one action.
+  */
+  .mk-final {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(1.5rem, 4vw, 3.5rem);
+    flex-wrap: wrap;
+    padding-block: clamp(2.25rem, 5vw, 3.5rem);
+    border-top: 1px solid var(--c-border-strong);
+    border-bottom: 1px solid var(--c-border);
+  }
+
+  .mk-final > div {
+    min-width: 0;
+    flex: 1 1 22rem;
+  }
+
+  /* ── Quick actions ───────────────────────────────────────────────────── */
+  /*
+    Three ways to reach the salon, as one ruled row. A card per action made
+    each door look like a separate product.
+  */
+  .mk-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border-top: 1px solid var(--c-border-strong);
+  }
+
+  .mk-quick > li {
+    flex: 1 1 12rem;
+  }
+
+  .mk-quick__link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1.15rem 1.5rem;
+    font-size: var(--step-0);
+    font-weight: 700;
+    text-decoration: none;
+    border-bottom: 1px solid var(--c-border);
+    transition: color 0.2s ease, background-color 0.2s ease;
+  }
+
+  @media (hover: hover) {
+    .mk-quick__link:hover {
+      background-color: var(--c-muted-wash);
+      color: var(--c-accent-2);
+    }
+  }
+
+  .mk-quick__link:focus-visible {
+    outline: 2px solid var(--c-accent-2);
+    outline-offset: -2px;
+  }
+
+  /* ── FAQ ─────────────────────────────────────────────────────────────── */
+  /*
+    A list of questions, not a stack of panels.
+
+    The boxed accordion this replaced was a widget in the middle of a page
+    whose other sections are rules and columns, and the questions were
+    stranded in a narrow column to one side of a 1216px box. Here the rows run
+    the full width of the shell, separated by the same hairline the service
+    menu uses, and the `+` rotates into the `×` that says "open".
+  */
+  .mk-faq {
+    border-top: 1px solid var(--c-border-strong);
+  }
+
+  .mk-faq__row {
+    border-bottom: 1px solid var(--c-border);
+  }
+
+  .mk-faq__q {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    width: 100%;
+    padding-block: 1.35rem;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .mk-faq__label {
+    font-size: var(--step-0);
+    font-weight: 700;
+    line-height: 1.6;
+    color: var(--c-text);
+  }
+
+  .mk-faq__icon {
+    display: grid;
+    place-items: center;
+    transition: transform 0.3s ease;
+  }
+
+  /* The `+` becomes an `×` when the row is open, so the state is legible
+     from the glyph alone and no second control is needed. */
+  .mk-faq__row[open] .mk-faq__icon {
+    transform: rotate(45deg);
+  }
+
+  .mk-faq__a {
+    max-width: 68ch;
+    padding-bottom: 1.5rem;
+    font-size: var(--step--1);
+    line-height: 1.9;
+    color: var(--c-muted);
+  }
+
+  /* FAQ rows sit flush in a divided list; a soft wash marks the row the
+     pointer is over without competing with the open state. */
+  @media (hover: hover) {
+    details.faq-item > summary:hover {
+      background-color: var(--c-muted-wash);
+      border-radius: var(--r-md);
+    }
+  }
+
+  /*
+    Money, phone numbers, slot times and booking references.
+
+    Two axes are being pinned here, and only one of them was. `tabular-nums`
+    makes every digit the same width so a counting figure does not jitter; it
+    says nothing about *height*. The editorial face (Amiri for Arabic, Cormorant
+    for Latin) defaults to text figures, where `1` is an x-height stroke and `0`
+    sits below the cap line — so `EGP 100` on the price list read as `EGP IOO`
+    and `12+` as `II+` in the hero's trust row. On the two numbers a visitor
+    compares fastest, that is a legibility defect, not a style.
+
+    `lining-nums` puts every digit on the baseline at full height. It is
+    duplicated as `font-feature-settings` because several Arabic text faces
+    expose the figure substitution only through the raw feature tag.
+  */
+  .numeric {
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+  }
+
+  /* ── Footer ──────────────────────────────────────────────────────────── */
+  /*
+  Scoped to `.mk-footer`, not the bare `footer` element: the review cards are
+  `<footer>` too, and the element selector was painting a 3rem top border and a
+  2rem bottom pad onto every one of them.
+*/
+.mk-footer {
+    border-top: 1px solid var(--c-border);
+    padding-block: 3rem 2rem;
+  }
+
+  .mk-f-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 3rem;
+  }
+
+  /* No social accounts: let the links take the second track instead of
+     reserving a third one for an empty column. */
+  .mk-f-grid[data-socials="false"] {
+    grid-template-columns: 2fr 1fr;
+  }
+
+  .mk-mark {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    border-radius: var(--r-md);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    background-color: var(--c-accent-wash);
+    color: var(--c-accent);
+    font-weight: 700;
+  }
+
+  .mk-f-h {
+    font-size: var(--step--1);
+    font-weight: 700;
+    color: var(--c-text);
+    margin-bottom: 1rem;
+  }
+
+  .mk-f-link {
+    font-size: var(--step--1);
+    font-weight: 700;
+    color: var(--c-muted);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  .mk-f-link:hover {
+    color: var(--c-accent);
+  }
+
+  .mk-social {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .mk-social a {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--c-border-strong);
+    color: var(--c-muted);
+    text-decoration: none;
+    font-size: 1.05rem;
+    transition:
+      color 0.2s ease,
+      border-color 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  @media (hover: hover) {
+    .mk-social a:hover {
+      border-color: var(--c-accent);
+      color: var(--c-accent-2);
+      transform: translateY(-2px);
+    }
+  }
+
+  .mk-f-bot {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--c-border);
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: var(--step--2);
+    color: var(--c-faint);
+  }
+
+  /* ── Sticky mobile CTA ───────────────────────────────────────────────── */
+  .mk-mcta {
+    display: none;
+    position: fixed;
+    inset-block-end: 0;
+    inset-inline: 0;
+    z-index: 60;
+    background-color: var(--c-glass-strong);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--c-border);
+    padding: 0.85rem var(--gutter)
+      calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* ── Responsive ──────────────────────────────────────────────────────── */
+  @media (max-width: 1000px) {
+    .mk-hero-grid,
+    .mk-hero-inner,
+    .mk-about-grid {
+      grid-template-columns: 1fr;
+      gap: 2.75rem;
+    }
+
+    /* The portrait should not become a billboard once it is full width. */
+    .mk-hero-media {
+      max-width: 34rem;
+      margin-inline: auto;
+      width: 100%;
+    }
+
+    /*
+      Lead with the photograph on a phone.
+
+      In the two-column spread the copy is the entry point and the portrait
+      answers it from the side. Collapsed to one column, that order put the
+      image below the headline, both CTAs, the trust row and the phone number —
+      so the largest element on the page, and the one that decides whether a
+      visitor trusts the place, waited behind four text blocks. On a 390px
+      screen it started at roughly 1.5 viewports down.
+    */
+    .mk-hero-aside {
+      order: -1;
+    }
+
+    /*
+      Moving the portrait first put its status caption directly above the
+      openbar, so a phone showed "مفتوح الآن" twice inside one screen — and the
+      announcement strip above the header says it a third time. The caption is
+      the one attached to the photograph the visitor is looking at, so the
+      standalone pill goes.
+    */
+    .mk-openbar {
+      display: none;
+    }
+
+    /* The frame hangs outside the box; on a single column it can collide with
+       the screen edge, so it is inset to the plate instead. */
+    .mk-hero-frame {
+      inset-inline-start: -0.5rem;
+      inset-block-end: -0.5rem;
+    }
+
+    .mk-reserve {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    /* The CTA owns the full second row instead of being squeezed into a cell. */
+    .mk-reserve-cta {
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--c-border);
+    }
+
+    .mk-reserve-field:nth-child(2) {
+      border-inline-end: 0;
+    }
+
+    .mk-reserve-field:nth-child(3) {
+      grid-column: 1 / -1;
+      border-inline-end: 0;
+      border-top: 1px solid var(--c-border);
+    }
+
+    .mk-hero-inner {
+      padding-block: 3.5rem 3rem;
+    }
+
+    .mk-f-grid {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .mk-mcta {
+      display: block;
+    }
+
+    /* Room for the fixed CTA so it never covers the footer's last row. */
+    .mk-footer {
+      padding-bottom: 5rem;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .mk-bookcard {
+      padding: 1.2rem;
+    }
+
+    .mk-topbar {
+      font-size: 0.72rem;
+    }
+
+    .mk-offers,
+    .mk-about-photo {
+      padding: 1.25rem;
+    }
+
+    /* One control per row: a native select narrower than its label truncates
+       the service name, which is the one thing the strip exists to show. */
+    .mk-reserve {
+      grid-template-columns: 1fr;
+    }
+
+    .mk-reserve-field,
+    .mk-reserve-field:nth-child(2),
+    .mk-reserve-field:nth-child(3) {
+      border-inline-end: 0;
+      border-top: 1px solid var(--c-border);
+    }
+
+    .mk-reserve-field:first-child {
+      border-top: 0;
+    }
+  }
+}

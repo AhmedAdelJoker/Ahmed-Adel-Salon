@@ -2,6 +2,8 @@ import { Calendar, Target } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "@/lib/format/locale";
 
 export interface MonthlyTargetProgressProps {
   monthlyTarget: number;
@@ -37,6 +39,8 @@ export function MonthlyTargetProgress({
   onCancelEditTarget,
   onSaveTarget,
 }: MonthlyTargetProgressProps) {
+  const { t, i18n } = useTranslation("owner");
+  const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
   return (
     <Card className="border-primary/30 bg-primary/5">
       <CardContent className="p-4 sm:p-5">
@@ -52,7 +56,7 @@ export function MonthlyTargetProgress({
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-muted">
-                الهدف الشهري للإيرادات
+                {t("finRep.target.title")}
               </p>
               {editingTarget ? (
                 <div className="mt-1 flex items-center gap-2">
@@ -62,10 +66,10 @@ export function MonthlyTargetProgress({
                     value={targetDraft}
                     onChange={(e) => onTargetDraftChange(e.target.value)}
                     className="h-9 w-36 rounded-xl border border-border bg-card px-3 text-sm font-black tabular-nums text-main outline-none focus:border-primary"
-                    aria-label="الهدف الشهري"
+                    aria-label={t("finRep.target.aria")}
                   />
                   <Button size="sm" onClick={onSaveTarget} loading={savingTarget} className="h-9 text-[11px] font-black">
-                    حفظ
+                    {t("common.save")}
                   </Button>
                   <Button
                     size="sm"
@@ -73,7 +77,7 @@ export function MonthlyTargetProgress({
                     onClick={onCancelEditTarget}
                     className="h-9 text-[11px] font-black"
                   >
-                    إلغاء
+                    {t("common.cancel")}
                   </Button>
                 </div>
               ) : (
@@ -87,7 +91,7 @@ export function MonthlyTargetProgress({
                       onClick={onEditTarget}
                       className="rounded-lg border border-border bg-card px-2 py-1 text-[10px] font-black text-muted hover:text-primary print:hidden"
                     >
-                      تعديل
+                      {t("common.edit")}
                     </button>
                   )}
                 </div>
@@ -109,13 +113,13 @@ export function MonthlyTargetProgress({
             </div>
             <p className="mt-1 text-[10px] font-bold text-muted">
               {targetProgress >= 100
-                ? "تم تحقيق الهدف! تجاوز بنسبة " + (targetProgress - 100).toFixed(1) + "%"
-                : "متبقي " + formatCurrency(Math.max(0, monthlyTarget - currentMonthRevenue)) + " للوصول للهدف"}
+                ? t("finRep.target.achieved", { pct: (targetProgress - 100).toFixed(1) })
+                : t("finRep.target.remaining", { amount: formatCurrency(Math.max(0, monthlyTarget - currentMonthRevenue)) })}
             </p>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-black text-muted">
             <Calendar size={12} />
-            <span>منذ {monthStart.slice(5).replace("-", "/")} حتى {toDate.slice(5).replace("-", "/")}</span>
+            <span>{t("finRep.target.sinceUntil", { from: monthStart.slice(5).replace("-", "/"), to: toDate.slice(5).replace("-", "/") })}</span>
           </div>
         </div>
       </CardContent>

@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
   Clock3,
@@ -35,6 +36,7 @@ const AppointmentCard = memo(function AppointmentCard({
   compact,
   ultraCompact,
 }: any) {
+  const { t, i18n } = useTranslation("schedule");
   const status = getStatusConfig(appointment.status);
   const isOnline = appointment.booking_source === "online";
   const duration = getAppointmentDuration(appointment);
@@ -84,12 +86,17 @@ const AppointmentCard = memo(function AppointmentCard({
       }}
       role="button"
       tabIndex={0}
-      aria-label={`موعد ${appointment.customer_name || "عميل"} الساعة ${formatTime12h(
-        String(
-          appointment.appointment_time || appointment.appointmentTime || "",
-        ).slice(0, 5),
-      )} - حالة ${status.label}`}
+      aria-label={t("appointmentCard.aria", {
+        customer: appointment.customer_name || t("appointmentCard.unknownCustomer"),
+        time: formatTime12h(
+          String(
+            appointment.appointment_time || appointment.appointmentTime || "",
+          ).slice(0, 5),
+        ),
+        status: i18n.t("schedule:" + status.label),
+      })}
       aria-grabbed={active}
+      aria-keyshortcuts="Enter"
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -151,7 +158,7 @@ const AppointmentCard = memo(function AppointmentCard({
           )}
           {!ultraCompact && duration != null && (
             <span className="text-[8px] text-muted font-bold">
-              ({duration}د)
+              ({duration} {t("listView.minuteShort")})
             </span>
           )}
         </div>
@@ -164,7 +171,7 @@ const AppointmentCard = memo(function AppointmentCard({
             ultraCompact ? "text-xs" : "text-sm",
           )}
         >
-          {appointment.customer_name || "عميل مجهول"}
+          {appointment.customer_name || t("appointmentCard.unknownCustomer")}
         </h4>
       </div>
 
@@ -181,7 +188,7 @@ const AppointmentCard = memo(function AppointmentCard({
             <GripVertical size={12} className="text-muted/20 shrink-0" />
             <p className="text-[9px] font-black text-muted/60 truncate italic">
               {appointment.notes ||
-                (compact ? "" : "اضغط للتفاصيل أو اسحب لنقل")}
+                (compact ? "" : t("appointmentCard.details"))}
             </p>
           </div>
           <div className="w-7 h-7 rounded-xl bg-card/80 flex items-center justify-center text-accent shadow-sm border border-border/40 group-hover/card:bg-accent group-hover/card:text-white transition-all duration-300 shrink-0">

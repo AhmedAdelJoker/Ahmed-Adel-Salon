@@ -1,5 +1,6 @@
 /** Customer helpers (moved from Customers page, no logic changes). */
-import { Award, CheckCircle2, Clock, Crown, Loader2, Star, XCircle } from "lucide-react";
+import { Award, BadgeDollarSign, CheckCircle2, Clock, Crown, Loader2, Star, XCircle } from "lucide-react";
+import i18n from "@/i18n";
 export function customerId(customer) {
     return customer?.customer_id || customer?.id || customer?.invoiceId;
   }
@@ -17,36 +18,31 @@ export function customerName(customer) {
     return (
       `${customer?.first_name || ""} ${customer?.last_name || ""}`.trim() ||
       customer?.name ||
-      "عميل"
+      (i18n.t("customers:customer.unknown") as string)
     );
   }
 
 export function secondPhone(customer) {
-    return (
-      customer?.phone2 ||
-      customer?.alternate_phone ||
-      customer?.secondary_phone ||
-      null
-    );
+    return customer?.second_phone || null;
   }
 
 export const TIER_CONFIG = {
   gold: {
-    label: "ذهبي",
+    label: "tier.gold",
     color: "text-amber-500",
     bg: "bg-amber-500/10",
     border: "border-amber-400",
     icon: Crown,
   },
   silver: {
-    label: "فضي",
+    label: "tier.silver",
     color: "text-slate-400",
     bg: "bg-slate-400/10",
     border: "border-slate-400",
     icon: Award,
   },
   bronze: {
-    label: "برونزي",
+    label: "tier.bronze",
     color: "text-orange-600",
     bg: "bg-orange-600/10",
     border: "border-orange-500",
@@ -61,63 +57,105 @@ export function getTierInfo(tier) {
   return TIER_CONFIG.bronze;
 }
 
+const normalizeStatus = (status?: string | null) =>
+  String(status || "")
+    .toLowerCase()
+    .replace(/-/g, "_");
+
 export function getStatusConfig(status) {
-  const map = {
+  const map: Record<string, { label: string; color: string; bg: string; icon: any }> = {
     PENDING: {
-      label: "قيد الانتظار",
+      label: "status.PENDING",
       color: "text-blue-500",
       bg: "bg-blue-500/10",
       icon: Clock,
     },
     CONFIRMED: {
-      label: "مؤكد",
+      label: "status.CONFIRMED",
       color: "text-amber-500",
       bg: "bg-amber-500/10",
       icon: CheckCircle2,
     },
+    WAITING: {
+      label: "status.WAITING",
+      color: "text-cyan-500",
+      bg: "bg-cyan-500/10",
+      icon: Clock,
+    },
     IN_PROGRESS: {
-      label: "قيد التنفيذ",
+      label: "status.IN_PROGRESS",
       color: "text-indigo-500",
       bg: "bg-indigo-500/10",
       icon: Loader2,
     },
+    READY_FOR_PAYMENT: {
+      label: "status.READY_FOR_PAYMENT",
+      color: "text-violet-500",
+      bg: "bg-violet-500/10",
+      icon: BadgeDollarSign,
+    },
     COMPLETED: {
-      label: "مكتمل",
+      label: "status.COMPLETED",
       color: "text-emerald-500",
       bg: "bg-emerald-500/10",
       icon: CheckCircle2,
     },
     CANCELLED: {
-      label: "ملغي",
+      label: "status.CANCELLED",
       color: "text-rose-500",
       bg: "bg-rose-500/10",
       icon: XCircle,
     },
+    AUTO_CANCELLED: {
+      label: "status.AUTO_CANCELLED",
+      color: "text-rose-700",
+      bg: "bg-rose-700/10",
+      icon: XCircle,
+    },
     NO_SHOW: {
-      label: "لم يحضر",
+      label: "status.NO_SHOW",
       color: "text-rose-700",
       bg: "bg-rose-700/10",
       icon: XCircle,
     },
   };
-  return map[status?.toUpperCase()] || map.PENDING;
+  const aliases: Record<string, string> = {
+    ready_for_pos: "READY_FOR_PAYMENT",
+    done: "COMPLETED",
+    checked_out: "COMPLETED",
+    paid: "COMPLETED",
+    in_service: "IN_PROGRESS",
+  };
+  const normalized = normalizeStatus(status);
+  const key = map[normalized.toUpperCase()]
+    ? normalized.toUpperCase()
+    : aliases[normalized] || "PENDING";
+  return map[key];
 }
 
-export function getInvoiceStatusConfig(status) {
-  const map = {
-    PAID: {
-      label: "مدفوعة",
-      color: "text-emerald-500",
-      bg: "bg-emerald-500/10",
+/**
+ * Invoices have no status column — real state comes from the closed/draft
+ * flags on the row itself. `is_closed` marks an invoice that was voided on
+ * its own (a month lock lives in its own table and never touches the row).
+ */
+export function getInvoiceStatusConfig(invoice) {
+  const key = invoice?.is_closed ? "CLOSED" : invoice?.is_draft ? "DRAFT" : "OPEN";
+  const map: Record<string, { label: string; color: string; bg: string }> = {
+    CLOSED: {
+      label: "invoices.statusClosed",
+      color: "text-red-500",
+      bg: "bg-red-500/10",
     },
-    PENDING: { label: "معلقة", color: "text-amber-500", bg: "bg-amber-500/10" },
-    OVERDUE: { label: "متأخرة", color: "text-rose-500", bg: "bg-rose-500/10" },
-    CANCELLED: {
-      label: "ملغاة",
+    OPEN: {
+      label: "invoices.statusOpen",
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+    },
+    DRAFT: {
+      label: "invoices.statusDraft",
       color: "text-slate-400",
       bg: "bg-slate-400/10",
     },
-    PARTIAL: { label: "جزئية", color: "text-blue-500", bg: "bg-blue-500/10" },
   };
-  return map[status?.toUpperCase()] || map.PENDING;
+  return map[key];
 }

@@ -1,15 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from datetime import datetime, time, timedelta
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 
 from app.db.session import get_db
-from app.api.deps import require_cashier_manager_owner, require_owner_or_manager
+from app.api.deps import (
+    require_cashier_manager_owner,
+    require_owner_or_manager,
+    require_shift_operator,
+)
 from app.models.user import User
 from app.models.pos_shift import PosShift
 from app.models.invoice import Invoice
-from app.models.invoice_item import InvoiceItem
 from app.models.expense import Expense
 from app.models.business_settings import BusinessSettings
 from app.schemas.pos_shift import (
@@ -17,15 +20,26 @@ from app.schemas.pos_shift import (
     DailySummaryShiftRead,
     DailySummaryTotals,
     DailySummaryUserRead,
+    PosShiftClose,
+    PosShiftOpen,
 )
-from app.services.pos_shift_service import auto_close_expired_shifts, is_within_working_hours
+from app.services.pos_shift_service import (
+    auto_close_expired_shifts,
+    is_within_working_hours,
+    next_closing_moment,
+    shift_window_totals,
+)
+from app.services.activity_log_service import log_activity
+from app.services.runtime_settings_service import get_runtime_settings
+from app.core.clock import coerce_naive, salon_day_bounds_utc, salon_now, utc_now_naive
+from app.core.security import verify_password
 
 router = APIRouter(prefix="/pos-shifts", tags=["POS Shifts"])
 
 @router.post("/auto-close-expired")
 def auto_close_expired_shifts_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner)
+    current_user: User = Depends(require_owner_or_manager)
 ):
     """Trigger global auto-close check for all shifts."""
     count = auto_close_expired_shifts(db)
@@ -34,7 +48,7 @@ def auto_close_expired_shifts_endpoint(
 @router.get("/current")
 def get_current_shift(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner)
+    current_user: User = Depends(require_shift_operator)
 ):
     # Proactively check and close all expired shifts
     auto_close_expired_shifts(db)
@@ -45,21 +59,127 @@ def get_current_shift(
     ).first()
     return shift
 
+@router.get("/current/stats")
+def get_current_shift_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_shift_operator),
+):
+    """Live, money-grade figures for the operator's open shift.
+
+    Mirrors the exact aggregation used by `close_shift` (1s lower-bound
+    tolerance, drafts excluded, same expense status filter) so the "expected
+    cash" the cashier sees while closing matches the figure the server stamps
+    one second later. `ShiftSidebar` used to derive this client-side from
+    `total_sales` (which includes card + split) and never subtracted expenses,
+    so the العجز/الزيادة indicator was wrong whenever card sales existed.
+    """
+    auto_close_expired_shifts(db)
+
+    shift = (
+        db.query(PosShift)
+        .filter(PosShift.user_id == current_user.id, PosShift.status == "open")
+        .first()
+    )
+    if shift is None:
+        return {"shift_id": None, "stats": None}
+
+    # Two clocks, one question each: the invoice window is compared against
+    # UTC-stamped created_at, so its "now" is UTC. The closing countdown asks
+    # when the salon's wall clock reaches closing time, so its "now" is the
+    # salon's. Sharing one value between both moved the window by the UTC
+    # offset and mislabelled live sales.
+    opened_at = coerce_naive(shift.opened_at)
+    now_utc = utc_now_naive()
+    now_salon = salon_now()
+
+    totals = shift_window_totals(
+        db,
+        user_id=shift.user_id,
+        start=opened_at,
+        end=now_utc,
+        opening_cash=shift.opening_cash,
+    )
+
+    rules = get_runtime_settings(
+        "financial_rules",
+        {"shiftCloseWarningMinutes": 15, "maxCashDiscrepancyWithoutNote": 0},
+    )
+    try:
+        warning_minutes = max(
+            0.0, float(rules.get("shiftCloseWarningMinutes", 15) or 0)
+        )
+    except (TypeError, ValueError):
+        warning_minutes = 15.0
+
+    # The variance the close will be refused for, sent to the client so the
+    # cashier can be asked for the note and the manager's co-signature in the
+    # same dialog, instead of discovering the gate after a rejected attempt.
+    try:
+        discrepancy_limit = max(
+            0.0, float(rules.get("maxCashDiscrepancyWithoutNote", 0) or 0)
+        )
+    except (TypeError, ValueError):
+        discrepancy_limit = 0.0
+
+    next_close = next_closing_moment(db)
+    closing_in_minutes = None
+    if next_close is not None:
+        closing_in_minutes = max(0.0, (next_close - now_salon).total_seconds() / 60.0)
+
+    return {
+        "shift_id": shift.id,
+        "opened_at": shift.opened_at,
+        "stats": {
+            "total_sales": float(totals["total_sales"]),
+            "cash_sales": float(totals["cash_sales"]),
+            "card_sales": float(totals["card_sales"]),
+            "split_sales": float(totals["split_sales"]),
+            "discount_total": float(totals["discount_total"]),
+            "invoice_count": totals["invoice_count"],
+            "service_count": totals["service_count"],
+            "product_count": totals["product_count"],
+            "total_expenses": float(totals["total_expenses"]),
+            "cash_expenses": float(totals["cash_expenses"]),
+            "expected_closing_cash": float(totals["expected_closing_cash"]),
+            "closing_in_minutes": closing_in_minutes,
+            "warning_minutes": warning_minutes,
+            "discrepancy_limit": discrepancy_limit,
+        },
+    }
+
+
+SHIFT_OVERRIDE_ROLES = ("owner", "admin", "manager", "accountant")
+
+
 @router.post("/open")
 def open_shift(
-    payload: dict,
+    payload: PosShiftOpen,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner)
+    current_user: User = Depends(require_shift_operator)
 ):
-    # Check working hours
-    if not is_within_working_hours(db):
-        # We allow it but maybe a warning is better? 
-        # User requested it to be "connected" with working hours.
-        # Let's be strict but allow an override if requested in the future.
-        raise HTTPException(
-            status_code=400, 
-            detail="لا يمكن فتح الوردية خارج ساعات عمل المحل الرسمية"
-        )
+    # Typed body: a negative opening float, a string, or a missing amount now
+    # arrives as a 422 naming the field, instead of a 500 from `Decimal()` or a
+    # negative drawer balance that no report could explain.
+    within_hours = is_within_working_hours(db)
+    override = bool(payload.override_hours)
+    override_reason = str(payload.override_reason or "").strip()
+
+    if not within_hours:
+        if not override:
+            raise HTTPException(
+                status_code=400,
+                detail="لا يمكن فتح الوردية خارج ساعات عمل المحل الرسمية",
+            )
+        if str(current_user.role or "").lower() not in SHIFT_OVERRIDE_ROLES:
+            raise HTTPException(
+                status_code=403,
+                detail="فتح الوردية خارج الدوام متاح للمدير والمالك فقط",
+            )
+        if not override_reason:
+            raise HTTPException(
+                status_code=400,
+                detail="اذكر سبب فتح الوردية خارج ساعات العمل",
+            )
 
     existing = db.query(PosShift).filter(
         PosShift.user_id == current_user.id,
@@ -67,111 +187,191 @@ def open_shift(
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="لديك وردية مفتوحة بالفعل")
-    
+
+    opening_note = payload.opening_note
+    if not within_hours and override:
+        opening_note = (
+            f"{opening_note or ''} | تجاوز خارج الدوام: {override_reason}"
+        ).strip(" |")
+
     shift = PosShift(
         user_id=current_user.id,
-        opening_cash=Decimal(str(payload.get("opening_cash") or payload.get("openingCash") or 0)),
-        opening_note=payload.get("opening_note"),
+        opening_cash=payload.opening_cash,
+        opening_note=opening_note,
         status="open"
     )
     db.add(shift)
+    db.flush()
+
+    from app.crud.core_business import create_cash_transaction
+    oc = float(shift.opening_cash or 0)
+    if oc > 0:
+        create_cash_transaction(
+            db,
+            direction="in",
+            amount=oc,
+            transaction_type="opening_balance",
+            payment_method="cash",
+            notes=f"رصيد افتتاحي وردية #{shift.id} - {current_user.full_name or current_user.username}",
+            user_id=current_user.id,
+            reference_type="pos_shift",
+            reference_id=shift.id,
+            reference_no=f"SHIFT-{shift.id}",
+            commit=False,
+        )
+
+    if not within_hours and override:
+        log_activity(
+            db,
+            user_id=current_user.id,
+            action="OPEN_SHIFT_OUTSIDE_HOURS",
+            entity_type="PosShift",
+            entity_id=str(shift.id),
+            description=(
+                f"فتح وردية خارج ساعات العمل بواسطة "
+                f"{current_user.full_name or current_user.username} — السبب: {override_reason}"
+            ),
+            commit=False,
+        )
+
     db.commit()
-    db.refresh(shift)
-
-    # خزنة الكاشير تسمع في الخزنة المركزية — رصيد افتتاحي كاش
-    try:
-        from app.crud.core_business import create_cash_transaction
-        oc = float(shift.opening_cash or 0)
-        if oc > 0:
-            create_cash_transaction(
-                db,
-                direction="in",
-                amount=oc,
-                transaction_type="opening_balance",
-                payment_method="cash",
-                notes=f"رصيد افتتاحي وردية #{shift.id} - {current_user.full_name or current_user.username}",
-                user_id=current_user.id,
-                reference_type="pos_shift",
-                reference_id=shift.id,
-                reference_no=f"SHIFT-{shift.id}",
-                commit=True,
-            )
-    except Exception as _e:
-        print(f"[Cashbox] opening_balance failed for shift {shift.id}: {_e}")
-
     db.refresh(shift)
     return shift
 
 @router.post("/{shift_id}/close")
 def close_shift(
     shift_id: int,
-    payload: dict,
+    payload: PosShiftClose,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_cashier_manager_owner)
+    current_user: User = Depends(require_shift_operator)
 ):
     shift = db.query(PosShift).filter(PosShift.id == shift_id).first()
     if not shift:
         raise HTTPException(status_code=404, detail="الوردية غير موجودة")
-    
+    if current_user.role == "cashier" and shift.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="يمكنك إغلاق ورديتك فقط")
+
     if shift.status == "closed":
         raise HTTPException(status_code=400, detail="الوردية مغلقة بالفعل")
 
     # Aggregate Data
-    # NOTE: 1s tolerance on the lower bound. SQLite stores server-side
+    # The window carries a 1s tolerance at both ends. SQLite stores server-side
     # CURRENT_TIMESTAMP without microseconds while bound datetimes carry
     # ".000000", so same-second invoices would string-compare as older
     # than opened_at and silently drop out of the close aggregates.
-    shift_start = shift.opened_at - timedelta(seconds=1)
-    invoices = db.query(Invoice).filter(
-        Invoice.created_at >= shift_start,
-        Invoice.created_by_user_id == shift.user_id,
-        Invoice.is_draft == False,
-    ).all()
-    
-    total_sales = Decimal("0.00")
-    cash_sales = Decimal("0.00")
-    card_sales = Decimal("0.00")
-    split_sales = Decimal("0.00")
-    discount_total = Decimal("0.00")
-    
-    invoice_ids = [inv.id for inv in invoices]
-    service_count = 0
-    product_count = 0
-    
-    if invoice_ids:
-        items = db.query(InvoiceItem).filter(InvoiceItem.invoice_id.in_(invoice_ids)).all()
-        for item in items:
-            if item.service_id:
-                service_count += (item.quantity or 1)
-            elif item.product_id:
-                product_count += (item.quantity or 1)
+    # The upper bound matters just as much: without it an invoice raised while
+    # this request was in flight gets folded into a shift that closed before it
+    # existed, and the day's cash no longer reconciles.
+    #
+    # The arithmetic itself lives in `shift_window_totals`, shared with the
+    # live tiles, the archived reprint and the auto-closer, so the figure the
+    # cashier counted against is the figure the server stamps.
+    # `closing_at` is stamped into `closed_at`, a UTC column sitting next to the
+    # UTC `opened_at` written by SQLite's CURRENT_TIMESTAMP. It used to carry
+    # the salon clock, so a closed shift's window sat three hours ahead of the
+    # UTC invoices it was meant to contain and its reprint could pull in sales
+    # raised long after the close.
+    closing_at = utc_now_naive()
+    opened_at = coerce_naive(shift.opened_at) or closing_at
+    totals = shift_window_totals(
+        db,
+        user_id=shift.user_id,
+        start=opened_at,
+        end=closing_at,
+        opening_cash=shift.opening_cash,
+        shift_id=shift.id,
+    )
+    total_sales = totals["total_sales"]
+    cash_sales = totals["cash_sales"]
+    discount_total = totals["discount_total"]
+    invoice_count = totals["invoice_count"]
+    service_count = totals["service_count"]
+    product_count = totals["product_count"]
 
-    for inv in invoices:
-        total_sales += inv.total_amount
-        discount_total += (inv.discount_amount or 0)
-        pm = (inv.payment_method or "").upper()
-        if pm == "CASH":
-            cash_sales += inv.total_amount
-        elif pm == "CARD":
-            card_sales += inv.total_amount
-        else:
-            split_sales += inv.total_amount
+    actual_closing_cash = payload.counted_cash
+    expected_closing_cash = totals["expected_closing_cash"]
 
-    # Expenses in this shift
-    expenses = db.query(Expense).filter(
-        Expense.created_at >= shift.opened_at,
-    ).all()
-    total_expenses = sum(Decimal(str(e.amount)) for e in expenses)
-    
-    shift.status = "closed"
-    shift.closed_at = datetime.now()
-    shift.actual_closing_cash = Decimal(str(payload.get("countedCash") or payload.get("closing_cash") or 0))
-    shift.expected_closing_cash = shift.opening_cash + cash_sales # Only cash affects the drawer
-    shift.total_sales = total_sales
-    shift.invoice_count = len(invoices)
-    shift.discount_total = discount_total
-    shift.closing_note = payload.get("closing_note")
-    
+    # Owner-configured cash discrepancy policy (financial_rules.maxCashDiscrepancyWithoutNote):
+    # beyond this variance the close must carry an explanatory note, and a
+    # cashier needs a manager to co-sign it. 0 keeps the pre-gate behaviour.
+    managed_roles = {"manager", "owner", "admin"}
+    discrepancy_limit = Decimal(
+        str(
+            get_runtime_settings(
+                "financial_rules",
+                {"maxCashDiscrepancyWithoutNote": 0},
+            ).get("maxCashDiscrepancyWithoutNote", 0)
+            or 0
+        )
+    )
+    variance = actual_closing_cash - expected_closing_cash
+    if discrepancy_limit > 0 and abs(variance) > discrepancy_limit:
+        closing_note = str(payload.closing_note or "").strip()
+        if not closing_note:
+            raise HTTPException(
+                status_code=400,
+                detail="العجز/الزيادة تجاوزت الحد المسموح — اذكر السبب في ملاحظة الإغلاق",
+            )
+        if str(current_user.role or "").lower() not in managed_roles:
+            approver_username = str(payload.approver_username or "").strip()
+            approver_password = str(payload.approver_password or "")
+            approver = (
+                db.query(User).filter(User.username == approver_username).first()
+                if approver_username
+                else None
+            )
+            approved = (
+                approver is not None
+                and str(approver.role or "").lower() in managed_roles
+                and bool(approver_password)
+                and verify_password(approver_password, approver.hashed_password)
+            )
+            if not approved:
+                raise HTTPException(
+                    status_code=403,
+                    detail="إغلاق بفارق تجاوز الحد المسموح يتطلب اعتماد مدير بصلاحياته",
+                )
+            log_activity(
+                db,
+                user_id=current_user.id,
+                action="START_POS_SHIFT_CLOSE_DISCREPANCY",
+                entity_type="PosShift",
+                entity_id=str(shift_id),
+                description=(
+                    "إغلاق وردية بفارق تجاوز الحد، تم اعتماده بواسطة "
+                    f"{approver.username} (فارق {variance})"
+                ),
+                commit=False,
+            )
+
+    # Close atomically. Two cashiers on two terminals can both read
+    # status == "open" and both compute totals; a conditional UPDATE means the
+    # database picks one winner and the loser is told, instead of the second
+    # write overwriting the first one's figures.
+    claimed = (
+        db.query(PosShift)
+        .filter(PosShift.id == shift_id, PosShift.status == "open")
+        .update(
+            {
+                PosShift.status: "closed",
+                PosShift.closed_at: closing_at,
+                PosShift.actual_closing_cash: actual_closing_cash,
+                PosShift.expected_closing_cash: expected_closing_cash,
+                PosShift.total_sales: total_sales,
+                PosShift.invoice_count: invoice_count,
+                PosShift.discount_total: discount_total,
+                PosShift.closing_note: payload.closing_note,
+            },
+            synchronize_session=False,
+        )
+    )
+    if not claimed:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="تم إغلاق الوردية من جهاز آخر — حدّث الصفحة قبل الإغلاق مرة أخرى",
+        )
+
     db.commit()
     db.refresh(shift)
     
@@ -180,14 +380,70 @@ def close_shift(
         "shift": shift,
         "stats": {
             "cash_sales": cash_sales,
-            "card_sales": card_sales,
-            "split_sales": split_sales,
+            "card_sales": totals["card_sales"],
+            "split_sales": totals["split_sales"],
             "service_count": service_count,
             "product_count": product_count,
-            "total_expenses": total_expenses,
+            "total_expenses": totals["total_expenses"],
             "cashier_name": current_user.full_name or current_user.username
         }
     }
+
+@router.get("/{shift_id}/stats")
+def get_shift_stats(
+    shift_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_shift_operator),
+):
+    """Money-grade breakdown for a (usually closed) shift — the reprint source.
+
+    Same aggregation as `close_shift` run over the shift's stored window, so a
+    reprint weeks later reconciles with the figures stamped at close time.
+    """
+    shift = db.query(PosShift).filter(PosShift.id == shift_id).first()
+    if not shift:
+        raise HTTPException(status_code=404, detail="الوردية غير موجودة")
+    if current_user.role == "cashier" and shift.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="يمكنك رؤية ورديتك فقط")
+
+    opened_at = coerce_naive(shift.opened_at)
+    if opened_at is None:
+        raise HTTPException(status_code=400, detail="الوردية بلا وقت افتتاح")
+
+    closed_at = coerce_naive(shift.closed_at)
+    # Stored stamps are UTC and so is the live window end they are compared
+    # against; the salon clock here would shift the reprint by the UTC offset.
+    end = closed_at if shift.status == "closed" and closed_at else utc_now_naive()
+
+    totals = shift_window_totals(
+        db,
+        user_id=shift.user_id,
+        start=opened_at,
+        end=end,
+        opening_cash=shift.opening_cash,
+    )
+
+    return {
+        "shift_id": shift.id,
+        "stats": {
+            "total_sales": float(totals["total_sales"]),
+            "cash_sales": float(totals["cash_sales"]),
+            "card_sales": float(totals["card_sales"]),
+            "split_sales": float(totals["split_sales"]),
+            "discount_total": float(totals["discount_total"]),
+            "invoice_count": totals["invoice_count"],
+            "service_count": totals["service_count"],
+            "product_count": totals["product_count"],
+            "total_expenses": float(totals["total_expenses"]),
+            "cash_expenses": float(totals["cash_expenses"]),
+            "opening_cash": float(shift.opening_cash or 0),
+            "expected_closing_cash": float(totals["expected_closing_cash"]),
+            "actual_closing_cash": float(shift.actual_closing_cash or 0)
+            if shift.status == "closed"
+            else None,
+        },
+    }
+
 
 @router.get("/daily-summary", response_model=DailySummaryResponse)
 def get_daily_summary(
@@ -201,10 +457,13 @@ def get_daily_summary(
         except ValueError:
             raise HTTPException(status_code=400, detail="صيغة التاريخ غير صحيحة. استخدم YYYY-MM-DD")
     else:
-        target_date = datetime.now().date()
+        target_date = salon_now().date()
         
-    start_of_day = datetime.combine(target_date, time.min)
-    end_of_day = datetime.combine(target_date, time.max)
+    # The reported day is the salon's calendar day, but every column the window
+    # is compared against holds UTC. `salon_day_bounds_utc` expresses the shop's
+    # [00:00, 23:59:59] in the storage clock; building it with `combine`
+    # silently trimmed the first/last UTC-offset hours off the report.
+    start_of_day, end_of_day = salon_day_bounds_utc(target_date)
     
     shifts = db.query(PosShift).options(joinedload(PosShift.user)).filter(
         PosShift.opened_at >= start_of_day,
@@ -226,17 +485,18 @@ def get_daily_summary(
     for shift in shifts:
         if shift.status == "open":
             # Live sales for open shifts (stored totals are only set on close).
-            # Same linkage as close_shift: invoices by this user since opening.
-            # NOTE: 1s tolerance for the sqlite datetime-precision trap
-            # (see total-balance): opened_at keeps microseconds while
-            # created_at is truncated to the second on read-back.
-            live_invoices = db.query(Invoice).filter(
-                Invoice.created_at >= shift.opened_at - timedelta(seconds=1),
-                Invoice.created_by_user_id == shift.user_id,
-                Invoice.is_draft == False,
-            ).all()
-            sales = sum((inv.total_amount for inv in live_invoices), Decimal("0"))
-            count = len(live_invoices)
+            # The window and the arithmetic are the shared ones, so the figure
+            # the daily summary prints is the figure the close will stamp.
+            # The upper bound is the end of the reported day, like every other
+            # query in this endpoint.
+            totals = shift_window_totals(
+                db,
+                user_id=shift.user_id,
+                start=coerce_naive(shift.opened_at) or start_of_day,
+                end=end_of_day,
+            )
+            sales = totals["total_sales"]
+            count = totals["invoice_count"]
         else:
             sales = shift.total_sales or Decimal("0")
             count = shift.invoice_count or 0
@@ -272,7 +532,11 @@ def list_shifts(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_cashier_manager_owner)
 ):
-    return db.query(PosShift).options(joinedload(PosShift.user)).filter(PosShift.user_id == current_user.id).order_by(PosShift.id.desc()).all()
+    query = db.query(PosShift).options(joinedload(PosShift.user))
+    # Supervisory roles audit/reprint any shift; a cashier sees their own only.
+    if str(current_user.role or "").lower() not in {"owner", "manager", "admin", "accountant"}:
+        query = query.filter(PosShift.user_id == current_user.id)
+    return query.order_by(PosShift.id.desc()).all()
 
 
 @router.get("/total-balance")
@@ -288,19 +552,20 @@ def get_total_cash_balance(
     if open_shifts:
         total_opening = sum(Decimal(str(s.opening_cash)) for s in open_shifts)
     
-    # Calculate sales for these shifts (drafts excluded; 1s tolerance
-    # for the sqlite datetime-precision trap, see close_shift)
+    # Calculate sales for these shifts (drafts excluded; the shared window and
+    # arithmetic, so the drawer figure agrees with the shift that is counted).
+    # Both bounds must be UTC to line up with the invoice stamps.
+    now_utc = utc_now_naive()
     total_sales = Decimal("0.00")
     for s in open_shifts:
-        shift_start = s.opened_at - timedelta(seconds=1)
-        invoices = db.query(Invoice).filter(
-            Invoice.created_at >= shift_start,
-            Invoice.created_by_user_id == s.user_id,
-            Invoice.is_draft == False,
-        ).all()
+        totals = shift_window_totals(
+            db,
+            user_id=s.user_id,
+            start=coerce_naive(s.opened_at) or now_utc,
+            end=now_utc,
+        )
         # Only cash sales affect the physical drawer
-        cash_sales = sum(Decimal(str(inv.total_amount)) for inv in invoices if (inv.payment_method or "").upper() == "CASH")
-        total_sales += cash_sales
+        total_sales += totals["cash_sales"]
 
     # Return as float to ensure JSON compatibility
     return {"total_balance": float(total_opening + total_sales)}

@@ -2,8 +2,8 @@ from app.db.base_class import Base  # noqa
 
 # Core models
 from app.models.user import User  # noqa
-from app.models.barber import Barber  # noqa
 from app.models.customer import Customer  # noqa
+from app.models.member_account import MemberAccount  # noqa
 from app.models.customer_cancellation_log import CustomerCancellationLog  # noqa
 from app.models.booking_audit_log import BookingAuditLog  # noqa
 from app.models.employee import Employee  # noqa
@@ -23,6 +23,15 @@ from app.models.appointment import Appointment  # noqa
 from app.models.appointment_service import AppointmentService  # noqa
 from app.models.invoice import Invoice  # noqa
 from app.models.invoice_item import InvoiceItem  # noqa
+from app.models.month_closure import MonthClosure  # noqa
+# Registers `invoice_counters`, which migration b8e2f3a4c5d6 creates. This
+# module is the only thing that populates the `target_metadata` Alembic's
+# autogenerate compares against, so a model imported *only* by a router is
+# absent from that comparison: the table is in the database and absent from the
+# models, which autogenerate reports as a table to DROP. That import was the
+# only thing keeping it out, and it was one endpoint away from a migration that
+# silently drops the day's invoice numbering.
+from app.models.invoice_counter import InvoiceCounter  # noqa
 from app.models.business_settings import BusinessSettings  # noqa
 from app.models.expense import Expense  # noqa
 from app.models.payroll_record import PayrollRecord  # noqa
@@ -43,7 +52,8 @@ from app.models.walk_in_queue import WalkInQueue  # noqa
 from app.models.waitlist_entry import WaitlistEntry  # noqa
 
 # Availability / Presence / Notifications
-# Phase 2 cleanup: removed legacy Barber* models (use Employee* equivalents)
+# Phase 2: the legacy `Barber` model and its `app.models.barber` shim are gone.
+# Employee is the single source of truth; `Employee.id` is what `barber_id` means.
 from app.models.employee_working_hour import EmployeeWorkingHour  # noqa
 from app.models.employee_time_off import EmployeeTimeOff  # noqa
 from app.models.employee_presence_log import EmployeePresenceLog  # noqa
@@ -52,7 +62,6 @@ from app.models.notification import Notification  # noqa
 from app.models.report_schedule import ReportSchedule  # noqa
 
 # Supporting / approval models
-from app.models.discount_approval_request import DiscountApprovalRequest  # noqa
 from app.models.invoice_adjustment_request import InvoiceAdjustmentRequest  # noqa
 from app.models.invoice_payment import InvoicePayment  # noqa
 from app.models.shop_settings import ShopSettings  # noqa

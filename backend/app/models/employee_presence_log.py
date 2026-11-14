@@ -52,6 +52,9 @@ class AttendancePenalty(Base):
     reason = Column(String(500), nullable=True)
     penalty_amount = Column(Numeric(10, 2), default=0)
     is_excused = Column(Boolean, default=False)
+    # "auto"  — created by the punch engine (late check-in policy)
+    # "manual" — entered by an admin from the penalties tab
+    source = Column(String(20), nullable=False, default="auto", server_default="auto")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     employee = relationship("Employee", back_populates="attendance_penalties")

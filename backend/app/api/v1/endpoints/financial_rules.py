@@ -27,6 +27,10 @@ DEFAULT_FINANCIAL_RULES = {
     "enableProductCostTracking": True,
     "enableExpenseApproval": True,
     "maxCashDiscrepancyWithoutNote": 0,
+    "enableAutoShiftClose": True,
+    "autoLockShiftHours": 24,
+    "shiftAutoCloseGracePeriod": 30,
+    "shiftCloseWarningMinutes": 15,
     "defaultPaymentMethod": "cash",
     "enabledPaymentMethods": {
         "cash": True,
@@ -60,6 +64,10 @@ class FinancialRulesPayload(BaseModel):
     enable_product_cost_tracking: bool = True
     enable_expense_approval: bool = True
     max_cash_discrepancy_without_note: float = 0
+    enable_auto_shift_close: bool = True
+    auto_lock_shift_hours: float = 24
+    shift_auto_close_grace_period: float = 30
+    shift_close_warning_minutes: float = 15
     default_payment_method: str = "cash"
     enabled_payment_methods: EnabledPaymentMethodsPayload = EnabledPaymentMethodsPayload()
 
@@ -85,6 +93,15 @@ def _sanitize_financial_rules(data: dict) -> dict:
     )
     merged["maxCashDiscrepancyWithoutNote"] = max(
         0, float(merged.get("maxCashDiscrepancyWithoutNote", 0) or 0)
+    )
+    merged["autoLockShiftHours"] = max(
+        0, float(merged.get("autoLockShiftHours", 24) or 0)
+    )
+    merged["shiftAutoCloseGracePeriod"] = max(
+        0, float(merged.get("shiftAutoCloseGracePeriod", 30) or 0)
+    )
+    merged["shiftCloseWarningMinutes"] = max(
+        0, float(merged.get("shiftCloseWarningMinutes", 15) or 0)
     )
     default_payment_method = str(
         merged.get("defaultPaymentMethod", "cash") or "cash"

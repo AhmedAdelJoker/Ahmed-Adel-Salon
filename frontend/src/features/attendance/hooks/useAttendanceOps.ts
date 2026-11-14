@@ -6,56 +6,41 @@ import type {
   AttendanceRecord,
   AttendanceSettingsForm,
   AttendanceViewMode,
-  EmployeeRecord,
   LeaveFormState,
   LeaveRecord,
-  WorkingHours,
 } from "@/features/attendance/types";
 import { emptyLeaveForm } from "@/features/attendance/types";
-import { exportAttendancePDF } from "@/features/attendance/utils/attendance";
+import { exportAttendancePDF, type TranslateFn } from "@/features/attendance/utils/attendance";
 
 /**
- * Attendance mutations & side-effects: manual register, import,
- * leaves, notifications, settings and PDF export.
- * Moved verbatim from `AttendanceManagement.tsx`.
+ * Attendance mutations & side-effects (compatibility hook).
+ * The main page currently owns its flows; this is kept compiling for barrel consumers.
  */
 export function useAttendanceOps(opts: {
-  todayRecords: AttendanceRecord[];
-  processedData: AttendanceRecord[];
-  archiveRecords: AttendanceRecord[];
+  rows: AttendanceRecord[];
   activeViewMode: AttendanceViewMode;
-  employees: EmployeeRecord[];
-  workingHours: WorkingHours;
-  fetchAttendance: () => Promise<void>;
-  fetchWorkingHours: () => Promise<void>;
+  locale: string;
+  t: TranslateFn;
+  fetchAttendance: () => Promise<void> | void;
+  fetchWorkingHours?: () => Promise<void> | void;
 }) {
-  const {
-    todayRecords,
-    processedData,
-    archiveRecords,
-    activeViewMode,
-    fetchAttendance,
-    fetchWorkingHours,
-  } = opts;
+  const { rows, activeViewMode, locale, t, fetchAttendance } = opts;
 
   const [regEmployeeId, setRegEmployeeId] = useState("");
   const [regStatus, setRegStatus] = useState("in");
   const [regTime, setRegTime] = useState(new Date().toISOString().slice(0, 16));
+  const [lateReason, setLateReason] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
   const [showLeaveForm, setShowLeaveForm] = useState(false);
-  const [leaveForm, setLeaveForm] = useState<LeaveFormState>({
-    ...emptyLeaveForm,
-  });
+  const [leaveForm, setLeaveForm] = useState<LeaveFormState>({ ...emptyLeaveForm });
   const [leaveFilter, setLeaveFilter] = useState("all");
 
-  const [notifications, setNotifications] = useState<AttendanceNotification[]>(
-    [],
-  );
+  const [notifications, setNotifications] = useState<AttendanceNotification[]>([]);
   const [notifPermission, setNotifPermission] = useState(
-    typeof Notification !== "undefined" ? Notification?.permission : "default",
+    typeof Notification !== "undefined" ? Notification.permission : "default",
   );
 
   const [showSettings, setShowSettings] = useState(false);
@@ -63,10 +48,12 @@ export function useAttendanceOps(opts: {
     open_time: "09:00",
     close_time: "22:00",
     late_threshold: 15,
+    late_penalty_per_minute: 0.5,
+    auto_penalty_enabled: true,
   });
 
   const handleManualRegister = useCallback(async () => {
-    if (!regEmployeeId) return toast.error("يرجى اختيار الموظف");
+    if (!regEmployeeId) return toast.error(t("attendance.selectEmployee"));
     setIsRegistering(true);
     try {
       await api.post("/barber-presence/register", null, {
@@ -74,28 +61,26 @@ export function useAttendanceOps(opts: {
           employee_id: regEmployeeId,
           status_type: regStatus,
           timestamp: regTime,
+          ...(lateReason ? { late_reason: lateReason } : {}),
         },
       });
-      toast.success("تم تسجيل العملية بنجاح");
-      fetchAttendance();
+      toast.success(t("attendance.registerSuccess"));
+      await fetchAttendance();
     } catch (err) {
-      const apiErr = err as {
-        response?: { data?: { detail?: unknown } };
-        message?: string;
-      };
+      const apiErr = err as { response?: { data?: { detail?: unknown } }; message?: string };
       toast.error(
-        (apiErr?.response?.data?.detail as string) ||
+        (typeof apiErr?.response?.data?.detail === "string" && apiErr.response.data.detail) ||
           apiErr?.message ||
-          "فشل تسجيل العملية",
+          t("attendance.registerFailed"),
       );
     } finally {
       setIsRegistering(false);
     }
-  }, [regEmployeeId, regStatus, regTime, fetchAttendance]);
+  }, [regEmployeeId, regStatus, regTime, lateReason, fetchAttendance, t]);
 
   const handleFileUpload = useCallback(
     async (e: any, type: string) => {
-      const file = e.target.files[0];
+      const file = e.target.files?.[0];
       if (!file) return;
       const formData = new FormData();
       formData.append("file", file);
@@ -105,29 +90,24 @@ export function useAttendanceOps(opts: {
           ? "/barber-presence/import-excel"
           : "/barber-presence/import-biometric";
       try {
-        const res = await api.post(endpoint, formData, {
+        await api.post(endpoint, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        toast.success(res.data?.message || "تم الاستيراد بنجاح");
-        fetchAttendance();
-      } catch (_err) {
-        toast.error("فشل استيراد الملف");
+        toast.success(t("attendance.importSuccess"));
+        await fetchAttendance();
+      } catch {
+        toast.error(t("attendance.importFailed"));
       } finally {
         setIsImporting(false);
         e.target.value = "";
       }
     },
-    [fetchAttendance],
+    [fetchAttendance, t],
   );
 
   const handleExportPDF = useCallback(() => {
-    void exportAttendancePDF({
-      activeViewMode,
-      todayRecords,
-      processedData,
-      archiveRecords,
-    });
-  }, [activeViewMode, todayRecords, processedData, archiveRecords]);
+    void exportAttendancePDF({ activeViewMode, rows, locale, t });
+  }, [activeViewMode, rows, locale, t]);
 
   const fetchLeaves = useCallback(async () => {
     try {
@@ -135,126 +115,54 @@ export function useAttendanceOps(opts: {
         params: { status: leaveFilter === "all" ? undefined : leaveFilter },
       });
       setLeaves(res.data || []);
-    } catch (_err) {
+    } catch {
       /* ignore */
     }
   }, [leaveFilter]);
 
   const handleCreateLeave = useCallback(async () => {
-    if (
-      !leaveForm.employee_id ||
-      !leaveForm.start_date ||
-      !leaveForm.end_date
-    ) {
-      return toast.error("يرجى إكمال جميع الحقول المطلوبة");
+    if (!leaveForm.employee_id || !leaveForm.start_date || !leaveForm.end_date) {
+      return toast.error(t("attendance.completeFields"));
     }
     try {
       await api.post("/barber-presence/leaves", leaveForm);
-      toast.success("تم إرسال طلب الإجازة");
+      toast.success(t("attendance.leaveSent"));
       setShowLeaveForm(false);
       setLeaveForm({ ...emptyLeaveForm });
       fetchLeaves();
     } catch (err) {
-      const apiErr = err as {
-        response?: { data?: { detail?: unknown } };
-        message?: string;
-      };
+      const apiErr = err as { response?: { data?: { detail?: unknown } }; message?: string };
       toast.error(
-        (apiErr?.response?.data?.detail as string) ||
+        (typeof apiErr?.response?.data?.detail === "string" && apiErr.response.data.detail) ||
           apiErr?.message ||
-          "فشل إرسال الطلب",
+          t("attendance.leaveFailed"),
       );
     }
-  }, [leaveForm, fetchLeaves]);
+  }, [leaveForm, fetchLeaves, t]);
 
   const handleLeaveAction = useCallback(
     async (leaveId: string | number | undefined, action: string) => {
       try {
-        await api.patch(`/barber-presence/leaves/${leaveId}`, {
-          status: action,
-        });
-        toast.success(action === "approved" ? "تم قبول الطلب" : "تم رفض الطلب");
+        await api.patch(`/barber-presence/leaves/${leaveId}`, { status: action });
+        toast.success(action === "approved" ? t("attendance.leaveApproved") : t("attendance.leaveRejected"));
         fetchLeaves();
-      } catch (_err) {
-        toast.error("فشل تحديث الطلب");
+      } catch {
+        toast.error(t("attendance.leaveFailed"));
       }
     },
-    [fetchLeaves],
+    [fetchLeaves, t],
   );
 
   const requestNotificationPermission = useCallback(async () => {
-    if (!("Notification" in window))
-      return toast.error("المتصفح لا يدعم الإشعارات");
+    if (!("Notification" in window)) return toast.error(t("attendance.noNotifications"));
     const permission = await Notification.requestPermission();
     setNotifPermission(permission);
-    if (permission === "granted") toast.success("تم تفعيل الإشعارات");
-  }, []);
-
-  const sendNotification = useCallback(
-    (title: string, body: string) => {
-      if (notifPermission === "granted")
-        new Notification(title, { body, icon: "/favicon.ico" });
-    },
-    [notifPermission],
-  );
-
-  const handleSaveSettings = useCallback(async () => {
-    try {
-      const workingHoursPayload: Record<string, unknown> = {};
-      const days = [
-        "sunday",
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-      ];
-      days.forEach((day) => {
-        workingHoursPayload[day] = {
-          is_open: true,
-          open_time: settingsForm.open_time,
-          close_time: settingsForm.close_time,
-        };
-      });
-      await api.post("/barber-presence/working-hours", {
-        working_hours: workingHoursPayload,
-      });
-      toast.success("تم حفظ الإعدادات");
-      setShowSettings(false);
-      fetchWorkingHours();
-    } catch (_err) {
-      toast.error("فشل حفظ الإعدادات");
-    }
-  }, [settingsForm, fetchWorkingHours]);
+    if (permission === "granted") toast.success(t("attendance.notificationsOn"));
+  }, [t]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      if (now.getHours() === 22) {
-        const stillIn = todayRecords.filter(
-          (p) => Number(p.stats?.totalHours) > 0 && !p.isComplete,
-        );
-        if (stillIn.length > 0) {
-          sendNotification(
-            "تذكير الانصراف",
-            ` ${stillIn.length} موظف لم يسجلوا انصراف بعد`,
-          );
-          setNotifications((prev) => [
-            ...prev,
-            {
-              id: Date.now(),
-              title: "تذكير الانصراف",
-              message: `${stillIn.length} موظف لم يسجلوا انصراف`,
-              time: new Date(),
-              read: false,
-            },
-          ]);
-        }
-      }
-    }, 3600000);
-    return () => clearInterval(interval);
-  }, [todayRecords, sendNotification]);
+    void fetchLeaves();
+  }, [fetchLeaves]);
 
   return {
     regEmployeeId,
@@ -263,6 +171,8 @@ export function useAttendanceOps(opts: {
     setRegStatus,
     regTime,
     setRegTime,
+    lateReason,
+    setLateReason,
     isRegistering,
     isImporting,
     leaves,
@@ -285,7 +195,5 @@ export function useAttendanceOps(opts: {
     handleCreateLeave,
     handleLeaveAction,
     requestNotificationPermission,
-    sendNotification,
-    handleSaveSettings,
   };
 }

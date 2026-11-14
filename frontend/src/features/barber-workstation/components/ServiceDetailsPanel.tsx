@@ -111,7 +111,7 @@ export const ServiceDetailsPanel = ({
             className="h-9"
             onClick={onAddProduct}
           >
-            <Plus size={12} className="ml-1.5" /> إضافة
+            <Plus size={12} className="ms-1.5" /> إضافة
           </Button>
         </div>
         {productsUsed.length === 0 ? (

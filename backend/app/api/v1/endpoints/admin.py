@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any, List
 
 from app.api import deps
+from app.core.clock import utc_now_naive
 from app.models.employee import Employee
 from app.models.user import User
 from app.models.invoice import Invoice
@@ -41,7 +42,10 @@ def archive_staff(
         raise HTTPException(status_code=404, detail="Staff not found")
     
     employee.is_archived = True
-    employee.archived_at = datetime.now()
+    # UTC, like every other stored timestamp. `datetime.now()` wrote the
+    # server's zone, so the archive audit trail disagreed with every other row by
+    # the offset whenever the server was not in Egypt.
+    employee.archived_at = utc_now_naive()
     db.add(employee)
     db.commit()
     return {"status": "staff_archived"}

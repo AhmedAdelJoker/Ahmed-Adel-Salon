@@ -16,12 +16,3 @@ export interface BookingFormData {
   services: unknown[];
   bookingSource: string;
 }
-
-export interface WalkInData {
-  phone: string;
-  firstName: string;
-  lastName: string;
-  employeeId: string;
-  serviceIds: unknown[];
-  notes: string;
-}

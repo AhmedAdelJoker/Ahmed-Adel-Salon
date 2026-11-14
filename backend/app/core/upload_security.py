@@ -107,10 +107,18 @@ def _sniff_mime(content: bytes) -> str | None:
     # xlsx / docx / zip-based formats all start with PK\x03\x04
     if head[:4] == b"PK\x03\x04":
         return "application/zip"
-    # Plain text / CSV heuristic
+    # Plain text / CSV heuristic.
+    #
+    # Decode a generous prefix with `errors="ignore"` rather than the 16-byte
+    # magic header: a UTF-8 Arabic header is multi-byte, so byte 16 can land
+    # in the middle of a character and turn a perfectly valid CSV into a
+    # UnicodeDecodeError -- which the caller reports as "the content does not
+    # match the extension", i.e. an import of an Arabic spreadsheet failed as
+    # if it were malware.
     try:
-        head.decode("utf-8")
-        if "," in head.decode("utf-8", errors="ignore").splitlines()[0]:
+        text = content[:4096].decode("utf-8", errors="ignore")
+        first_line = text.splitlines()[0] if text else ""
+        if "," in first_line:
             return "text/csv"
     except (UnicodeDecodeError, IndexError):
         pass
@@ -190,6 +198,12 @@ async def validate_upload(
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 _PDF_EXTS = {".pdf"}
 _DATA_EXTS = {".xlsx", ".csv"}
+# Two container formats only. WebM is included because Safari/iOS has historically
+# shipped without MP4/H.264, so an mp4-only hero video renders as a blank box on
+# the platform a salon owner is most likely to demo from. Both are validated by
+# extension here; the public site picks whichever the browser reports support
+# for via `canPlayType`.
+_VIDEO_EXTS = {".mp4", ".webm"}
 _IMAGE_OR_PDF_EXTS = _IMAGE_EXTS | _PDF_EXTS
 
 
@@ -215,6 +229,17 @@ def _only(exts: set[str]):
 async def validate_image(upload: UploadFile, *, max_size: int | None = None) -> bytes:
     """Validate an image upload (jpg, jpeg, png, webp, gif)."""
     with _only(_IMAGE_EXTS):
+        return await validate_upload(upload, max_size=max_size)
+
+
+async def validate_video(upload: UploadFile, *, max_size: int | None = None) -> bytes:
+    """Validate a hero-video upload (mp4, webm).
+
+    Callers must pass an explicit `max_size`: the global image cap is far too
+    small for a short clip, and silently inheriting it would reject every video
+    a salon owner could realistically record on a phone.
+    """
+    with _only(_VIDEO_EXTS):
         return await validate_upload(upload, max_size=max_size)
 
 

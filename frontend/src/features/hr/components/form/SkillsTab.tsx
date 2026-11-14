@@ -3,7 +3,10 @@ import type { Dispatch, SetStateAction } from "react";
 import type { EmployeeRecord } from "@/types/employee";
 import type { ServiceRecord } from "@/types/catalog";
 import { Scissors } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/core/utils";
+import { formatEmployeeMoney } from "@/features/hr/utils/helpers";
+import { getIntlLocale } from "@/lib/format/locale";
 
 export default function SkillsTab({
   allServices,
@@ -14,6 +17,9 @@ export default function SkillsTab({
   formData: EmployeeRecord;
   setFormData: Dispatch<SetStateAction<EmployeeRecord>>;
 }) {
+  const { t, i18n } = useTranslation("owner");
+  const language = i18n.resolvedLanguage || i18n.language || "ar";
+  const locale = getIntlLocale(language);
   return (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="p-6 rounded-[2rem] bg-accent/5 border border-accent/10 flex items-center gap-6">
@@ -22,11 +28,10 @@ export default function SkillsTab({
               </div>
               <div>
                 <h3 className="text-xl font-black text-main">
-                  المؤهلات والخدمات
+                  {t("hr.skillsTitle")}
                 </h3>
                 <p className="text-xs font-bold text-muted mt-1">
-                  حدد الخدمات التي يتقنها الموظف ليتم عرضها له ديناميكياً في
-                  شاشة الـ POS والحجوزات.
+                  {t("hr.skillsDesc")}
                 </p>
               </div>
             </div>
@@ -68,7 +73,8 @@ export default function SkillsTab({
                         : "text-muted",
                     )}
                   >
-                    {service.category} • {service.price} ج.م
+                    {service.category} •{" "}
+                    {formatEmployeeMoney(service.price, locale, language)}
                   </div>
                 </button>
               ))}

@@ -2,6 +2,7 @@ import { TrendingUp, CreditCard, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ChartCard } from "@/components/shared/DisplayComponents";
 import { cn, formatCurrency } from "@/lib/core/utils";
+import { chartColor } from "@/lib/core/chart";
 import { getTypeColor, getTypeLabel, PAYMENT_LABELS } from "@/features/cashbox/utils/cashboxHelpers";
 import type { CashboxTrendPoint, CashboxTypeBreakdown, PaymentMethodBreakdown } from "@/types/cashbox";
 import {
@@ -25,10 +26,10 @@ interface Props {
 }
 
 const PAY_COLORS: Record<string, string> = {
-  cash: "#10b981",
-  card: "#6366f1",
-  bank_transfer: "#0ea5e9",
-  wallet: "#f59e0b",
+  cash: "var(--chart-3)",
+  card: "var(--chart-2)",
+  bank_transfer: "var(--chart-6)",
+  wallet: "var(--chart-4)",
 };
 
 export function CashboxCharts({ trend, breakdown, todayNet, byMethod = [] }: Props) {
@@ -71,12 +72,12 @@ export function CashboxCharts({ trend, breakdown, todayNet, byMethod = [] }: Pro
           <AreaChart data={trend} margin={{ top: 8, right: 16, left: 4, bottom: 0 }}>
             <defs>
               <linearGradient id="gradInCash" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                <stop offset="0%" stopColor="var(--chart-3)" stopOpacity={0.25} />
+                <stop offset="100%" stopColor="var(--chart-3)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="gradOutCash" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ef4444" stopOpacity={0.2} />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+                <stop offset="0%" stopColor="var(--chart-7)" stopOpacity={0.2} />
+                <stop offset="100%" stopColor="var(--chart-7)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
@@ -96,9 +97,9 @@ export function CashboxCharts({ trend, breakdown, todayNet, byMethod = [] }: Pro
               labelFormatter={(l: string) => `يوم ${l}`}
               contentStyle={{ borderRadius: 16, border: "1px solid var(--border)", fontWeight: 800, fontSize: 12, boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}
             />
-            <Area type="monotone" dataKey="in" name="وارد" stroke="#10b981" fill="url(#gradInCash)" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 2, fill: "white" }} activeDot={{ r: 5 }} />
-            <Area type="monotone" dataKey="out" name="صادر" stroke="#ef4444" fill="url(#gradOutCash)" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 2, fill: "white" }} activeDot={{ r: 5 }} />
-            <Area type="monotone" dataKey="net" name="صافي" stroke="#6366f1" strokeDasharray="6 3" fill="none" strokeWidth={2} dot={false} />
+            <Area type="monotone" dataKey="in" name="وارد" stroke="var(--chart-3)" fill="url(#gradInCash)" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 2, fill: "var(--bg-card)" }} activeDot={{ r: 5 }} />
+            <Area type="monotone" dataKey="out" name="صادر" stroke="var(--chart-7)" fill="url(#gradOutCash)" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 2, fill: "var(--bg-card)" }} activeDot={{ r: 5 }} />
+            <Area type="monotone" dataKey="net" name="صافي" stroke="var(--chart-2)" strokeDasharray="6 3" fill="none" strokeWidth={2} dot={false} />
           </AreaChart>
         </ResponsiveContainer>
         <div className="mt-3 hidden sm:grid grid-cols-3 gap-2 text-center">
@@ -144,7 +145,7 @@ export function CashboxCharts({ trend, breakdown, todayNet, byMethod = [] }: Pro
               />
             </PieChart>
           </ResponsiveContainer>
-          <div className="grid grid-cols-1 gap-1 mt-2 max-h-[90px] overflow-y-auto custom-scrollbar pr-1">
+          <div className="grid grid-cols-1 gap-1 mt-2 max-h-[90px] overflow-y-auto custom-scrollbar pe-1">
             {breakdown.slice(0, 4).map((t) => {
               const color = getTypeColor(t.type);
               const label = getTypeLabel(t.type);
@@ -177,8 +178,17 @@ export function CashboxCharts({ trend, breakdown, todayNet, byMethod = [] }: Pro
             <PieChart>
               <Pie data={hasMethod ? byMethod : [{ method: "cash", value: 1 }]} cx="50%" cy="50%" innerRadius={48} outerRadius={72} paddingAngle={3} dataKey="value" stroke="none">
                 {(hasMethod ? byMethod : [{ method: "cash", value: 1 }]).map((entry, idx) => {
-                  const col = PAY_COLORS[entry.method] ?? `hsl(${(idx * 47) % 360} 70% 50%)`;
-                  return <Cell key={idx} fill={hasMethod ? col : "#e5e7eb"} stroke="white" strokeWidth={2} />;
+                  // Unknown methods used to get a generated random hue, which put
+                  // off-palette colours into an otherwise themed chart.
+                  const col = PAY_COLORS[entry.method] ?? chartColor(idx + 4);
+                  return (
+                    <Cell
+                      key={idx}
+                      fill={hasMethod ? col : "var(--bg-soft)"}
+                      stroke="var(--bg-card)"
+                      strokeWidth={2}
+                    />
+                  );
                 })}
               </Pie>
               <Tooltip
@@ -193,13 +203,13 @@ export function CashboxCharts({ trend, breakdown, todayNet, byMethod = [] }: Pro
           <div className="grid grid-cols-2 gap-1.5 mt-2">
             {(hasMethod ? byMethod : []).map((t) => {
               const label = PAYMENT_LABELS[t.method] ?? t.method;
-              const col = PAY_COLORS[t.method] ?? "#6b7280";
+              const col = PAY_COLORS[t.method] ?? "var(--text-muted)";
               const pct = totalByMethod ? ((t.value / totalByMethod) * 100).toFixed(1) : "0";
               return (
                 <div key={t.method} className="flex items-center gap-1.5 rounded-xl border border-border bg-soft/30 px-2 py-1.5 min-w-0">
                   <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: col }} />
                   <span className="text-[11px] font-black text-main truncate">{label}</span>
-                  <span className="text-[10px] font-bold text-muted mr-auto">{pct}%</span>
+                  <span className="text-[10px] font-bold text-muted me-auto">{pct}%</span>
                 </div>
               );
             })}

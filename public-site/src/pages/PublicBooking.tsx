@@ -1,143 +1,89 @@
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowRight,
+  ArrowLeft,
   CalendarDays,
-  Scissors,
   CheckCircle2,
-  User,
   ChevronLeft,
-  Sparkles,
-  Zap,
-  Timer,
   Clock3,
-  WalletCards,
-  BadgeCheck,
   MapPin,
   Phone,
+  Scissors,
+  User,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-hot-toast";
-import { formatCurrency, formatTime12h, getApiErrorMessage } from "../lib/utils";
+
 import api from "../services/api";
-import { Badge } from "../components/ui/badge";
-import { Button } from "../components/ui/button";
-import { Card } from "../components/ui/card";
-import { Input } from "../components/ui/input";
+import { useI18n } from "../context/I18nContext";
+import { resolveTheme, applyThemeMode } from "../lib/theme";
+import { useAppearance } from "../lib/useAppearance";
 import {
-  buildPublicSalonPath,
   buildPublicBookingPath,
+  buildPublicSalonPath,
+  buildWhatsappUrl,
   resolvePublicSlug,
 } from "../lib/publicSite";
+import {
+  clearBookingDraft,
+  readBookingDraft,
+  writeBookingDraft,
+} from "../lib/bookingDraft";
+import { getApiErrorMessage } from "../lib/utils";
+import { resolveAssetUrl } from "../lib/imageOptimizer";
+import { useSEO } from "../hooks/useSEO";
+import { trackEvent } from "../components/landing/Analytics";
+import { BRAND } from "../lib/site";
 
-const BOOKING_STEPS = [
-  { id: 1, label: "الخدمات", hint: "اختر ما يناسبك من القائمة" },
-  { id: 2, label: "الحلاق", hint: "حدد المختص أو اتركه متاحًا" },
-  { id: 3, label: "الموعد", hint: "اختر اليوم والوقت المناسبين" },
-  { id: 4, label: "البيانات", hint: "أكد معلوماتك قبل الإرسال" },
-];
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import BookingConfirmation, {
+  type ConfirmationDetails,
+} from "../components/booking/BookingConfirmation";
 
-const STATIC_URL = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace("/api/v1", "")
-  : "http://localhost:8000";
+/**
+ * The public booking flow.
+ *
+ * ## Why this file was rewritten rather than restyled
+ *
+ * It was the single worst offender in the codebase for the old design:
+ *
+ *  - **82 hardcoded `#D4AF37`** plus 18 `#09090B`. Every button, chip, border,
+ *    ring, progress bar and summary total was gold, regardless of the salon's
+ *    palette — its three `THEMES` entries existed but only supplied `bg` and
+ *    `text`, so a "silver" salon still booked through a gold interface.
+ *  - **Two `blur-[120px]` / `blur-[140px]` animated blobs** behind the form,
+ *    re-compositing every frame.
+ *  - **~100 Arabic string literals** outside the translation catalogue, so the
+ *    language switcher left the page in Arabic after switching to English.
+ *  - **~1400px radii** (`rounded-[3rem]`, `rounded-[4rem]`) on containers that
+ *    held nothing but text.
+ *  - `dir="rtl"` hardcoded on the page root, pinning the layout to Arabic and
+ *    mirroring it wrongly for an English visitor.
+ *
+ * What replaced it: a stepped form on the palette's own tokens, an asymmetric
+ * two-column layout with a sticky summary, everything routed through `t()`,
+ * and a draft written to `localStorage` on every change so a refresh, a
+ * backgrounded mobile tab or a dropped connection at the submit step no longer
+ * costs the visitor the form they just filled in.
+ */
 
-const THEMES = {
-  midnight: {
-    primary: "#D4AF37", // Champagne Gold
-    secondary: "#B08D26", // Deep Gold
-    accent: "#F8FAFC", // Ice White
-    bg: "#09090B", // Midnight Black
-    card: "#17171A", // Dark Zinc
-    dark: "#FFFFFF", // Contrast White
-    text: "#F8FAFC", // Ice White
-    muted: "#94A3B8", // Slate Gray
-  },
-  gold: {
-    primary: "#D4AF37", // True Royal Gold
-    secondary: "#A67C00", // Warm Bronze
-    accent: "#FDFBF7", // Crisp Ivory
-    bg: "#FAFAF7", // Cleaner Cream background
-    card: "#FFFFFF", // Pure White
-    dark: "#110E0A", // Very dark brown/black
-    text: "#241E15", // Deep Charcoal Brown
-    muted: "#8C7A61", // Rich Taupe
-  },
-  silver: {
-    primary: "#E2E8F0", // Ice Silver Glow
-    secondary: "#94A3B8", // Slate Blue
-    accent: "#F8FAFC", // Crisp Snow
-    bg: "#F1F5F9", // Cool Gray background
-    card: "#FFFFFF", // Pure White
-    dark: "#0F172A", // Midnight Slate
-    text: "#1E293B", // Slate Charcoal
-    muted: "#64748B", // Slate Gray
-  },
-};
+const STEPS = [
+  { id: 1, key: "booking.step.services", hintKey: "booking.step.servicesHint" },
+  { id: 2, key: "booking.step.barber", hintKey: "booking.step.barberHint" },
+  { id: 3, key: "booking.step.schedule", hintKey: "booking.step.scheduleHint" },
+  { id: 4, key: "booking.step.details", hintKey: "booking.step.detailsHint" },
+] as const;
 
-const slideVariants = {
-  enter: (dir) => ({
-    x: dir > 0 ? 50 : -50,
-    opacity: 0,
-    filter: "blur(10px)"
-  }),
-  center: {
-    x: 0,
-    opacity: 1,
-    filter: "blur(0px)",
-    transition: { type: "spring", stiffness: 100, damping: 20 }
-  },
-  exit: (dir) => ({
-    x: dir > 0 ? -50 : 50,
-    opacity: 0,
-    filter: "blur(10px)",
-    transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] }
-  })
-};
+const CONFIRMED = 5;
 
-export interface CatalogService {
-  id?: string | number;
-  service_id?: string | number;
-  name?: string;
-  name_ar?: string;
-  price?: number | string;
-  duration_minutes?: number | string;
-  duration?: number | string;
-  category_id?: string | number;
-  description?: string;
-  description_ar?: string;
-  [key: string]: unknown;
-}
-
-export interface CatalogBarber {
-  id?: string | number;
-  display_name?: string;
-  profile_image_url?: string;
-  job_title?: string;
-  [key: string]: unknown;
-}
-
-export interface CatalogBusiness {
-  salon_name?: string;
-  salonName?: string;
-  shop_phone?: string;
-  shopPhone?: string;
-  address?: string;
-  logo_url?: string;
-  logoUrl?: string;
-  currency?: string;
-  landing_theme_id?: string;
-  landingThemeId?: string;
-  [key: string]: unknown;
-}
-
-export interface BookingServiceItem {
-  service_id: string | number;
+interface SelectedService {
+  service_id: number | string;
   quantity: number;
 }
 
-export interface BookingFormData {
-  services: BookingServiceItem[];
-  barber_id: string | number | null;
+interface BookingForm {
+  services: SelectedService[];
+  barber_id: number | string | null;
   appointment_date: string;
   appointment_time: string;
   first_name: string;
@@ -147,1225 +93,1107 @@ export interface BookingFormData {
   notes: string;
 }
 
-export default function PublicBooking({ embedded = false }: { embedded?: boolean }) {
+const EMPTY_FORM: BookingForm = {
+  services: [],
+  barber_id: null,
+  appointment_date: "",
+  appointment_time: "",
+  first_name: "",
+  last_name: "",
+  phone: "",
+  email: "",
+  notes: "",
+};
+
+type Catalog = {
+  services?: any[];
+  categories?: any[];
+  barbers?: any[];
+  /** Offers carry `service_ids`, which is what makes `?offer=` resolvable. */
+  offers?: any[];
+  business?: Record<string, any>;
+};
+
+export default function PublicBooking() {
   const navigate = useNavigate();
   const { publicSlug } = useParams();
+  const { t, locale, time12, price: formatPrice } = useI18n();
+  const [appearance] = useAppearance();
 
   const [step, setStep] = useState(1);
-  const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [catalog, setCatalog] = useState<{
-    services: CatalogService[];
-    categories: { id?: string | number; [key: string]: unknown }[];
-    barbers: CatalogBarber[];
-    business: CatalogBusiness;
-  }>({
-    services: [],
-    categories: [],
-    barbers: [],
-    business: {},
-  });
-
-  const settings = catalog.business;
-  const theme = THEMES[settings?.landing_theme_id ?? ""] || THEMES[settings?.landingThemeId ?? ""] || THEMES.midnight;
-
-  const [bookingData, setBookingData] = useState<BookingFormData>({
-    services: [],
-    barber_id: null,
-    appointment_date: "",
-    appointment_time: "",
-    first_name: "",
-    last_name: "",
-    phone: "",
-    email: "",
-    notes: "",
-  });
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [catalog, setCatalog] = useState<Catalog>({});
+  const [form, setForm] = useState<BookingForm>(EMPTY_FORM);
+  const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [category, setCategory] = useState<string>("all");
 
-  const confettiArray = useMemo(() => {
-    return Array.from({ length: 45 }).map((_, idx) => ({
-      id: idx,
-      x: Math.random() * 500 - 250,
-      y: Math.random() * -350 - 150,
-      rotation: Math.random() * 360,
-      color: ["#B0762D", "#C5A880", "#10B981", "#D4AF37", "#17110E"][idx % 5],
-      size: Math.random() * 10 + 6,
-      delay: Math.random() * 0.3
-    }));
-  }, [step]);
+  /**
+   * Everything the confirmation needs, assembled from the booking response.
+   *
+   * Held in state rather than recomputed from `form`, because the only fields
+   * the server knows and the client cannot derive — the appointment id and its
+   * customer id — arrive in the POST response. A confirmation rendered from
+   * client state alone cannot offer a reference to quote on the call.
+   */
+  const [receipt, setReceipt] = useState<ConfirmationDetails | null>(null);
 
-  const selectedServices = bookingData.services
-    .map((selected) =>
-      (catalog?.services || []).find((service) => service.id === selected.service_id),
-    )
-    .filter((s): s is CatalogService => Boolean(s));
-  const bookingTotal = selectedServices.reduce(
-    (sum, service) => sum + Number(service?.price || 0),
-    0,
-  );
-  const selectedDuration = selectedServices.reduce(
-    (sum, service) => sum + Number(service?.duration_minutes || service?.duration || 0),
-    0,
-  );
-  const progressPercentage = step >= 5 ? 100 : Math.max(25, (Math.min(step, 4) / 4) * 100);
-  const selectedBarber =
-    (catalog?.barbers || []).find((barber) => barber.id === bookingData.barber_id)
-      ?.display_name || "أي حلاق متاح";
-
-  const morningSlots = availableSlots.filter((s) => {
-    const h = parseInt(s.split(":")[0], 10);
-    return h < 12;
-  });
-  const afternoonSlots = availableSlots.filter((s) => {
-    const h = parseInt(s.split(":")[0], 10);
-    return h >= 12 && h < 17;
-  });
-  const eveningSlots = availableSlots.filter((s) => {
-    const h = parseInt(s.split(":")[0], 10);
-    return h >= 17;
-  });
-  const currentStepMeta =
-    BOOKING_STEPS.find((item) => item.id === Math.min(step, 4)) ||
-    BOOKING_STEPS[0];
-  const business = catalog?.business || {};
-  const salonName = business.salon_name || business.salonName || "Barber Luxe";
-  const homePath = publicSlug ? buildPublicSalonPath(business) : "/";
-  const bookingPath = publicSlug ? buildPublicBookingPath(business) : "/book";
-  const phoneValue = business.shop_phone || business.shopPhone || "";
-  const addressValue = business.address || "يرجى إضافة عنوان المحل من الإعدادات";
-  const resolveAssetUrl = (value) => {
-    if (!value) return null;
-    return String(value).startsWith("http") ? value : `${STATIC_URL}${value}`;
-  };
-  const logoImage = resolveAssetUrl(business.logo_url || business.logoUrl);
-
-  useEffect(() => {
-    fetchCatalog();
+  /**
+   * Deep links from the entity pages: `?service=<id>`, `?offer=<id>`,
+   * `?barber=<id>`.
+   *
+   * `EntityPage` links a service, a barber and an offer into this flow with the
+   * entity preselected. Those pages are the local-SEO surface — each service
+   * gets its own indexable URL with a price in the structured data — so a
+   * visitor arriving from one of them in Google should not have to find the
+   * service again.
+   *
+   * An offer carries `service_ids`, which is what makes `?offer=` resolvable: an
+   * offer is not a service, it is a bundle, so it preselects every service in
+   * the bundle.
+   */
+  const deepLink = useMemo(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return {
+      service: searchParams.get("service"),
+      offer: searchParams.get("offer"),
+      barber: searchParams.get("barber"),
+    };
   }, []);
 
-  useEffect(() => {
-    const business = catalog?.business || {};
-    if (!publicSlug || !Object.keys(business).length) return;
-    const expectedSlug = resolvePublicSlug(business);
-    if (publicSlug !== expectedSlug) {
-      navigate(buildPublicBookingPath(business), { replace: true });
-    }
-  }, [catalog, navigate, publicSlug]);
+  /** Applied once the catalogue is loaded, since it has to resolve ids. */
+  const [deepLinkApplied, setDeepLinkApplied] = useState(false);
+  const lastStep = useRef(1);
 
-  async function fetchCatalog() {
+  /** Memoised: the theme, the slug guard and three memos below depend on it. */
+  const business = useMemo(() => catalog.business ?? {}, [catalog.business]);
+
+  const theme = useMemo(
+    () => resolveTheme(business, appearance),
+    [business, appearance],
+  );
+
+  useEffect(() => {
+    applyThemeMode(theme);
+  }, [theme]);
+
+  /* ── Catalogue ──────────────────────────────────────────────────────── */
+
+  const loadCatalog = useCallback(async () => {
     try {
-      setLoading(true);
-      const res = await api.get("/public/booking-catalog");
-      setCatalog(res?.data || {});
-    } catch (_error) {
-      toast.error("فشل تحميل البيانات، يرجى المحاولة لاحقاً");
+      const response = await api.get("/public/booking-catalog");
+      setCatalog((response.data ?? response) as Catalog);
+    } catch {
+      toast.error(t("booking.error.catalog"));
     } finally {
       setLoading(false);
     }
-  }
+  }, [t]);
 
-  async function fetchSlots(date) {
-    if (!date) return;
-    try {
-      setSlotsLoading(true);
-      const serviceIds = bookingData.services.map((service) => service.service_id);
-      const res = await api.get("/public/time-slots", {
-        params: {
-          booking_date: date,
-          barber_id: bookingData.barber_id,
-          service_ids: serviceIds,
-        },
-      });
-      setAvailableSlots(
-        res?.data?.available_slots ||
-          (res as { available_slots?: unknown })?.available_slots ||
-          [],
-      );
-    } catch (_error) {
-      toast.error("فشل جلب الأوقات المتاحة");
-    } finally {
-      setSlotsLoading(false);
-    }
-  }
+  useEffect(() => {
+    void loadCatalog();
+  }, [loadCatalog]);
 
-  function toggleService(serviceId) {
-    setBookingData((prev) => {
-      const exists = prev.services.find(
-        (service) => service.service_id === serviceId,
-      );
-      if (exists) {
-        return {
-          ...prev,
-          services: prev.services.filter(
-            (service) => service.service_id !== serviceId,
-          ),
-        };
+  /* ── Deep link ──────────────────────────────────────────────────────── */
+
+  useEffect(() => {
+    if (loading || deepLinkApplied) return;
+    if (!deepLink.service && !deepLink.offer && !deepLink.barber) return;
+
+    setForm((previous) => {
+      const next = { ...previous };
+
+      if (deepLink.offer) {
+        // An offer is a bundle, so it resolves to a set of services.
+        const offer = (catalog.offers ?? []).find(
+          (item: any) => String(item.id) === deepLink.offer,
+        );
+        const ids: (number | string)[] = offer?.service_ids ?? [];
+        if (ids.length) {
+          next.services = ids.map((id) => ({ service_id: id, quantity: 1 }));
+        }
       }
+
+      if (deepLink.service) {
+        next.services = [
+          ...next.services.filter(
+            (service) => String(service.service_id) !== deepLink.service,
+          ),
+          { service_id: deepLink.service, quantity: 1 },
+        ];
+      }
+
+      if (deepLink.barber) {
+        const match = (catalog.barbers ?? []).find(
+          (barber: any) => String(barber.id) === deepLink.barber,
+        );
+        if (match) next.barber_id = match.id;
+      }
+
+      return next;
+    });
+
+    // Jump past the steps the link already answered, so a `?barber=` link does
+    // not make the visitor page through services they already chose.
+    if (deepLink.barber) setStep(2);
+    setDeepLinkApplied(true);
+  }, [loading, deepLink, deepLinkApplied, catalog]);
+
+  /* ── Funnel ─────────────────────────────────────────────────────────── */
+
+  // `booking_started` fires once, when the catalogue is actually usable — not on
+  // mount, which would count every reload and every bounce as an intent.
+  useEffect(() => {
+    if (loading || !catalog.services?.length) return;
+    trackEvent("booking_started", {
+      services: catalog.services.length,
+      barbers: catalog.barbers?.length ?? 0,
+    });
+  }, [loading, catalog]);
+
+  useEffect(() => {
+    if (loading || step === lastStep.current) return;
+    lastStep.current = step;
+    trackEvent("booking_step", { step });
+  }, [loading, step]);
+
+
+  /**
+   * A canonical-slug guard. `/book` is a legacy alias that always resolves to
+   * the same catalogue, so a visitor who lands on the wrong slug is redirected
+   * to the right one instead of silently viewing the wrong URL forever.
+   */
+  useEffect(() => {
+    if (!publicSlug || !Object.keys(business).length) return;
+    if (publicSlug !== resolvePublicSlug(business)) {
+      navigate(buildPublicBookingPath(business), { replace: true });
+    }
+  }, [business, navigate, publicSlug]);
+
+  /* ── Draft ──────────────────────────────────────────────────────────── */
+
+  /**
+   * Fetch the open slots for a date, taking the barber and services as
+   * arguments rather than reading them from `form`.
+   *
+   * Reading them from state would mean the function changes identity on every
+   * keystroke, so the draft-restore effect below could not depend on it without
+   * refetching on every keypress.
+   */
+  const loadSlots = useCallback(
+    async (
+      date: string,
+      barberId: number | string | null,
+      services: SelectedService[],
+    ) => {
+      if (!date) return;
+      try {
+        setSlotsLoading(true);
+        const response: any = await api.get("/public/time-slots", {
+          params: {
+            booking_date: date,
+            barber_id: barberId,
+            service_ids: services.map((service) => service.service_id),
+          },
+        });
+        setSlots(response?.data?.available_slots ?? response?.available_slots ?? []);
+      } catch {
+        toast.error(t("booking.error.slots"));
+      } finally {
+        setSlotsLoading(false);
+      }
+    },
+    [t],
+  );
+
+  /** Restored once, on first mount, before any write can overwrite it. */
+  const restored = useMemo(() => {
+    const draft = readBookingDraft<BookingForm>(publicSlug);
+    return draft?.form ?? null;
+  }, [publicSlug]);
+
+  useEffect(() => {
+    if (!restored) return;
+    setForm({ ...EMPTY_FORM, ...restored });
+    // A restored draft with a date already chosen needs its slots back, or the
+    // visitor lands on step 3 with an empty picker and a filled-in time.
+    if (restored.appointment_date) {
+      void loadSlots(restored.appointment_date, restored.barber_id, restored.services);
+    }
+  }, [restored, loadSlots]);
+
+  useEffect(() => {
+    // Nothing worth saving yet: an untouched empty form would just evict a
+    // previous draft with nothing to show for it.
+    const hasContent =
+      form.services.length > 0 ||
+      form.first_name ||
+      form.phone ||
+      form.appointment_date;
+    if (hasContent) writeBookingDraft(form, publicSlug);
+  }, [form, publicSlug]);
+
+  /* ── Derived ────────────────────────────────────────────────────────── */
+
+  const salonName =
+    business.salonName || business.salon_name || BRAND.name;
+  const currency = business.currency || "ج.م";
+  const homePath = publicSlug ? buildPublicSalonPath(business) : "/";
+  const logoImage = resolveAssetUrl(business.logoUrl || business.logo_url);
+
+  /**
+   * Directions and WhatsApp, for the confirmation.
+   *
+   * Both use the shared `buildWhatsappUrl` rather than a local copy — a local
+   * copy is exactly how the hard-coded Egyptian country code ended up applying
+   * to every salon in every country.
+   */
+  const whatsappUrlForSalon = buildWhatsappUrl(
+    business.shopWhatsApp || business.shop_whatsapp || business.shop_phone,
+  );
+  const mapsUrlForSalon =
+    business.googleMapsUrl ||
+    business.google_maps_url ||
+    (business.address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`
+      : null);
+
+  const selectedServices = useMemo(
+    () =>
+      form.services
+        .map((chosen) =>
+          (catalog.services ?? []).find(
+            (service: any) => service.id === chosen.service_id,
+          ),
+        )
+        .filter(Boolean) as any[],
+    [catalog.services, form.services],
+  );
+
+  const total = selectedServices.reduce(
+    (sum, service) => sum + Number(service?.price || 0) * Number(service?.quantity || 1),
+    0,
+  );
+
+  const duration = selectedServices.reduce(
+    (sum, service) =>
+      sum + Number(service?.duration_minutes || service?.duration || 0),
+    0,
+  );
+
+  const barberName = useMemo(() => {
+    if (!form.barber_id) return t("booking.anyBarber");
+    const match = (catalog.barbers ?? []).find(
+      (barber: any) => barber.id === form.barber_id,
+    );
+    return match?.display_name || t("booking.anyBarber");
+  }, [catalog.barbers, form.barber_id, t]);
+
+  /** Slots grouped into the three bands the picker renders. */
+  const slotBands = useMemo(() => {
+    const band = (from: number, to: number) =>
+      slots.filter((slot) => {
+        const hour = Number.parseInt(slot.split(":")[0], 10);
+        return hour >= from && hour < to;
+      });
+    return {
+      morning: band(0, 12),
+      afternoon: band(12, 17),
+      evening: band(17, 24),
+    };
+  }, [slots]);
+
+  useSEO({
+    title: `${t("booking.title")} — ${salonName}`,
+    description: t("booking.metaDescription"),
+    noindex: true,
+  });
+
+  /* ── Actions ────────────────────────────────────────────────────────── */
+
+  function patch(changes: Partial<BookingForm>) {
+    setForm((previous) => ({ ...previous, ...changes }));
+  }
+
+  function toggleService(id: number | string) {
+    setForm((previous) => {
+      const exists = previous.services.some(
+        (service) => service.service_id === id,
+      );
       return {
-        ...prev,
-        services: [...prev.services, { service_id: serviceId, quantity: 1 }],
+        ...previous,
+        services: exists
+          ? previous.services.filter((service) => service.service_id !== id)
+          : [...previous.services, { service_id: id, quantity: 1 }],
       };
     });
   }
 
-  function handleDateChange(event) {
-    const date = event.target.value;
-    setBookingData((prev) => ({
-      ...prev,
-      appointment_date: date,
-      appointment_time: "",
-    }));
-    fetchSlots(date);
+  function onDateChange(date: string) {
+    patch({ appointment_date: date, appointment_time: "" });
+    void loadSlots(date, form.barber_id, form.services);
   }
 
-  function nextStep() {
-    if (step === 1 && bookingData.services.length === 0) {
-      toast.error("يرجى اختيار خدمة واحدة على الأقل");
+  function onBarberChange(barberId: number | string | null) {
+    patch({ barber_id: barberId });
+    // Slot availability is per barber, so a change here invalidates whatever
+    // the visitor had picked.
+    if (form.appointment_date) {
+      patch({ appointment_time: "" });
+      void loadSlots(form.appointment_date, barberId, form.services);
+    }
+  }
+
+  function next() {
+    if (step === 1 && !form.services.length) {
+      toast.error(t("booking.error.noService"));
+      // Only *which* field failed, never what was typed: this is a form full of
+      // a visitor's name and phone number.
+      trackEvent("booking_validation_failed", { step, field: "services" });
       return;
     }
-    if (step === 3 && (!bookingData.appointment_date || !bookingData.appointment_time)) {
-      toast.error("يرجى اختيار التاريخ والوقت");
+    if (step === 3 && (!form.appointment_date || !form.appointment_time)) {
+      toast.error(t("booking.error.noDateTime"));
+      trackEvent("booking_validation_failed", {
+        step,
+        field: !form.appointment_date ? "appointment_date" : "appointment_time",
+      });
       return;
     }
-    setDirection(1);
-    setStep((current) => current + 1);
+    setStep((current) => Math.min(current + 1, 4));
   }
 
-  function prevStep() {
-    setDirection(-1);
-    setStep((current) => current - 1);
+  function back() {
+    setStep((current) => Math.max(current - 1, 1));
   }
 
-  async function handleSubmit() {
-    if (!bookingData.first_name || !bookingData.phone) {
-      toast.error("يرجى إدخال الاسم الأول ورقم الهاتف");
+  async function submit() {
+    const missing: string[] = [];
+    if (!form.first_name.trim()) missing.push("first_name");
+    if (!form.phone.trim()) missing.push("phone");
+
+    if (missing.length) {
+      toast.error(t("booking.error.fixFields"));
+      trackEvent("booking_validation_failed", { step, fields: missing });
       return;
     }
 
     try {
       setSubmitting(true);
-      
-      const submissionData = {
-        ...bookingData,
-        salon_slug: publicSlug,
-        email: bookingData.email?.trim() === "" ? null : bookingData.email
-      };
+      const response: any = await api.post("/public/booking", {
+        ...form,
+        // An untouched optional field must be null, not "": Pydantic accepts
+        // `null` for an optional email and rejects an empty string as invalid.
+        email: form.email.trim() === "" ? null : form.email.trim(),
+      });
 
-      await api.post("/public/booking", submissionData);
-      setDirection(1);
-      setStep(5);
-      toast.success("تم تسجيل حجزك بنجاح");
+      const data = response?.data ?? response ?? {};
+      const appointmentId = Number(data.appointment_id ?? 0) || undefined;
+
+      setReceipt({
+        salonName,
+        // The API returns no separate reference, so the appointment id is the
+        // durable handle the visitor can quote on the call.
+        reference: appointmentId ? `#${appointmentId}` : "—",
+        appointmentId,
+        date: form.appointment_date,
+        time: form.appointment_time,
+        timeLabel: time12(form.appointment_time),
+        services: selectedServices.map(
+          (service: any) => service.name_ar || service.name,
+        ),
+        barberName,
+        customerName: `${form.first_name} ${form.last_name}`.trim(),
+        customerPhone: form.phone,
+        notes: form.notes || undefined,
+        address: business.address || undefined,
+        durationMinutes: duration || undefined,
+        mapsUrl: mapsUrlForSalon ?? undefined,
+        whatsappUrl: whatsappUrlForSalon ?? undefined,
+        pageUrl: typeof window !== "undefined" ? window.location.origin : undefined,
+      });
+
+      clearBookingDraft(publicSlug);
+      setStep(CONFIRMED);
+      toast.success(t("booking.success"));
+      trackEvent("booking_completed", {
+        services: form.services.length,
+        has_barber: Boolean(form.barber_id),
+      });
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "فشل تسجيل الحجز"));
+      toast.error(getApiErrorMessage(error, t("booking.error.submit")));
+      trackEvent("booking_submit_failed", { step });
     } finally {
       setSubmitting(false);
     }
   }
 
+  /* ── Render ─────────────────────────────────────────────────────────── */
+
   if (loading) {
     return (
-      <div
-        className="min-h-screen relative flex items-center justify-center overflow-hidden"
-        style={{ backgroundColor: theme.bg }}
-      >
-        <div className="relative flex flex-col items-center gap-6">
-           <div className="h-20 w-20 rounded-[2rem] flex items-center justify-center shadow-2xl animate-bounce" style={{ backgroundColor: theme.dark, color: theme.primary }}>
-              <Scissors size={40} />
-           </div>
-           <p className="text-[10px] font-black uppercase tracking-[0.5em] animate-pulse" style={{ color: theme.primary }}>Refining Booking Canvas...</p>
+      <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
+        <div className="flex flex-col items-center gap-5 text-center">
+          <div className="grid h-16 w-16 place-items-center rounded-[length:var(--r-lg)] border border-line bg-panel text-accent">
+            <Scissors size={28} aria-hidden="true" />
+          </div>
+          <p
+            role="status"
+            className="text-[length:var(--step--1)] font-medium uppercase text-ink-faint"
+            style={{ letterSpacing: "var(--tracking-eyebrow)" }}
+          >
+            {t("booking.loading")}
+          </p>
         </div>
       </div>
     );
   }
 
+  const currentStep = STEPS.find((item) => item.id === Math.min(step, 4))!;
+  const visibleCategories = (catalog.categories ?? []).filter(
+    (item: any) => category === "all" || item.id === category,
+  );
+
   return (
-    <div
-      className={`${embedded ? "rounded-[3rem] border p-5 shadow-soft backdrop-blur-xl sm:p-10" : "min-h-screen px-4 py-20 sm:px-10"} relative overflow-hidden transition-colors duration-700`}
-      style={{ backgroundColor: theme.bg, color: theme.text, borderColor: `${theme.primary}15` }}
-      dir="rtl"
-    >
-      {/* Luxury Animated Ambient Background Blobs - Optimized */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
-        <motion.div
-          animate={{
-            x: [0, 60, -30, 0],
-            y: [0, -80, 50, 0],
-            scale: [1, 1.05, 0.95, 1],
-          }}
-          transition={{
-            duration: 35,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="absolute top-1/4 left-1/4 w-[450px] h-[450px] rounded-full blur-[120px] opacity-[0.08] will-change-transform"
-          style={{ backgroundColor: theme.primary, transform: "translateZ(0)" }}
-        />
-        <motion.div
-          animate={{
-            x: [0, -80, 40, 0],
-            y: [0, 70, -60, 0],
-            scale: [1, 0.95, 1.05, 1],
-          }}
-          transition={{
-            duration: 42,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="absolute bottom-1/4 right-1/4 w-[550px] h-[550px] rounded-full blur-[140px] opacity-[0.06] will-change-transform"
-          style={{ backgroundColor: theme.secondary, transform: "translateZ(0)" }}
-        />
-      </div>
-
-      <div className="mx-auto max-w-6xl relative z-10">
-        {!embedded ? (
-          <div className="mb-12">
-            <div className="public-glass-card flex flex-col gap-8 rounded-[3.5rem] p-8 md:p-12 border shadow-[0_40px_100px_rgba(0,0,0,0.5)]" style={{ borderColor: "rgba(212,175,55,0.15)", backgroundColor: "rgba(23,23,26,0.8)" }}>
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex min-w-0 items-center gap-6">
-                  <button
-                    type="button"
-                    onClick={() => navigate(homePath)}
-                    className="group inline-flex h-14 w-14 items-center justify-center rounded-full border transition-all hover:scale-110 active:scale-95 bg-white/5 border-white/10"
-                    style={{ color: "#D4AF37" }}
-                    aria-label="العودة إلى الصفحة الرئيسية"
-                  >
-                    <ArrowRight size={22} className="transition-transform group-hover:translate-x-1" />
-                  </button>
- 
-                  <div className="flex min-w-0 items-center gap-5">
-                    <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-[1.25rem] bg-[#09090B] text-[#D4AF37] shadow-2xl border border-white/10">
-                      {logoImage ? (
-                        <img
-                          src={logoImage}
-                          alt={salonName}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <Scissors size={28} />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                       <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#D4AF37] opacity-80">
-                        الواجهة الملكية للحجز
-                      </p>
-                      <p className="truncate text-2xl font-black text-white">
-                        {salonName}
-                      </p>
-                    </div>
-                  </div>
-                </div>
- 
-                <div className="flex flex-wrap gap-3">
-                  <Badge variant="outline" className="bg-white/5 text-slate-300 border-white/10 backdrop-blur-xl font-black px-4 py-1.5 rounded-xl uppercase tracking-widest text-[10px]">
-                    <CalendarDays size={14} className="ml-2 text-[#D4AF37]" />
-                    SECURE BOOKING
-                  </Badge>
-                  <Badge variant="outline" className="bg-white/5 text-slate-300 border-white/10 backdrop-blur-xl font-black px-4 py-1.5 rounded-xl uppercase tracking-widest text-[10px]">
-                    <Sparkles size={14} className="ml-2 text-[#D4AF37]" />
-                    ROYAL EXPERIENCE
-                  </Badge>
-                </div>
-              </div>
- 
-              <div className="grid gap-8 lg:grid-cols-[1.4fr_0.6fr] pt-8 border-t border-white/5">
-                <div className="rounded-[2.5rem] border p-10 backdrop-blur-xl flex flex-col justify-between" style={{ backgroundColor: "rgba(212,175,55,0.03)", borderColor: "rgba(212,175,55,0.1)" }}>
-                  <div className="space-y-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#D4AF37]">
-                      تنويه ملكي
-                    </p>
-                    <h2 className="text-3xl font-black text-white leading-snug">
-                      تجربة حجز مستقلة، سريعة، وبأعلى معايير الخصوصية.
-                    </h2>
-                    <p className="text-base font-bold text-slate-400 leading-relaxed max-w-2xl">
-                      نحن نوفر لك بيئة حجز هادئة تركز على تفاصيلك الشخصية، لضمان حصولك على الخدمة التي تليق بمكانتك في الموعد الذي تفضله.
-                    </p>
-                  </div>
- 
-                  <div className="mt-10 flex flex-wrap gap-4 items-center">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => navigate(homePath)}
-                      className="rounded-2xl border-white/10 bg-white/5 hover:bg-white/10 text-white font-black px-8 py-4"
-                    >
-                      العودة للواجهة
-                    </Button>
-                    <div className="h-1 w-1 rounded-full bg-[#D4AF37]" />
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                      ENCRYPTED & PROTECTED CONNECTION
-                    </span>
-                  </div>
-                </div>
- 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                  <QuickInfo icon={MapPin} label="الموقع الملكي" value={addressValue} theme={theme} />
-                  <QuickInfo
-                    icon={Phone}
-                    label="رقم الهاتف"
-                    value={phoneValue || "أضف رقم الهاتف من إعدادات المحل"}
-                    dir={phoneValue ? "ltr" : "rtl"}
-                    theme={theme}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        <div className={`space-y-10 ${embedded ? "mb-10" : "mb-16"}`}>
-          <div className="mx-auto max-w-4xl text-center">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-              className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-[2rem] bg-[#09090B] text-[#D4AF37] shadow-[0_20px_50px_rgba(212,175,55,0.2)] border border-[#D4AF37]/20"
-            >
-              <Scissors size={36} />
-            </motion.div>
-            <p className="text-[11px] font-black uppercase tracking-[0.5em] text-[#D4AF37] opacity-80">خطوات الحجز الملكي</p>
-            <h1 className="mt-4 text-4xl font-black tracking-tighter sm:text-7xl text-white">
-              احجز موعدك الآن
-            </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg font-bold text-slate-400 leading-relaxed">
-              اتبع الخطوات الموضحة أدناه لتأكيد حجزك في ثوانٍ معدودة. كل تفصيلة هنا صُممت لراحتك.
-            </p>
-          </div>
- 
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            <InfoTile
-              icon={BadgeCheck}
-              title="الخدمات"
-              value={`${selectedServices.length}`}
-              hint="يمكنك اختيار باقة خدمات متكاملة"
-            />
-            <InfoTile
-              icon={User}
-              title="الخبير"
-              value={selectedBarber}
-              hint="نخبة الحلاقين في خدمتك"
-            />
-            <InfoTile
-              icon={Timer}
-              title="الوقت المقدر"
-              value={selectedDuration ? `${selectedDuration} دقيقة` : "--"}
-              hint="مدة الجلسة التقريبية"
-            />
-            <InfoTile
-              icon={WalletCards}
-              title="الإجمالي"
-              value={`${bookingTotal} ${catalog.business.currency || "ج.م"}`}
-              hint="الدفع داخل الصالون"
-            />
-          </div>
-        </div>
- 
-        <div className="mb-12 rounded-[3.5rem] border p-8 md:p-12 public-glass-card shadow-[0_30px_80px_rgba(0,0,0,0.3)]" style={{ borderColor: "rgba(212,175,55,0.15)", backgroundColor: "rgba(23,23,26,0.7)" }}>
-          <div className="mb-10 flex items-end justify-between gap-6 border-b border-white/5 pb-8">
-            <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#D4AF37]">
-                الخطوة الحالية
-              </p>
-              <h3 className="text-3xl font-black text-white">
-                {currentStepMeta.label}
-              </h3>
-              <p className="text-sm font-bold text-slate-500">
-                {currentStepMeta.hint}
-              </p>
-            </div>
-            <div className="rounded-2xl border px-6 py-3 text-lg font-black bg-[#D4AF37]/10 border-[#D4AF37]/30 text-[#D4AF37]">
-              {Math.min(step, 4)} / 4
-            </div>
-          </div>
- 
-          <div className="relative mb-12 h-3 w-full overflow-hidden rounded-full bg-white/5">
-            <motion.div
-              className="h-full rounded-full relative"
-              style={{ backgroundColor: "#D4AF37", boxShadow: "0 0 20px rgba(212,175,55,0.4)" }}
-              initial={{ width: "25%" }}
-              animate={{ width: `${(Math.min(step, 4) / 4) * 100}%` }}
-              transition={{ type: "spring", stiffness: 100, damping: 20 }}
-            >
-              <div className="absolute inset-0 bg-white/20 animate-pulse rounded-full" />
-            </motion.div>
-          </div>
- 
-          <div className="grid gap-5 sm:grid-cols-4">
-            {BOOKING_STEPS.map((item) => (
-              <div
-                key={item.id}
-                className={`rounded-[1.75rem] border p-6 transition-all duration-500 ${
-                  step >= item.id
-                    ? "shadow-2xl translate-y-[-4px]"
-                    : "opacity-40"
-                }`}
-                style={{
-                  backgroundColor: step >= item.id ? "rgba(212, 175, 55, 0.08)" : "transparent",
-                  borderColor: step >= item.id ? "#D4AF37" : "rgba(255,255,255,0.1)",
-                }}
+    <div className="grain relative min-h-screen">
+      <header className="topbar">
+        <div className="shell relative z-10 flex items-center justify-between gap-4 py-3.5">
+          <button
+            type="button"
+            onClick={() => navigate(homePath)}
+            className="flex min-w-0 items-center gap-3 text-start"
+          >
+            <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-[length:var(--r-sm)] border border-line bg-panel text-accent">
+              {logoImage ? (
+                <img src={logoImage} alt={salonName} className="h-full w-full object-cover" />
+              ) : (
+                <Scissors size={20} aria-hidden="true" />
+              )}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-[length:var(--step-0)] font-bold">
+                {salonName}
+              </span>
+              <span
+                className="block text-[length:var(--step--2)] font-medium uppercase text-ink-faint"
+                style={{ letterSpacing: "var(--tracking-eyebrow)" }}
               >
-                <div className="flex items-center justify-between">
-                  <span
-                    className="flex h-10 w-10 items-center justify-center rounded-[1rem] text-sm font-black shadow-2xl transition-all duration-500"
-                    style={{
-                      backgroundColor: step >= item.id ? "#D4AF37" : "rgba(255,255,255,0.1)",
-                      color: step >= item.id ? "#09090B" : "#F8FAFC",
-                    }}
-                  >
-                    {step > item.id ? <CheckCircle2 size={18} /> : item.id}
-                  </span>
-                  <span className="text-xs font-black uppercase tracking-widest text-white">
-                    {item.label}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+                {t("booking.secure")}
+              </span>
+            </span>
+          </button>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="space-y-6">
-            <AnimatePresence mode="wait" custom={direction}>
-              {step === 1 ? (
-                <motion.div
-                  key="step1"
-                  custom={direction}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  className="space-y-8"
+          <Button size="sm" onClick={() => navigate(homePath)} variant="outline">
+            <ArrowLeft size={15} aria-hidden="true" className="rtl-flip" />
+            {t("nav.home")}
+          </Button>
+        </div>
+      </header>
+
+      <main id="main-content" className="relative z-10 shell pb-24 pt-12" tabIndex={-1}>
+        {step === CONFIRMED && receipt ? (
+          <BookingConfirmation
+            details={receipt}
+            t={t}
+            locale={locale}
+            onDone={() => navigate(homePath)}
+            doneLabel={t("booking.backHomeCta")}
+          />
+        ) : step === CONFIRMED ? (
+          <div className="mx-auto max-w-xl py-10 text-center">
+            <div className="mx-auto grid h-24 w-24 place-items-center rounded-full border border-accent-line bg-accent-wash text-accent">
+              <CheckCircle2 size={44} strokeWidth={1.5} aria-hidden="true" />
+            </div>
+            <h1 className="mt-8 text-[length:var(--step-4)] font-bold leading-tight text-balance">
+              {t("booking.success")}
+            </h1>
+            <p className="mx-auto mt-4 text-[length:var(--step-0)] leading-relaxed text-ink-soft">
+              {t("booking.successBody", { salon: salonName })}
+            </p>
+            <Button onClick={() => navigate(homePath)} className="mt-10 w-full sm:w-auto">
+              <CalendarDays size={17} aria-hidden="true" />
+              {t("booking.backHomeCta")}
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-10 lg:grid-cols-12 lg:gap-14">
+            {/* ── The form ─────────────────────────────────────────── */}
+            <div className="lg:col-span-7 xl:col-span-8">
+              <header className="mb-8">
+                <p
+                  className="text-[length:var(--step--2)] font-semibold uppercase text-accent"
+                  style={{ letterSpacing: "var(--tracking-eyebrow)" }}
                 >
-                  <div className="flex flex-wrap gap-3 pb-2 overflow-x-auto scrollbar-hidden">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCategory("all")}
-                      className={`px-6 py-3 rounded-2xl text-xs font-black border transition-all duration-300 ${
-                        selectedCategory === "all"
-                          ? "bg-[#D4AF37] border-[#D4AF37] text-[#09090B] shadow-xl"
-                          : "bg-white/5 border-white/10 text-slate-400 hover:border-[#D4AF37]/50 hover:text-white"
+                  {t("booking.stepOf", { current: Math.min(step, 4), total: 4 })}
+                </p>
+                <h1 className="mt-2 text-[length:var(--step-4)] font-bold leading-tight text-balance">
+                  {t(currentStep.key)}
+                </h1>
+                <p className="mt-2 text-[length:var(--step-0)] text-ink-soft">
+                  {t(currentStep.hintKey)}
+                </p>
+              </header>
+
+              {/* Progress: a hairline rail with four notches, rather than the
+                  previous glowing gold bar. The notch for a completed step
+                  fills; the current one is ringed. */}
+              <ol className="mb-10 flex items-center gap-2" aria-hidden="true">
+                {STEPS.map((item) => (
+                  <li key={item.id} className="flex-1">
+                    <span
+                      className={`block h-1 rounded-full transition-colors duration-300 ${
+                        step >= item.id ? "bg-accent" : "bg-[color:var(--c-border)]"
                       }`}
+                    />
+                  </li>
+                ))}
+              </ol>
+
+              {/* ── Step 1: services ─────────────────────────────── */}
+              {step === 1 ? (
+                <section aria-labelledby="step-services">
+                  <div className="mb-6 flex gap-2 overflow-x-auto pb-1 scrollbar-hidden">
+                    <CategoryChip
+                      active={category === "all"}
+                      onClick={() => setCategory("all")}
                     >
-                      الكل
-                    </button>
-                    {(catalog?.categories || []).map((cat) => (
-                      <button
-                        key={String(cat.id ?? "")}
-                        type="button"
-                        onClick={() => setSelectedCategory(String(cat.id ?? ""))}
-                        className={`px-6 py-3 rounded-2xl text-xs font-black border transition-all duration-300 ${
-                          selectedCategory === cat.id
-                            ? "bg-[#D4AF37] border-[#D4AF37] text-[#09090B] shadow-xl"
-                            : "bg-white/5 border-white/10 text-slate-400 hover:border-[#D4AF37]/50 hover:text-white"
-                        }`}
+                      {t("booking.allCategories")}
+                    </CategoryChip>
+                    {(catalog.categories ?? []).map((item: any) => (
+                      <CategoryChip
+                        key={item.id}
+                        active={category === item.id}
+                        onClick={() => setCategory(item.id)}
                       >
-                        {String(cat.name_ar ?? "")}
-                      </button>
+                        {item.name_ar || item.name}
+                      </CategoryChip>
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    {(catalog?.categories || [])
-                      .filter((cat) => selectedCategory === "all" || selectedCategory === cat.id)
-                      .map((cat) => (
-                        <div key={cat.id} className="space-y-5">
-                          <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#D4AF37] opacity-80">
-                            <Zap size={14} /> {String(cat.name_ar ?? "")}
-                          </h3>
-                          <div className="space-y-4">
-                            {(catalog?.services || [])
-                              .filter((service) => service.category_id === cat.id)
-                              .map((service) => (
-                                <motion.button
-                                  key={service.id}
-                                  type="button"
-                                  onClick={() => toggleService(service.id)}
-                                  whileHover={{ scale: 1.02 }}
-                                  whileTap={{ scale: 0.98 }}
-                                  className="flex w-full items-center justify-between rounded-[2rem] border p-5 text-right transition-all duration-300 group"
-                                  style={{
-                                    borderColor: bookingData.services.find(s => s.service_id === service.id) ? "#D4AF37" : "rgba(255,255,255,0.08)",
-                                    backgroundColor: bookingData.services.find(s => s.service_id === service.id) ? "rgba(212,175,55,0.08)" : "rgba(255,255,255,0.02)",
-                                    boxShadow: bookingData.services.find(s => s.service_id === service.id) ? "0 10px 30px rgba(212,175,55,0.1)" : "none",
-                                  }}
-                                >
-                                  <div className="flex items-center gap-5">
-                                    <div
-                                      className={`flex h-12 w-12 items-center justify-center rounded-[1rem] transition-all duration-300 ${
-                                        bookingData.services.find(
-                                          (selected) =>
-                                            selected.service_id === service.id,
-                                        )
-                                          ? "bg-[#D4AF37] text-[#09090B]"
-                                          : "bg-white/5 text-slate-500 group-hover:bg-white/10"
+                  {visibleCategories.length ? (
+                    <div className="space-y-9">
+                      {visibleCategories.map((group: any) => {
+                        const groupServices = (catalog.services ?? []).filter(
+                          (service: any) => service.category_id === group.id,
+                        );
+                        if (!groupServices.length) return null;
+
+                        return (
+                          <div key={group.id}>
+                            <h2
+                              id="step-services"
+                              className="mb-3 text-[length:var(--step--1)] font-semibold uppercase text-ink-faint"
+                              style={{ letterSpacing: "var(--tracking-eyebrow)" }}
+                            >
+                              {group.name_ar || group.name}
+                            </h2>
+                            <ul className="rule-grid border-t border-line">
+                              {groupServices.map((service: any) => {
+                                const selected = form.services.some(
+                                  (item) => item.service_id === service.id,
+                                );
+                                return (
+                                  <li key={service.id}>
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleService(service.id)}
+                                      aria-pressed={selected}
+                                      className={`flex w-full items-center justify-between gap-4 border-b border-line px-1 py-4 text-start transition-colors duration-200 ${
+                                        selected
+                                          ? "bg-accent-wash"
+                                          : "hover:bg-[color:var(--c-inset)]"
                                       }`}
                                     >
-                                      <Scissors size={24} />
-                                    </div>
-                                    <div>
-                                      <p className="text-base font-black text-white">
-                                        {service.name}
-                                      </p>
-                                      <div className="flex items-center gap-2 mt-1">
-                                         <Clock3 size={10} className="text-slate-500" />
-                                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                                           {service.duration_minutes} MIN
-                                         </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="text-lg font-black text-[#D4AF37]">
-                                    {service.price}
-                                    <span className="text-[10px] font-bold mr-1 opacity-60">
-                                      {catalog.business.currency || "ج.م"}
-                                    </span>
-                                  </div>
-                                </motion.button>
-                              ))}
+                                      <span className="flex min-w-0 items-center gap-4">
+                                        <span
+                                          aria-hidden="true"
+                                          className={`grid h-10 w-10 shrink-0 place-items-center rounded-[length:var(--r-sm)] border transition-colors duration-200 ${
+                                            selected
+                                              ? "border-accent bg-accent text-on-accent"
+                                              : "border-line bg-panel text-ink-faint"
+                                          }`}
+                                        >
+                                          {selected ? (
+                                            <CheckCircle2 size={18} />
+                                          ) : (
+                                            <Scissors size={17} />
+                                          )}
+                                        </span>
+                                        <span className="min-w-0">
+                                          <span className="block truncate text-[length:var(--step-0)] font-semibold">
+                                            {service.name_ar || service.name}
+                                          </span>
+                                          <span className="mt-0.5 flex items-center gap-1.5 text-[length:var(--step--2)] text-ink-faint">
+                                            <Clock3 size={11} aria-hidden="true" />
+                                            <span className="numeric">
+                                              {service.duration_minutes ?? service.duration}
+                                            </span>
+                                            {t("common.minutes")}
+                                          </span>
+                                        </span>
+                                      </span>
+                                      <span className="numeric shrink-0 text-[length:var(--step-1)] font-bold text-accent">
+                                        {formatPrice(Number(service.price || 0))}
+                                      </span>
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
                           </div>
-                        </div>
-                      ))}
-                  </div>
-
-                  <div className="flex justify-end pt-6">
-                    <Button
-                      disabled={loading}
-                      onClick={nextStep}
-                      className="h-16 gap-3 rounded-2xl px-12 text-sm font-black uppercase tracking-[0.2em] shadow-2xl transition-all hover:scale-105 active:scale-95"
-                      style={{ backgroundColor: "#D4AF37", color: "#09090B" }}
-                    >
-                      المتابعة لاختيار الحلاق <ChevronLeft size={18} />
-                    </Button>
-                  </div>
-                </motion.div>
-              ) : null}
-
-              {step === 2 ? (
-                <motion.div
-                  key="step2"
-                  custom={direction}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  className="space-y-8"
-                >
-                  <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
-                    <motion.button
-                      type="button"
-                      onClick={() =>
-                        setBookingData({ ...bookingData, barber_id: null })
-                      }
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.97 }}
-                      className={`relative overflow-hidden group space-y-5 rounded-[3rem] border p-8 text-center transition-all duration-500 ${
-                        bookingData.barber_id === null
-                          ? "border-[#D4AF37] bg-[#D4AF37]/10 shadow-2xl"
-                          : "border-white/5 bg-white/20 hover:border-white/20"
-                      }`}
-                    >
-                      <div
-                        className={`mx-auto flex h-24 w-24 items-center justify-center rounded-[2rem] border transition-all duration-500 ${
-                          bookingData.barber_id === null
-                            ? "bg-[#D4AF37] border-[#D4AF37] text-[#09090B]"
-                            : "bg-white/5 border-white/10 text-slate-500 group-hover:bg-[#D4AF37]/20 group-hover:text-[#D4AF37]"
-                        }`}
-                      >
-                        <User size={44} />
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-lg font-black text-white">
-                          أي حلاق متاح
-                        </p>
-                        <p className="text-[11px] font-black text-[#D4AF37] uppercase tracking-widest opacity-70">
-                          THE FASTEST OPTION
-                        </p>
-                      </div>
-                    </motion.button>
-
-                    {(catalog?.barbers || []).map((barber) => (
-                      <motion.button
-                        key={barber.id}
-                        type="button"
-                        onClick={() =>
-                          setBookingData({
-                            ...bookingData,
-                            barber_id: barber.id ?? null,
-                          })
-                        }
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.97 }}
-                        className={`relative overflow-hidden group space-y-5 rounded-[3rem] border p-8 text-center transition-all duration-500 ${
-                          bookingData.barber_id === barber.id
-                            ? "border-[#D4AF37] bg-[#D4AF37]/10 shadow-2xl"
-                            : "border-white/5 bg-white/20 hover:border-white/20"
-                        }`}
-                      >
-                        <div
-                          className={`mx-auto flex h-24 w-24 items-center justify-center overflow-hidden rounded-[2rem] border transition-all duration-500 ${
-                            bookingData.barber_id === barber.id
-                              ? "border-[#D4AF37]"
-                              : "border-white/10"
-                          }`}
-                        >
-                          {barber.profile_image_url ? (
-                            <img
-                              src={resolveAssetUrl(barber.profile_image_url)}
-                              alt={barber.display_name}
-                              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-slate-500 bg-white/5">
-                              <User size={44} />
-                            </div>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-lg font-black text-white group-hover:text-[#D4AF37] transition-colors">
-                            {barber.display_name}
-                          </p>
-                          {barber.job_title && (
-                            <p className="text-[11px] font-black text-[#D4AF37] uppercase tracking-widest opacity-80">
-                              {barber.job_title}
-                            </p>
-                          )}
-                        </div>
-                      </motion.button>
-                    ))}
-                  </div>
-
-                  <div className="flex justify-between pt-6">
-                    <Button
-                      variant="outline"
-                      disabled={loading}
-                      onClick={prevStep}
-                      className="h-16 rounded-[1.5rem] px-10 text-xs font-black uppercase tracking-widest border-white/10 text-white hover:bg-white/5"
-                    >
-                      رجوع
-                    </Button>
-                    <Button
-                      disabled={loading}
-                      onClick={nextStep}
-                      className="h-16 gap-3 rounded-[1.5rem] px-12 text-sm font-black uppercase tracking-[0.2em] shadow-2xl transition-all"
-                      style={{ backgroundColor: "#D4AF37", color: "#09090B" }}
-                    >
-                      اختيار الموعد <ChevronLeft size={18} />
-                    </Button>
-                  </div>
-                </motion.div>
-              ) : null}
-
-              {step === 3 ? (
-                <motion.div
-                  key="step3"
-                  custom={direction}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  className="space-y-8"
-                >
-                  <div className="grid grid-cols-1 gap-10 md:grid-cols-[350px_1fr]">
-                    <div className="space-y-6">
-                      <h3 className="text-xs font-black uppercase tracking-[0.3em] text-[#D4AF37]">
-                        اختر التاريخ الملكي
-                      </h3>
-                      <input
-                        type="date"
-                        min={new Date().toISOString().split("T")[0]}
-                        max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]}
-                        value={bookingData.appointment_date || ""}
-                        onChange={handleDateChange}
-                        className="h-20 w-full rounded-[2rem] border border-white/10 bg-white/5 px-8 text-lg font-black text-white outline-none focus:border-[#D4AF37] transition-all"
-                        style={{ colorScheme: 'dark' }}
-                      />
-                      <div className="rounded-[2rem] bg-[#D4AF37]/5 p-6 border border-[#D4AF37]/20">
-                        <div className="flex items-start gap-4">
-                           <Sparkles size={20} className="text-[#D4AF37] shrink-0 mt-1" />
-                           <p className="text-sm font-bold text-slate-400 leading-relaxed">
-                            نحن نلتزم بموعدك بأعلى درجات الدقة. في حالات نادرة قد يتغير الحرفي المنفذ لضمان انسيابية تجربتك الفاخرة.
-                           </p>
-                        </div>
-                      </div>
+                        );
+                      })}
                     </div>
-                    <div className="space-y-6">
-                      <h3 className="text-xs font-black uppercase tracking-[0.3em] text-[#D4AF37]">
-                        المواعيد المتاحة (تايم سلاوتس)
-                      </h3>
-                      {slotsLoading ? (
-                        <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
-                          {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
-                            <div
-                              key={item}
-                              className="h-16 animate-pulse rounded-[1.25rem] bg-white/5"
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="space-y-8">
-                          {!bookingData.appointment_date ? (
-                            <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
-                              <p className="text-base font-black text-slate-500 uppercase tracking-widest">
-                                يرجى اختيار التاريخ لتفعيل الأوقات
-                              </p>
-                            </div>
-                          ) : availableSlots.length === 0 ? (
-                            <div className="py-20 text-center border-2 border-dashed border-rose-500/20 rounded-[3rem] bg-rose-500/5">
-                              <p className="text-base font-black text-rose-400">
-                                عذراً، جميع المواعيد محجوزة في هذا اليوم
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="space-y-10">
-                              {morningSlots.length > 0 && (
-                                <div className="space-y-4">
-                                  <h4 className="text-xs font-black text-slate-400 flex items-center gap-3 uppercase tracking-widest">
-                                    <div className="h-[1px] w-8 bg-white/10" />
-                                    🌅 Morning Slots
-                                  </h4>
-                                  <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
-                                    {morningSlots.map((slot) => (
-                                      <button
-                                        key={slot}
-                                        type="button"
-                                        onClick={() =>
-                                          setBookingData({
-                                            ...bookingData,
-                                            appointment_time: slot,
-                                          })
-                                        }
-                                        className={`h-16 rounded-[1.25rem] border text-sm font-black transition-all duration-300 ${
-                                          bookingData.appointment_time === slot
-                                            ? "border-[#D4AF37] bg-[#D4AF37] text-[#09090B] shadow-2xl"
-                                            : "border-white/5 bg-white/5 text-slate-400 hover:border-white/20 hover:text-white"
-                                        }`}
-                                      >
-                                        {formatTime12h(slot)}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {afternoonSlots.length > 0 && (
-                                <div className="space-y-4">
-                                  <h4 className="text-xs font-black text-slate-400 flex items-center gap-3 uppercase tracking-widest">
-                                    <div className="h-[1px] w-8 bg-white/10" />
-                                    ☀️ Afternoon Slots
-                                  </h4>
-                                  <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
-                                    {afternoonSlots.map((slot) => (
-                                      <button
-                                        key={slot}
-                                        type="button"
-                                        onClick={() =>
-                                          setBookingData({
-                                            ...bookingData,
-                                            appointment_time: slot,
-                                          })
-                                        }
-                                        className={`h-16 rounded-[1.25rem] border text-sm font-black transition-all duration-300 ${
-                                          bookingData.appointment_time === slot
-                                            ? "border-[#D4AF37] bg-[#D4AF37] text-[#09090B] shadow-2xl"
-                                            : "border-white/5 bg-white/5 text-slate-400 hover:border-white/20 hover:text-white"
-                                        }`}
-                                      >
-                                        {formatTime12h(slot)}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {eveningSlots.length > 0 && (
-                                <div className="space-y-4">
-                                  <h4 className="text-xs font-black text-slate-400 flex items-center gap-3 uppercase tracking-widest">
-                                    <div className="h-[1px] w-8 bg-white/10" />
-                                    🌙 Evening Slots
-                                  </h4>
-                                  <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
-                                    {eveningSlots.map((slot) => (
-                                      <button
-                                        key={slot}
-                                        type="button"
-                                        onClick={() =>
-                                          setBookingData({
-                                            ...bookingData,
-                                            appointment_time: slot,
-                                          })
-                                        }
-                                        className={`h-16 rounded-[1.25rem] border text-sm font-black transition-all duration-300 ${
-                                          bookingData.appointment_time === slot
-                                            ? "border-[#D4AF37] bg-[#D4AF37] text-[#09090B] shadow-2xl"
-                                            : "border-white/5 bg-white/5 text-slate-400 hover:border-white/20 hover:text-white"
-                                        }`}
-                                      >
-                                        {formatTime12h(slot)}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex justify-between pt-6">
-                    <Button
-                      variant="outline"
-                      disabled={loading}
-                      onClick={prevStep}
-                      className="h-16 rounded-[1.5rem] px-10 text-xs font-black uppercase tracking-widest border-white/10 text-white hover:bg-white/5"
-                    >
-                      رجوع
-                    </Button>
-                    <Button
-                      disabled={loading}
-                      onClick={nextStep}
-                      className="h-16 gap-3 rounded-[1.5rem] px-12 text-sm font-black uppercase tracking-[0.2em] shadow-2xl transition-all"
-                      style={{ backgroundColor: "#D4AF37", color: "#09090B" }}
-                    >
-                      تأكيد البيانات <ChevronLeft size={18} />
-                    </Button>
-                  </div>
-                </motion.div>
-              ) : null}
-
-              {step === 4 ? (
-                <motion.div
-                  key="step4"
-                  custom={direction}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  className="space-y-8"
-                >
-                  <Card className="space-y-10 border-white/5 bg-white/5 p-10 shadow-2xl rounded-[3rem] backdrop-blur-xl">
-                    <div className="grid grid-cols-1 gap-12 md:grid-cols-2">
-                      <div className="space-y-6">
-                        <h3 className="text-xs font-black uppercase tracking-[0.3em] text-[#D4AF37]">
-                          البيانات الشخصية
-                        </h3>
-                        <div className="space-y-5">
-                          <Input
-                            placeholder="الاسم الأول"
-                            value={bookingData.first_name || ""}
-                            onChange={(e) =>
-                              setBookingData({
-                                ...bookingData,
-                                first_name: e.target.value,
-                              })
-                            }
-                            className="h-14 rounded-2xl border-white/10 bg-white/5 text-white font-bold px-6 focus:border-[#D4AF37]"
-                          />
-                          <Input
-                            placeholder="اسم العائلة"
-                            value={bookingData.last_name || ""}
-                            onChange={(e) =>
-                              setBookingData({
-                                ...bookingData,
-                                last_name: e.target.value,
-                              })
-                            }
-                            className="h-14 rounded-2xl border-white/10 bg-white/5 text-white font-bold px-6 focus:border-[#D4AF37]"
-                          />
-                          <Input
-                            placeholder="رقم الهاتف"
-                            value={bookingData.phone || ""}
-                            onChange={(e) =>
-                              setBookingData({
-                                ...bookingData,
-                                phone: e.target.value,
-                              })
-                            }
-                            className="h-14 rounded-2xl border-white/10 bg-white/5 text-white text-left font-black px-6 focus:border-[#D4AF37]"
-                            dir="ltr"
-                          />
-                          <Input
-                            placeholder="البريد الإلكتروني (اختياري)"
-                            value={bookingData.email || ""}
-                            onChange={(e) =>
-                              setBookingData({
-                                ...bookingData,
-                                email: e.target.value,
-                              })
-                            }
-                            className="h-14 rounded-2xl border-white/10 bg-white/5 text-white text-left font-bold px-6 focus:border-[#D4AF37]"
-                            dir="ltr"
-                          />
-                          <textarea
-                            placeholder="هل لديك أي ملاحظات إضافية؟"
-                            value={bookingData.notes || ""}
-                            onChange={(e) =>
-                              setBookingData({
-                                ...bookingData,
-                                notes: e.target.value,
-                              })
-                            }
-                            className="min-h-[140px] w-full rounded-[2rem] border border-white/10 bg-white/5 p-6 text-sm font-bold text-white outline-none transition-all focus:border-[#D4AF37]"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-6 rounded-[2.5rem] border border-[#D4AF37]/10 bg-[#D4AF37]/5 p-8 flex flex-col justify-between">
-                        <div className="space-y-6">
-                           <h3 className="text-xs font-black uppercase tracking-[0.3em] text-[#D4AF37]">
-                             الملخص النهائي
-                           </h3>
-                           <div className="space-y-5">
-                             <SummaryRow
-                               label="الخدمات المختارة"
-                               value={`${bookingData.services.length} خدمات`}
-                             />
-                             <SummaryRow
-                               label="تاريخ الموعد"
-                               value={bookingData.appointment_date}
-                             />
-                             <SummaryRow
-                               label="توقيت الحجز"
-                               value={formatTime12h(bookingData.appointment_time)}
-                             />
-                             <SummaryRow label="الحرفي المختار" value={selectedBarber} />
-                           </div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between border-t border-[#D4AF37]/20 pt-6">
-                          <span className="text-xs font-black uppercase tracking-widest text-slate-400">
-                            الإجمالي المستحق
-                          </span>
-                          <span className="text-4xl font-black text-white">
-                            {bookingTotal} <span className="text-sm font-bold opacity-60 uppercase">{catalog.business.currency}</span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                  
-                  <div className="flex justify-between pt-6">
-                    <Button
-                      variant="outline"
-                      disabled={loading}
-                      onClick={prevStep}
-                      className="h-16 rounded-[1.5rem] px-10 text-xs font-black uppercase tracking-widest border-white/10 text-white hover:bg-white/5"
-                    >
-                      رجوع
-                    </Button>
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={submitting || loading}
-                      className="h-16 rounded-[1.5rem] px-16 text-sm font-black uppercase tracking-[0.2em] shadow-2xl transition-all"
-                      style={{ backgroundColor: "#D4AF37", color: "#09090B" }}
-                    >
-                      {submitting ? "جاري المعالجة..." : "تثبيت الموعد الملكي"}
-                    </Button>
-                  </div>
-                </motion.div>
-              ) : null}
-
-              {step === 5 ? (
-                <motion.div
-                  key="success"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="relative space-y-10 py-16 text-center overflow-hidden rounded-[4rem] border border-white/5 bg-white/5 backdrop-blur-xl"
-                >
-                  {/* Success Particles */}
-                  <div className="absolute inset-0 pointer-events-none overflow-hidden flex justify-center items-center">
-                    {confettiArray.map((p) => (
-                      <motion.div
-                        key={p.id}
-                        className="absolute rounded-full z-50"
-                        style={{
-                          width: p.size,
-                          height: p.size,
-                          backgroundColor: p.color,
-                        }}
-                        initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
-                        animate={{
-                          x: p.x,
-                          y: p.y + 400,
-                          rotate: p.rotation + 720,
-                          opacity: 0
-                        }}
-                        transition={{
-                          duration: 2.5,
-                          ease: "easeOut",
-                          delay: p.delay
-                        }}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="relative mx-auto flex h-32 w-32 items-center justify-center rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 shadow-[0_0_60px_rgba(212,175,55,0.2)]">
-                    <CheckCircle2 size={64} strokeWidth={1.5} />
-                  </div>
-                  
-                  <div className="space-y-4 px-10">
-                    <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter">
-                      تم الحجز بنجاح!
-                    </h2>
-                    <p className="mx-auto max-w-lg text-lg font-bold text-slate-400 leading-relaxed">
-                      شكراً لاختيارك <span className="text-white">{salonName}</span>. لقد تم تأكيد موعدك بنجاح، وستصلك رسالة تفصيلية قريباً.
+                  ) : (
+                    <p className="well px-6 py-12 text-center text-[length:var(--step-0)] text-ink-soft">
+                      {t("booking.noServicesInCategory")}
                     </p>
-                  </div>
-
-                  <Card className="mx-auto max-w-sm space-y-6 border border-white/10 p-10 bg-white/5 rounded-[2.5rem]">
-                    <div className="flex justify-between items-center text-sm font-black uppercase tracking-widest text-[#D4AF37]">
-                      <span className="opacity-60">DATE</span>
-                      <span className="text-white">{bookingData.appointment_date}</span>
-                    </div>
-                    <div className="h-[1px] w-full bg-white/5" />
-                    <div className="flex justify-between items-center text-sm font-black uppercase tracking-widest text-[#D4AF37]">
-                      <span className="opacity-60">TIME</span>
-                      <span className="text-white">{formatTime12h(bookingData.appointment_time)}</span>
-                    </div>
-                  </Card>
-
-                  <Button
-                    disabled={loading}
-                    onClick={() =>
-                      navigate(
-                        publicSlug
-                          ? buildPublicSalonPath(catalog.business || {})
-                          : "/",
-                      )
-                    }
-                    className="h-16 rounded-2xl px-16 text-xs font-black uppercase tracking-[0.3em] shadow-2xl transition-all hover:scale-105"
-                    style={{ backgroundColor: "#D4AF37", color: "#09090B" }}
-                  >
-                    العودة للرئيسية
-                  </Button>
-                </motion.div>
+                  )}
+                </section>
               ) : null}
-            </AnimatePresence>
-          </div>
 
-          {step < 5 ? (
-            <aside className="lg:sticky lg:top-32 lg:self-start">
-              <Card className="rounded-[3rem] border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
-                <div className="flex items-center gap-3 mb-6">
-                   <div className="h-2 w-2 rounded-full bg-[#D4AF37] animate-pulse" />
-                   <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#D4AF37]">
-                     Live Summary
-                   </p>
-                </div>
-                
-                <h3 className="text-2xl font-black text-white tracking-tight">
-                  تفاصيل الموعد
-                </h3>
-
-                <div className="mt-8 space-y-5">
-                  <SummaryRow
-                    label="عدد الخدمات"
-                    value={`${selectedServices.length}`}
-                  />
-                  <SummaryRow label="الحرفي" value={selectedBarber} />
-                  <SummaryRow
-                    label="التاريخ"
-                    value={bookingData.appointment_date || "--"}
-                  />
-                  <SummaryRow
-                    label="الوقت"
-                    value={bookingData.appointment_time ? formatTime12h(bookingData.appointment_time) : "--"}
-                  />
-                </div>
-
-                <div className="mt-10 rounded-[2rem] border border-white/5 bg-white/5 p-6">
-                  <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#D4AF37] mb-4">
-                    SELECTED SERVICES
-                  </p>
-                  <div className="space-y-3 max-h-[200px] overflow-y-auto scrollbar-hidden">
-                    {selectedServices.length ? (
-                      selectedServices.map((service) => (
-                        <div
-                          key={service.id}
-                          className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3 text-xs font-bold"
-                        >
-                          <span className="truncate text-slate-300">
-                            {service.name}
-                          </span>
-                          <span className="text-[#D4AF37]">
-                            {service.price} {catalog.business.currency || "ج.م"}
-                          </span>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-center text-[10px] font-black uppercase tracking-widest text-slate-600">
-                        EMPTY CART
-                      </div>
-                    )}
+              {/* ── Step 2: barber ──────────────────────────────── */}
+              {step === 2 ? (
+                <section aria-labelledby="step-barber">
+                  <h2 id="step-barber" className="sr-only">
+                    {t("booking.step.barber")}
+                  </h2>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <BarberCard
+                      selected={form.barber_id === null}
+                      onClick={() => onBarberChange(null)}
+                      label={t("booking.anyBarber")}
+                      caption={t("booking.anyBarberCaption")}
+                      fallback={<User size={26} aria-hidden="true" />}
+                    />
+                    {(catalog.barbers ?? []).map((barber: any) => (
+                      <BarberCard
+                        key={barber.id}
+                        selected={form.barber_id === barber.id}
+                        onClick={() => onBarberChange(barber.id)}
+                        label={barber.display_name || t("booking.anyBarber")}
+                        caption={barber.job_title || undefined}
+                        fallback={<User size={26} aria-hidden="true" />}
+                        image={resolveAssetUrl(barber.profile_image_url)}
+                      />
+                    ))}
                   </div>
+                </section>
+              ) : null}
+
+              {/* ── Step 3: slot ────────────────────────────────── */}
+              {step === 3 ? (
+                <section aria-labelledby="step-slot" className="space-y-8">
+                  <h2 id="step-slot" className="sr-only">
+                    {t("booking.step.schedule")}
+                  </h2>
+
+                  <div className="max-w-xs">
+                    <label
+                      htmlFor="booking-date"
+                      className="mb-2 block text-[length:var(--step--1)] font-semibold"
+                    >
+                      {t("booking.pickDate")}
+                    </label>
+                    <input
+                      id="booking-date"
+                      type="date"
+                      value={form.appointment_date}
+                      min={new Date().toISOString().slice(0, 10)}
+                      max={new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10)}
+                      onChange={(event) => onDateChange(event.target.value)}
+                      className="input h-12 px-4 text-[length:var(--step--1)]"
+                      style={{ colorScheme: theme.isDark ? "dark" : "light" }}
+                    />
+                  </div>
+
+                  {!form.appointment_date ? (
+                    <p className="well px-6 py-16 text-center text-[length:var(--step-0)] text-ink-soft">
+                      {t("booking.pickDateFirst")}
+                    </p>
+                  ) : slotsLoading ? (
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {Array.from({ length: 8 }, (_, index) => (
+                        <div key={index} className="skeleton-shimmer h-12 rounded-[length:var(--r-sm)]" />
+                      ))}
+                    </div>
+                  ) : !slots.length ? (
+                    <p className="well border-[color:var(--c-stop)] px-6 py-16 text-center text-[length:var(--step-0)] text-[color:var(--c-stop)]">
+                      {t("booking.noSlots")}
+                    </p>
+                  ) : (
+                    <div className="space-y-7">
+                      {(
+                        [
+                          ["booking.slots.morning", slotBands.morning],
+                          ["booking.slots.afternoon", slotBands.afternoon],
+                          ["booking.slots.evening", slotBands.evening],
+                        ] as const
+                      )
+                        .filter(([, list]) => list.length)
+                        .map(([labelKey, list]) => (
+                          <div key={labelKey}>
+                            <h3
+                              className="mb-3 text-[length:var(--step--2)] font-semibold uppercase text-ink-faint"
+                              style={{ letterSpacing: "var(--tracking-eyebrow)" }}
+                            >
+                              {t(labelKey)}
+                            </h3>
+                            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                              {list.map((slot) => (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  onClick={() => patch({ appointment_time: slot })}
+                                  aria-pressed={form.appointment_time === slot}
+                                  className={`h-12 rounded-[length:var(--r-sm)] border text-[length:var(--step--1)] font-semibold transition-colors duration-200 ${
+                                    form.appointment_time === slot
+                                      ? "border-accent bg-accent text-on-accent"
+                                      : "border-line bg-panel text-ink-soft hover:border-accent-line hover:text-accent"
+                                  }`}
+                                >
+                                  {time12(slot)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </section>
+              ) : null}
+
+              {/* ── Step 4: details ─────────────────────────────── */}
+              {step === 4 ? (
+                <section aria-labelledby="step-details">
+                  <h2 id="step-details" className="sr-only">
+                    {t("booking.step.details")}
+                  </h2>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <Field
+                      id="first-name"
+                      label={t("booking.field.firstName")}
+                      value={form.first_name}
+                      onChange={(value) => patch({ first_name: value })}
+                    />
+                    <Field
+                      id="last-name"
+                      label={t("booking.field.lastName")}
+                      value={form.last_name}
+                      onChange={(value) => patch({ last_name: value })}
+                    />
+                    <Field
+                      id="phone"
+                      label={t("booking.field.phone")}
+                      value={form.phone}
+                      onChange={(value) => patch({ phone: value })}
+                      type="tel"
+                      inputMode="tel"
+                      ltr
+                      required
+                    />
+                    <Field
+                      id="email"
+                      label={t("booking.field.email")}
+                      hint={t("common.optional")}
+                      value={form.email}
+                      onChange={(value) => patch({ email: value })}
+                      type="email"
+                      inputMode="email"
+                      ltr
+                    />
+                  </div>
+
+                  <div className="mt-5">
+                    <label
+                      htmlFor="notes"
+                      className="mb-2 block text-[length:var(--step--1)] font-semibold"
+                    >
+                      {t("booking.field.notes")}{" "}
+                      <span className="font-normal text-ink-faint">
+                        ({t("common.optional")})
+                      </span>
+                    </label>
+                    <textarea
+                      id="notes"
+                      value={form.notes}
+                      onChange={(event) => patch({ notes: event.target.value })}
+                      rows={4}
+                      className="input min-h-28 resize-y p-4 text-[length:var(--step--1)]"
+                    />
+                  </div>
+                </section>
+              ) : null}
+
+              {/* ── Nav ────────────────────────────────────────── */}
+              <div className="mt-10 flex items-center justify-between gap-3 border-t border-line pt-6">
+                {step > 1 ? (
+                  <Button variant="ghost" onClick={back}>
+                    {t("common.back")}
+                  </Button>
+                ) : (
+                  <span />
+                )}
+
+                {step < 4 ? (
+                  <Button onClick={next}>
+                    {/* The button names where it is going, not "next": on a
+                        four-step form a visitor who has not read the header
+                        still knows where they are. */}
+                    {t(
+                      step === 1
+                        ? "booking.nextToBarber"
+                        : step === 2
+                          ? "booking.nextToSchedule"
+                          : "booking.nextToDetails",
+                    )}
+                    <ChevronLeft size={16} aria-hidden="true" className="rtl-flip" />
+                  </Button>
+                ) : (
+                  <Button onClick={submit} loading={submitting}>
+                    {submitting ? t("booking.submitting") : t("booking.submit")}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* ── Summary ───────────────────────────────────────── */}
+            <aside className="lg:col-span-5 xl:col-span-4">
+              <div className="well p-6 lg:sticky lg:top-24">
+                <h2 className="text-[length:var(--step-1)] font-bold">
+                  {t("booking.summaryHeading")}
+                </h2>
+
+                <dl className="mt-5 space-y-3 text-[length:var(--step--1)]">
+                  <SummaryRow
+                    label={t("common.services")}
+                    value={String(selectedServices.length)}
+                  />
+                  <SummaryRow label={t("booking.summary.barber")} value={barberName} />
+                  <SummaryRow
+                    label={t("booking.summary.date")}
+                    value={form.appointment_date || "—"}
+                  />
+                  <SummaryRow
+                    label={t("booking.summary.time")}
+                    value={form.appointment_time ? time12(form.appointment_time) : "—"}
+                  />
+                  <SummaryRow
+                    label={t("booking.durationEstimate")}
+                    value={
+                      duration ? `${duration} ${t("common.minutes")}` : "—"
+                    }
+                  />
+                </dl>
+
+                <div className="mt-6 border-t border-line pt-5">
+                  <p
+                    className="text-[length:var(--step--2)] font-semibold uppercase text-ink-faint"
+                    style={{ letterSpacing: "var(--tracking-eyebrow)" }}
+                  >
+                    {t("booking.selectedServices")}
+                  </p>
+                  {selectedServices.length ? (
+                    <ul className="mt-3 space-y-2">
+                      {selectedServices.map((service: any) => (
+                        <li
+                          key={service.id}
+                          className="flex items-center justify-between gap-3 text-[length:var(--step--1)]"
+                        >
+                          <span className="truncate text-ink-soft">
+                            {service.name_ar || service.name}
+                          </span>
+                          <span className="numeric shrink-0 font-semibold">
+                            {formatPrice(Number(service.price || 0))}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-[length:var(--step--1)] text-ink-faint">
+                      {t("booking.cartEmpty")}
+                    </p>
+                  )}
                 </div>
 
-                <div className="mt-10 flex items-center justify-between border-t border-white/10 pt-8">
-                  <span className="text-xs font-black uppercase tracking-widest text-slate-500">
-                    TOTAL
+                <div className="mt-6 flex items-baseline justify-between gap-3 border-t border-line pt-5">
+                  <span
+                    className="text-[length:var(--step--1)] font-semibold uppercase text-ink-faint"
+                    style={{ letterSpacing: "var(--tracking-eyebrow)" }}
+                  >
+                    {t("booking.summary.total")}
                   </span>
-                  <span className="text-4xl font-black text-white tracking-tighter">
-                    {bookingTotal} <span className="text-xs font-bold opacity-40">{catalog.business.currency}</span>
+                  <span className="numeric text-[length:var(--step-2)] font-bold text-accent">
+                    {formatPrice(total)} {currency}
                   </span>
                 </div>
-              </Card>
+
+                {business.address || business.shop_phone || business.shopPhone ? (
+                  <ul className="mt-6 space-y-2.5 border-t border-line pt-5 text-[length:var(--step--1)] text-ink-soft">
+                    {business.address ? (
+                      <li className="flex items-start gap-2.5">
+                        <MapPin size={14} aria-hidden="true" className="mt-1 shrink-0 text-accent" />
+                        <span>{business.address}</span>
+                      </li>
+                    ) : null}
+                    {business.shop_phone || business.shopPhone ? (
+                      <li className="flex items-start gap-2.5">
+                        <Phone size={14} aria-hidden="true" className="mt-1 shrink-0 text-accent" />
+                        <span className="numeric">
+                          {business.shop_phone || business.shopPhone}
+                        </span>
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : null}
+              </div>
             </aside>
-          ) : null}
-        </div>
-      </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
 
-function InfoTile({ title, value, hint, icon: Icon = Sparkles }) {
+/* ── Pieces ──────────────────────────────────────────────────────────── */
+
+function CategoryChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="group rounded-[2.5rem] border border-white/5 bg-white/5 p-6 shadow-2xl transition-all duration-500 hover:-translate-y-2 hover:bg-white/10 backdrop-blur-xl">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-3">
-          <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 group-hover:text-[#D4AF37] transition-colors">
-            {title}
-          </p>
-          <h3 className="line-clamp-2 text-xl font-black text-white">{value}</h3>
-        </div>
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.25rem] bg-[#09090B] text-[#D4AF37] border border-white/10 transition-all duration-500 group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(212,175,55,0.2)]">
-          <Icon size={24} />
-        </div>
-      </div>
-      <p className="mt-5 text-[11px] font-bold leading-relaxed text-slate-500 border-t border-white/5 pt-4">
-        {hint}
-      </p>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`shrink-0 rounded-[length:var(--r-sm)] border px-4 py-2 text-[length:var(--step--1)] font-medium transition-colors duration-200 ${
+        active
+          ? "border-accent bg-accent text-on-accent"
+          : "border-line bg-panel text-ink-soft hover:border-accent-line hover:text-accent"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
-function SummaryRow({ label, value }) {
+function BarberCard({
+  selected,
+  onClick,
+  label,
+  caption,
+  image,
+  fallback,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  label: string;
+  caption?: string;
+  image?: string | null;
+  fallback: React.ReactNode;
+}) {
+  // A stored path whose file is gone is a truthy URL that answers 404, so the
+  // `<img>` would render as a broken image rather than the initial fallback.
+  const [photoBroken, setPhotoBroken] = useState(false);
+  const showPhoto = Boolean(image) && !photoBroken;
+
   return (
-    <div className="flex items-center justify-between gap-4 text-xs font-black uppercase tracking-wide">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-right text-white">{value}</span>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`flex flex-col items-center gap-3 rounded-[length:var(--r-lg)] border p-5 text-center transition-colors duration-200 ${
+        selected
+          ? "border-accent bg-accent-wash"
+          : "border-line bg-panel hover:border-accent-line"
+      }`}
+    >
+      <span
+        className={`grid h-20 w-20 place-items-center overflow-hidden rounded-[length:var(--r-md)] border ${
+          selected ? "border-accent" : "border-line"
+        }`}
+      >
+        {showPhoto ? (
+          <img
+            src={image as string}
+            alt=""
+            className="h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+            onError={() => setPhotoBroken(true)}
+          />
+        ) : (
+          <span className={selected ? "text-accent" : "text-ink-faint"}>{fallback}</span>
+        )}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-[length:var(--step--1)] font-semibold">
+          {label}
+        </span>
+        {caption ? (
+          <span className="mt-0.5 block truncate text-[length:var(--step--2)] text-ink-faint">
+            {caption}
+          </span>
+        ) : null}
+      </span>
+    </button>
   );
 }
 
-function QuickInfo({ icon: Icon, label, value, dir = "rtl", theme }) {
+function Field({
+  id,
+  label,
+  hint,
+  value,
+  onChange,
+  type = "text",
+  inputMode,
+  ltr = false,
+  required = false,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  inputMode?: "tel" | "email" | "text";
+  ltr?: boolean;
+  required?: boolean;
+}) {
   return (
-    <div className="rounded-[2.5rem] border border-white/10 bg-white/5 p-6 backdrop-blur-3xl transition-all hover:bg-white/10">
-      <div className="flex items-start gap-5">
-        <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-[#09090B] border border-white/10" style={{ color: "#D4AF37" }}>
-          <Icon size={24} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[9px] font-black uppercase tracking-[0.4em] text-[#D4AF37]">
-            {label}
-          </p>
-          <p className="mt-3 break-words text-sm font-black text-white" dir={dir}>
-            {value}
-          </p>
-        </div>
-      </div>
+    <div>
+      <label htmlFor={id} className="mb-2 block text-[length:var(--step--1)] font-semibold">
+        {label}
+        {required ? <span className="text-accent"> *</span> : null}
+        {hint ? <span className="font-normal text-ink-faint"> — {hint}</span> : null}
+      </label>
+      <Input
+        id={id}
+        type={type}
+        inputMode={inputMode}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        // Phone numbers and email addresses are LTR runs inside an RTL line;
+        // without this the punctuation jumps to the wrong end.
+        dir={ltr ? "ltr" : undefined}
+        required={required}
+      />
     </div>
   );
 }
 
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <dt className="text-ink-faint">{label}</dt>
+      <dd className="truncate text-end font-semibold">{value}</dd>
+    </div>
+  );
+}

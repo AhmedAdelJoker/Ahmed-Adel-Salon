@@ -17,6 +17,7 @@ from app.models.notification import Notification
 from app.models.report_schedule import ReportSchedule
 from app.models.user import User
 from app.utils.media import get_upload_path
+from app.core.clock import utc_now_naive
 
 FREQUENCY_LABELS = {"daily": "اليومي", "weekly": "الأسبوعي", "monthly": "الشهري"}
 KEEP_PDFS = int(__import__("os").environ.get("SCHEDULED_PDF_KEEP", "20"))
@@ -24,7 +25,7 @@ KEEP_PDFS = int(__import__("os").environ.get("SCHEDULED_PDF_KEEP", "20"))
 
 def period_for_frequency(frequency: str, now: Optional[datetime] = None) -> tuple[datetime, datetime, str]:
     """Resolve (start, end, arabic_label) for a schedule frequency."""
-    now = now or datetime.utcnow()
+    now = now or utc_now_naive()
     if frequency == "weekly":
         start = (now - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
         label = "آخر 7 أيام"
@@ -39,7 +40,7 @@ def period_for_frequency(frequency: str, now: Optional[datetime] = None) -> tupl
 
 
 def compute_next_run(frequency: str, from_dt: Optional[datetime] = None) -> datetime:
-    from_dt = from_dt or datetime.utcnow()
+    from_dt = from_dt or utc_now_naive()
     if frequency == "weekly":
         return from_dt + timedelta(days=7)
     if frequency == "monthly":
@@ -101,7 +102,7 @@ def generate_summary_pdf(
     from app.api.v1.endpoints.exports import _build_table_pdf
     from app.utils.media import get_upload_path
 
-    now = now or datetime.utcnow()
+    now = now or utc_now_naive()
     freq = FREQUENCY_LABELS.get(frequency, frequency)
     pdf_buffer = _build_table_pdf(
         title=f"{name} ({freq})",
@@ -148,7 +149,7 @@ def _notify_owners(db: Session, title: str, message: str) -> int:
 
 def run_schedule(db: Session, schedule: ReportSchedule) -> dict[str, Any]:
     """Execute one schedule: compute summary + deliver. Returns a result dict."""
-    now = datetime.utcnow()
+    now = utc_now_naive()
     start, end, period_label = period_for_frequency(schedule.frequency, now)
     summary = compute_period_summary(db, start, end)
     message = build_summary_message(schedule.name, schedule.frequency, period_label, summary)
@@ -231,7 +232,7 @@ def run_schedule(db: Session, schedule: ReportSchedule) -> dict[str, Any]:
 
 def run_due_schedules(db: Session) -> list[dict[str, Any]]:
     """Run every active schedule whose next_run_at has passed."""
-    now = datetime.utcnow()
+    now = utc_now_naive()
     due = (
         db.query(ReportSchedule)
         .filter(ReportSchedule.is_active.is_(True), ReportSchedule.next_run_at <= now)

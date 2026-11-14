@@ -16,9 +16,11 @@ import { formatCurrency } from "@/lib/core/utils";
 import { cn } from "@/lib/core/utils";
 import api from "@/services/api";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 export default function BookingModal({ open, onOpenChange, customer, onSuccess }: any) {
    
+  const { t } = useTranslation("customers");
   const [serviceIds, setServiceIds] = useState<any[]>([]);
   const [employeeId, setEmployeeId] = useState("none");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -45,12 +47,14 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
       setExistingBookings([]);
       return;
     }
-    Promise.all([api.get("/services"), api.get("/employees")])
+    // /employees/active (not /employees): the payroll roster is
+    // manage-employees-only; this modal only needs assignable staff names.
+    Promise.all([api.get("/services"), api.get("/employees/active")])
       .then(([s, b]) => {
         setServices(s.data || []);
         setBarbers(b.data || []);
       })
-      .catch(() => {});
+      .catch((err) => console.error("BookingModal data load failed:", err));
   }, [open]);
 
   useEffect(() => {
@@ -66,17 +70,25 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
       setExistingBookings([]);
       return;
     }
+    // List endpoint only honors start/end dates through date_filter="custom".
     api
       .get("/appointments", {
         params: {
           customer_id: customer.customer_id,
-          date_from: date,
-          date_to: date,
+          date_filter: "custom",
+          start_date: date,
+          end_date: date,
+          limit: 100,
         },
       })
       .then((res) => setExistingBookings(res.data || []))
       .catch(() => setExistingBookings([]));
   }, [date, customer?.customer_id]);
+
+  const finishedStatuses = ["cancelled", "auto_cancelled", "no_show"];
+  const sameDayBookings = existingBookings.filter(
+    (b) => !finishedStatuses.includes(String(b.status || "").toLowerCase()),
+  );
 
   const toggleService = (id) => {
     setServiceIds((prev) =>
@@ -107,7 +119,7 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
       });
       setConflictMsg(
         res.data?.has_conflict
-          ? res.data?.message || "يوجد تعارض في الموعد"
+          ? res.data?.message || t("bookingModal.conflict")
           : "",
       );
     } catch (err) {
@@ -132,13 +144,13 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
 
   const handleSubmit = async () => {
     if (serviceIds.length === 0)
-      return toast.error("اختر خدمة واحدة على الأقل");
-    if (!time) return toast.error("يرجى اختيار الوقت");
-    if (isTimeInPast(time)) return toast.error("لا يمكن الحجز في وقت مضى");
+      return toast.error(t("bookingModal.errorSelectService"));
+    if (!time) return toast.error(t("bookingModal.errorSelectTime"));
+    if (isTimeInPast(time)) return toast.error(t("bookingModal.errorPastTime"));
     if (conflictMsg) return toast.error(conflictMsg);
-    if (existingBookings.length > 0)
+    if (sameDayBookings.length > 0)
       return toast.error(
-        "هذا العميل لديه حجز بالفعل في هذا اليوم. يرجى اختيار يوم آخر.",
+        t("bookingModal.errorSameDay"),
       );
 
     try {
@@ -152,12 +164,12 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
         notes,
         booking_source: "shop",
       });
-      toast.success("تم حجز الموعد بنجاح");
+      toast.success(t("bookingModal.success"));
       onSuccess?.();
     } catch (err) {
        
       const apiErr2 = err as { response?: { data?: { detail?: unknown } } };
-      toast.error((apiErr2?.response?.data?.detail as string) || "فشل الحجز");
+      toast.error((apiErr2?.response?.data?.detail as string) || t("bookingModal.failed"));
     } finally {
       setSubmitting(false);
     }
@@ -188,7 +200,7 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <CalendarClock size={14} className="text-primary" />
             </div>
-            حجز جديد للعميل
+            {t("bookingModal.title")}
           </DialogTitle>
           <DialogDescription className="text-[10px] text-muted">
             {customer?.first_name} {customer?.last_name}
@@ -198,7 +210,7 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
           {/* Services */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-              اختر الخدمات *
+              {t("bookingModal.selectServices")}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto">
               {services.map((srv) => (
@@ -221,7 +233,7 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
                       {formatCurrency(srv.price || srv.base_price || 0)}
                     </span>
                     <span className="text-muted">
-                      {srv.duration_minutes || 30} د
+                      {srv.duration_minutes || 30} {t("bookingModal.minutesAbbr")}
                     </span>
                   </div>
                 </button>
@@ -233,7 +245,7 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                التاريخ *
+                {t("bookingModal.date")}
               </label>
               <input
                 type="date"
@@ -245,14 +257,14 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-                الوقت *
+                {t("bookingModal.time")}
               </label>
               <select
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 className="w-full h-10 rounded-xl bg-soft border border-border px-3 text-sm font-bold focus:border-primary focus:ring-0"
               >
-                <option value="">اختر الوقت</option>
+                <option value="">{t("bookingModal.time")}</option>
                 {timeSlots.map((slot) => (
                   <option key={slot} value={slot}>
                     {slot}
@@ -265,14 +277,14 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
           {/* Barber */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-              الخبير
+              {t("bookingModal.barber")}
             </label>
             <select
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
               className="w-full h-10 rounded-xl bg-soft border border-border px-3 text-sm font-bold focus:border-primary focus:ring-0"
             >
-              <option value="none">توزيع تلقائي</option>
+              <option value="none">{t("bookingModal.autoAssign")}</option>
               {barbers.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.display_name || b.full_name}
@@ -284,12 +296,12 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
           {/* Notes */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-muted uppercase tracking-widest">
-              ملاحظات
+              {t("bookingModal.notes")}
             </label>
             <input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="أي ملاحظات..."
+              placeholder={t("bookingModal.notesPlaceholder")}
               className="w-full h-10 rounded-xl bg-soft border border-border px-3 text-sm font-bold focus:border-primary focus:ring-0"
             />
           </div>
@@ -302,11 +314,10 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
               </p>
             </div>
           )}
-          {existingBookings.length > 0 && (
+          {sameDayBookings.length > 0 && (
             <div className="rounded-lg bg-warning/5 border border-warning/20 p-2.5">
               <p className="text-[10px] font-black text-warning flex items-center gap-1.5">
-                <AlertTriangle size={12} /> هذا العميل لديه حجز في هذا اليوم
-                بالفعل
+                <AlertTriangle size={12} /> {t("bookingModal.sameDay")}
               </p>
             </div>
           )}
@@ -314,7 +325,7 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
           {/* Summary */}
           <div className="rounded-xl bg-success/5 border border-success/20 p-3">
             <div className="text-[10px] font-bold text-muted">
-              الإجمالي ({serviceIds.length} خدمات • {totalDuration} دقيقة)
+              {t("bookingModal.summary", { count: serviceIds.length, duration: totalDuration })}
             </div>
             <div className="text-xl font-black text-success">
               {formatCurrency(totalPrice)}
@@ -327,7 +338,7 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
             onClick={() => onOpenChange(false)}
             className="h-10 flex-1 rounded-xl text-xs"
           >
-            إلغاء
+            {t("bookingModal.cancel")}
           </Button>
           <Button
             variant="primary"
@@ -338,13 +349,15 @@ export default function BookingModal({ open, onOpenChange, customer, onSuccess }
               serviceIds.length === 0 ||
               !time ||
               !!conflictMsg ||
-              existingBookings.length > 0
+              sameDayBookings.length > 0
             }
           >
-            <Plus size={14} className="ml-1.5" /> تأكيد الحجز
+            <Plus size={14} className="ms-1.5" /> {t("bookingModal.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
+

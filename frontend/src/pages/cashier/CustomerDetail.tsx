@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { PageShell } from "@/components/shared/PageShell";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -15,15 +18,23 @@ import {
   AlertCircle,
   CalendarClock,
   Receipt,
+  FileText,
+  Clock,
+  MessageCircle,
+  Printer,
+  Send,
+  Download,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "react-hot-toast";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { cn, formatCurrency, getInitials } from "@/lib/core/utils";
+import { exportCustomerPDF } from "@/lib/export/customerPDF";
 
 import {
   useCustomerDetailPage,
@@ -33,17 +44,23 @@ import {
   CustomerEditDialog,
   BookingModal,
 } from "@/features/customers";
+import { InvoiceDetailsDialog } from "@/features/invoices";
+import { printThermalReceipt } from "@/lib/print/receipt";
+import { useSalon } from "@/context/SalonContext";
 import { PageHeader } from "@/components/shared/PremiumUI";
 import { Badge } from "@/components/ui/badge";
 
 function CustomerDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const isOwner = ["OWNER", "ADMIN"].includes(
     String(user?.role || "").toUpperCase(),
   );
   const customerId = Number(id);
+  const { t, i18n } = useTranslation("customers");
+  const dateLocale = i18n.language.startsWith("ar") ? "ar-EG" : "en-GB";
   const {
     customer,
     appointments,
@@ -72,12 +89,20 @@ function CustomerDetailPage() {
 
   const [activeTab, setActiveTab] = useState("overview");
 
+  // Row -> invoice details. State lives here (page level) because the dialog
+  // is the invoices feature's shared component; the tab stays page-agnostic
+  // and simply reports which row was opened.
+  const [selectedInvoice, setSelectedInvoice] = useState<
+    Record<string, unknown> | null
+  >(null);
+  const { settings } = useSalon();
+
   if (customerLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" aria-busy="true" aria-label={t("page.loading")}>
         <div className="flex flex-col items-center gap-3">
-          <Skeleton className="h-20 w-20 rounded-2xl" />
-          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-20 w-20 rounded-2xl" aria-hidden="true" />
+          <Skeleton className="h-4 w-40" aria-hidden="true" />
         </div>
       </div>
     );
@@ -88,27 +113,39 @@ function CustomerDetailPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center">
           <AlertCircle size={48} className="text-rose-400" />
-          <h3 className="text-lg font-black text-main">العميل غير موجود</h3>
-          <Button
-            variant="primary"
-            onClick={() => navigate("/customers")}
-            className="rounded-xl"
-          >
-            <ArrowRight size={16} className="ml-2" /> العودة للعملاء
-          </Button>
+          <h3 className="text-lg font-black text-main">{t("customerDetail.notFound")}</h3>
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              variant="primary"
+              onClick={() => navigate("/customers")}
+              className="rounded-xl"
+            >
+              <ArrowRight size={16} className="ms-2" /> {t("customerDetail.backToCustomers")}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                navigate("/customers");
+                // Trigger create customer flow - the Customers page handles this
+              }}
+              className="rounded-xl"
+            >
+              <Plus size={14} className="ms-1.5" /> {t("quickActions.createCustomer")}
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-12">
-      <div className="mx-auto max-w-7xl space-y-4 px-3 pt-4 sm:space-y-5 sm:px-4 lg:px-6">
+    <div>
+      <PageShell contained>
         <PageHeader
           className={undefined}
           title={`${customer.first_name} ${customer.last_name || ""}`}
-          subtitle={`ملف العميل الكامل • رقم #${customer.customer_id}`}
-          badge={tierInfo.label}
+          subtitle={t("details.profileSubtitle", { id: customer.customer_id })}
+          badge={t(tierInfo.label)}
           icon={tierInfo.icon}
           actions={
             <div className="flex items-center gap-2 flex-wrap">
@@ -117,15 +154,94 @@ function CustomerDetailPage() {
                 onClick={() => navigate("/customers")}
                 className="h-10 rounded-xl px-3 text-xs"
               >
-                <ArrowRight size={14} className="ml-1.5" /> العودة
+                <ArrowRight size={14} className="ms-1.5" /> {t("customerDetail.back")}
               </Button>
               <Button
                 variant="primary"
                 className="h-10 rounded-xl px-3 text-xs"
                 onClick={() => setIsBookingOpen(true)}
               >
-                <Plus size={14} className="ml-1.5" /> حجز جديد
+                <Plus size={14} className="ms-1.5" /> {t("customerDetail.newBooking")}
               </Button>
+              {customer.phone && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const phone = customer.phone.replace(/\s/g, "");
+                    const msg = encodeURIComponent(
+                      `مرحباً ${customer.first_name}، نتمنى لك يوماً سعيداً من صالون برو`,
+                    );
+                    window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+                  }}
+                  className="h-8 rounded-xl px-2 text-[10px] whitespace-nowrap"
+                  aria-label={t("quickActions.whatsapp")}
+                  title={t("quickActions.whatsapp")}
+                >
+                  <MessageCircle size={12} className="ms-1" /> {t("quickActions.whatsapp")}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  toast(
+                    t("quickActions.reminder"),
+                    { icon: "📱", duration: 3000 },
+                  );
+                }}
+                className="h-8 rounded-xl px-2 text-[10px] whitespace-nowrap"
+                aria-label={t("quickActions.reminder")}
+                title={t("quickActions.reminder")}
+              >
+                <Send size={12} className="ms-1" /> {t("quickActions.reminder")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  window.print();
+                }}
+                className="h-8 rounded-xl px-2 text-[10px] whitespace-nowrap"
+                aria-label={t("quickActions.printCard")}
+                title={t("quickActions.printCard")}
+              >
+                <Printer size={12} className="ms-1" /> {t("quickActions.printCard")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  exportCustomerPDF({
+                    customer,
+                    appointments,
+                    invoices,
+                    stats,
+                    tierInfo,
+                    salonName: settings?.salon_name || settings?.salonName || "Salon Pro",
+                  });
+                }}
+                className="h-8 rounded-xl px-2 text-[10px] whitespace-nowrap"
+                aria-label={t("export.button")}
+                title={t("export.button")}
+              >
+                <Download size={12} className="ms-1" /> {t("export.button")}
+              </Button>
+              {isOwner && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    // Transfer to POS - create a quick sale session
+                    setIsBookingOpen(true);
+                  }}
+                  className="h-8 rounded-xl px-2 text-[10px] whitespace-nowrap"
+                  aria-label={t("quickActions.transferPOS")}
+                  title={t("quickActions.transferPOS")}
+                >
+                  <CreditCard size={12} className="ms-1" /> {t("quickActions.transferPOS")}
+                </Button>
+              )}
               {isOwner && (
                 <>
                   <Button
@@ -133,14 +249,14 @@ function CustomerDetailPage() {
                     onClick={openEdit}
                     className="h-10 rounded-xl px-3 text-xs"
                   >
-                    <Edit3 size={14} className="ml-1.5" /> تعديل
+                    <Edit3 size={14} className="ms-1.5" /> {t("customerDetail.edit")}
                   </Button>
                   <Button
                     variant="danger"
                     onClick={() => setIsDeleteOpen(true)}
                     className="h-10 rounded-xl px-3 text-xs"
                   >
-                    <Trash2 size={14} className="ml-1.5" /> حذف
+                    <Trash2 size={14} className="ms-1.5" /> {t("customerDetail.delete")}
                   </Button>
                 </>
               )}
@@ -174,7 +290,7 @@ function CustomerDetailPage() {
                     tierInfo.bg,
                   )}
                 >
-                  <tierInfo.icon size={10} className="ml-1" /> {tierInfo.label}
+                  <tierInfo.icon size={10} className="ms-1" /> {t(tierInfo.label)}
                 </Badge>
               </div>
               <div className="flex flex-wrap items-center gap-3 mt-1 text-xs">
@@ -184,6 +300,14 @@ function CustomerDetailPage() {
                     className="flex items-center gap-1 text-muted hover:text-primary"
                   >
                     <Phone size={12} /> <span dir="ltr">{customer.phone}</span>
+                  </a>
+                )}
+                {customer.second_phone && (
+                  <a
+                    href={`tel:${customer.second_phone}`}
+                    className="flex items-center gap-1 text-muted hover:text-primary"
+                  >
+                    <Phone size={12} /> <span dir="ltr">{customer.second_phone}</span>
                   </a>
                 )}
                 {customer.email && (
@@ -196,11 +320,21 @@ function CustomerDetailPage() {
                 )}
                 {customer.created_at && (
                   <span className="flex items-center gap-1 text-muted">
-                    <Calendar size={12} /> منذ{" "}
-                    {new Date(customer.created_at).toLocaleDateString("ar-EG", {
+                    <Calendar size={12} /> {t("details.since")}{" "}
+                    {new Date(customer.created_at).toLocaleDateString(dateLocale, {
                       year: "numeric",
                       month: "short",
                     })}
+                  </span>
+                )}
+                {customer.address && (
+                  <span className="flex items-center gap-1 text-muted">
+                    <FileText size={12} /> {customer.address}
+                  </span>
+                )}
+                {customer.notes && (
+                  <span className="flex items-center gap-1 text-muted" title={customer.notes}>
+                    <Send size={12} /> {customer.notes}
                   </span>
                 )}
               </div>
@@ -210,13 +344,13 @@ function CustomerDetailPage() {
 
         {/* Stats */}
         {stats && (
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-6">
             <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
               <div className="flex items-center gap-2">
                 <TrendingUp size={16} className="text-primary" />
                 <div>
                   <p className="text-[8px] font-bold uppercase text-muted sm:text-[10px]">
-                    إجمالي الإنفاق
+                    {t("overview.totalSpend")}
                   </p>
                   <p className="text-base font-black text-main sm:text-lg">
                     {formatCurrency(stats.totalSpend)}
@@ -229,7 +363,7 @@ function CustomerDetailPage() {
                 <CalendarClock size={16} className="text-info" />
                 <div>
                   <p className="text-[8px] font-bold uppercase text-muted sm:text-[10px]">
-                    الزيارات
+                    {t("overview.visits")}
                   </p>
                   <p className="text-base font-black text-main sm:text-lg">
                     {stats.visits}
@@ -242,7 +376,7 @@ function CustomerDetailPage() {
                 <Trophy size={16} className="text-warning" />
                 <div>
                   <p className="text-[8px] font-bold uppercase text-muted sm:text-[10px]">
-                    نقاط الولاء
+                    {t("overview.points")}
                   </p>
                   <p className="text-base font-black text-main sm:text-lg">
                     {stats.points}
@@ -255,10 +389,49 @@ function CustomerDetailPage() {
                 <CreditCard size={16} className="text-success" />
                 <div>
                   <p className="text-[8px] font-bold uppercase text-muted sm:text-[10px]">
-                    المدفوع
+                    {t("overview.paid")}
                   </p>
                   <p className="text-base font-black text-main sm:text-lg">
                     {formatCurrency(stats.totalPaid)}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+              <div className="flex items-center gap-2">
+                <FileText size={16} className="text-info" />
+                <div>
+                  <p className="text-[8px] font-bold uppercase text-muted sm:text-[10px]">
+                    {t("overview.avgSpend")}
+                  </p>
+                  <p className="text-base font-black text-main sm:text-lg">
+                    {formatCurrency(stats.avgSpend)}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={16} className="text-warning" />
+                <div>
+                  <p className="text-[8px] font-bold uppercase text-muted sm:text-[10px]">
+                    {t("overview.noShowRate")}
+                  </p>
+                  <p className="text-base font-black text-main sm:text-lg">
+                    {stats.noShowRate}%
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-primary" />
+                <div>
+                  <p className="text-[8px] font-bold uppercase text-muted sm:text-[10px]">
+                    {t("overview.upcomingAppointments")}
+                  </p>
+                  <p className="text-base font-black text-main sm:text-lg">
+                    {stats.upcomingCount}
                   </p>
                 </div>
               </div>
@@ -270,16 +443,16 @@ function CustomerDetailPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="h-10 px-1 rounded-xl bg-soft border border-border gap-1 w-full flex-wrap justify-start">
             {[
-              { key: "overview", label: "نظرة عامة", icon: User },
+              { key: "overview", label: t("tabs.overview"), icon: User },
               {
                 key: "appointments",
-                label: "المواعيد",
+                label: t("tabs.appointments"),
                 icon: CalendarClock,
                 count: appointments.length,
               },
               {
                 key: "invoices",
-                label: "الفواتير",
+                label: t("tabs.invoices"),
                 icon: Receipt,
                 count: invoices.length,
               },
@@ -307,6 +480,8 @@ function CustomerDetailPage() {
             appointmentsLoading={appointmentsLoading}
             invoices={invoices}
             invoicesLoading={invoicesLoading}
+            activityLogs={activityLogs}
+            activityLoading={activityLoading}
           />
 
           <CustomerAppointmentsTab
@@ -314,7 +489,11 @@ function CustomerDetailPage() {
             loading={appointmentsLoading}
           />
 
-          <CustomerInvoicesTab invoices={invoices} loading={invoicesLoading} />
+          <CustomerInvoicesTab
+            invoices={invoices}
+            loading={invoicesLoading}
+            onViewInvoice={(inv) => setSelectedInvoice(inv ?? null)}
+          />
         </Tabs>
 
         {/* Edit Dialog */}
@@ -332,9 +511,18 @@ function CustomerDetailPage() {
           open={isBookingOpen}
           onOpenChange={setIsBookingOpen}
           customer={customer}
-          onSuccess={() => {
+          onSuccess={async () => {
             setIsBookingOpen(false);
-            window.location.reload();
+            await queryClient.invalidateQueries({ queryKey: ["customers"] });
+          }}
+        />
+
+        {/* Invoice details (row eye button in the invoices tab) */}
+        <InvoiceDetailsDialog
+          selectedInvoice={selectedInvoice}
+          onClose={() => setSelectedInvoice(null)}
+          onPrintSelected={() => {
+            if (selectedInvoice) void printThermalReceipt(selectedInvoice, settings);
           }}
         />
 
@@ -342,14 +530,14 @@ function CustomerDetailPage() {
         <ConfirmDialog
           open={isDeleteOpen}
           onOpenChange={setIsDeleteOpen}
-          title="حذف العميل"
-          description={`هل أنت متأكد من حذف ${customer.first_name}؟ سيتم حذفه نهائياً من النظام.`}
+          title={t("customerDetail.archive")}
+          description={t("customerDetail.archiveConfirm", { name: customer.first_name })}
           onConfirm={handleDelete}
-          confirmText="نعم، احذف"
-          cancelText="إلغاء"
+          confirmText={t("customerDetail.archiveConfirmText")}
+          cancelText={t("customerDetail.archiveCancel")}
           variant="danger"
         />
-      </div>
+      </PageShell>
     </div>
   );
 }
@@ -361,3 +549,7 @@ export default function CustomerDetail() {
     </ErrorBoundary>
   );
 }
+
+
+
+

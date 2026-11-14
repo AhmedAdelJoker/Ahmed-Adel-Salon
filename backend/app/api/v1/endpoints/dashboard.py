@@ -23,6 +23,7 @@ from app.models.employee import Employee
 from app.models.expense import Expense
 from app.models.pos_shift import PosShift
 from app.models.employee_presence_log import EmployeePresenceLog
+from app.core.clock import salon_day_bounds_utc, salon_now
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -108,19 +109,24 @@ def cashier_summary(
     current_user: User = Depends(require_cashier_manager_owner),
 ):
     from datetime import date, datetime, time
-    today_start = datetime.combine(date.today(), time.min)
-    today_end = datetime.combine(date.today(), time.max)
+    # These bounds are compared against `Invoice.created_at` and
+    # `Expense.created_at`, which SQLite writes with CURRENT_TIMESTAMP -- UTC,
+    # always. Building them from a *local* midnight selects the wrong 24 hours
+    # by the UTC offset: it drops the first hours of the shop's morning into
+    # yesterday and pulls the tail of today forward. `salon_day_bounds_utc` takes
+    # the shop's day and expresses it in the clock the column is stored in.
+    today_start, today_end = salon_day_bounds_utc()
 
     customers_count = db.query(Customer).filter(Customer.is_deleted == False).count()
     
     # Today's appointments
     today_appointments = db.query(Appointment).filter(
-        Appointment.appointment_date == date.today()
+        Appointment.appointment_date == salon_now().date()
     ).count()
     
     # Daily Cancellations
     today_cancellations = db.query(Appointment).filter(
-        Appointment.appointment_date == date.today(),
+        Appointment.appointment_date == salon_now().date(),
         Appointment.status.in_(["cancelled", "auto_cancelled"])
     ).count()
     
@@ -168,7 +174,7 @@ def cashier_summary(
 
     # Waiting customers (appointments with waiting/pending/confirmed status for today)
     waiting_customers = db.query(Appointment).filter(
-        Appointment.appointment_date == date.today(),
+        Appointment.appointment_date == salon_now().date(),
         Appointment.status.in_(["waiting", "pending", "confirmed"])
     ).count()
 

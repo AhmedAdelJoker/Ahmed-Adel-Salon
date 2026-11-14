@@ -1,6 +1,10 @@
-"""TOTP two-factor auth — setup/enable/login-gate/disable flow."""
+"""TOTP two-factor auth — setup/enable/login-gate/disable flow + encryption at rest."""
 import pyotp
 
+from app.core.config import settings
+from app.core.totp_crypto import encrypt_totp_secret
+from app.models.activity_log import ActivityLog
+from app.models.user import User
 from tests.helpers import make_user
 
 
@@ -113,3 +117,96 @@ def test_2fa_disable_with_password_restores_simple_login(client, db_session):
     # Plain login works again (old token from before disable is stale; re-login).
     plain = _login(client)
     assert plain.status_code == 200, plain.text
+
+
+# --- encryption at rest -------------------------------------------------------
+# A TOTP seed cannot be hashed (the server must recompute codes), so it is
+# encrypted instead. Storing it readable would hand anyone with database access
+# a working 2FA bypass.
+
+
+def _user_row(db_session, username="cashier1"):
+    return db_session.query(User).filter(User.username == username).first()
+
+
+def test_totp_secret_is_never_stored_plaintext(client, db_session):
+    headers, secret = _setup_2fa(client, db_session)
+
+    stored = _user_row(db_session).totp_secret
+    assert stored, "secret must be persisted"
+    assert stored != secret, "TOTP seed must not be stored in plaintext"
+    assert secret not in stored, "plaintext seed must not appear inside the stored value"
+
+    # The setup response still hands back the plaintext seed for the QR code.
+    assert secret
+
+
+def test_2fa_still_verifies_with_encrypted_secret(client, db_session):
+    headers, secret = _setup_2fa(client, db_session)
+    enable = client.post(
+        "/api/v1/auth/2fa/enable",
+        json={"code": pyotp.TOTP(secret).now()},
+        headers=headers,
+    )
+    assert enable.status_code == 200, enable.text
+    good = _login(client, totp=pyotp.TOTP(secret).now())
+    assert good.status_code == 200, good.text
+
+
+def test_legacy_plaintext_secret_verifies_and_is_upgraded(client, db_session):
+    """Rows written before encryption existed must keep working, then migrate."""
+    headers, secret = _setup_2fa(client, db_session)
+
+    user = _user_row(db_session)
+    user.totp_secret = secret  # simulate the pre-encryption row
+    db_session.commit()
+    assert _user_row(db_session).totp_secret == secret
+
+    enable = client.post(
+        "/api/v1/auth/2fa/enable",
+        json={"code": pyotp.TOTP(secret).now()},
+        headers=headers,
+    )
+    assert enable.status_code == 200, enable.text
+
+    # Verifying rewrote the row as ciphertext. The request runs on its own
+    # session, so drop the identity-map copy before re-reading.
+    db_session.expire_all()
+    upgraded = _user_row(db_session).totp_secret
+    assert upgraded != secret, "legacy plaintext secret must be re-encrypted"
+    assert secret not in upgraded
+
+    assert _login(client, totp=pyotp.TOTP(secret).now()).status_code == 200
+
+
+def test_undecryptable_secret_fails_closed_and_is_audited(client, db_session):
+    """A seed encrypted under a rotated SECRET_KEY must not authenticate."""
+    headers, secret = _setup_2fa(client, db_session)
+    enable = client.post(
+        "/api/v1/auth/2fa/enable",
+        json={"code": pyotp.TOTP(secret).now()},
+        headers=headers,
+    )
+    assert enable.status_code == 200, enable.text
+
+    original = settings.SECRET_KEY
+    try:
+        # Ciphertext from a *different* key — what a SECRET_KEY rotation leaves behind.
+        settings.SECRET_KEY = "a-totally-different-secret-key-32chars"
+        alien = encrypt_totp_secret(secret)
+    finally:
+        settings.SECRET_KEY = original
+    assert alien != secret
+
+    user = _user_row(db_session)
+    user.totp_secret = alien
+    db_session.commit()
+
+    resp = _login(client, totp=pyotp.TOTP(secret).now())
+    assert resp.status_code == 401, resp.text
+
+    reasons = [
+        (log.description or "")
+        for log in db_session.query(ActivityLog).all()
+    ]
+    assert any("totp_secret_undecryptable" in r for r in reasons), reasons

@@ -1,10 +1,13 @@
 import React from "react";
 import { Lightbulb } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
 import { Sparkles, Target, TrendingUp, Zap } from "lucide-react";
+import { currencyLabel } from "@/lib/core/currency";
 
 export default function AIInsights({ data, isSidebar = false }) {
   if (!data) return null;
+  const { t } = useTranslation("owner");
 
   return (
     <div
@@ -20,7 +23,7 @@ export default function AIInsights({ data, isSidebar = false }) {
             <Sparkles size={20} />
           </div>
           <h3 className="text-xl font-black uppercase tracking-tight">
-            الرؤية الذكية للأداء
+            {t("ai.title")}
           </h3>
         </div>
       )}
@@ -59,7 +62,7 @@ export default function AIInsights({ data, isSidebar = false }) {
                   isSidebar ? "text-white" : "text-slate-500",
                 )}
               >
-                توصية ذكية #{idx + 1}
+                {t("ai.recommendation", { n: idx + 1 })}
               </p>
               <p
                 className={cn(
@@ -86,15 +89,13 @@ export default function AIInsights({ data, isSidebar = false }) {
       >
         <div className="relative z-10">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-1">
-            الربح المتوقع
+            {t("ai.predictedProfit")}
           </p>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black tracking-tighter">
               {Number(data.predicted).toLocaleString()}
             </span>
-            <span className="text-[10px] font-black opacity-80 uppercase">
-              ج.م
-            </span>
+            <span className="text-[10px] font-black opacity-80 uppercase">{currencyLabel()}</span>
           </div>
         </div>
         <div
