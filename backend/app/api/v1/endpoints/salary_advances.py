@@ -74,20 +74,25 @@ def create_salary_advance(
     db.flush()
 
     from app.crud.core_business import create_cash_transaction
-    create_cash_transaction(
-        db,
-        direction="out",
-        amount=float(payload.amount),
-        transaction_type="salary_advance",
-        payment_method="cash",
-        notes=f"صرف سلفة: {employee.full_name}",
-        user_id=current_user.id,
-        reference_type="salary_advance",
-        reference_id=db_obj.id,
-        reference_no=f"ADV-{db_obj.id}",
-        employee_id=employee.id,
-        commit=False,
-    )
+    try:
+        create_cash_transaction(
+            db,
+            direction="out",
+            amount=float(payload.amount),
+            transaction_type="salary_advance",
+            payment_method="cash",
+            notes=f"صرف سلفة: {employee.full_name}",
+            user_id=current_user.id,
+            reference_type="salary_advance",
+            reference_id=db_obj.id,
+            reference_no=f"ADV-{db_obj.id}",
+            employee_id=employee.id,
+            commit=False,
+        )
+    except ValueError as e:
+        # Overdraft — the whole request fails atomically with a clear 400.
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
     db.commit()
     db.refresh(db_obj)

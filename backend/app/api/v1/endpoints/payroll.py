@@ -424,6 +424,10 @@ def pay_payroll(
         db.commit()
         db.refresh(record)
         return record
+    except ValueError as e:
+        # Overdraft / invalid movement — message for the user, not a 500.
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
