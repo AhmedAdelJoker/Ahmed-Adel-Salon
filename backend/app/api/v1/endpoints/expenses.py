@@ -23,6 +23,7 @@ from app.core.clock import (
     salon_month_start_utc as _salon_month_start_utc,
     salon_now,
     salon_year_start_utc as _salon_year_start_utc,
+    utc_now_naive,
 )
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
@@ -620,7 +621,7 @@ def update_expense(
         if existing:
             existing.is_voided = True
             existing.void_reason = "expense_edited"
-            existing.voided_at = salon_now()
+            existing.voided_at = utc_now_naive()
             existing.voided_by = current_user.id
             db.add(existing)
             # Testing sessions run with autoflush=False; force the void to be
