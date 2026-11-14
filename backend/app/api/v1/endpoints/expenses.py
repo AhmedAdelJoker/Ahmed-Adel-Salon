@@ -11,12 +11,13 @@ from app.db.session import get_db
 from app.api.deps import require_cashier_manager_owner, require_owner_or_admin, require_owner_or_manager
 from app.models.user import User
 from app.models.expense import Expense
+from app.models.cash_transaction import CashTransaction
 from app.schemas.expense import ExpenseCreate, ExpenseRead, ExpenseSummary, ExpenseArchiveResponse
 from app.utils.expense_labels import expense_label_ar
 from app.utils.media import process_image_content, get_upload_path
 from app.core.upload_security import validate_image_or_pdf
 from app.core.audit import audit_log
-from app.crud.core_business import create_cash_transaction
+from app.crud.core_business import create_cash_transaction, find_existing_cash_transaction
 from app.core.clock import (
     salon_day_bounds_utc,
     salon_month_start_utc as _salon_month_start_utc,
@@ -26,6 +27,38 @@ from app.core.clock import (
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 # UPLOAD_DIR now resolved lazily via get_upload_path("expenses") (SOT §5.2)
+
+# Sort fields the ledger may order by. Anything else is a 400 instead of a
+# 500 from getattr()ing something that isn't a column (e.g. "metadata").
+_SORTABLE_FIELDS = {
+    "id": Expense.id,
+    "title": Expense.title,
+    "amount": Expense.amount,
+    "category": Expense.category,
+    "status": Expense.status,
+    "payment_method": Expense.payment_method,
+    "expense_date": Expense.expense_date,
+    "created_at": Expense.created_at,
+}
+
+
+def _is_owner_or_admin(user) -> bool:
+    return str(getattr(user, "role", "") or "").strip().lower() in {"owner", "admin"}
+
+
+def _serialize_expense(exp, *, reveal_private: bool) -> ExpenseRead:
+    """Serialize an Expense ORM object, stripping the owner-only fields.
+
+    `internal_notes` is the owner's private memo attached to a financial
+    record; cashiers/accountants/managers must never receive it. Done at the
+    serialization boundary so the ORM object itself is never mutated (setting
+    `exp.internal_notes = None` would mark the instance dirty and persist the
+    NULL on the next flush — silently destroying the note).
+    """
+    model = ExpenseRead.model_validate(exp)
+    if not reveal_private:
+        model = model.model_copy(update={"internal_notes": None})
+    return model
 
 
 @router.get("", response_model=list[ExpenseRead])
@@ -90,13 +123,18 @@ def list_expenses(
             except Exception:
                 pass
 
-    # Phase 2: optional explicit sort (defaults to expense_date DESC)
+    # Phase 2: optional explicit sort (defaults to expense_date DESC).
+    # Allowlist only — an arbitrary attribute name used to 500 the request.
     if sort:
-        sort_field = sort.lstrip("-")
+        sort_field = sort.lstrip("-").lower()
         desc = sort.startswith("-")
-        column = getattr(Expense, sort_field, None)
-        if column is not None:
-            query = query.order_by(column.desc() if desc else column.asc())
+        column = _SORTABLE_FIELDS.get(sort_field)
+        if column is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"فرز غير مدعوم: {sort_field} — المسموح: {sorted(_SORTABLE_FIELDS)}",
+            )
+        query = query.order_by(column.desc() if desc else column.asc())
     else:
         query = query.order_by(Expense.expense_date.desc(), Expense.id.desc())
 
@@ -113,7 +151,9 @@ def list_expenses(
         response.headers["X-Page-Size"] = str(eff_limit)
         if page is not None:
             response.headers["X-Page"] = str(page)
-    return query.offset(eff_skip).limit(eff_limit).all()
+    items = query.offset(eff_skip).limit(eff_limit).all()
+    reveal_private = _is_owner_or_admin(current_user)
+    return [_serialize_expense(e, reveal_private=reveal_private) for e in items]
 
 
 @router.get("/archive", response_model=ExpenseArchiveResponse)
@@ -130,6 +170,11 @@ def get_expenses_archive(
     current_user: User = Depends(require_cashier_manager_owner),
 ):
     query = db.query(Expense).options(joinedload(Expense.created_by_user))
+
+    # The archive is the money ledger, not the journal of decisions —
+    # rejected rows never moved money, so they stay out of counts and sums.
+    # (They remain visible in the main tab under the status filter.)
+    query = query.filter(Expense.status != "rejected")
 
     if start_date:
         try:
@@ -175,8 +220,9 @@ def get_expenses_archive(
         response.headers["X-Page-Size"] = str(limit)
         response.headers["X-Page"] = str(page)
 
+    reveal_private = _is_owner_or_admin(current_user)
     return {
-        "items": items,
+        "items": [_serialize_expense(e, reveal_private=reveal_private) for e in items],
         "total": total,
         "total_amount": float(total_amount),
     }
@@ -205,8 +251,15 @@ def get_expenses_summary(
         except ValueError:
             pass
 
-    total = base_query.with_entities(func.sum(Expense.amount)).scalar() or 0
-    count = base_query.count()
+    # Money that actually moved is "approved" only. Pending is reported
+    # separately (it may still become money out); rejected never was.
+    approved_query = base_query.filter(Expense.status == "approved")
+    pending_query = base_query.filter(Expense.status == "pending_audit")
+
+    total = approved_query.with_entities(func.sum(Expense.amount)).scalar() or 0
+    count = approved_query.count()
+    pending_total = pending_query.with_entities(func.sum(Expense.amount)).scalar() or 0
+    pending_count = pending_query.count()
 
     # One reading of the clock for the whole summary. Called per line instead,
     # the month could be computed from one "now" and the year from another if the
@@ -226,25 +279,45 @@ def get_expenses_summary(
 
     # Today
     today_total = db.query(func.sum(Expense.amount)).filter(
-        Expense.expense_date >= today_start, Expense.expense_date <= today_end
+        Expense.expense_date >= today_start, Expense.expense_date <= today_end,
+        Expense.status == "approved",
     ).scalar() or 0
 
     # This month
     month_total = db.query(func.sum(Expense.amount)).filter(
-        Expense.expense_date >= month_start
+        Expense.expense_date >= month_start,
+        Expense.status == "approved",
     ).scalar() or 0
 
     # Year total
     year_total = db.query(func.sum(Expense.amount)).filter(
-        Expense.expense_date >= year_start
+        Expense.expense_date >= year_start,
+        Expense.status == "approved",
     ).scalar() or 0
 
-    # Category breakdown & top
-    cat_rows = base_query.with_entities(
+    # Category breakdown & top — approved money only, same basis as totals
+    cat_rows = approved_query.with_entities(
         Expense.category,
         func.sum(Expense.amount).label("total"),
         func.count(Expense.id).label("cnt")
     ).group_by(Expense.category).order_by(func.sum(Expense.amount).desc()).all()
+
+    # Payment-method breakdown — the frontend used to compute this from the
+    # current page of rows, which made the chart depend on which page you
+    # were looking at. Server-side, filtered by the same from/to range.
+    pay_rows = approved_query.with_entities(
+        Expense.payment_method,
+        func.sum(Expense.amount).label("total"),
+        func.count(Expense.id).label("cnt"),
+    ).group_by(Expense.payment_method)
+    payment_breakdown = [
+        {
+            "method": r.payment_method or "cash",
+            "amount": float(r.total),
+            "count": r.cnt,
+        }
+        for r in pay_rows
+    ]
 
     categories = [
         {
@@ -265,6 +338,9 @@ def get_expenses_summary(
         "total_amount": float(total),
         "count": count,
         "categories": categories,
+        "payment_breakdown": payment_breakdown,
+        "pending_total": float(pending_total),
+        "pending_count": pending_count,
         # Legacy aliases for existing frontend
         "today_total": float(today_total),
         "month_total": float(month_total),
@@ -308,23 +384,30 @@ def create_expense(
 
     if status_val == "approved" and expense.amount and float(expense.amount) > 0:
         pm = str(expense.payment_method or "cash").strip().lower()
-        create_cash_transaction(
-            db,
-            direction="out",
-            amount=float(expense.amount),
-            transaction_type="expense_payment",
-            payment_method=pm or "cash",
-            notes=f"مصروف: {expense.title} - {expense.category}",
-            user_id=current_user.id,
-            reference_type="expense",
-            reference_id=expense.id,
-            reference_no=f"EXP-{expense.id}",
-            commit=False,
-        )
+        try:
+            create_cash_transaction(
+                db,
+                direction="out",
+                amount=float(expense.amount),
+                transaction_type="expense_payment",
+                payment_method=pm or "cash",
+                notes=f"مصروف: {expense.title} - {expense.category}",
+                user_id=current_user.id,
+                reference_type="expense",
+                reference_id=expense.id,
+                reference_no=f"EXP-{expense.id}",
+                commit=False,
+            )
+        except ValueError as e:
+            # The cash box refused (e.g. overdraft when negative cash is
+            # disallowed). The expense must not persist without its cash
+            # movement — fail the whole request atomically.
+            db.rollback()
+            raise HTTPException(status_code=400, detail=str(e))
 
     db.commit()
     expense = db.query(Expense).options(joinedload(Expense.created_by_user)).filter(Expense.id == expense.id).first()
-    return expense
+    return _serialize_expense(expense, reveal_private=_is_owner_or_admin(current_user))
 
 
 @router.post("/{expense_id}/approve", response_model=ExpenseRead)
@@ -357,7 +440,6 @@ def approve_expense(
     }
 
     if was_pending and expense.amount and float(expense.amount) > 0:
-        from app.crud.core_business import find_existing_cash_transaction
         existing = find_existing_cash_transaction(
             db,
             reference_type="expense",
@@ -366,19 +448,25 @@ def approve_expense(
         )
         if not existing:
             pm = str(expense.payment_method or "cash").strip().lower()
-            create_cash_transaction(
-                db,
-                direction="out",
-                amount=float(expense.amount),
-                transaction_type="expense_payment",
-                payment_method=pm or "cash",
-                notes=f"مصروف معتمد: {expense.title} - {expense.category}",
-                user_id=current_user.id,
-                reference_type="expense",
-                reference_id=expense.id,
-                reference_no=f"EXP-{expense.id}",
-                commit=False,
-            )
+            try:
+                create_cash_transaction(
+                    db,
+                    direction="out",
+                    amount=float(expense.amount),
+                    transaction_type="expense_payment",
+                    payment_method=pm or "cash",
+                    notes=f"مصروف معتمد: {expense.title} - {expense.category}",
+                    user_id=current_user.id,
+                    reference_type="expense",
+                    reference_id=expense.id,
+                    reference_no=f"EXP-{expense.id}",
+                    commit=False,
+                )
+            except ValueError as e:
+                # Overdraft policy refused the movement — the approval must
+                # not be recorded without its cash-box entry.
+                db.rollback()
+                raise HTTPException(status_code=400, detail=str(e))
             snapshot["cash_movement_created"] = True
 
     db.commit()
@@ -390,7 +478,8 @@ def approve_expense(
         entity_id=expense_id,
         description=snapshot,
     )
-    return expense
+    db.refresh(expense)
+    return _serialize_expense(expense, reveal_private=_is_owner_or_admin(current_user))
 
 
 @router.post("/{expense_id}/reject", response_model=ExpenseRead)
@@ -403,7 +492,17 @@ def reject_expense(
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
-    
+
+    # Rejecting is the mirror of approving a *pending* expense. Only a
+    # pending_audit expense can move to rejected — anything else means the
+    # money already moved (or the decision is final elsewhere) and flipping
+    # the label here would desync the cash box.
+    if expense.status != "pending_audit":
+        raise HTTPException(
+            status_code=409,
+            detail="يمكن رفض المصروف المعلّق فقط — المعتمد لا يمكن رفضه دون معالجة الخزينة",
+        )
+
     # Rejecting blocks a payout, so it is the mirror of approve: both move the
     # expense across the audit boundary and both need a trail.
     snapshot = {
@@ -422,7 +521,7 @@ def reject_expense(
         entity_id=expense_id,
         description=snapshot,
     )
-    return expense
+    return _serialize_expense(expense, reveal_private=_is_owner_or_admin(current_user))
 
 
 @router.post("/upload-invoice")
@@ -446,13 +545,14 @@ async def upload_invoice_image(
 def update_expense(
     expense_id: int,
     payload: ExpenseCreate,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_manager),
 ):
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not expense:
         raise HTTPException(status_code=404, detail="المصروف غير موجود")
-    
+
     if str(current_user.role or "").strip().lower() not in ("owner", "admin"):
         raise HTTPException(status_code=403, detail="التعديل متاح للمالك فقط")
 
@@ -460,6 +560,42 @@ def update_expense(
     requiring = {"إيجار", "مشتريات"}
     if payload.category in requiring and not (payload.recipient_name and str(payload.recipient_name).strip()):
         raise HTTPException(status_code=400, detail="اسم المستفيد/المورد مطلوب لفئة الإيجار والمشتريات")
+
+    was_approved = expense.status == "approved"
+    amount_changed = payload.amount is not None and float(payload.amount) != float(expense.amount or 0)
+    payment_changed = bool(payload.payment_method) and str(payload.payment_method).strip().lower() != str(expense.payment_method or "").strip().lower()
+
+    # An approved expense already moved money. Editing the amount or payment
+    # method here would leave the cash box permanently stale, so the linked
+    # movement is voided and rewritten with the new figures. The old row is
+    # kept (voided) for the audit trail — never deleted.
+    cash_swap_needed = was_approved and (amount_changed or payment_changed)
+    if cash_swap_needed:
+        existing = find_existing_cash_transaction(
+            db,
+            reference_type="expense",
+            reference_id=expense.id,
+            transaction_type="expense_payment",
+        )
+        if existing:
+            existing.is_voided = True
+            existing.void_reason = "expense_edited"
+            existing.voided_at = salon_now()
+            existing.voided_by = current_user.id
+            db.add(existing)
+            # Testing sessions run with autoflush=False; force the void to be
+            # visible so the cash-box duplicate guard (find_existing_cash_-
+            # transaction filters is_voided == 0) sees the old row as spent.
+            db.flush()
+
+    before = {
+        "title": expense.title,
+        "category": expense.category,
+        "amount": float(expense.amount or 0),
+        "payment_method": expense.payment_method,
+        "expense_date": str(expense.expense_date) if expense.expense_date else None,
+        "status": expense.status,
+    }
 
     expense.title = payload.title or expense.title
     expense.amount = payload.amount
@@ -473,16 +609,50 @@ def update_expense(
     expense.internal_notes = getattr(payload, "internal_notes", None)
     if payload.expense_date:
         expense.expense_date = payload.expense_date
-    if getattr(payload, "status", None):
-        expense.status = payload.status
+    # NOTE: client-supplied `status` is ignored — the lifecycle moves through
+    # /approve and /reject only.
+
+    after = {
+        "title": expense.title,
+        "category": expense.category,
+        "amount": float(expense.amount or 0),
+        "payment_method": expense.payment_method,
+        "expense_date": str(expense.expense_date) if expense.expense_date else None,
+        "status": expense.status,
+    }
+
+    if cash_swap_needed:
+        pm = str(expense.payment_method or "cash").strip().lower()
+        try:
+            create_cash_transaction(
+                db,
+                direction="out",
+                amount=float(expense.amount),
+                transaction_type="expense_payment",
+                payment_method=pm or "cash",
+                notes=f"مصروف (معدّل): {expense.title} - {expense.category}",
+                user_id=current_user.id,
+                reference_type="expense",
+                reference_id=expense.id,
+                reference_no=f"EXP-{expense.id}",
+                commit=False,
+            )
+        except ValueError as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=str(e))
+
+    audit_log(
+        db, request, current_user,
+        action="update_expense",
+        entity_type="expense",
+        entity_id=expense_id,
+        description={"before": before, "after": after, "cash_swap": cash_swap_needed},
+    )
 
     db.commit()
     db.refresh(expense)
-    # ensure created_by is loaded for response
-    db.refresh(expense)
-    # reload with joinedload for creator
     expense = db.query(Expense).options(joinedload(Expense.created_by_user)).filter(Expense.id == expense_id).first()
-    return expense
+    return _serialize_expense(expense, reveal_private=_is_owner_or_admin(current_user))
 
 
 @router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)

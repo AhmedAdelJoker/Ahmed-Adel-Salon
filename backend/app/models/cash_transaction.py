@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, Boolean, Text
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, Boolean, Text, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -7,6 +7,13 @@ from app.db.base_class import Base
 
 class CashTransaction(Base):
     __tablename__ = "cash_transactions"
+
+    # Lookup path used on every expense create/approve: find_existing_cash_transaction
+    # filters on (reference_type, reference_id, type). Without this index that is a
+    # full table scan once the box has history.
+    __table_args__ = (
+        Index("ix_cash_transactions_reference_lookup", "reference_type", "reference_id", "type"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     transaction_no = Column(String(50), unique=True, index=True)
