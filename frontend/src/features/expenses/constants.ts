@@ -63,15 +63,21 @@ export const CATEGORY_ICONS: Record<string, typeof Users> = {
   أخرى: FileText,
 };
 
-export const SYSTEM_LINKS: Array<{
-  label: string;
+export interface SystemLink {
+  key: "inventory" | "payroll" | "cashbox" | "invoices";
   icon: typeof Users;
-  desc: string;
   color: string;
   href: string;
-}> = [
-  { label: "المخزون", icon: Package, desc: "مشتريات المخزون تُنشئ مصروف تلقائي", color: "bg-emerald-500", href: "/inventory" },
-  { label: "الرواتب", icon: Users, desc: "صرف الرواتب يُنشئ مصروف رواتب", color: "bg-indigo-500", href: "/owner/payroll" },
-  { label: "الصندوق", icon: Wallet, desc: "كل مصروف يخصم من رصيد الكاش", color: "bg-amber-500", href: "/owner/cashbox" },
-  { label: "الفواتير", icon: Receipt, desc: "الإيرادات - المصروفات = صافي الربح", color: "bg-sky-500", href: "/invoices" },
+}
+
+/**
+ * Labels/descriptions are NOT stored here on purpose — they are translated
+ * via `expenses.systemLinks.<key>Label` / `.<key>Desc` so the panel renders
+ * in the user's language.
+ */
+export const SYSTEM_LINKS: SystemLink[] = [
+  { key: "inventory", icon: Package, color: "bg-emerald-500", href: "/inventory" },
+  { key: "payroll", icon: Users, color: "bg-indigo-500", href: "/owner/payroll" },
+  { key: "cashbox", icon: Wallet, color: "bg-amber-500", href: "/owner/cashbox" },
+  { key: "invoices", icon: Receipt, color: "bg-sky-500", href: "/invoices" },
 ];

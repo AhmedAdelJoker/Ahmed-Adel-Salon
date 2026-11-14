@@ -17,9 +17,11 @@ import {
   RefreshCw,
   ShieldCheck,
   CheckCircle2,
+  XCircle,
   Users,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,6 +57,7 @@ import {
 const ExpensesPage = () => {
   const { t, i18n } = useTranslation("owner");
   const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language || "ar");
+  const paginationLocale = (i18n.resolvedLanguage || i18n.language || "ar").toLowerCase().startsWith("en") ? "en" : "ar";
   const navigate = useNavigate();
   const { user } = useAuth();
   const isOwner = ["OWNER", "ADMIN"].includes(String(user?.role || "").toUpperCase());
@@ -91,6 +94,8 @@ const ExpensesPage = () => {
     setDateTo,
     paymentFilter,
     setPaymentFilter,
+    statusFilter,
+    setStatusFilter,
     formData,
     setFormData,
     invoiceInputRef,
@@ -100,10 +105,13 @@ const ExpensesPage = () => {
     handleEdit,
     handleView,
     handleApprove,
+    handleReject,
     handleInvoiceUpload,
     resetForm,
     exportToCSV,
   } = useExpensesData(isOwner);
+
+  const [rejectId, setRejectId] = useState<number | string | null>(null);
 
   return (
     <div className="erp-page space-y-6 pb-10">
@@ -143,6 +151,8 @@ const ExpensesPage = () => {
         setCategoryFilter={setCategoryFilter}
         paymentFilter={paymentFilter}
         setPaymentFilter={setPaymentFilter}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
         dateFrom={dateFrom}
         setDateFrom={setDateFrom}
         dateTo={dateTo}
@@ -193,6 +203,7 @@ const ExpensesPage = () => {
                   onClick={() => {
                     setCategoryFilter("all");
                     setPaymentFilter("all");
+                    setStatusFilter("all");
                     setDateFrom("");
                     setDateTo("");
                     setSearchTerm("");
@@ -212,7 +223,7 @@ const ExpensesPage = () => {
               const CatIcon = CATEGORY_ICONS[exp.category ?? ""] || FileText;
               const catColor = CATEGORY_COLORS[exp.category ?? ""] || "var(--text-muted)";
               const isPending = exp.status === "pending_audit";
-              const isCancelled = exp.status === "cancelled" || exp.status === "rejected";
+              const isRejected = exp.status === "rejected" || exp.status === "cancelled";
               return (
                 <motion.div key={exp.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: i * 0.02 }}>
                   <PremiumCard className="group p-4 sm:p-5 hover:shadow-premium transition-all">
@@ -225,7 +236,7 @@ const ExpensesPage = () => {
                           <h3 className="text-[14px] font-black text-main truncate max-w-[220px] sm:max-w-[320px]">{exp.title}</h3>
                           <Badge variant="outline" className="h-6 rounded-full px-2.5 text-[10px] font-black border-0 text-white" style={{ backgroundColor: catColor }}>{exp.category}</Badge>
                           {isPending && <Badge className="h-6 rounded-full bg-amber-500 text-white border-0 text-[10px] font-black animate-pulse">{t("expenses.pendingApproval")}</Badge>}
-                          {isCancelled && <Badge variant="danger" className="h-6 rounded-full text-[10px] font-black">{t("expenses.cancelled")}</Badge>}
+                          {isRejected && <Badge variant="danger" className="h-6 rounded-full text-[10px] font-black">{exp.status === "rejected" ? t("expenses.statusRejected") : t("expenses.cancelled")}</Badge>}
                           {exp.invoice_image_url && <a href={exp.invoice_image_url.startsWith("http") ? exp.invoice_image_url : `${staticURL}${exp.invoice_image_url}`} target="_blank" rel="noreferrer" className="h-6 inline-flex items-center gap-1 rounded-full bg-slate-900 text-white px-2.5 text-[10px] font-black"><ImageIcon size={10} /> {t("expenses.invoiceLabel")}</a>}
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-[11px] font-bold text-muted">
@@ -240,8 +251,8 @@ const ExpensesPage = () => {
                         {exp.description && <p className="mt-2 text-xs font-bold text-muted/80 line-clamp-2 bg-soft/50 rounded-xl px-3 py-2 border border-border/30">{exp.description}</p>}
                       </div>
                       <div className="flex flex-col items-end gap-2 shrink-0">
-                        <span className={cn("text-lg font-black tabular-nums tracking-tight", isCancelled ? "line-through opacity-40 text-muted" : "text-slate-900")}>
-                          <CurrencyText value={exp.amount} tone={isCancelled ? "muted" : "primary"} />
+                        <span className={cn("text-lg font-black tabular-nums tracking-tight", isRejected ? "line-through opacity-40 text-muted" : "text-slate-900")}>
+                          <CurrencyText value={exp.amount} tone={isRejected ? "muted" : "primary"} />
                         </span>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl bg-soft border border-border hover:bg-slate-900 hover:text-white" onClick={() => handleView(exp)} title={t("expenses.viewDetails")}>
@@ -250,10 +261,15 @@ const ExpensesPage = () => {
                           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl bg-soft border border-border hover:bg-slate-900 hover:text-white" onClick={() => handleEdit(exp)} title={isOwner ? t("expenses.edit") : t("expenses.viewDetails")}>
                             {isOwner ? <FileText size={14} /> : <Eye size={14} />}
                           </Button>
-                          {isPending && isOwner && exp.id && (
-                            <Button size="sm" className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] px-3" onClick={() => exp.id != null && handleApprove(exp.id)}>
-                              <CheckCircle2 size={12} className="ms-1" /> {t("expenses.approve")}
-                            </Button>
+                          {isPending && isOwner && exp.id != null && (
+                            <>
+                              <Button size="sm" className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] px-3" onClick={() => handleApprove(exp.id as number | string)}>
+                                <CheckCircle2 size={12} className="ms-1" /> {t("expenses.approve")}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-8 rounded-xl border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 font-black text-[11px] px-3" onClick={() => setRejectId(exp.id as number | string)}>
+                                <XCircle size={12} className="ms-1" /> {t("expenses.reject")}
+                              </Button>
+                            </>
                           )}
                           {isOwner ? (
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-muted hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200" onClick={() => setDeleteId(exp.id ?? null)} title={t("expenses.deleteProtected")} >
@@ -287,7 +303,7 @@ const ExpensesPage = () => {
               paginator={paginator}
               onPageChange={(p) => setCurrentPage(p)}
               showSizeChanger={false}
-              locale="ar"
+              locale={paginationLocale}
             />
             <p className="mt-1 text-center text-[10px] font-bold text-muted">
               {t("expenses.pageOf", { page: currentPage, total: totalPages, count: totalCount })}
@@ -341,6 +357,7 @@ const ExpensesPage = () => {
       </Dialog>
 
       <ConfirmDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)} title={t("expenses.deleteTitle")} description={t("expenses.deleteDesc")} onConfirm={handleDelete} confirmText={t("expenses.tryDelete")} cancelText={t("expenses.close")} variant="danger" />
+      <ConfirmDialog open={!!rejectId} onOpenChange={(open) => !open && setRejectId(null)} title={t("expenses.rejectTitle")} description={t("expenses.rejectDesc")} onConfirm={() => { if (rejectId != null) handleReject(rejectId); setRejectId(null); }} confirmText={t("expenses.rejectConfirm")} cancelText={t("expenses.close")} variant="danger" />
     </div>
   );
 };

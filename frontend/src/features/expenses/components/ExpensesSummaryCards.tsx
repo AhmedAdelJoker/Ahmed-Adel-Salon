@@ -1,4 +1,4 @@
-import { Clock, Calendar, TrendingUp, Tag, FileSpreadsheet, ArrowUpRight } from "lucide-react";
+import { Clock, Calendar, TrendingUp, Tag, FileSpreadsheet, ArrowUpRight, Hourglass } from "lucide-react";
 import { PremiumCard } from "@/components/shared/PremiumUI";
 import {
   StatCard as StatCardDisplay,
@@ -7,6 +7,7 @@ import {
 } from "@/components/shared/DisplayComponents";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatCurrency } from "@/lib/core/utils";
+import { useTranslation } from "react-i18next";
 import {
   PieChart,
   Pie,
@@ -40,6 +41,11 @@ export function ExpensesSummaryCards({
   expenseRowsCount,
   onSystemLinkClick,
 }: ExpensesSummaryCardsProps) {
+  const { t } = useTranslation("owner");
+  const pendingCount = Number(summary?.pending_count ?? 0);
+  const pendingTotal = Number(summary?.pending_total ?? 0);
+  const topCategoryName = summary?.top_category || "—";
+
   return (
     <>
       <PremiumCard noPadding className="overflow-hidden border-dashed bg-gradient-to-br from-card via-card to-soft/30">
@@ -49,22 +55,26 @@ export function ExpensesSummaryCards({
               <FileSpreadsheet size={16} />
             </div>
             <div>
-              <h3 className="text-sm font-black text-main">ترابط المصروفات مع النظام</h3>
-              <p className="text-[11px] font-bold text-muted">كل مصروف هو عقدة مالية مرتبطة بباقي الوحدات</p>
+              <h3 className="text-sm font-black text-main">{t("expenses.linkageTitle")}</h3>
+              <p className="text-[11px] font-bold text-muted">{t("expenses.linkageSubtitle")}</p>
             </div>
-            <Badge variant="outline" className="me-auto hidden sm:flex rounded-full bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-black">تكامل تلقائي</Badge>
+            <Badge variant="outline" className="me-auto hidden sm:flex rounded-full bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-black">{t("expenses.autoIntegration")}</Badge>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {SYSTEM_LINKS.map((link) => (
-              <button key={link.label} onClick={() => onSystemLinkClick(link.href)} className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-right hover:border-slate-900 hover:shadow-md transition-all">
+              <button
+                key={link.key}
+                onClick={() => onSystemLinkClick(link.href)}
+                className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-right hover:border-slate-900 hover:shadow-md transition-all"
+              >
                 <div className={cn("h-10 w-10 rounded-xl text-white flex items-center justify-center shrink-0", link.color)}>
                   <link.icon size={18} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-black text-main flex items-center gap-1">
-                    {link.label} <ArrowUpRight size={12} className="text-muted group-hover:text-slate-900 transition-colors" />
+                    {t(`expenses.systemLinks.${link.key}Label`)} <ArrowUpRight size={12} className="text-muted group-hover:text-slate-900 transition-colors" />
                   </div>
-                  <div className="text-[10px] font-bold text-muted leading-tight mt-0.5 line-clamp-2">{link.desc}</div>
+                  <div className="text-[10px] font-bold text-muted leading-tight mt-0.5 line-clamp-2">{t(`expenses.systemLinks.${link.key}Desc`)}</div>
                 </div>
               </button>
             ))}
@@ -73,28 +83,46 @@ export function ExpensesSummaryCards({
       </PremiumCard>
 
       <div data-stats-grid="true">
-        <CurrencyStatCard label="اليوم" value={Number(summary?.today_total ?? 0)} icon={Clock} variant="danger" />
-        <CurrencyStatCard label="هذا الشهر" value={Number(summary?.month_total ?? summary?.total_amount ?? 0)} icon={Calendar} variant="primary" />
-        <CurrencyStatCard label="هذا العام" value={Number(summary?.year_total ?? 0)} icon={TrendingUp} variant="success" />
-        <StatCardDisplay label="أعلى فئة" value={String(summary?.top_category || "—")} icon={Tag} variant="warning" />
+        <CurrencyStatCard label={t("expenses.todayKpi")} value={Number(summary?.today_total ?? 0)} icon={Clock} variant="danger" />
+        <CurrencyStatCard label={t("expenses.monthKpi")} value={Number(summary?.month_total ?? summary?.total_amount ?? 0)} icon={Calendar} variant="primary" />
+        <CurrencyStatCard label={t("expenses.yearKpi")} value={Number(summary?.year_total ?? 0)} icon={TrendingUp} variant="success" />
+        <StatCardDisplay label={t("expenses.topCategoryKpi")} value={String(topCategoryName)} icon={Tag} variant="warning" />
       </div>
+
+      {pendingCount > 0 && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-2 rounded-2xl border border-amber-300/60 bg-amber-50/70 px-4 py-3 text-[11px] font-black text-amber-800"
+        >
+          <Hourglass size={14} className="shrink-0" />
+          <span>{t("expenses.pendingRibbon", { count: pendingCount, amount: formatCurrency(pendingTotal) })}</span>
+          <span className="ms-auto text-[10px] font-bold opacity-80">{t("expenses.pendingRibbonHint")}</span>
+        </div>
+      )}
 
       {summary && (
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
-          <span className="text-muted">العدد الكلي:</span>
-          <Badge className="bg-slate-900 text-white rounded-full px-3 font-black">{summary.count || 0} سجل</Badge>
+          <span className="text-muted">{t("expenses.totalCountLabel")}</span>
+          <Badge className="bg-slate-900 text-white rounded-full px-3 font-black">{summary.count || 0} {t("expenses.recordsSuffix")}</Badge>
           <span className="h-1 w-1 rounded-full bg-border" />
-          <span className="text-muted">الإجمالي:</span>
+          <span className="text-muted">{t("expenses.totalAmountLabel")}</span>
           <span className="font-black text-main">{formatCurrency(summary.total_amount || 0)}</span>
-          {hasActiveFilters && <Badge variant="outline" className="rounded-full bg-amber-50 text-amber-700 border-amber-200 me-2">مفلتر</Badge>}
+          {pendingCount > 0 && (
+            <>
+              <span className="h-1 w-1 rounded-full bg-border" />
+              <span className="text-muted">{t("expenses.pendingCountLabel")}</span>
+              <span className="font-black text-amber-700">{pendingCount} {t("expenses.recordsSuffix")}</span>
+            </>
+          )}
+          {hasActiveFilters && <Badge variant="outline" className="rounded-full bg-amber-50 text-amber-700 border-amber-200 me-2">{t("expenses.filteredBadge")}</Badge>}
         </div>
       )}
 
       {expenseRowsCount > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 min-w-0">
-          <ChartCard className="xl:col-span-3" title="توزيع الفئات" subtitle="نسب المصاريف حسب كل فئة"
-            badge={<Badge variant="outline" className="rounded-full text-[10px] font-black whitespace-nowrap">{categoryData.length} فئات</Badge>}
-            data={categoryData} height={300} emptyTitle="لا توجد فئات بعد" emptyHint="سجّل مصاريف متعددة لرؤية التوزيع">
+          <ChartCard className="xl:col-span-3" title={t("expenses.categoryDistribution")} subtitle={t("expenses.categoryDistributionSub")}
+            badge={<Badge variant="outline" className="rounded-full text-[10px] font-black whitespace-nowrap">{t("expenses.categoriesCount", { count: categoryData.length })}</Badge>}
+            data={categoryData} height={300} emptyTitle={t("expenses.noCategoryData")} emptyHint={t("expenses.noCategoryDataHint")}>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart margin={{ top: 0, right: 0, bottom: 12, left: 0 }}>
                 <Pie data={categoryData} cx="50%" cy="44%" innerRadius={52} outerRadius={78} paddingAngle={3} dataKey="value" stroke="none">
@@ -106,8 +134,8 @@ export function ExpensesSummaryCards({
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard className="xl:col-span-2" title="طرق الدفع" subtitle="قيمة المصاريف لكل وسيلة دفع"
-            data={paymentData} height={300} emptyTitle="لا توجد بيانات دفع" emptyHint="سجّل مصاريف بوسائل دفع مختلفة">
+          <ChartCard className="xl:col-span-2" title={t("expenses.paymentMethodsChart")} subtitle={t("expenses.paymentMethodsChartSub")}
+            data={paymentData} height={300} emptyTitle={t("expenses.noPaymentData")} emptyHint={t("expenses.noPaymentDataHint")}>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={paymentData} margin={{ top: 8, right: 8, left: -8, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />

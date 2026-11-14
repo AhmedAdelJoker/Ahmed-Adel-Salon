@@ -31,10 +31,38 @@ export interface ExpenseRecord {
   [key: string]: unknown;
 }
 
-export interface ExpenseSummary {
-  total: number;
+export interface ExpenseCategorySlice {
+  name: string;
+  /** Arabic label provided by the backend (`expense_label_ar`). */
+  label_ar?: string | null;
+  value: number;
+}
+
+export interface ExpensePaymentSlice {
+  method: string;
+  amount: number;
   count: number;
-  [key: string]: unknown;
+}
+
+/**
+ * Real `/expenses/summary` payload. Money totals are approved-only; pending
+ * is reported separately via pending_total/pending_count. `status_breakdown`
+ * is the only field that includes rejected/pending amounts.
+ */
+export interface ExpenseSummary {
+  total_amount: number;
+  count: number;
+  categories: ExpenseCategorySlice[];
+  payment_breakdown: ExpensePaymentSlice[];
+  pending_total: number;
+  pending_count: number;
+  today_total: number;
+  month_total: number;
+  year_total: number;
+  top_category?: string | null;
+  top_category_ar?: string | null;
+  top_amount: number;
+  status_breakdown: Record<string, { amount: number; count: number }>;
 }
 
 export interface ExpenseFormData {
