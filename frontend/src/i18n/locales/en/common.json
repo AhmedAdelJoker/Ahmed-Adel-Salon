@@ -64,5 +64,9 @@
     "empty": "No data matches the selected filters",
     "success": "File downloaded successfully",
     "failed": "Failed to download the file, please try again"
+  },
+  "actions": {
+    "close": "Close",
+    "securingSession": "Securing the session..."
   }
 }

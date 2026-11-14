@@ -99,14 +99,16 @@ test('?employeeId opens the read-only file and ?edit opens the form', async ({
 
   await login(page);
 
-  // The file: read-only, with the payroll and attendance shortcuts.
+  // The file: the employee's details, and nothing else.
   await page.goto(`/manager/hr?employeeId=${employeeId}`);
   const file = page.getByTestId('employee-quick-view');
   await expect(file).toBeVisible({ timeout: 30000 });
   await expect(file.getByTestId('employee-file-name')).toContainText('هدى سالم');
-  // An editable form here would be a shared link that hands the reader a
-  // save button for someone else's record.
-  await expect(page.getByTestId('employee-file-edit')).toBeVisible();
+  // The card shows the record; it is not a menu of shortcuts to edit,
+  // payroll and attendance. Those live on the employee's row.
+  await expect(file.getByRole('button', { name: /Payroll sheet/i })).toHaveCount(0);
+  await expect(file.getByRole('button', { name: /Attendance record/i })).toHaveCount(0);
+  await expect(file.getByRole('button', { name: /^Edit$/ })).toHaveCount(0);
 
   // The param is consumed once, so the URL does not stay armed.
   await expect(page).not.toHaveURL(new RegExp(`employeeId=${employeeId}`));

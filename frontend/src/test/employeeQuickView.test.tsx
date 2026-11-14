@@ -154,6 +154,46 @@ describe("EmployeeQuickView", () => {
     expect(employeeAttempts).toBe(2);
   });
 
+  it("carries no action buttons -- it shows the record, the row changes it", async () => {
+    /**
+     * The card used to offer edit, payroll and attendance, which made it a
+     * menu wearing a record's clothing: the same employee on screen twice, and
+     * the actions one click from a place that read as a summary.
+     *
+     * The row keeps its own actions -- that is where a change belongs -- so
+     * the card is now only the record.
+     */
+    api.get = vi.fn().mockImplementation((url: string) => {
+      if (url === "/employees/2") {
+        return Promise.resolve({
+          data: {
+            id: 2,
+            fullName: "Ahmed adel",
+            jobTitle: "barber",
+            status: "active",
+            baseSalary: "7000.00",
+          },
+        });
+      }
+      return Promise.resolve({
+        data: { net_salary: 0, metrics: { attendance_percent: 0 } },
+      });
+    });
+
+    renderView();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("employee-file-name")).toHaveTextContent(
+        "Ahmed adel",
+      ),
+    );
+    expect(screen.queryByRole("button", { name: /Payroll sheet/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Attendance record/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Edit$/ })).toBeNull();
+    // The record is still all there.
+    expect(screen.getByText("الراتب وشروط العمل")).toBeTruthy();
+  });
+
   it("renders English labels when the UI language is English", async () => {
     await i18n.changeLanguage("en");
     api.get = vi.fn().mockImplementation((url: string) => {
@@ -183,6 +223,7 @@ describe("EmployeeQuickView", () => {
     );
     expect(screen.getAllByText("Barber").length).toBeGreaterThan(0);
     expect(screen.getByText("Full time")).toBeTruthy();
-    expect(screen.getByRole("dialog", { name: /Employee file/i })).toBeTruthy();
+    // The card is a details card, not a "quick view" menu.
+    expect(screen.getByRole("dialog", { name: /Employee details/i })).toBeTruthy();
   });
 });

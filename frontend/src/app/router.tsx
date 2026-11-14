@@ -62,6 +62,10 @@ function isElectronEnv(): boolean {
 }
 
 function RouteLoader() {
+  // The loader is on screen in the reader's language too: an English user
+  // watching an Arabic "securing the session" while the app boots reads it as
+  // a stuck screen rather than a wait.
+  const { t } = useTranslation("common");
   // Covers the full viewport (100dvh) so no bare canvas shows during:
   // - initial auth check (RequireAuth loading)
   // - lazy route chunk load (Suspense fallback)
@@ -82,7 +86,7 @@ function RouteLoader() {
         <div className="space-y-1 text-center">
           <p className="text-sm font-black text-main">Salon Pro Pro</p>
           <p className="text-xs font-bold tracking-widest text-muted uppercase">
-            جاري تأمين الجلسة...
+            {t("actions.securingSession")}
           </p>
         </div>
       </div>

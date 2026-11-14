@@ -101,11 +101,6 @@ export const EmployeeQuickView = ({
 
   const [employee, setEmployee] = useState<EmployeeRecord | null>(null);
 
-  // This dialog is rendered by UIProvider outside the Router tree, so router
-  // hooks are unavailable here. Hash navigation works for the app's HashRouter.
-  const navigateTo = useCallback((path: string) => {
-    window.location.hash = `#${path}`;
-  }, []);
   const [payroll, setPayroll] = useState<PayrollSnapshot | null>(null);
   const [penalties, setPenalties] = useState<
     Array<{ penalty_amount: number; is_excused: boolean }> | null
@@ -214,7 +209,6 @@ export const EmployeeQuickView = ({
   );
 
   const metrics = payroll?.metrics;
-  const canEdit = employee?.id != null;
   const hasId = employeeId != null && employeeId !== "";
 
   const close = () => onOpenChange?.(false);
@@ -227,24 +221,6 @@ export const EmployeeQuickView = ({
     } catch {
       // Clipboard may be unavailable in restricted contexts; keep the UI quiet.
     }
-  };
-
-  const goEdit = () => {
-    if (!canEdit) return;
-    close();
-    navigateTo(`/manager/hr?edit=${employee.id}`);
-  };
-
-  const goPayroll = () => {
-    if (!hasId) return;
-    close();
-    navigateTo(`/owner/payroll?employeeId=${employeeId}`);
-  };
-
-  const goAttendance = () => {
-    if (!hasId) return;
-    close();
-    navigateTo(`/attendance?employeeId=${employeeId}`);
   };
 
   return (
@@ -586,44 +562,6 @@ export const EmployeeQuickView = ({
                 </section>
               </div>
             )}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-sunken/30 px-4 py-3 sm:px-5">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-lg"
-                onClick={goPayroll}
-                disabled={!hasId}
-              >
-                <Wallet size={14} className="me-1.5" />
-                {t("hr.payrollSheet")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-lg"
-                onClick={goAttendance}
-                disabled={!hasId}
-              >
-                <CalendarDays size={14} className="me-1.5" />
-                {t("hr.attendanceRecord")}
-              </Button>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              className="rounded-lg bg-accent text-content-on-accent hover:opacity-95"
-              onClick={goEdit}
-              disabled={!canEdit}
-              data-testid="employee-file-edit"
-            >
-              <Pencil size={14} className="me-1.5" />
-              {t("hr.edit")}
-            </Button>
           </div>
         </div>
       </DialogContent>

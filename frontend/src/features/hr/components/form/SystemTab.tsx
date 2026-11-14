@@ -154,7 +154,12 @@ export default function SystemTab({
                     <SelectContent className="rounded-xl">
                       {ROLES.map((r) => (
                         <SelectItem key={r.value} value={r.value}>
-                          {r.label}
+                          {/* The access level, in the reader's language: an
+                              English form listing the levels in Arabic told
+                              the owner nothing about what they were granting. */}
+                          {t(`hr.accessRole.${r.value}`, {
+                            defaultValue: r.label,
+                          })}
                         </SelectItem>
                       ))}
                     </SelectContent>
