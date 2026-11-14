@@ -352,6 +352,46 @@ def get_expenses_summary(
     }
 
 
+@router.get("/trend", response_model=dict)
+def get_expenses_trend(
+    months: int = Query(12, ge=3, le=24),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_cashier_manager_owner),
+):
+    """Monthly approved-spend series for the trend chart.
+
+    Dialect-agnostic on purpose: one ranged SUM per month bucket instead of
+    strftime/to_char. The buckets are zero-filled so the chart axis is stable.
+    """
+    _today = salon_now().date()
+    buckets: list[tuple[int, int]] = []
+    for offset in range(months - 1, -1, -1):
+        month = _today.month - offset
+        year = _today.year
+        while month <= 0:
+            month += 12
+            year -= 1
+        buckets.append((year, month))
+
+    series = []
+    for year, month in buckets:
+        start = datetime(year, month, 1)
+        end = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+        approved = db.query(Expense).filter(
+            Expense.expense_date >= start,
+            Expense.expense_date < end,
+            Expense.status == "approved",
+        )
+        total = approved.with_entities(func.sum(Expense.amount)).scalar() or 0
+        count = approved.count()
+        series.append({
+            "month": f"{year}-{month:02d}",
+            "total": float(total),
+            "count": int(count),
+        })
+    return {"months": series}
+
+
 @router.post("", response_model=ExpenseRead, status_code=status.HTTP_201_CREATED)
 def create_expense(
     payload: ExpenseCreate,

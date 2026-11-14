@@ -17,6 +17,12 @@ export const CATEGORIES = [
   "رواتب", "إيجار", "مشتريات", "كهرباء", "مياه", "إنترنت", "صيانة", "تسويق", "ضيافة", "سلف", "أخرى",
 ];
 
+/** Quick date-range chips offered in the ledger toolbar. */
+export type ExpenseQuickRange = "all" | "thisMonth" | "lastMonth" | "thisYear";
+
+/** Whitelisted server-side sort values (see allowlist in expenses router). */
+export type ExpenseSort = "-expense_date" | "-amount" | "title";
+
 export const PAYMENT_METHODS = [
   { value: "cash", label: "نقدي" },
   { value: "card", label: "بطاقة" },

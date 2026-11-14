@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 import api from "@/services/api";
-import type { ExpenseFormData, ExpenseRecord, ExpenseSummary } from "@/types/expenses";
-import { PAYMENT_METHODS, CATEGORY_COLORS } from "@/features/expenses/constants";
+import type { ExpenseFormData, ExpenseRecord, ExpenseSummary, ExpenseTrendPoint } from "@/types/expenses";
+import { PAYMENT_METHODS, CATEGORY_COLORS, type ExpenseQuickRange, type ExpenseSort } from "@/features/expenses/constants";
 
 const PAGE_SIZE = 20;
 const EXPORT_PAGE_SIZE = 200;
@@ -14,6 +14,7 @@ export function useExpensesData(isOwner: boolean) {
   const invoiceInputRef = useRef<HTMLInputElement | null>(null);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [summary, setSummary] = useState<ExpenseSummary | null>(null);
+  const [trend, setTrend] = useState<ExpenseTrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -32,6 +33,8 @@ export function useExpensesData(isOwner: boolean) {
   const [dateTo, setDateTo] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sort, setSort] = useState<ExpenseSort>("-expense_date");
+  const [quickRange, setQuickRange] = useState<ExpenseQuickRange>("all");
   const [formData, setFormData] = useState<ExpenseFormData>({
     title: "", description: "", amount: "", category: "أخرى",
     payment_method: "cash", expense_date: new Date().toISOString().split("T")[0],
@@ -52,8 +55,28 @@ export function useExpensesData(isOwner: boolean) {
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
     if (debouncedSearch) params.q = debouncedSearch;
+    if (sort) params.sort = sort;
     return params;
-  }, [categoryFilter, paymentFilter, statusFilter, dateFrom, dateTo, debouncedSearch]);
+  }, [categoryFilter, paymentFilter, statusFilter, dateFrom, dateTo, debouncedSearch, sort]);
+
+  const onQuickRange = useCallback((range: ExpenseQuickRange) => {
+    setQuickRange(range);
+    setCurrentPage(1);
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const iso = (d: Date) => d.toISOString().split("T")[0];
+    if (range === "all") { setDateFrom(""); setDateTo(""); return; }
+    if (range === "thisMonth") { setDateFrom(iso(new Date(y, m, 1))); setDateTo(iso(now)); return; }
+    if (range === "lastMonth") {
+      setDateFrom(iso(new Date(y, m - 1, 1)));
+      setDateTo(iso(new Date(y, m, 0)));
+      return;
+    }
+    // thisYear
+    setDateFrom(iso(new Date(y, 0, 1)));
+    setDateTo(iso(new Date(y, m, now.getDate())));
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
@@ -65,10 +88,17 @@ export function useExpensesData(isOwner: boolean) {
       const summaryParams: Record<string, unknown> = {};
       if (dateFrom) summaryParams.from_date = dateFrom;
       if (dateTo) summaryParams.to_date = dateTo;
+      // Charts must aggregate the same range as the list, not the current
+      // page — otherwise every page flip redraws them differently. The trend
+      // series is independent (last 12 months) and may not exist on older
+      // backends — a missing endpoint must not break the page.
       const [listRes, summaryRes] = await Promise.all([
         api.get("/expenses", { params }),
         api.get("/expenses/summary", { params: summaryParams }),
       ]);
+      api.get("/expenses/trend", { params: { months: 12 } })
+        .then((res) => { if (Array.isArray(res.data?.months)) setTrend(res.data.months); })
+        .catch(() => { /* trend unavailable — chart hides itself */ });
       const data = listRes.data;
       const items: ExpenseRecord[] = Array.isArray(data) ? data : data.items || data.data || [];
       setExpenses(items);
@@ -155,6 +185,28 @@ export function useExpensesData(isOwner: boolean) {
   }, []);
 
   const handleView = useCallback((exp: ExpenseRecord) => { setViewItem(exp); setIsViewOpen(true); }, []);
+
+  const duplicateExpense = useCallback((exp: ExpenseRecord) => {
+    // Same title/category/amount/method — fresh date, fresh status flow,
+    // invoice kept so the user can clear it with one click if not wanted.
+    setFormData({
+      title: exp.title || "",
+      description: exp.description || "",
+      amount: exp.amount != null ? String(exp.amount) : "",
+      category: exp.category || "أخرى",
+      payment_method: exp.payment_method || "cash",
+      expense_date: new Date().toISOString().split("T")[0],
+      status: "recorded",
+      invoice_image_url: (exp.invoice_image_url as string) || "",
+      recipient_name: (exp.recipient_name as string) || "",
+      reference_type: (exp.reference_type as string) || "",
+      reference_id: exp.reference_id != null ? String(exp.reference_id) : "",
+      internal_notes: "",
+    });
+    setIsEditing(false);
+    setCurrentId(null);
+    setIsModalOpen(true);
+  }, []);
 
   const handleApprove = useCallback(async (id: number | string) => {
     try { await api.post(`/expenses/${id}/approve`); toast.success(t("expenses.approveSuccess")); fetchData(); }
@@ -244,12 +296,12 @@ export function useExpensesData(isOwner: boolean) {
   const totalAmount = expenseRows.reduce((s, e) => s + Number(e.amount || 0), 0);
   const pendingTotal = Number(summary?.pending_total ?? 0);
   const pendingCount = Number(summary?.pending_count ?? 0);
-  const hasActiveFilters = categoryFilter !== "all" || paymentFilter !== "all" || statusFilter !== "all" || !!dateFrom || !!dateTo || !!debouncedSearch;
+  const hasActiveFilters = categoryFilter !== "all" || paymentFilter !== "all" || statusFilter !== "all" || !!dateFrom || !!dateTo || !!debouncedSearch || quickRange !== "all";
 
   return {
     expenses, summary, loading, currentPage, setCurrentPage, totalCount, totalPages, expenseRows, categoryData, paymentData, totalAmount, pendingTotal, pendingCount, hasActiveFilters,
     isModalOpen, setIsModalOpen, isEditing, isSubmitting, deleteId, setDeleteId, uploading, viewItem, isViewOpen, setIsViewOpen,
-    searchTerm, setSearchTerm, categoryFilter, setCategoryFilter, dateFrom, setDateFrom, dateTo, setDateTo, paymentFilter, setPaymentFilter, statusFilter, setStatusFilter,
-    formData, setFormData, invoiceInputRef, fetchData, handleSubmit, handleDelete, handleEdit, handleView, handleApprove, handleReject, handleInvoiceUpload, resetForm, exportToCSV,
+    searchTerm, setSearchTerm, categoryFilter, setCategoryFilter, dateFrom, setDateFrom, dateTo, setDateTo, paymentFilter, setPaymentFilter, statusFilter, setStatusFilter, sort, setSort, quickRange, onQuickRange,
+    formData, setFormData, invoiceInputRef, fetchData, handleSubmit, handleDelete, handleEdit, handleView, handleApprove, handleReject, handleInvoiceUpload, resetForm, exportToCSV, duplicateExpense, trend,
   };
 }

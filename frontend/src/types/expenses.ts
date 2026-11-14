@@ -44,6 +44,13 @@ export interface ExpensePaymentSlice {
   count: number;
 }
 
+export interface ExpenseTrendPoint {
+  /** "YYYY-MM" */
+  month: string;
+  total: number;
+  count: number;
+}
+
 /**
  * Real `/expenses/summary` payload. Money totals are approved-only; pending
  * is reported separately via pending_total/pending_count. `status_breakdown`

@@ -261,3 +261,28 @@ def test_sort_rejects_unknown_field(client, db_session):
     owner_headers = auth_headers(client, "owner8", "Ownerpass8")
     resp = client.get("/api/v1/expenses?sort=-metadata", headers=owner_headers)
     assert resp.status_code == 400
+
+
+def test_trend_endpoint_is_approved_only_and_zero_filled(client, db_session):
+    owner = make_user(db_session, username="owner9", password="Ownerpass9", role="owner")
+    owner_headers = auth_headers(client, "owner9", "Ownerpass9")
+    _seed_cash(db_session, owner.id)
+
+    created = _create_as(
+        client,
+        owner_headers,
+        {"title": "trend-check", "amount": 123.0, "category": "أخرى"},
+    )
+    assert created["status"] == "approved"
+
+    resp = client.get("/api/v1/expenses/trend?months=6", headers=owner_headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert len(body["months"]) == 6
+    current = body["months"][-1]
+    assert current["month"] == __import__("datetime").datetime.now().strftime("%Y-%m")
+    assert current["total"] >= 123.0
+    # Older zero-filled buckets exist and are non-negative
+    for bucket in body["months"]:
+        assert bucket["total"] >= 0
+        assert bucket["count"] >= 0
